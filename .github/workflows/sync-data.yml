@@ -81,10 +81,9 @@ jobs:
               rm -f ".incoming/$j.json"; fail=$((fail+1))
             fi
           done
-          # Never wipe a good feed with a bad fetch: only files that survived
-          # the JSON check are moved into place.
-          for f in .incoming/*.json; do [ -e "$f" ] && mv "$f" "public/$(basename "$f")"; done
-          rmdir .incoming 2>/dev/null || true
+          # Files stay in .incoming until the commit step. That step resets the
+          # worktree to origin/main before copying them in, so a run that races
+          # another can re-apply cleanly instead of pushing a stale parent.
           echo "failed=$fail" >> "$GITHUB_OUTPUT"
           # Nine of nine failing means the upstream moved or the token died —
           # that is worth a red run. A few missing is a partial build upstream.
@@ -99,23 +98,52 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, pathlib, datetime
-          e = pathlib.Path("public/edition.json")
+          e = pathlib.Path(".incoming/edition.json")
           if e.exists():
               d = json.loads(e.read_text())
               print("edition:", d.get("build_date"), "built_at", d.get("built_at"))
-          for f in sorted(pathlib.Path("public").glob("*.json")):
+          for f in sorted(pathlib.Path(".incoming").glob("*.json")):
               print(f"  {f.name:18} {f.stat().st_size/1024:8.1f} KB")
           PY
 
+      # RESET, COPY, COMMIT, PUSH — in that order, and retried.
+      #
+      # The first version staged straight onto the checked-out commit and
+      # pushed. Two runs overlapping (a schedule and a dispatch, seconds apart)
+      # meant the second pushed a parent that no longer existed and was
+      # rejected "fetch first". The data was fine; the job was red for a reason
+      # that had nothing to do with the data.
+      #
+      # Resetting to origin/main immediately before copying makes the job
+      # idempotent: it always writes what it just downloaded onto whatever the
+      # remote currently is, so a loser of the race simply re-applies and wins
+      # the next attempt. Nothing is ever merged, because there is nothing to
+      # merge — the feeds are wholesale replacements, not edits.
       - name: Commit whatever changed
         run: |
           set -eu
           git config user.name  "signal-sync[bot]"
           git config user.email "signal-sync@users.noreply.github.com"
-          git add public/*.json
-          if git diff --cached --quiet; then
-            echo "no change — upstream has not rebuilt since the last sync"
-            exit 0
-          fi
-          git commit -m "data: feeds synced from trading-dashboard $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
-          git push
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            for f in .incoming/*.json; do
+              [ -e "$f" ] || continue
+              cp "$f" "public/$(basename "$f")"
+            done
+            git add public/*.json
+            if git diff --cached --quiet; then
+              echo "no change — upstream has not rebuilt since the last sync"
+              exit 0
+            fi
+            git commit -q -m "data: feeds synced from trading-dashboard $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
+            if git push origin main; then
+              echo "pushed on attempt $attempt"
+              exit 0
+            fi
+            echo "push rejected — another run got there first; re-applying (attempt $attempt)"
+            sleep $((attempt * 5))
+          done
+          echo "::error::could not push after 3 attempts"
+          exit 1
