@@ -1,0 +1,10 @@
+# Copy to .dev.vars for `wrangler dev`. NEVER commit .dev.vars — it is
+# gitignored. For the deployed Worker use `wrangler secret put` instead, which
+# stores these encrypted rather than in any file.
+#
+# Both values already exist as GitHub Actions secrets on
+# caakshayk1-boop/trading-dashboard (TURSO_URL / TURSO_TOKEN). GitHub secrets
+# are write-only, so they have to be read from the Turso dashboard or
+# `turso db tokens create`, not copied out of Actions.
+TURSO_URL=libsql://your-db.turso.io
+TURSO_TOKEN=

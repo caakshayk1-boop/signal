@@ -1,0 +1,121 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# sync-data.yml — pull the nine feeds from the newspaper repo into this one.
+#
+# THIS IS THE FILE THAT DECOUPLES THE TWO PROJECTS.
+#
+# Moving the site to its own repo and its own Worker isolates the DEPLOY: a
+# broken build over there can no longer take this site down, and a thirteenth
+# serverless function can no longer break it silently. It does nothing for the
+# DATA, because nine of the feeds this site reads are build artefacts produced
+# by generate.py in trading-dashboard.
+#
+# The options were: recompute them here (two sources of truth for the same
+# numbers — the worst outcome), fetch them from news.askakshay.com at request
+# time (that site going down takes this one with it, which is the coupling we
+# are removing), or mirror them. This mirrors them.
+#
+# The consequence, stated plainly: if the newspaper build fails, this site
+# keeps serving the LAST GOOD copy of every feed rather than failing with it.
+# Stale is a state this page already handles and labels; gone is not.
+#
+# The API routes are unaffected — they read Turso and Yahoo directly and are
+# live regardless of what either repo's build is doing.
+# ─────────────────────────────────────────────────────────────────────────────
+name: sync data
+
+on:
+  schedule:
+    # 06:40 and 12:40 UTC. The newspaper builds at ~05:30 UTC; the first run
+    # picks it up, the second catches a late or re-run build.
+    #
+    # GitHub SILENTLY DROPS scheduled runs — a green workflow history with
+    # nothing actually having run. That is why there are two, and why the
+    # freshness check below reports age rather than assuming the cron fired.
+    - cron: "40 6 * * *"
+    - cron: "40 12 * * *"
+  workflow_dispatch:
+  push:
+    paths: [".github/workflows/sync-data.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-data
+  cancel-in-progress: false
+
+env:
+  UPSTREAM: caakshayk1-boop/trading-dashboard
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fetched from the upstream repo, not from news.askakshay.com. The repo
+      # is the source of truth and is reachable even when the site is not.
+      # A public repo needs no token; GITHUB_TOKEN is passed anyway so this
+      # keeps working if the upstream is ever made private.
+      - name: Fetch the nine feeds
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p .incoming
+          fail=0
+          for j in alerts conviction edition ipo mandate news pulse screen today; do
+            if gh api "repos/$UPSTREAM/contents/docs/$j.json" \
+                 -H "Accept: application/vnd.github.raw" > ".incoming/$j.json" 2>/dev/null \
+               && [ -s ".incoming/$j.json" ]; then
+              # A 404 body or an HTML error page is still a non-empty file.
+              # Only valid JSON is allowed to replace a good copy.
+              if python3 -c "import json,sys; json.load(open('.incoming/$j.json'))" 2>/dev/null; then
+                printf '  ok    %-12s %s\n' "$j" "$(du -h ".incoming/$j.json" | cut -f1)"
+              else
+                printf '  BAD   %-12s not valid JSON — keeping the copy in this repo\n' "$j"
+                rm -f ".incoming/$j.json"; fail=$((fail+1))
+              fi
+            else
+              printf '  MISS  %-12s upstream did not answer — keeping the copy in this repo\n' "$j"
+              rm -f ".incoming/$j.json"; fail=$((fail+1))
+            fi
+          done
+          # Never wipe a good feed with a bad fetch: only files that survived
+          # the JSON check are moved into place.
+          for f in .incoming/*.json; do [ -e "$f" ] && mv "$f" "public/$(basename "$f")"; done
+          rmdir .incoming 2>/dev/null || true
+          echo "failed=$fail" >> "$GITHUB_OUTPUT"
+          # Nine of nine failing means the upstream moved or the token died —
+          # that is worth a red run. A few missing is a partial build upstream.
+          if [ "$fail" -ge 9 ]; then
+            echo "::error::every feed failed to fetch — check $UPSTREAM still publishes docs/*.json"
+            exit 1
+          fi
+
+      # Age is reported, never asserted, because staleness is upstream's
+      # problem to fix and this job's problem to make visible.
+      - name: Report feed freshness
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, datetime
+          e = pathlib.Path("public/edition.json")
+          if e.exists():
+              d = json.loads(e.read_text())
+              print("edition:", d.get("build_date"), "built_at", d.get("built_at"))
+          for f in sorted(pathlib.Path("public").glob("*.json")):
+              print(f"  {f.name:18} {f.stat().st_size/1024:8.1f} KB")
+          PY
+
+      - name: Commit whatever changed
+        run: |
+          set -eu
+          git config user.name  "signal-sync[bot]"
+          git config user.email "signal-sync@users.noreply.github.com"
+          git add public/*.json
+          if git diff --cached --quiet; then
+            echo "no change — upstream has not rebuilt since the last sync"
+            exit 0
+          fi
+          git commit -m "data: feeds synced from trading-dashboard $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
+          git push

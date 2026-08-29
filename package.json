@@ -1,0 +1,21 @@
+{
+  "name": "signal",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Indian markets in one screen — a live board and a trading signal brief, over a public ledger.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node test/ui.mjs http://127.0.0.1:8787",
+    "test:prod": "node test/ui.mjs $SIGNAL_URL",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.15.7"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1",
+    "wrangler": "^4.42.0"
+  }
+}

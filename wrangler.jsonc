@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "signal",
+  "main": "src/index.js",
+
+  // 2025-04-01 or later matters for two reasons: it turns on
+  // nodejs_compat_populate_process_env (so process.env carries the secrets the
+  // copied handlers read), and it is the baseline the current Static Assets
+  // behaviour is defined against. Do not lower it without reading src/index.js.
+  "compatibility_date": "2026-05-01",
+
+  // node:crypto is used by _db.js (timingSafeEqual, createHmac) and
+  // subscribe.js (createHash), and Buffer by both. All three are provided by
+  // nodejs_compat; without the flag the Worker fails to start, not at runtime.
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    // The Worker runs FIRST and falls through to assets, which is what lets
+    // /api/* be claimed before a static file of the same name could shadow it.
+    "run_worker_first": ["/api/*"],
+    // A hash route (#/markets) never reaches the server, so there is no SPA
+    // rewrite to configure — every real path is a real file.
+    "not_found_handling": "404-page"
+  },
+
+  "observability": { "enabled": true },
+
+  // NO secrets here. TURSO_URL and TURSO_TOKEN are set with
+  // `wrangler secret put`, which stores them encrypted and keeps them out of
+  // git. See README.md.
+  "vars": {
+    "SITE": "signal"
+  }
+}

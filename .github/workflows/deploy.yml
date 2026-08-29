@@ -1,0 +1,53 @@
+# Deploy the Worker, then check the site a browser actually renders.
+#
+# The check is the point. Every widget on this site is JavaScript, and a dead
+# slider or a frozen number leaves a page that still looks finished — which is
+# exactly how a broken deploy survives a green build. test/ui.mjs asserts the
+# behaviour, not the bytes.
+#
+# Needs one secret: CLOUDFLARE_API_TOKEN, scoped to "Edit Cloudflare Workers".
+# Without it this workflow is skipped rather than failed, so the repo is not
+# permanently red before the token is set. See README.md.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**/*.md", "public/*.json"]   # data syncs deploy themselves below
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm }
+
+      - name: Is a Cloudflare token configured?
+        id: gate
+        run: |
+          if [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then echo "go=yes" >> "$GITHUB_OUTPUT"
+          else echo "::warning::CLOUDFLARE_API_TOKEN not set — skipping deploy"; echo "go=no" >> "$GITHUB_OUTPUT"; fi
+
+      - if: steps.gate.outputs.go == 'yes'
+        run: npm ci
+
+      - if: steps.gate.outputs.go == 'yes'
+        name: Deploy the Worker
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # SIGNAL_URL is a repo variable, not a secret — it is a public URL, and
+      # putting it in vars means the log can print which site was checked.
+      - if: steps.gate.outputs.go == 'yes' && vars.SIGNAL_URL != ''
+        name: Check the rendered page
+        run: |
+          npx playwright install chromium --with-deps
+          node test/ui.mjs "${{ vars.SIGNAL_URL }}"
