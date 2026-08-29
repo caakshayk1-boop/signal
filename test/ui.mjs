@@ -196,8 +196,13 @@ try {
   ok("every section is visible", await rp.locator(".b-reveal:not(.in)").count() === 0);
   ok("every chart overlay is visible", await rp.locator(".b-ov:not(.on)").count() === 0);
   ok("the confidence figure is written", /^\d+$/.test((await rp.locator("#dialN").innerText()).trim()));
+  // The assertion is that the FILL STEP RAN, not that every score is positive:
+  // a component genuinely scoring 0 renders a 0% bar, and treating that as
+  // "never filled" is the test inventing a defect. Every bar must carry a
+  // width, and at least one must be non-zero.
   const widths = await rp.locator(".b-crow .tr i").evaluateAll(es => es.map(e => e.style.width));
-  ok("the score bars are filled", widths.length > 0 && widths.every(w => w && w !== "0%"), widths);
+  ok("every score bar was given a width", widths.length > 0 && widths.every(w => !!w), widths);
+  ok("at least one score bar is non-zero", widths.some(w => w && w !== "0%"), widths);
   await rmCtx.close();
 
   /* ── NARROW ──────────────────────────────────────────────────────────── */
