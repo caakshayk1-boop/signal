@@ -27,6 +27,18 @@
 
   "observability": { "enabled": true },
 
+  // CUSTOM DOMAIN — uncomment once DNS for the hostname is in this Cloudflare
+  // account, then `wrangler deploy`. Cloudflare provisions the certificate and
+  // the route itself; there is no A or CNAME record to add by hand for a
+  // Workers custom domain, which is the step people add and then wonder why it
+  // conflicts.
+  //
+  // Do this BEFORE `npm run set-domain <host>` — that flips the page to
+  // index,follow and writes a canonical, and a canonical pointing at a
+  // hostname that does not resolve is a dead end a crawler holds against you.
+  //
+  // "routes": [{ "pattern": "signal.askakshay.com", "custom_domain": true }],
+
   // NO secrets here. TURSO_URL and TURSO_TOKEN are set with
   // `wrangler secret put`, which stores them encrypted and keeps them out of
   // git. See README.md.

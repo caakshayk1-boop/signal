@@ -134,11 +134,21 @@ newspaper.
 deliberately `noindex` — `public/index.html` is otherwise a byte-for-byte
 duplicate of a page already indexed at `news.askakshay.com/next.html`, and
 letting a crawler find both splits the ranking of a page you already own.
-When DNS points here, edit `public/index.html`:
 
-- change `<meta name="robots">` back to `index,follow,max-image-preview:large`
-- restore `<link rel="canonical" href="https://<domain>/">`
-- restore `<meta property="og:url">`
+Uncomment the `routes` block in `wrangler.jsonc`, redeploy, and once the
+hostname actually resolves:
+
+```bash
+npm run set-domain signal.askakshay.com    # or whichever host
+npm run set-domain -- --unset              # to go back
+```
+
+That flips the robots tag and writes `canonical`, `og:url` and absolute image
+URLs together — three tags that have to agree, and a page saying
+`index,follow` while its canonical still points at the other domain is worse
+than either state alone, because it hands the ranking away on purpose. Run it
+only after DNS resolves: a canonical pointing at a hostname that does not
+answer is a dead end a crawler holds against the site.
 
 **4. Optional — deploy from CI.** `.github/workflows/deploy.yml` skips itself
 until `CLOUDFLARE_API_TOKEN` (scoped "Edit Cloudflare Workers") and
