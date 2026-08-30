@@ -642,7 +642,7 @@
       // five are still positive — that is the +0.60% sitting under a "losers"
       // heading. Strongest and weakest; the numbers say whether either is red.
       sec('Strongest five', list(s.top)) +
-      sec('Weakest five', list(s.bottom)));
+      sec('Weakest five', list(s.bottom) + PLKEY));
   }
 
   /* A bottom sheet on a phone, a centred dialog on a desk. <dialog> gives the
@@ -746,8 +746,43 @@
       ${staleMin != null && staleMin > 90 && r.session === 'open' ? `<div class="mk-foot">
         This quote is <b>${dur(staleMin * 60)}</b> old while the exchange is open — the upstream feed
         has not updated it.</div>` : ''}
+      ${/* THE SAME CARD AS EVERYWHERE ELSE.
+          * A board row expands into quote detail — range, session, volume — and
+          * stopped there. For an index or a commodity that is the whole story,
+          * but the gainers, losers and multibagger blocks are COMPANIES, and on
+          * every other surface of this site tapping a company opens its card.
+          * Here it opened a different, smaller thing, so the same tap did two
+          * different things depending on which page you were on.
+          *
+          * Offered only when there is a card to open: the button is drawn from
+          * the row's bare symbol and openStock() is what decides whether that
+          * symbol is in the 750-name screen. */''}
+      ${mkStockSym(r) ? `<div class="mk-more">
+        <button type="button" class="mk-card" data-card="${esc(mkStockSym(r))}">
+          Open the full company card for ${esc(mkStockSym(r))} &rarr;</button>
+      </div>` : ''}
     </div>`;
   };
+
+  /* The board carries indices (^NSEI), futures (GC=F), pairs (USDINR=X) and
+   * plain equities (TCS.NS). Only the last has a company card, and it is the
+   * only shape without one of those markers. */
+  const mkStockSym = r => {
+    const raw = String(r.symbol || '').trim();
+    if (!raw || /[\^=]/.test(raw)) return null;
+    const bare = raw.replace(/\.(NS|BO)$/i, '');
+    return /^[A-Z0-9&-]{2,}$/.test(bare) ? bare : null;
+  };
+
+  /* Delegated, like the row toggle below it: the drawers are built on first
+   * open, so a listener bound at paint time would miss every one of them. */
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('.mk-card[data-card]');
+    if (!b) return;
+    e.preventDefault();
+    e.stopPropagation();
+    openStock(b.dataset.card);
+  });
 
   /* One delegated toggle for every board row on the page. */
   document.addEventListener('click', ev => {
@@ -808,7 +843,7 @@
    * and whether it is stretched on the daily AND the monthly, does. */
   const levelTable = rows => !rows || !rows.length ?
     `<div class="empty">Nothing qualifies today.</div>` :
-    `<div class="rank">
+    PLKEY + `<div class="rank">
       <div class="rank-r lvl-r rank-head">
         <span class="i">#</span><span class="s">Name</span>
         <span class="x">Price</span><span class="x">vs 50D</span><span class="x">vs 200D</span>
@@ -869,8 +904,9 @@
       sec('Where the money went', `<div class="sk" style="height:104px"></div>`) +
       sec('The wire', skel('sk-card', 3)));
 
-    const [t, p, n, m] = await Promise.all(
-      [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets')]);
+    const [t, p, n, m, fl] = await Promise.all(
+      [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets'),
+       get('/api/flows')]);
     /* ── THE HERO ────────────────────────────────────────────────────────
      * The first viewport has to answer four things: what this is, what state
      * the market is in, what to do next, and how long that takes. It replaces
@@ -880,6 +916,11 @@
      * illustration, no number that is not measured elsewhere on the site. */
     const heroMk = m.ok ? (m.data.markets || []) : [];
     const heroNifty = heroMk.find(x => /nifty 50/i.test(x.name || ''));
+    const heroSensex = heroMk.find(x => /sensex/i.test(x.name || ''));
+    // FII and DII net cash flows, straight from NSE. Not in any mirrored feed
+    // — see src/api/flows.js. ok:false means NSE would not answer, and the
+    // block says "Not published" rather than showing a zero.
+    const flow = fl.ok && fl.data && fl.data.ok ? fl.data : null;
     const heroBr = (p.ok ? p.data : {}).breadth || {};
     const adv = Number(heroBr.up), counted = Number(heroBr.counted);
     // "Risk-on / neutral / risk-off" is NOT invented here — it is the breadth
@@ -905,16 +946,40 @@
         </div>
       </div>
       <div class="hero-r">
-        ${heroRegime ? `<div class="hero-reg ${heroRegime[1]}">
-          <span class="k">Market state</span>
-          <span class="v">${heroRegime[0]}</span>
-          <span class="s">${esc(heroRegime[2])} ${Number.isFinite(adv) ? `${adv} of ${counted} names advancing.` : ''}</span>
-        </div>` : ''}
-        ${heroNifty ? `<div class="hero-q">
+        ${/* NIFTY, SENSEX, FLOWS — the three readings, in that order.
+            * The lead slot used to hold a "Market state" badge reading RISK-ON
+            * or NEUTRAL, which is a restatement of the breadth number printed
+            * a few centimetres below it and not a fact about the market that
+            * the market itself reports. The index is. */''}
+        ${heroNifty ? `<div class="hero-reg ${dir(heroNifty.change_pct)}">
           <span class="k">Nifty 50</span>
           <span class="v">${esc(heroNifty.price ?? '—')}</span>
-          <span class="c ${dir(heroNifty.change_pct)}">${pct(heroNifty.change_pct)}</span>
+          <span class="s"><b class="${dir(heroNifty.change_pct)}">${pct(heroNifty.change_pct)}</b> today${
+            Number.isFinite(adv) && Number.isFinite(counted) && counted
+              ? ` · ${adv} of ${counted} screened names advancing` : ''}</span>
         </div>` : ''}
+        ${heroSensex ? `<div class="hero-q">
+          <span class="k">Sensex</span>
+          <span class="v">${esc(heroSensex.price ?? '—')}</span>
+          <span class="c ${dir(heroSensex.change_pct)}">${pct(heroSensex.change_pct)}</span>
+        </div>` : ''}
+        <div class="hero-q hero-fl">
+          <span class="k">FII &amp; DII${flow && flow.date ? ` · ${esc(flow.date)}` : ''}</span>
+          ${flow ? `<span class="fl-r">
+              <b>FII</b>
+              <i class="${dir(flow.fii && flow.fii.net)}">${flow.fii && flow.fii.net != null
+                ? (flow.fii.net > 0 ? '+' : '') + '₹' + Math.round(flow.fii.net).toLocaleString('en-IN') + ' cr'
+                : 'Not published'}</i>
+            </span>
+            <span class="fl-r">
+              <b>DII</b>
+              <i class="${dir(flow.dii && flow.dii.net)}">${flow.dii && flow.dii.net != null
+                ? (flow.dii.net > 0 ? '+' : '') + '₹' + Math.round(flow.dii.net).toLocaleString('en-IN') + ' cr'
+                : 'Not published'}</i>
+            </span>
+            <span class="fl-n">Net cash-market buying, last published session.</span>`
+          : `<span class="fl-n">Not published — NSE did not answer.</span>`}
+        </div>
       </div>
     </section>`;
     if (!t.ok && !p.ok) { paint(out + fail('Today', t.error || p.error)); return; }
@@ -928,10 +993,13 @@
      * same number a second time, 263px lower — measured. A four-tile summary
      * that spends a quarter of itself repeating the line above it is three
      * tiles long. Sensex is the other index an Indian reader checks. */
-    const sensex = mk && (mk.markets || []).find(x => /sensex/i.test(x.name || ''));
     out += sec('The tape', `<div class="grid">
-        ${tile(sensex ? esc(sensex.price) : '—', 'Sensex',
-               sensex ? pct(sensex.change_pct) : 'feed unreachable', sensex ? dir(sensex.change_pct) : '')}
+        ${/* Nifty AND Sensex now sit in the hero, so an index tile here would
+            * be the third printing of the same number on one screen. This slot
+            * carries the thing the indices cannot say: how wide the move was. */''}
+        ${tile(br.down != null ? `${br.down}<span style="color:var(--dim)">/${br.counted}</span>` : '—',
+               'Declining', br.at_52w_low != null ? `${br.at_52w_low} at 52-week lows` : '',
+               br.down > br.up ? 'dn' : '')}
         ${tile(br.up != null ? `${br.up}<span style="color:var(--dim)">/${br.counted}</span>` : '—',
                'Advancing', br.median != null ? `median ${pct(br.median)} on the week` : '',
                br.up > br.down ? 'up' : 'dn')}
@@ -1540,13 +1608,7 @@
               · page ${scrPage + 1} of ${pages}</span>
             <button type="button" class="pg" data-pg="next" ${scrPage >= pages - 1 ? 'disabled' : ''}>Next →</button>
           </div>`;
-          const key = `<p class="pl-key">
-            <span>Each row's line runs from its <b>52-week low</b> to its <b>high</b>:</span>
-            <span><i class="know"></i>price now</span>
-            <span><i class="k200"></i>200-day</span>
-            <span><i class="k50"></i>50-day</span>
-            <span><i class="k20"></i>20-day</span>
-            <span>— the levels these engines trade against.</span></p>`;
+          const key = PLKEY;
           const title = scrPresets.size
             ? [...scrPresets].map(k => PRESETS[k][0]).join(' + ')
             : PRESETS.all[0];
@@ -1634,6 +1696,21 @@
    * carry the 52-week range, 750 carry the 20 and 50-day, 736 the 200-day. A
    * name missing its range gets no line rather than a made-up one.
    */
+  /* THE KEY TO THE LINE, WHEREVER THE LINE IS.
+   *
+   * This legend existed once, at the bottom of the Screen. The same component
+   * is drawn on the sector drill, the ranked idea tables, the movers and the
+   * watchlist, and on every one of those a reader met four unexplained ticks
+   * on a coloured bar. A chart component that needs a key needs it on every
+   * page that draws it, or it is decoration on all but one of them. */
+  const PLKEY = `<p class="pl-key">
+    <span>Each row's line runs from its <b>52-week low</b> to its <b>high</b>:</span>
+    <span><i class="know"></i>price now</span>
+    <span><i class="k200"></i>200-day</span>
+    <span><i class="k50"></i>50-day</span>
+    <span><i class="k20"></i>20-day</span>
+    <span>— the levels these engines trade against.</span></p>`;
+
   const priceLine = r => {
     const n = v => Number.isFinite(Number(v)) ? Number(v) : null;
     const lo = n(r.low52), hi = n(r.high52), px = n(r.price);
@@ -1844,6 +1921,14 @@
     if ((r.roce ?? 0) >= 20) why.push([`Earns ${Math.round(r.roce)}% on capital employed`, 'ROCE, invested capital']);
     if ((r.de ?? 9) <= 0.1) why.push(['Effectively debt-free', `D/E ${r.de}`]);
     const flags = (r.risk?.flags || []);
+    /* yoy() colours by sign, which is right for a growth rate and wrong for a
+     * PE, a current ratio or a tax rate — none of which is "good" for being
+     * positive. fact() states the number and lets the reader judge it. */
+    const fact = (l, v, unit = '%') => v == null || v === '' ? '' :
+      `<div class="yy"><span>${esc(l)}</span><b>${
+        typeof v === 'number' ? Number(v).toFixed(2).replace(/\.00$/, '') : esc(v)
+      }${unit === 'pctile' ? '<i class="u">th pct</i>' : unit ? `<i class="u">${esc(unit)}</i>` : ''}</b></div>`;
+
     const yoy = (l, v, unit = '%') => v == null ? '' :
       `<div class="yy"><span>${esc(l)}</span><b class="${dir(v)}">${v > 0 ? '+' : ''}${Number(v).toFixed(1)}${unit}</b></div>`;
 
@@ -1883,6 +1968,50 @@
           `<div class="read read-against"><b>${esc(f.t)}</b><span>${esc(f.k || '')}</span></div>`).join('')
           : '<p class="hint">No flags raised by the risk screen.</p>'}</div>
       </div>
+      ${/* ── CAPITAL ALLOCATION ───────────────────────────────────────────
+          * The card carried seven composite scores and not one plain fact
+          * about the business: no PE, no book value, no ownership, no balance
+          * sheet, no sign of how many years of accounts any of it rests on.
+          * A screen that says "Quality 82.4" and cannot say what the company
+          * earns on capital is asking to be taken on faith.
+          *
+          * The headline here is the Piotroski F-score, which is already in the
+          * feed as a count out of nine — a real x/9 rather than a number
+          * invented to look like one. It is nine yes/no tests on profitability,
+          * leverage and operating efficiency, and it is the closest thing in
+          * this data to a capital-allocation grade. */''}
+      ${r.piotroski != null ? `<h4 class="sh">Capital allocation</h4>
+      <div class="alloc">
+        <div class="alloc-s">
+          <b>${esc(r.piotroski)}<i>/${esc(r.piotroski_of ?? 9)}</i></b>
+          <span class="alloc-bar"><i style="width:${
+            Math.max(0, Math.min(100, (r.piotroski / (r.piotroski_of || 9)) * 100)).toFixed(0)}%"></i></span>
+          <span class="alloc-l">Piotroski F-score${
+            r.piotroski >= 7 ? ' · strong' : r.piotroski >= 5 ? ' · middling' : ' · weak'}</span>
+        </div>
+        <p class="alloc-n">Nine pass/fail tests on profit, leverage and efficiency.
+          ${r.piotroski >= 7 ? 'Passing seven or more is the band associated with the better half of the market.'
+            : r.piotroski >= 5 ? 'Five or six is unremarkable — it clears no bar and fails none.'
+            : 'Below five is the band this test exists to flag.'}</p>
+      </div>` : ''}
+
+      <h4 class="sh">What you are paying${r.fy_count ? ` <em>· accounts for ${esc(r.fy_count)} year${r.fy_count > 1 ? 's' : ''}</em>` : ''}</h4>
+      <div class="yoy">${fact('Price / earnings', r.pe, '')}${fact('Price / book', r.pb, '')}
+        ${fact('PE vs its own 5-year range', r.pe_pctile, 'pctile')}${fact('Dividend yield', r.div_yield)}</div>
+
+      <h4 class="sh">Balance sheet</h4>
+      <div class="yoy">${fact('Debt / equity', r.de, '')}${fact('Interest cover', r.icover, 'x')}
+        ${fact('Current ratio', r.curr, 'x')}${fact('Tax rate', r.tax)}</div>
+
+      <h4 class="sh">Who owns it</h4>
+      <div class="yoy">${fact('Promoters / insiders', r.insiders)}${fact('Institutions', r.instis)}
+        ${r.shares_changed != null ? `<div class="yy"><span>Share count</span><b class="${r.shares_changed ? 'dn' : 'up'}">${
+          r.shares_changed ? 'Changed — check dilution' : 'Unchanged'}</b></div>` : ''}</div>
+
+      <h4 class="sh">Growth${r.fy_count ? ` <em>· compound, over ${esc(r.fy_count)} years of accounts</em>` : ''}</h4>
+      <div class="yoy">${yoy('Revenue CAGR', r.rev_cagr)}${yoy('EBITDA CAGR', r.ebitda_cagr)}
+        ${yoy('EPS CAGR', r.eps_cagr)}${fact('Earnings momentum', r.em_label, '')}</div>
+
       <h4 class="sh">Latest year on year</h4>
       <div class="yoy">${yoy('Revenue', r.rev_yoy)}${yoy('EBITDA', r.ebitda_yoy)}${yoy('Profit', r.pat_yoy)}
         ${yoy('EPS', r.eps_yoy)}${yoy('EBIT margin', r.margin_delta, 'pt')}</div>
@@ -2059,6 +2188,40 @@
                  `${wins}W / ${losses}L closed`, (wins + losses) && wins / (wins + losses) >= .5 ? 'up' : 'dn')}
           ${tile(closed.length, 'Closed and scored', 'expiries counted as losses')}
         </div>`) +
+        /* ── THE HISTORY THAT WAS BEING HIDDEN ─────────────────────────────
+         * Every figure above counts only from LAUNCH, which is correct — this
+         * site should be judged on what it published, not on what an engine
+         * did before anyone could read it. But two days after launch that
+         * window contains nothing closed, so the page said, in effect, "there
+         * is no record" while the ledger behind it held 80 resolved trades.
+         * A record page that shows nothing is worse than one that shows an
+         * uncomfortable number.
+         *
+         * So both are here, and the difference between them is stated rather
+         * than blurred: the block above is the published record and the block
+         * below is the engine's prior history, which was graded before launch
+         * and is not a claim about this site's live performance. */
+        (() => {
+          const prior = every.filter(r => dayOf(r) < LAUNCH);
+          const H = recordOf(prior);
+          if (!H.trades) return '';
+          const priorOpen = prior.length - H.trades;
+          return sec('Before this site published them', `<div class="grid">
+            ${tile(H.trades, 'Closed trades', 'graded before ' + esc(LAUNCH))}
+            ${tile(H.win_rate != null ? H.win_rate + '%' : '—', 'Win rate',
+                   `${H.wins}W / ${H.losses}L`, H.win_rate >= 50 ? 'up' : 'dn')}
+            ${tile(H.expectancy_r != null ? (H.expectancy_r > 0 ? '+' : '') + H.expectancy_r.toFixed(3) + 'R' : '—',
+                   'Expectancy per trade', 'average R across those trades',
+                   H.expectancy_r > 0 ? 'up' : 'dn')}
+            ${tile(priorOpen, 'Still open from then', 'marked to live prices')}
+          </div>
+          <p class="hint"><b>This is the engine's history, not this site's record.</b>
+            These trades closed before ${esc(LAUNCH)}, when nobody could act on them, and they were
+            graded in a rebuild rather than watched live. They are shown because hiding them would
+            leave this page claiming to have no record at all while ${H.trades} resolved trades sat
+            in the same ledger. Judge the site on the block above; judge the engine on this one.</p>`,
+            `${H.trades} closed`, 'What the engine did before launch, stated as such.');
+        })() +
         `<div class="chips" role="group" aria-label="Signal filter">${chips.map(([k, l]) =>
           `<button type="button" class="chip" data-s="${k}" aria-pressed="${sigFilter === k}">${esc(l)}</button>`).join('')}</div>` +
         sec('Alerts', rows.length ? `<div class="cards-2">${rows.map(card).join('')}</div>`
@@ -2530,6 +2693,13 @@
      * as the engine before this site, with their own dates. */
     const HERE = recordOf(rows.filter(sinceLaunch));
     const H = HERE.trades ? HERE : null;
+    /* THE ENGINE'S PRIOR RECORD, FOR THE VERDICT BELOW.
+     * Two days after launch HERE is empty, so a brief that only cited the
+     * since-launch record could say nothing at all about whether setups like
+     * this one have worked. PRIOR is the same ledger before LAUNCH: 80 closed
+     * trades at the time of writing, and the number is not flattering. That is
+     * exactly why it belongs on the page that asks someone to act. */
+    const PRIOR = recordOf(rows.filter(r => !sinceLaunch(r)));
     const S_ALL = S && S.headline ? S.headline : null;
     /* EVERY FIELD OFF /api/stats IS OPTIONAL.
      * The tiles interpolated H.wins and H.losses straight into the markup, so
@@ -2768,10 +2938,18 @@
                        middling score is the site saying it does not have a strong read, not a
                        softened yes.`
                     : `<b>${Math.round(score)} of 100 — this is a weak setup by this site's own
-                       measure.</b> It appears here because it is the best-scoring signal open right
-                       now, which is not the same as a good one. On a reading this low the honest
-                       answer to "should I take this" is no, or not at this size. What a low score
-                       buys you is a documented reason to skip it.`}
+                       measure.</b> It is here because it is the best-scoring signal open right now,
+                       which is not the same as a good one: the screen ranks what it has, and on a
+                       quiet day the top of a weak field is still a weak field. On a reading this
+                       low the honest answer to "should I take this" is no, or not at this size.${
+                         PRIOR && PRIOR.trades >= 20 && PRIOR.expectancy_r != null
+                           ? ` And the wider evidence agrees: across <b>${PRIOR.trades}</b> signals
+                              this engine has closed, the average outcome is
+                              <b>${PRIOR.expectancy_r > 0 ? '+' : ''}${PRIOR.expectancy_r.toFixed(3)}R</b>
+                              at a <b>${PRIOR.win_rate}%</b> win rate${PRIOR.expectancy_r < 0
+                                ? ' — that is a losing record, and nothing on this page should be read as if it were not'
+                                : ''}.`
+                           : ''}`}
             </p>
             <p class="b-p" style="font-size:13px">The score is the mean of the components that could be
               measured. A component with no data is left out rather than filled in${have.length < COMPS.length
@@ -3672,10 +3850,16 @@
 
   let newsQ = '', newsSrc = '';
   R['/news'] = async () => {
-    const [n, sc] = await Promise.all([get('/news.json'), get('/screen.json')]);
+    const [n, sc, pu] = await Promise.all(
+      [get('/news.json'), get('/screen.json'), get('/pulse.json')]);
     if (!n.ok) { paint(head('The wire', '', 'Every story') + fail('The wire', n.error)); return; }
     const all = Array.isArray(n.data) ? n.data : [];
     const universe = sc.ok ? (sc.data.rows || sc.data.data || []) : [];
+    // Median sector move today, so a matched story can say what its sector did
+    // rather than only which company it named.
+    const secMove = new Map();
+    for (const x of (pu.ok ? (pu.data.sectors_day || pu.data.sectors || []) : []))
+      if (x && x.sector) secMove.set(x.sector, x.r1d ?? x.r1w ?? null);
 
     const draw = () => {
       const q = newsQ.trim().toLowerCase();
@@ -3683,20 +3867,40 @@
         (!newsSrc || (x.source || '') === newsSrc) &&
         (!q || `${x.title} ${x.summary} ${x.source}`.toLowerCase().includes(q)));
       const sources = [...new Set(all.map(x => x.source).filter(Boolean))].sort();
+      const linked = all.filter(x => universe.length && newsMatch(x, universe).length).length;
 
-      const body = rows.length ? `<div class="nw">${rows.map(x => {
+      const body = rows.length ? `<div class="nwg">${rows.map(x => {
         const hits = universe.length ? newsMatch(x, universe) : [];
-        return `<article class="nw-i">
-          <div class="nw-m"><span class="nw-s">${esc(x.source || 'wire')}</span></div>
-          <h3 class="nw-t">${x.link
+        /* THE BADGE STATES A MEASURED FACT, NOT A GRADE.
+         *
+         * The obvious thing to copy here is a LOW / MEDIUM / HIGH IMPACT
+         * chip. This feed carries a headline, a summary, a source and a link
+         * — no timestamp, no clustering, no analysis — so an impact grade
+         * would be a number I made up, printed in the typeface the rest of
+         * this site reserves for measured things. What CAN be established is
+         * whether a story names a company in the 750-name screen, and what
+         * that company and its sector actually did. That is the badge. */
+        const secs = [...new Set(hits.map(h => h.sector).filter(Boolean))];
+        const mv = secs.length === 1 ? secMove.get(secs[0]) : null;
+        return `<article class="nwc">
+          <div class="nwc-h">
+            <span class="nwc-s">${esc(x.source || 'wire')}</span>
+            <span class="nwc-b ${hits.length ? 'is-on' : ''}">${hits.length
+              ? `Names ${hits.length} screened ${hits.length > 1 ? 'companies' : 'company'}`
+              : 'No screened company named'}</span>
+          </div>
+          <h3 class="nwc-t">${x.link
             ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title || '')}</a>`
             : esc(x.title || '')}</h3>
-          ${x.summary ? `<p class="nw-d">${esc(x.summary)}</p>` : ''}
-          ${hits.length ? `<div class="nw-h">
-            <span class="nw-hl">On the screen</span>
-            ${hits.map(r => `<a class="nw-c ${dir(r.r1d)}" href="#/screen"
+          ${x.summary ? `<p class="nwc-d">${esc(x.summary)}</p>` : ''}
+          ${hits.length ? `<div class="nwc-w">
+            <span class="nwc-wl">What it touches</span>
+            <div class="nwc-cs">${hits.map(r => `<a class="nw-c ${dir(r.r1d)}" href="#/screen"
                  title="${esc(r.name || '')} — ${esc(r.sector || '')}">
-               <b>${esc(r.sym)}</b><i>${pct(r.r1d)}</i></a>`).join('')}
+               <b>${esc(r.sym)}</b><i>${pct(r.r1d)}</i></a>`).join('')}</div>
+            ${secs.length ? `<p class="nwc-sec">${esc(secs.join(' · '))}${
+              mv != null ? ` — the sector's median move today is <b class="${dir(mv)}">${pct(mv)}</b>` : ''
+            }.</p>` : ''}
           </div>` : ''}
         </article>`;
       }).join('')}</div>`
@@ -3708,12 +3912,20 @@
                    placeholder="Search headlines, summaries or sources" aria-label="Search the wire">
           </div>
           <div class="chips" role="group" aria-label="Source">
-            <button type="button" class="chip${newsSrc ? '' : ' on'}" data-s="" aria-pressed="${!newsSrc}">All sources</button>
-            ${sources.map(sv => `<button type="button" class="chip${newsSrc === sv ? ' on' : ''}"
+            <button type="button" class="chip" data-s="" aria-pressed="${!newsSrc}">All sources</button>
+            ${sources.map(sv => `<button type="button" class="chip"
                data-s="${esc(sv)}" aria-pressed="${newsSrc === sv}">${esc(sv)}</button>`).join('')}
           </div>`, `${rows.length} of ${all.length}`) +
-        sec('Stories', body, null,
-          'The names under a headline are a text match against the 750-name screen, shown with the move that name actually made — not a view on what the story means.'));
+        sec('Stories', body, `${linked} market-linked`,
+          'A story is linked to a company only when it names it as a proper noun. Everything under a headline here is measured — which names it mentions, and what those names did. Nothing on this page grades a story’s importance, because this feed carries no data that would support it.') +
+        sec('What is not here', `<p class="hint" style="margin-top:0">
+          This wire carries a headline, a summary, a source and a link — and nothing else.
+          There is no timestamp, no story clustering and no analysis in it, so this page cannot
+          show <b>time since publication</b>, <b>“+N more sources”</b>, an <b>impact grade</b>, or a
+          written <b>why it matters</b>. Those exist on news.askakshay.com because they are
+          generated during that site’s daily build and written into its pages; they are not
+          published as a feed, so there is nothing here to mirror. Producing them on this site
+          needs either a feed added to that build, or a language-model key on this Worker.</p>`));
 
       const qi = document.getElementById('nwq');
       if (qi) {
@@ -4044,6 +4256,7 @@
       : `<div class="empty">Nothing starred yet. Open <a href="#/screen" style="color:var(--accent)">Screen</a>
          or any company card and press the star.</div>`,
       syms.length ? `${syms.length} name${syms.length > 1 ? 's' : ''}` : '');
+    if (syms.length) out = out.replace(/<\/section>$/, PLKEY + '</section>');
 
     /* ── ALERTS ─────────────────────────────────────────────────────────── */
     const al = alertsAll();
@@ -4331,49 +4544,106 @@
    *     banner discovered on return is stale news about news.
    */
   (function () {
-    let mine = null, busy = false;
+    /* TWO KINDS OF STALE, AND ONLY ONE OF THEM CAN BE FIXED IN PLACE.
+     *
+     * New DATA needs no reload: every number was fetched after load, so
+     * re-running the refresh picks it up and the reader keeps their scroll,
+     * their filters and their open cards.
+     *
+     * New CODE is the opposite, and this is the case I got wrong. I reasoned
+     * that the service worker is network-first for the shell, so a deploy
+     * would be picked up "on the next navigation" — but this is a hash-routed
+     * SPA and there IS no next navigation. A tab left open runs the
+     * JavaScript it loaded when it opened, for as long as it stays open,
+     * across any number of deploys. Every fix shipped into that window was
+     * invisible to the person looking at the page, and the page said nothing.
+     *
+     * build.json carries a hash of the shell files. It is a .json, so the
+     * service worker's fetch handler skips it and it always comes from the
+     * network. Compared against the hash present when this tab loaded, a
+     * difference means the code on the server is not the code running here.
+     */
+    let edition = null, build = null, busy = false, offered = false;
     const bar = document.getElementById('editionBar');
+    const txt = bar && bar.querySelector('.ed-t');
+    const go  = bar && bar.querySelector('.ed-go');
+
+    const show = (html, withReload) => {
+      if (!bar || !txt) return;
+      txt.innerHTML = html;
+      if (go) go.hidden = !withReload;
+      bar.hidden = false;
+      requestAnimationFrame(() => bar.classList.add('on'));
+    };
+
+    const grab = async url => {
+      const r = await fetch(url + '?t=' + Date.now(), { cache: 'no-store' });
+      return r.ok ? r.json() : null;
+    };
 
     async function check() {
       if (busy) return;
       busy = true;
       try {
-        const r = await fetch('/edition.json?t=' + Date.now(), { cache: 'no-store' });
-        if (!r.ok) return;
-        const j = await r.json();
-        if (!j || !j.build_id) return;
-        if (mine === null) { mine = j.build_id; return; }   // first look: record only
-        if (j.build_id === mine) return;
-        mine = j.build_id;
+        const [ed, bd] = await Promise.all([
+          grab('/edition.json').catch(() => null),
+          grab('/build.json').catch(() => null),
+        ]);
 
-        await refresh(true);                                // the data, swapped in place
-        if (document.visibilityState === 'hidden' || !bar) return;
+        /* CODE FIRST. If the running app is out of date then so is every
+         * conclusion the reader draws from it, including about the data. */
+        if (bd && bd.build) {
+          if (build === null) build = bd.build;             // first look: record
+          else if (bd.build !== build && !offered) {
+            offered = true;
+            // Nothing is lost by reloading a tab nobody is looking at, and a
+            // reader who returns to a stale tab should find it current.
+            // Guarded once per build so a mid-deploy mismatch cannot loop.
+            const KEY = 'sig:reloaded';
+            let tried = null;
+            try { tried = sessionStorage.getItem(KEY); } catch (e) { /* private mode */ }
+            if (document.visibilityState === 'hidden' && tried !== bd.build) {
+              try { sessionStorage.setItem(KEY, bd.build); } catch (e) { /* private mode */ }
+              location.reload();
+              return;
+            }
+            show('<b>This page has been updated.</b> Reload to get the new version — ' +
+                 'nothing you are looking at is lost.', true);
+            return;                                          // code beats data
+          }
+        }
 
-        // Name the edition. "A newer edition is available" gives the reader
-        // nothing to weigh it against and reads as chrome.
-        const w = bar.querySelector('.ed-when');
-        if (w) w.textContent = j.build_date || '';
-        bar.hidden = false;
-        // Next frame, so the transition has a from-state to animate out of.
-        requestAnimationFrame(() => bar.classList.add('on'));
+        if (ed && ed.build_id) {
+          if (edition === null) { edition = ed.build_id; }    // first look: record
+          else if (ed.build_id !== edition) {
+            edition = ed.build_id;
+            await refresh(true);                             // swapped in place
+            if (document.visibilityState === 'hidden') return;
+            show('New edition' + (ed.build_date ? ' · <span class="ed-when">' +
+                 esc(ed.build_date) + '</span>' : '') + ' — this page is now showing it.', false);
+          }
+        }
       } catch (e) {
-        /* offline, or a host serving no edition.json — neither is worth saying */
+        /* offline, or a host serving neither file — neither is worth saying */
       } finally { busy = false; }
     }
 
     if (bar) {
-      const dismiss = bar.querySelector('.ed-x');
-      if (dismiss) dismiss.addEventListener('click', () => {
+      const x = bar.querySelector('.ed-x');
+      if (x) x.addEventListener('click', () => {
         bar.classList.remove('on');
         setTimeout(() => { bar.hidden = true; }, 280);
       });
+      if (go) go.addEventListener('click', () => location.reload());
     }
     document.addEventListener('visibilitychange', () => {
-      // Coming back to the tab in the morning is exactly when this has changed.
+      // Coming back to the tab is exactly when this has changed.
       if (document.visibilityState === 'visible') check();
     });
     check();
-    setInterval(check, 10 * 60 * 1000);
+    // Two minutes, not ten: this is now the mechanism that decides whether a
+    // reader is looking at the current site at all.
+    setInterval(check, 2 * 60 * 1000);
   })();
 
   /* ── theme ─────────────────────────────────────────────────────────────── */

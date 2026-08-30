@@ -2304,3 +2304,80 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 .b-verdict.is-mid{border-left-color:var(--b-gold)}
 .b-verdict.is-lo{border-left-color:var(--b-bear)}
 @media(max-width:700px){.b-verdict{font-size:13.5px;padding:12px 13px}}
+
+/* The reload action. Present only when the page cannot fix itself in place —
+   a new build — and absent for a new data edition, which needs no action. */
+.ed-go{flex:none;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);
+  font:600 11.5px/1 var(--ui);padding:7px 13px;border-radius:99px;cursor:pointer}
+.ed-go:hover{filter:brightness(1.08)}
+.ed-t b{font-weight:600}
+
+/* FII & DII in the hero. Two rows and a caption — the flows are a pair and
+   mean nothing apart: FII selling into DII buying is a different market from
+   both selling. */
+.hero-fl{display:block}
+.fl-r{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:5px}
+.fl-r b{font:500 11px/1.3 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.fl-r i{font:600 15px/1.2 var(--mono);font-style:normal;font-variant-numeric:tabular-nums;color:var(--text)}
+.fl-r i.up{color:var(--up)} .fl-r i.dn{color:var(--down)}
+.fl-n{display:block;margin-top:8px;font:400 11px/1.45 var(--ui);color:var(--dim)}
+.hero-reg .s b.up{color:var(--up)} .hero-reg .s b.dn{color:var(--down)}
+
+/* ── CAPITAL ALLOCATION ───────────────────────────────────────────────────
+   A real x/9, not a number styled to look like a grade. The count and the
+   denominator are one unit, so the denominator is set smaller and tighter
+   rather than given equal weight. */
+.alloc{border:1px solid var(--line);border-radius:10px;padding:14px 15px;background:var(--surface)}
+.alloc-s{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.alloc-s > b{font:600 30px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text);
+  letter-spacing:-.02em}
+.alloc-s > b i{font:500 16px/1 var(--mono);font-style:normal;color:var(--dim)}
+.alloc-bar{flex:1 1 120px;min-width:90px;height:6px;border-radius:3px;background:var(--line);
+  overflow:hidden}
+.alloc-bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.alloc-l{font:500 11px/1 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.alloc-n{margin:10px 0 0;font:400 12.5px/1.55 var(--ui);color:var(--muted);max-width:62ch}
+.sh em{font-style:normal;font-weight:400;color:var(--dim);
+  font-family:var(--mono);font-size:.72em;letter-spacing:.04em}
+.yy b i.u{font:400 .72em/1 var(--mono);font-style:normal;color:var(--dim);margin-left:3px}
+@media(max-width:700px){
+  .alloc-s > b{font-size:26px}
+  .alloc-bar{flex-basis:100%;order:3}
+}
+
+/* ── THE WIRE AS A BOARD ──────────────────────────────────────────────────
+   A grid of cards rather than a reading column: eighteen stories scanned for
+   the two or three that touch something you hold is a scanning task, and a
+   single column makes scanning into scrolling. */
+.nwg{display:grid;grid-template-columns:repeat(auto-fill,minmax(288px,1fr));gap:14px}
+.nwc{border:1px solid var(--line);border-radius:12px;padding:16px 17px;background:var(--surface);
+  display:flex;flex-direction:column}
+.nwc-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.nwc-s{font:500 10.5px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+/* The badge reports linkage, which is measured — not importance, which is not. */
+.nwc-b{font:500 10px/1 var(--mono);letter-spacing:.05em;text-transform:uppercase;
+  border:1px solid var(--line2);color:var(--dim);border-radius:4px;padding:4px 7px}
+.nwc-b.is-on{border-color:var(--accent);color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.nwc-t{font:400 17.5px/1.32 var(--serif);letter-spacing:-.01em;margin:0 0 7px;text-wrap:balance}
+.nwc-t a{color:var(--text);text-decoration:none}
+.nwc-t a:hover{color:var(--accent);text-decoration:underline}
+.nwc-d{font:400 13.5px/1.55 var(--ui);color:var(--muted);margin:0 0 12px}
+.nwc-w{margin-top:auto;padding-top:12px;border-top:1px solid var(--line)}
+.nwc-wl{display:block;font:500 9.5px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:8px}
+.nwc-cs{display:flex;flex-wrap:wrap;gap:6px}
+.nwc-sec{margin:9px 0 0;font:400 12px/1.5 var(--ui);color:var(--dim)}
+.nwc-sec b.up{color:var(--up)} .nwc-sec b.dn{color:var(--down)}
+@media(max-width:700px){
+  .nwg{grid-template-columns:1fr;gap:12px}
+  .nwc-t{font-size:17px}
+  .nwc-wl{font-size:10.5px}
+}
+
+/* The board row's route into the full company card. */
+.mk-more{grid-column:1/-1;margin-top:4px}
+.mk-card{width:100%;text-align:left;border:1px solid var(--line2);background:var(--bg);
+  color:var(--accent);font:500 12.5px/1 var(--ui);padding:11px 13px;border-radius:8px;
+  cursor:pointer;min-height:40px}
+.mk-card:hover{background:var(--raised);border-color:var(--accent)}
