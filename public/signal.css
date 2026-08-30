@@ -1699,3 +1699,20 @@ body::before{display:none}
   .b-lvl-val{font-size:11.5px}
   .b-lvl-line{min-width:0}
 }
+
+/* ── PAGER ────────────────────────────────────────────────────────────────
+   750 rows are paginated rather than capped: the page size stays 40 because
+   one page is exactly one quote request, so every visible row can carry a
+   live mark. Before this, rows 41-750 were simply unreachable while the
+   header said "750 of 750". */
+.pager{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.pg{background:none;border:1px solid var(--line2);border-radius:8px;cursor:pointer;
+  color:var(--text);font:500 13px/1 var(--ui);padding:0 14px;min-height:40px;
+  transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease)}
+.pg:hover:not(:disabled){background:var(--raised)}
+.pg:disabled{opacity:.38;cursor:default}
+.pg-n{font:400 12.5px/1.5 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums;
+  text-align:center;flex:1 1 auto;min-width:0}
+.pg-n b{color:var(--text);font-weight:500}
+@media(max-width:520px){.pg-n{order:-1;flex-basis:100%}}

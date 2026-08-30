@@ -294,17 +294,15 @@ try {
 
   await p.goto(SITE + "#/signals", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE);
-  /* The curve needs graded R multiples, which only the LIVE ledger carries —
-   * the build-time snapshot does not record them. So a deployment without
-   * Turso configured legitimately has no curve, and the test asserts the
-   * explanation instead of the chart. It never just passes quietly: it says
-   * which of the two it checked. */
-  const hasLedger = await p.evaluate(async () => {
-    try { return (await (await fetch("/api/health")).json()).turso_configured === true; }
-    catch { return false; }
-  });
-  if (hasLedger) {
-    ok("the cumulative-R curve is drawn", await p.locator(".rc-line").count() === 1);
+  /* THE CURVE IS SCOPED TO LAUNCH, so it is legitimately empty until a signal
+   * published on or after that date closes. The assertion is therefore not
+   * "a chart exists" but "the section is honest": either it draws the curve
+   * with a working crosshair, or it explains why there is none AND discloses
+   * the pre-launch history rather than quietly dropping it. Gating on Turso
+   * alone was wrong — a configured ledger with nothing closed yet is the
+   * normal state of a record that has just started. */
+  const drewCurve = await p.locator(".rc-line").count() === 1;
+  if (drewCurve) {
     ok("the curve prints its end value",
        /[+-]?\d+\.\d+R/.test(await p.locator(".rc-end").innerText()));
     const rcBox = await p.locator("#rcHit").boundingBox();
@@ -312,10 +310,11 @@ try {
     await p.waitForTimeout(300);
     ok("the curve has a working crosshair", await p.locator("#rcT.on").count() === 1);
   } else {
-    console.log("  NOTE  no ledger on this deployment (Turso not configured)");
     const t = await p.locator("main").innerText();
-    ok("the missing curve is explained, not omitted",
-       /No graded R multiples are available/.test(t) && /left out rather than drawn/.test(t));
+    console.log("  NOTE  no closed trades since launch — checking the explanation instead");
+    ok("the empty curve says the record starts here", /The record starts here/.test(t));
+    ok("the pre-launch history is disclosed, not dropped",
+       /Before this site existed/.test(t) || /did not answer/.test(t));
   }
 
   ok("the manifest is linked", await p.locator('link[rel="manifest"]').count() === 1);

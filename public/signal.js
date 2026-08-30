@@ -384,6 +384,36 @@
     return { ok: true, rows, live: false, error: live.error };
   }
 
+  /* ── THE SCREEN INDEX ────────────────────────────────────────────────────
+   * symbol → its row on the 750-name screen. Built once and reused, so the
+   * 237 KB (gzipped) feed is fetched at most once per session however many
+   * routes want a technical field.
+   *
+   * Loaded AFTER the table has painted, never before: the columns are already
+   * in the markup showing em dashes, so filling them shifts nothing, and a
+   * page that waits on a quarter-megabyte before showing the movers is a worse
+   * page than one that shows them and completes itself a moment later. */
+  window.__SCRIDX = null;
+  async function screenIndex() {
+    if (window.__SCRIDX) return window.__SCRIDX;
+    if (!SCREEN) {
+      const r = await get('/screen.json');
+      if (!r.ok) return null;
+      SCREEN = (r.data.rows || []).filter(x => x && x.sym);
+    }
+    const idx = {};
+    for (const r of SCREEN) idx[r.sym] = r;
+    window.__SCRIDX = idx;
+    return idx;
+  }
+
+  /* Repaint any level table in place once the index is available. */
+  async function fillLevels(render) {
+    if (window.__SCRIDX) return;              // already joined on first paint
+    const idx = await screenIndex();
+    if (idx && typeof render === 'function') render();
+  }
+
   /* ── shared widgets ────────────────────────────────────────────────────── */
 
   // Five steps each way, on the sector's own median. A continuous ramp reads
@@ -621,8 +651,14 @@
         <span class="x">RSI 14D</span><span class="x">RSI 1M</span><span class="m">1W</span>
       </div>
       ${rows.map((r, i) => {
-        const v50 = r.sma50 ? (r.price - r.sma50) / r.sma50 * 100 : null;
-        const v200 = r.sma200 ? (r.price - r.sma200) / r.sma200 * 100 : null;
+        /* The movers feed carries sym, name, price, sector, r1w, r1m and
+         * turnover — and NOT sma50, sma200, rsi or rsi_m. Four of this table's
+         * eight columns were therefore permanently em dashes on the markets
+         * page. The values exist: every one is on the 750-name screen, keyed by
+         * the same symbol. fillLevels() joins them in after paint. */
+        const sc = (window.__SCRIDX && window.__SCRIDX[r.sym]) || r;
+        const v50 = sc.sma50 && sc.price ? (sc.price - sc.sma50) / sc.sma50 * 100 : null;
+        const v200 = sc.sma200 && sc.price ? (sc.price - sc.sma200) / sc.sma200 * 100 : null;
         const hot = v => v == null ? 'var(--dim)' : v > 70 ? 'var(--warn)' : v < 35 ? 'var(--accent)' : 'var(--dim)';
         return `<div class="rank-r lvl-r" data-sym="${esc(r.sym)}" role="button" tabindex="0">
           <span class="i">${i + 1}</span>
@@ -630,8 +666,8 @@
           <span class="x" data-px>₹${esc(r.price ?? '—')}</span>
           <span class="x ${dir(v50)}">${v50 == null ? '—' : pct(v50)}</span>
           <span class="x ${dir(v200)}">${v200 == null ? '—' : pct(v200)}</span>
-          <span class="x" style="color:${hot(r.rsi)}">${r.rsi != null ? Math.round(r.rsi) : '—'}</span>
-          <span class="x" style="color:${hot(r.rsi_m)}">${r.rsi_m != null ? Math.round(r.rsi_m) : '—'}</span>
+          <span class="x" style="color:${hot(sc.rsi)}">${sc.rsi != null ? Math.round(sc.rsi) : '—'}</span>
+          <span class="x" style="color:${hot(sc.rsi_m)}">${sc.rsi_m != null ? Math.round(sc.rsi_m) : '—'}</span>
           <span class="m ${dir(r.r1w)}">${pct(r.r1w)}</span>
         </div>`; }).join('')}</div>`;
 
@@ -913,11 +949,16 @@
         'Forty-six instruments, each with the year behind it.');
     } else { out += sec('The board', fail('The live board', tk.error)); }
 
-    out += sec('Biggest movers, one week', levelTable((pu.movers_up || []).slice(0, 8)),
-      '', 'What actually moved, over a week rather than a day.');
-    out += sec('Biggest fallers, one week', levelTable((pu.movers_dn || []).slice(0, 8)),
-      '', 'The other half of the same week.');
-    paint(out);
+    const movers = () =>
+      sec('Biggest movers, one week', levelTable((pu.movers_up || []).slice(0, 8)),
+        '', 'What actually moved, over a week rather than a day.') +
+      sec('Biggest fallers, one week', levelTable((pu.movers_dn || []).slice(0, 8)),
+        '', 'The other half of the same week.');
+    const before = out;
+    paint(out + movers());
+    // Then join the technical columns and repaint those two tables in place.
+    // The markup is identical apart from four cells, so nothing moves.
+    fillLevels(() => { if (routeOf() === '/markets') paint(before + movers()); });
   };
 
   R['/ideas'] = async () => {
@@ -1034,7 +1075,7 @@
    * which is the whole reason the digest exists and why both can coexist.
    */
   let SCREEN = null;
-  let scrQ = '', scrPreset = 'all', scrSort = 'comp';
+  let scrQ = '', scrPreset = 'all', scrSort = 'comp', scrPage = 0;
   const PRESETS = {
     all:        ['Everything',     () => true],
     breakout:   ['Breaking out',   r => (r.setup?.tags || []).some(t => /BREAKOUT/.test(t))],
@@ -1088,21 +1129,50 @@
         // page is exactly one request and every visible row can carry a live
         // mark. A 60-row page would leave a third of the screen showing the
         // morning close beside two thirds showing live — worse than either.
-        sec(PRESETS[scrPreset][0], rows.length ? screenTable(rows.slice(0, 40))
-          : `<div class="empty">Nothing matches. Try a different preset or clear the search.</div>`,
-          `${rows.length} of ${SCREEN.length}`));
+        (() => {
+          /* PAGINATED, NOT CAPPED. The page size stays 40 for the reason above
+           * — one page is exactly one quote request, so every visible row can
+           * carry a live mark. What was wrong was that rows 41 to 750 were
+           * simply unreachable: the header said "750 of 750" while the table
+           * showed forty, which reads as a broken table rather than a page. */
+          const PER = 40;
+          const pages = Math.max(1, Math.ceil(rows.length / PER));
+          if (scrPage >= pages) scrPage = 0;          // a filter change shortens the list
+          const from = scrPage * PER;
+          const page = rows.slice(from, from + PER);
+          const nav = pages < 2 ? '' : `<div class="pager">
+            <button type="button" class="pg" data-pg="prev" ${scrPage === 0 ? 'disabled' : ''}>← Previous</button>
+            <span class="pg-n">Showing <b>${from + 1}–${Math.min(from + PER, rows.length)}</b>
+              of <b>${rows.length}</b>${rows.length !== SCREEN.length ? ` matching (of ${SCREEN.length})` : ''}
+              · page ${scrPage + 1} of ${pages}</span>
+            <button type="button" class="pg" data-pg="next" ${scrPage >= pages - 1 ? 'disabled' : ''}>Next →</button>
+          </div>`;
+          return sec(PRESETS[scrPreset][0], rows.length ? screenTable(page) + nav
+            : `<div class="empty">Nothing matches. Try a different preset or clear the search.</div>`,
+            `${rows.length} of ${SCREEN.length}`);
+        })());
+
+      main.querySelectorAll('.pg').forEach(b => b.addEventListener('click', () => {
+        scrPage += b.dataset.pg === 'next' ? 1 : -1;
+        draw();
+        // Back to the top of the table, not the top of the document: the reader
+        // is paging through a list, not starting the page again.
+        const t = main.querySelector('.rank, .scr');
+        if (t) window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 90,
+                                 behavior: REDUCED ? 'auto' : 'smooth' });
+      }));
 
       const inp = main.querySelector('#scrq');
       inp.addEventListener('input', () => {
         // Coalesced: 750 rows re-filtered on every keystroke is 750 rows of
         // work per keystroke, and the phone feels it.
         clearTimeout(inp._t);
-        inp._t = setTimeout(() => { scrQ = inp.value; const at = inp.selectionStart; draw();
+        inp._t = setTimeout(() => { scrQ = inp.value; scrPage = 0; const at = inp.selectionStart; draw();
           const n = main.querySelector('#scrq'); n.focus(); n.setSelectionRange(at, at); }, 160);
       });
       main.querySelector('#scrs').addEventListener('change', e => { scrSort = e.target.value; draw(); });
       main.querySelectorAll('.chip').forEach(b =>
-        b.addEventListener('click', () => { scrPreset = b.dataset.p; draw(); }));
+        b.addEventListener('click', () => { scrPreset = b.dataset.p; scrPage = 0; draw(); }));
       main.querySelectorAll('[data-sym]').forEach(el =>
         el.addEventListener('click', () => openStock(el.dataset.sym)));
 
@@ -1276,11 +1346,25 @@
      * page says so rather than showing an empty table that reads as a fault.
      */
     const LAUNCH = '2026-08-29';
+
     const dayOf = r => String(r.alert_date || r.date || '').slice(0, 10);
     const every = a.rows;
-    // From the WHOLE ledger, not this page's launch window: a performance
-    // curve that starts today is not a performance curve.
-    const CURVE = rCurve(every);
+    /* THE CURVE FOLLOWS THE SAME LAUNCH WINDOW AS THE REST OF THE PAGE.
+     *
+     * It was drawn from the whole ledger and ended at −24.86R over 80 closed
+     * trades, on a page whose every other figure counts only from LAUNCH. Two
+     * different populations under one heading is the kind of inconsistency
+     * that makes a reader distrust both numbers, and rightly.
+     *
+     * Today that means an EMPTY curve: 25 signals are open and none has
+     * closed. So the section says so. An empty record at the start is the
+     * truthful state of a record that starts today, and it will fill itself
+     * as positions close. The pre-launch history is not deleted — it is
+     * summarised below with its own dates attached, so nothing is hidden and
+     * nothing is passed off as this site's own result. */
+    const sinceLaunch = r => String(r.closed_at || r.date || '').slice(0, 10) >= LAUNCH;
+    const CURVE = rCurve(every.filter(sinceLaunch));
+    const PRIOR = rCurve(every.filter(r => !sinceLaunch(r)));
     const all = every.filter(r => dayOf(r) >= LAUNCH);
 
     // Filter on the row's OWN badge, not on arithmetic over pnl_pct.
@@ -1364,11 +1448,22 @@
          * to include it rather than data that is not there. */
         (CURVE ? sec('Cumulative R', rCurveHtml(CURVE), `${CURVE.used} closed`,
           'Every closed signal, in the order it closed.')
-         : sec('Cumulative R', `<div class="empty">No graded R multiples are available${
-            a.live ? ' — fewer than five closed signals carry one'
-                   : ', because the live ledger did not answer and the morning snapshot does not record them'
-           }. The curve is left out rather than drawn from an assumed value.</div>`,
-          '', 'Every closed signal, in the order it closed.')) +
+         : sec('Cumulative R', `<div class="empty" style="text-align:left;padding:22px 20px">
+            <b style="color:var(--text)">The record starts here.</b><br>
+            ${a.live
+              ? `No signal published since ${esc(LAUNCH)} has closed yet, so there is no curve to
+                 draw. It appears the moment one does, and every closed trade after that adds a
+                 point — up or down.`
+              : `The live ledger did not answer, and the morning snapshot does not record graded
+                 R multiples, so the curve cannot be drawn from it.`}
+            ${PRIOR ? `<br><br><span style="color:var(--dim)">Before this site existed the same
+              engines closed <b style="color:var(--muted)">${PRIOR.used}</b> graded trades, ending
+              at <b style="color:var(--muted)">${PRIOR.end >= 0 ? '+' : ''}${PRIOR.end.toFixed(2)}R</b>
+              between ${esc(PRIOR.pts[0].t)} and ${esc(PRIOR.pts[PRIOR.pts.length - 1].t)}. That
+              history is real and is not deleted, but it was produced under a different
+              configuration and a ledger that has been re-graded twice, so it is not counted as
+              this site's record.</span>` : ''}
+          </div>`, '', 'Every closed signal, in the order it closed.')) +
         sec('The record', `<div class="grid">
           ${tile(all.length, 'Signals published', 'since ' + esc(LAUNCH), 'ac')}
           ${tile(opens.length, 'Still open', 'marked to live prices')}
@@ -2708,12 +2803,40 @@
    * build writes. It is a summary in the header and the full table behind a
    * click — the detail belongs on Methodology, not in the chrome.
    */
+  /* ONLY THE DATASETS THIS SITE ACTUALLY RENDERS.
+   *
+   * data-health.json is the newspaper's artefact and describes twelve
+   * datasets, most of which belong to a different product — Careers, Podcasts,
+   * Smart Reads, Fund screen. Two of the three it was reporting as degraded
+   * were feeds nothing on this site reads, so the header said "9/12 current"
+   * about a site whose own data was fine.
+   *
+   * A freshness badge that counts other people's data is worse than no badge:
+   * it is a number that looks like it means something about the page you are
+   * on. Scoped to what this site serves, and anything not on the list is
+   * ignored rather than counted against us. */
+  const OUR_DATASETS = [
+    /signal ledger/i,      // the alerts and the record
+    /stock screen/i,       // screen.json — Screen, Ideas, Brief
+    /^markets$/i,          // the board
+    /trade ideas/i,        // today.json
+    /new listings/i,       // ipo.json — the IPO route
+    /world news/i,         // news.json — the wire on Today
+  ];
   let HEALTH = null;
   async function paintFreshness() {
     const r = await get('/data-health.json');
     const btn = document.getElementById('freshBtn');
     if (!r.ok || !btn) return;
-    HEALTH = r.data;
+    const all = (r.data.datasets || []);
+    const mine = all.filter(d => OUR_DATASETS.some(re => re.test(String(d.dataset || ''))));
+    // If the artefact ever renames its datasets, showing NOTHING is safer than
+    // silently reporting 0/0 as though everything were broken.
+    if (!mine.length) return;
+    const isCurrent = d => /current|live|fresh|ok/i.test(String(d.status || ''));
+    HEALTH = { ...r.data, datasets: mine,
+               current: mine.filter(isCurrent).length, total: mine.length,
+               skipped: all.length - mine.length };
     const cur = Number(HEALTH.current), tot = Number(HEALTH.total);
     if (!Number.isFinite(cur) || !Number.isFinite(tot)) return;
     btn.hidden = false;
@@ -2724,9 +2847,11 @@
     btn.onclick = () => {
       const ds = HEALTH.datasets || [];
       sheet('Data freshness', `
-        <p class="sheet-p">Every dataset this site renders, when it last updated, and how
+        <p class="sheet-p">Every dataset <b>this site</b> renders, when it last updated, and how
           often it is supposed to. A dataset that is behind is listed as behind — the page
-          that uses it still says so at the point of use.</p>
+          that uses it still says so at the point of use.${HEALTH.skipped
+            ? ` ${HEALTH.skipped} other feeds exist in the source artefact and are not counted here,
+                because nothing on this site reads them.` : ''}</p>
         <div class="board" style="margin-top:14px">
           ${ds.map(d => `<div class="board-row">
             <span class="n">${esc(d.dataset || '')}<br>
