@@ -1357,8 +1357,18 @@
         return;
       }
       main.innerHTML = base +
+        /* A missing curve is EXPLAINED, not omitted. It needs graded R
+         * multiples, and the build-time snapshot this page falls back to when
+         * the live ledger is unreachable does not carry them — so on that path
+         * the section would simply vanish, which reads as a page that forgot
+         * to include it rather than data that is not there. */
         (CURVE ? sec('Cumulative R', rCurveHtml(CURVE), `${CURVE.used} closed`,
-          'Every closed signal, in the order it closed.') : '') +
+          'Every closed signal, in the order it closed.')
+         : sec('Cumulative R', `<div class="empty">No graded R multiples are available${
+            a.live ? ' — fewer than five closed signals carry one'
+                   : ', because the live ledger did not answer and the morning snapshot does not record them'
+           }. The curve is left out rather than drawn from an assumed value.</div>`,
+          '', 'Every closed signal, in the order it closed.')) +
         sec('The record', `<div class="grid">
           ${tile(all.length, 'Signals published', 'since ' + esc(LAUNCH), 'ac')}
           ${tile(opens.length, 'Still open', 'marked to live prices')}

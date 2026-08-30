@@ -287,13 +287,29 @@ try {
 
   await p.goto(SITE + "#/signals", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE);
-  ok("the cumulative-R curve is drawn", await p.locator(".rc-line").count() === 1);
-  ok("the curve prints its end value",
-     /[+-]?\d+\.\d+R/.test(await p.locator(".rc-end").innerText()));
-  const rcBox = await p.locator("#rcHit").boundingBox();
-  await p.mouse.move(rcBox.x + rcBox.width * 0.55, rcBox.y + rcBox.height / 2);
-  await p.waitForTimeout(300);
-  ok("the curve has a working crosshair", await p.locator("#rcT.on").count() === 1);
+  /* The curve needs graded R multiples, which only the LIVE ledger carries —
+   * the build-time snapshot does not record them. So a deployment without
+   * Turso configured legitimately has no curve, and the test asserts the
+   * explanation instead of the chart. It never just passes quietly: it says
+   * which of the two it checked. */
+  const hasLedger = await p.evaluate(async () => {
+    try { return (await (await fetch("/api/health")).json()).turso_configured === true; }
+    catch { return false; }
+  });
+  if (hasLedger) {
+    ok("the cumulative-R curve is drawn", await p.locator(".rc-line").count() === 1);
+    ok("the curve prints its end value",
+       /[+-]?\d+\.\d+R/.test(await p.locator(".rc-end").innerText()));
+    const rcBox = await p.locator("#rcHit").boundingBox();
+    await p.mouse.move(rcBox.x + rcBox.width * 0.55, rcBox.y + rcBox.height / 2);
+    await p.waitForTimeout(300);
+    ok("the curve has a working crosshair", await p.locator("#rcT.on").count() === 1);
+  } else {
+    console.log("  NOTE  no ledger on this deployment (Turso not configured)");
+    const t = await p.locator("main").innerText();
+    ok("the missing curve is explained, not omitted",
+       /No graded R multiples are available/.test(t) && /left out rather than drawn/.test(t));
+  }
 
   ok("the manifest is linked", await p.locator('link[rel="manifest"]').count() === 1);
   ok("the service worker is served",

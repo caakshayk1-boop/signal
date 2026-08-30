@@ -1679,3 +1679,23 @@ body::before{display:none}
 @media(max-width:560px){ .bar-right > .btn-cta{display:none} }
 /* The brand is a link and therefore a target; it measured 17px tall. */
 .brand{min-height:44px;align-items:center}
+
+/* ── LADDER AT 320px ─────────────────────────────────────────────────────
+   The row is tag + rule + distance + value in a flex line. At 320px the
+   distance read-out alone reserves 96px and the row measured 291px inside a
+   242px box, which pushed the whole page 10px sideways.
+
+   The distance goes first: it is the supplementary figure, it is revealed on
+   hover or focus rather than always shown, and its content — how far a level
+   is from the current price — is stated in words in the trade plan below. The
+   PRICE never goes, because a level without its price is decoration.
+
+   The rule is allowed to shrink to nothing (min-width:0) so the two things
+   that must be legible always are. */
+@media(max-width:560px){
+  .b-lvl{gap:7px}
+  .b-lvl-d{display:none}
+  .b-lvl-tag{font-size:9px;letter-spacing:.06em;flex:none}
+  .b-lvl-val{font-size:11.5px}
+  .b-lvl-line{min-width:0}
+}
