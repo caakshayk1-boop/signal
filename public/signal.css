@@ -50,6 +50,14 @@
 
 /* ── TOKENS ──────────────────────────────────────────────────────────────── */
 :root{
+  /* ONE DISPLAY FACE, NOT TWO. --disp was Manrope and --serif was Newsreader,
+     and both were used for headings — the route title in Newsreader, the sheet
+     title and the wordmark in heavy Manrope. Two display voices on one page is
+     what reads as "different fonts used in different places". Newsreader now
+     carries every heading; Manrope stays the interface face and JBMono stays
+     the data face, which is a three-role system with one job each. The token
+     is kept rather than deleted so the wordmark can stay deliberately
+     geometric — a logotype is allowed to be its own thing. */
   --disp:'Manrope',system-ui,sans-serif;
   --ui:'Manrope',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --mono:'JBMono',ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -82,6 +90,17 @@
   --gut:clamp(20px,5vw,40px);
   --barh:64px; --tabh:56px;
 }
+/* COLOR-SCHEME FOLLOWS THE SITE, NOT THE MACHINE.
+   Without this the user agent renders its own surfaces — dialog defaults,
+   form controls, scrollbars — against the OS setting while every token here
+   stays on the site's. That mismatch is not cosmetic: a <dialog> in the top
+   layer inherits the UA's CanvasText, so on a dark-mode machine the command
+   palette and the company card drew WHITE text on this site's light panel.
+   Measured at 1.07:1 — invisible, and it is what a reader on a dark-mode Mac
+   saw every time they pressed Cmd-K. */
+:root{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
+
 :root[data-theme="dark"]{
   --bg:#0B0F14; --surface:#141A22; --raised:#1B222C;
   --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.16);
@@ -487,7 +506,7 @@ main,.foot{position:relative;z-index:1}
    <dialog> for the focus trap and Escape. Bottom sheet on a phone because
    that is where the thumb is; centred on a desk. */
 .sheet{border:0;padding:0;background:transparent;max-width:none;max-height:none;
-  width:100%;height:100%;margin:0}
+  width:100%;height:100%;margin:0;color:var(--text)}
 .sheet::backdrop{background:rgba(4,7,11,.72);backdrop-filter:blur(4px)}
 .sheet-in{position:fixed;left:0;right:0;bottom:0;max-height:88vh;overflow-y:auto;
   background:var(--bg);border-top:1px solid var(--live);border-radius:16px 16px 0 0;
@@ -496,7 +515,7 @@ main,.foot{position:relative;z-index:1}
 @keyframes sheetUp{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
 .sheet-h{position:sticky;top:0;background:var(--bg);display:flex;align-items:center;gap:12px;
   padding:16px 0 12px;border-bottom:1px solid var(--line);z-index:2}
-.sheet-h h2{font:800 19px/1.2 var(--disp);letter-spacing:-.01em;flex:1;min-width:0}
+.sheet-h h2{font:600 21px/1.2 var(--serif);letter-spacing:-.012em;flex:1;min-width:0}
 .sheet-h h2 small{display:block;font:400 12px/1.4 var(--ui);color:var(--muted);margin-top:3px}
 .sheet-b{padding-top:14px}
 @media(min-width:760px){
@@ -635,7 +654,7 @@ h4.sh{font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;
 /* ── JOIN ─────────────────────────────────────────────────────────────────── */
 .join{display:grid;gap:28px;padding:24px 0 8px}
 @media(min-width:900px){.join{grid-template-columns:1.15fr .85fr;gap:56px;padding:48px 0 24px;align-items:start}}
-.join h1{font:800 clamp(30px,5vw,46px)/1.05 var(--disp);letter-spacing:-.028em;text-wrap:balance}
+.join h1{font:400 clamp(30px,5vw,46px)/1.05 var(--serif);letter-spacing:-.02em;text-wrap:balance}
 .join-sub{font-size:clamp(15px,2vw,17px);line-height:1.6;color:var(--muted);margin-top:14px;max-width:52ch}
 .join-ul{list-style:none;margin:26px 0 0;display:grid;gap:13px}
 .join-ul li{font-size:14px;line-height:1.55;color:var(--muted);padding-left:20px;position:relative}
@@ -797,7 +816,11 @@ body::before{display:none}
   --b-bg:var(--bg); --b-sur:var(--surface); --b-hi:var(--raised);
   --b-line:var(--line); --b-line2:var(--line2);
   --b-ink:var(--text); --b-mut:var(--muted); --b-dim:var(--dim);
-  --b-acc:var(--accent); --b-bull:var(--up); --b-bear:var(--down); --b-gold:#8A6208;
+  /* --b-bear is NOT var(--down) here. The site's red measures 4.01:1 on the
+     brief's white, and the stop price is set at 16px — under AA on the one
+     number a reader must not misread. Darkened for this palette only; the
+     shared --down is untouched because nothing else failed at its own size. */
+  --b-acc:var(--accent); --b-bull:var(--up); --b-bear:#AE3325; --b-gold:#8A6208;
   --b-serif:'Newsreader',Georgia,serif;
   background:var(--b-bg);color:var(--b-ink);
   margin:-20px calc(var(--gut) * -1) -40px;padding:0 var(--gut) 64px;
@@ -809,8 +832,14 @@ body::before{display:none}
 :root[data-theme="dark"] .brief{
   --b-bg:#0A0C0F; --b-sur:#13161B; --b-hi:#191D23;
   --b-line:rgba(255,255,255,.08); --b-line2:rgba(255,255,255,.15);
-  --b-ink:#F3F5F8; --b-mut:#98A0AB; --b-dim:#6E7681;
-  --b-acc:#7A9BEE; --b-bull:#4E9E72; --b-bear:#C15F54; --b-gold:#C9A961;
+  /* Measured against all three brief surfaces, not picked by eye. --b-dim was
+     #6E7681, which lands at 3.68:1 on --b-hi and 3.95:1 on --b-sur — under AA
+     on 128 text nodes. It went unnoticed because dark mode used to be opt-in;
+     it is now the default for a reader whose machine is dark, so it has to
+     hold up. --b-bear was 4.05:1 on the same surface. Both lightened only as
+     far as AA requires, so the ink / muted / dim hierarchy still reads. */
+  --b-ink:#F3F5F8; --b-mut:#A8B0BB; --b-dim:#868E99;
+  --b-acc:#7A9BEE; --b-bull:#4E9E72; --b-bear:#D0776B; --b-gold:#C9A961;
 }
 .brief ::selection{background:var(--b-acc);color:#0A0C0F}
 .b-wrap{max-width:1180px;margin:0 auto}
@@ -1608,7 +1637,8 @@ body::before{display:none}
 .hero-q .c{font:500 13px/1 var(--mono);font-variant-numeric:tabular-nums;text-align:right}
 
 /* ── COMMAND PALETTE ─────────────────────────────────────────────────────── */
-.cmd{border:0;padding:0;background:none;max-width:none;max-height:none;width:100%;height:100%}
+.cmd{border:0;padding:0;background:none;max-width:none;max-height:none;width:100%;height:100%;
+  color:var(--text)}
 .cmd::backdrop{background:color-mix(in srgb,#000 46%,transparent);backdrop-filter:blur(3px)}
 .cmd-in{position:fixed;left:50%;top:clamp(48px,9vh,110px);transform:translateX(-50%);
   width:min(94vw,600px);background:var(--surface);border:1px solid var(--line2);
@@ -1622,7 +1652,7 @@ body::before{display:none}
   font:inherit;color:inherit;min-height:44px;align-items:center}
 .cmd-r .k{grid-row:1/3;font:500 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
   color:var(--dim)}
-.cmd-r .n{font:600 14px/1.2 var(--ui)}
+.cmd-r .n{font:600 14px/1.2 var(--ui);color:var(--text)}
 .cmd-r .d{font-size:12.5px;line-height:1.4;color:var(--dim);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cmd-r[aria-selected="true"]{background:var(--raised)}
@@ -2062,3 +2092,215 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
   .ed-dot{animation:none}
   .chg,.chg-up,.chg-dn{animation:none}
 }
+
+/* ── THE WIRE, IN FULL ────────────────────────────────────────────────────
+   A reading column, not a grid. Headlines are the serif — this is the one
+   part of the site that is prose rather than data, and it should look it. */
+.nw{display:flex;flex-direction:column}
+.nw-i{padding:20px 0;border-top:1px solid var(--line)}
+.nw-i:first-child{border-top:0;padding-top:4px}
+.nw-m{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.nw-s{font:500 10px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.nw-t{font:400 clamp(18px,2.1vw,23px)/1.28 var(--serif);letter-spacing:-.012em;
+  margin:0 0 6px;max-width:64ch;text-wrap:balance}
+.nw-t a{color:var(--text);text-decoration:none;background-image:linear-gradient(var(--line2),var(--line2));
+  background-size:100% 1px;background-repeat:no-repeat;background-position:0 100%}
+.nw-t a:hover{color:var(--accent);background-image:linear-gradient(var(--accent),var(--accent))}
+.nw-d{font:400 14.5px/1.55 var(--ui);color:var(--muted);margin:0;max-width:70ch}
+
+/* The join. Chips are links to the screen, coloured by the move the name
+   actually made — the only editorial claim here is "this story names this
+   company", and the number beside it is measured, not inferred. */
+.nw-h{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:11px}
+.nw-hl{font:500 10.5px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;
+  color:var(--dim);margin-right:2px}
+.nw-c{display:inline-flex;align-items:baseline;gap:6px;text-decoration:none;
+  padding:5px 9px;border:1px solid var(--line);border-radius:99px;background:var(--surface)}
+.nw-c b{font:600 11px/1 var(--mono);letter-spacing:.02em;color:var(--text)}
+.nw-c i{font:500 11px/1 var(--mono);font-style:normal;color:var(--dim)}
+.nw-c.up i{color:var(--up)} .nw-c.dn i{color:var(--down)}
+.nw-c:hover{border-color:var(--line2);background:var(--raised)}
+.more-l{color:var(--accent);text-decoration:none;font-weight:500}
+.more-l:hover{text-decoration:underline}
+.chips-hint{margin:-6px 0 14px}
+
+@media(max-width:700px){
+  .nw-i{padding:17px 0}
+  .nw-t{font-size:18.5px;line-height:1.3}
+  .nw-d{font-size:14px}
+}
+
+/* ── THE TRADING DAY ──────────────────────────────────────────────────────
+   Six analog faces and a globe. The faces are analog on purpose: the shape
+   of a clock at 3pm is legible before any digit is read, which is the whole
+   argument for one on a page already dense with numerals. */
+.wc{display:grid;grid-template-columns:132px 1fr;gap:22px;align-items:center}
+.wc-r{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:14px 18px}
+.wc-i{display:flex;align-items:center;gap:11px;min-width:0;opacity:.62}
+.wc-i.on{opacity:1}
+.wc-f{width:38px;height:38px;flex:none}
+.wc-dial{fill:var(--surface);stroke:var(--line);stroke-width:1}
+.wc-i.on .wc-dial{stroke:var(--up);fill:color-mix(in srgb,var(--up) 8%,var(--surface))}
+.wc-tk{stroke:var(--line2);stroke-width:1.2;stroke-linecap:round}
+.wc-h{stroke:var(--text);stroke-width:2.1;stroke-linecap:round}
+.wc-m{stroke:var(--text);stroke-width:1.4;stroke-linecap:round}
+.wc-pin{fill:var(--text)}
+.wc-i.on .wc-h,.wc-i.on .wc-m,.wc-i.on .wc-pin{stroke:var(--up);fill:var(--up)}
+.wc-x{display:flex;flex-direction:column;gap:1px;min-width:0}
+.wc-c{font:600 12.5px/1.25 var(--ui);color:var(--text)}
+.wc-t{font:500 15px/1.15 var(--mono);font-variant-numeric:tabular-nums;color:var(--text);
+  letter-spacing:-.01em}
+.wc-e{font:400 10px/1.3 var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--dim)}
+.wc-i.on .wc-e b{color:var(--up)}
+.wc-n{font:400 10.5px/1.3 var(--ui);color:var(--dim)}
+
+/* The globe. One SVG, spun by CSS — no script, no requestAnimationFrame
+   (which does not run in a background tab), and nothing to clean up. */
+.wc-globe{width:132px;height:132px;display:block}
+.wc-sea{fill:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+.wc-rim{fill:none;stroke:var(--line2);stroke-width:1.1}
+.wc-par{fill:none;stroke:var(--line);stroke-width:.7;opacity:.75}
+.wc-mer{fill:none;stroke:var(--line);stroke-width:.7;opacity:.75}
+.wc-spin{transform-origin:60px 60px;animation:wcSpin 42s linear infinite}
+@keyframes wcSpin{from{transform:rotateY(0)}to{transform:rotateY(360deg)}}
+.wc-city{fill:var(--dim)}
+.wc-city.on{fill:var(--up)}
+
+@media(prefers-reduced-motion:reduce){ .wc-spin{animation:none} }
+
+@media(max-width:700px){
+  /* The globe is ornament and goes first in the source only for the desktop
+     grid; on a phone the six clocks are the payload and lead. */
+  .wc{grid-template-columns:1fr;gap:16px}
+  .wc-g{order:2;display:flex;justify-content:center}
+  .wc-r{order:1;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 12px}
+  .wc-globe{width:112px;height:112px}
+  .wc-c{font-size:12px} .wc-t{font-size:14px} .wc-n{font-size:10px}
+}
+
+/* ── PRICE HISTORY ON A CARD ──────────────────────────────────────────────
+   Coloured by the direction of the WINDOW on screen, not of the day — on a
+   two-year monthly chart today's move is not the story being told. */
+.cc{margin:0 0 16px}
+.cc-h{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;margin-bottom:10px}
+.cc-tabs{margin-bottom:0}
+.cc-tabs .chip{padding:6px 12px;font-size:11px}
+.cc-b{font:400 11.5px/1.3 var(--ui);color:var(--dim)}
+.cc-w{display:block}
+.cc-s{width:100%;height:150px;display:block;overflow:visible}
+.cc-l{fill:none;stroke:var(--up);stroke-width:1.6;vector-effect:non-scaling-stroke;
+  stroke-linejoin:round;stroke-linecap:round}
+.cc-a{fill:color-mix(in srgb,var(--up) 12%,transparent);stroke:none}
+.cc-s.dn .cc-l{stroke:var(--down)}
+.cc-s.dn .cc-a{fill:color-mix(in srgb,var(--down) 12%,transparent)}
+.cc-ax{display:flex;justify-content:space-between;gap:10px;margin-top:7px;
+  font:400 10.5px/1 var(--mono);color:var(--dim);letter-spacing:.02em}
+.cc-hl b{color:var(--muted);font-weight:500}
+.cc-sum{margin-top:6px;font:400 12px/1.4 var(--ui);color:var(--dim)}
+.cc-sum b{font-family:var(--mono);font-weight:600}
+.cc-sum b.up{color:var(--up)} .cc-sum b.dn{color:var(--down)}
+
+@media(max-width:700px){
+  .cc-s{height:132px}
+  .cc-h{gap:8px}
+  .cc-ax{font-size:9.5px}
+  /* The middle high/low label is the first thing to go when the axis cannot
+     fit three items — the two dates carry the window, which is the point. */
+  .cc-hl{display:none}
+}
+
+/* ── THE BRIEF ON A PHONE ─────────────────────────────────────────────────
+   Two measured failures, both of the same kind: a layout built for a wide
+   viewport, narrowed until it stopped saying anything.
+
+   THE JOURNEY. Six steps at min-width:96px is 576px of track inside a 350px
+   column, in a scroller whose scrollbar is deliberately hidden. So the last
+   three steps — Sizing, Exit, and the risk-and-reward that follows — were not
+   merely cramped, they were unreachable and gave no sign they existed. A
+   sequence does not have to run left-to-right to be a sequence; on a phone it
+   runs down the page, where there is room, with the connector turned to match.
+
+   THE LADDER TAGS. min-width:74px with white-space:nowrap on a label that
+   needs 80px clips "52-week high" to "52-week hig". The line between tag and
+   price is the only element on that row with nothing to say, so it is the one
+   that gives up its width. */
+@media(max-width:640px){
+  .b-jr{grid-auto-flow:row;grid-template-columns:1fr;overflow:visible;
+    margin-top:18px;padding-left:2px}
+  .b-jn{min-width:0;text-align:left;padding:0 0 18px 26px}
+  .b-jn:last-child{padding-bottom:0}
+  .b-jn::before{top:3px;bottom:-3px;left:4px;right:auto;width:1px;height:auto}
+  .b-jn:first-child::before{left:4px;top:9px}
+  .b-jn:last-child::before{bottom:auto;height:0}
+  .b-jn i{top:4px;left:0;margin-left:0}
+}
+@media(max-width:560px){
+  /* The tag sizes to its own text; the rule absorbs whatever is left. */
+  .b-lvl-tag{min-width:0;font-size:9.5px;letter-spacing:.05em;flex:0 0 auto}
+  .b-lvl-val{min-width:0}
+  .b-lvl-line{flex:1 1 6px;min-width:4px}
+}
+
+/* ── A READABLE FLOOR ON SMALL SCREENS ───────────────────────────────────
+   A survey of six routes at 390px found 700-odd text nodes set below 11px —
+   217 of them the uppercase mono key in every key/value pair, at 9.5px.
+   Sizes that are merely quiet on a 27-inch display are unreadable held at
+   arm's length, and this site puts real information in those labels: which
+   figure a number IS, is carried by the label, not the number.
+
+   Raised to a floor rather than rescaled, so the typographic hierarchy is
+   unchanged — the small text stays the small text, it just stops being
+   smaller than a phone can render legibly. The few labels living inside
+   fixed-size ornaments (step bullets, the ladder's tags) are lifted less,
+   because there is a box around them that cannot grow. */
+@media(max-width:700px){
+  .kv .kk{font-size:11px;letter-spacing:.06em}
+  .rng-e{font-size:11px}
+  .mk-nosp{font-size:10.5px;letter-spacing:.05em}
+  .mk-chev{font-size:12px}
+  .tipb{font-size:11px}
+  .nw-s{font-size:11px}
+  .wc-n{font-size:11px}
+  .eyebrow{font-size:11px}
+  .cc-ax{font-size:10.5px}
+  .b-lvl-d{font-size:11px}
+  /* Inside a fixed ornament: lifted as far as the box allows, no further. */
+  .kb{font-size:10.5px}
+  .b-lvl-tag{font-size:10.5px}
+}
+
+/* The rest of the sub-11px labels, same argument as the block above. These
+   are the ones set by rules that name no class of their own — progress
+   captions, session badges, the conviction and trail markers, the brief's
+   quick-nav numerals and its SVG level tags. */
+@media(max-width:700px){
+  .prog-l{font-size:10.5px}
+  .cv-view span,.trail span{font-size:10.5px}
+  .clk-z{font-size:10.5px}
+  .lv-k{font-size:10.5px}
+  .sess{font-size:10.5px}
+  .b-qnav a .kb{font-size:10.5px}
+  .b-px-t i,.rc-t i{font-size:11px}
+  .idea-cxl{font-size:10.5px}
+  .b-px-c text.ltag{font-size:10.5px}
+  .cc-ax{font-size:10.5px}
+}
+/* The tab strip scrolls horizontally now, so it no longer has to buy room by
+   shrinking its own labels below legibility on the narrowest phones. */
+@media(max-width:400px){.tabs a{font-size:11.5px;letter-spacing:.01em}}
+
+/* ── WHAT THE SCORE MEANS FOR ACTION ─────────────────────────────────────
+   The dial said "26 / LOW CONVICTION" and the page around it said "Today's
+   brief", which reads as a recommendation with a small number next to it. A
+   reader is entitled to ask why a 26 is being shown at all. It is shown
+   because it is the best signal currently open — and the page now says so,
+   and says that a 26 is a reason to pass. */
+.b-verdict{font:400 14px/1.6 var(--ui);color:var(--b-mut);
+  margin:2px 0 14px;padding:13px 15px;border-radius:10px;
+  background:var(--b-sur);border-left:3px solid var(--b-dim)}
+.b-verdict b{color:var(--b-ink);font-weight:600}
+.b-verdict.is-hi{border-left-color:var(--b-bull)}
+.b-verdict.is-mid{border-left-color:var(--b-gold)}
+.b-verdict.is-lo{border-left-color:var(--b-bear)}
+@media(max-width:700px){.b-verdict{font-size:13.5px;padding:12px 13px}}

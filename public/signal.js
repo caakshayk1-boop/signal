@@ -23,7 +23,33 @@
   const CACHE = 'sig:';
   const TIMEOUT = 8000;
 
+  /* ── IS THERE ANY REASON TO REPAINT? ───────────────────────────────────
+   *
+   * The page replaced its entire contents every sixty seconds whether or not
+   * a single number had moved. Outside market hours that is every repaint:
+   * the same DOM torn down and rebuilt, sparklines redrawn, hover and text
+   * selection dropped, for no new information at all. It reads as the page
+   * twitching at you.
+   *
+   * FEEDS remembers the last body seen per URL and bumps feedRev when one
+   * genuinely differs. routeUrls remembers which feeds the current route
+   * actually read, so refresh() can re-fetch exactly those, compare, and
+   * return without rendering when nothing moved.
+   *
+   * MICRO exists only to make that probe free: the render that follows a
+   * changed probe would otherwise request the same URLs a second time within
+   * milliseconds. Five seconds is long enough to cover probe-then-render and
+   * far too short to serve anyone a stale price. */
+  const FEEDS = new Map();
+  const MICRO = new Map();
+  const MICRO_MS = 5000;
+  let feedRev = 0;
+  let routeUrls = new Set();
+
   async function get(url) {
+    routeUrls.add(url);
+    const micro = MICRO.get(url);
+    if (micro && Date.now() - micro.at < MICRO_MS) return micro.res;
     const key = CACHE + url;
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), TIMEOUT);
@@ -31,8 +57,16 @@
       const r = await fetch(url, { signal: ctl.signal });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
+      // Content, not timestamps: two fetches a minute apart with identical
+      // bodies are the same edition and must not trigger a repaint.
+      const body = JSON.stringify(j);
+      const prev = FEEDS.get(url);
+      FEEDS.set(url, body);
+      if (prev !== undefined && prev !== body) feedRev++;
       try { sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), j })); } catch (e) { /* private mode */ }
-      return { ok: true, data: j, stale: false };
+      const res = { ok: true, data: j, stale: false };
+      MICRO.set(url, { at: Date.now(), res });
+      return res;
     } catch (err) {
       let cached = null;
       try { cached = JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (e) { /* ignore */ }
@@ -889,9 +923,15 @@
     const mk = m.ok ? m.data : null;
     const nifty = mk && (mk.markets || []).find(x => /nifty 50/i.test(x.name || ''));
 
+    /* SENSEX HERE, NOT NIFTY. The hero directly above this already prints
+     * Nifty 50 as the headline figure, so the first tile of the tape was the
+     * same number a second time, 263px lower — measured. A four-tile summary
+     * that spends a quarter of itself repeating the line above it is three
+     * tiles long. Sensex is the other index an Indian reader checks. */
+    const sensex = mk && (mk.markets || []).find(x => /sensex/i.test(x.name || ''));
     out += sec('The tape', `<div class="grid">
-        ${tile(nifty ? esc(nifty.price) : '—', 'Nifty 50',
-               nifty ? pct(nifty.change_pct) : 'feed unreachable', nifty ? dir(nifty.change_pct) : '')}
+        ${tile(sensex ? esc(sensex.price) : '—', 'Sensex',
+               sensex ? pct(sensex.change_pct) : 'feed unreachable', sensex ? dir(sensex.change_pct) : '')}
         ${tile(br.up != null ? `${br.up}<span style="color:var(--dim)">/${br.counted}</span>` : '—',
                'Advancing', br.median != null ? `median ${pct(br.median)} on the week` : '',
                br.up > br.down ? 'up' : 'dn')}
@@ -919,7 +959,12 @@
           <span class="ws">${esc(x.source || 'wire')}</span>
           <span class="wt">${esc(x.title || '')}</span>
           ${x.summary ? `<span class="wd">${esc(String(x.summary).slice(0, 150))}</span>` : ''}
-        </a>`).join('')}</div>` : `<div class="empty">The wire is quiet.</div>`, `${wire.length} stories`);
+        </a>`).join('')}</div>
+        <p class="hint"><a href="#/news" class="more-l">Read all ${wire.length} stories, with the names each one touches &rarr;</a></p>`
+      : `<div class="empty">The wire is quiet.</div>`,
+      /* "18 stories" over a list of six is a caption contradicting the thing
+       * it captions. Say what is on screen, and link to the rest. */
+      wire.length > 6 ? `6 of ${wire.length}` : `${wire.length} stories`);
 
     const cv = await get('/conviction.json');
     if (cv.ok && (cv.data.picks || []).length) {
@@ -1090,6 +1135,144 @@
     </article>`;
   };
 
+
+  /* ── THE WORLD, AND WHO IS AWAKE IN IT ────────────────────────────────────
+   *
+   * This board carries instruments from six exchanges, and until now the only
+   * hint of that was a per-segment "Opens in 6h 9m". A reader looking at a
+   * flat Nikkei at midnight in Dubai could not tell whether it was flat
+   * because nothing happened or flat because Tokyo has been shut for hours —
+   * which is the difference between information and no information.
+   *
+   * Hours are LOCAL to each exchange and the clocks are built with
+   * Intl.DateTimeFormat, so daylight saving is handled by the platform rather
+   * than by a table in this file that would be wrong twice a year.
+   *
+   * What this does NOT know is holidays. Diwali, Thanksgiving and Boxing Day
+   * will each show a market as open when it is shut. The strip says so in
+   * words rather than quietly being wrong — a market-hours widget that claims
+   * more precision than it has is worse than none.
+   */
+  const EXCHANGES = [
+    ['Mumbai',    'NSE',   'Asia/Kolkata',   9.25, 15.5,  72.83],
+    ['Hong Kong', 'HKEX',  'Asia/Hong_Kong', 9.5,  16.0,  114.16],
+    ['Tokyo',     'TSE',   'Asia/Tokyo',     9.0,  15.0,  139.69],
+    ['Dubai',     'DFM',   'Asia/Dubai',     10.0, 15.0,  55.27],
+    ['London',    'LSE',   'Europe/London',  8.0,  16.5,  -0.13],
+    ['New York',  'NYSE',  'America/New_York', 9.5, 16.0, -74.01],
+  ];
+
+  // Local wall-clock parts for a zone, without pulling in a date library.
+  function zoneNow(tz) {
+    const f = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour12: false,
+      weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const parts = Object.fromEntries(f.formatToParts(new Date()).map(x => [x.type, x.value]));
+    return { wd: parts.weekday, h: +parts.hour % 24, m: +parts.minute, s: +parts.second };
+  }
+
+  const fmtGap = mins => {
+    const d = Math.max(0, Math.round(mins));
+    return d >= 60 ? `${Math.floor(d / 60)}h ${d % 60}m` : `${d}m`;
+  };
+
+  function exchangeState(tz, open, close) {
+    const t = zoneNow(tz);
+    const now = t.h + t.m / 60 + t.s / 3600;
+    const weekend = t.wd === 'Sat' || t.wd === 'Sun';
+    if (!weekend && now >= open && now < close)
+      return { open: true, label: 'Closes in ' + fmtGap((close - now) * 60), t };
+    // Next open: later today on a weekday, otherwise the next weekday morning.
+    let wait;
+    if (!weekend && now < open) wait = (open - now) * 60;
+    else {
+      const daysAhead = t.wd === 'Fri' ? 3 : t.wd === 'Sat' ? 2 : 1;
+      wait = ((24 - now) + open + (daysAhead - 1) * 24) * 60;
+    }
+    return { open: false, label: 'Opens in ' + fmtGap(wait), t };
+  }
+
+  // An analog face. Hands are plain rotations — no per-frame work, and the
+  // whole thing is redrawn once a second by one timer for all six.
+  const clockFace = (h, m) => {
+    const hh = ((h % 12) + m / 60) * 30, mm = m * 6;
+    return `<svg class="wc-f" viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="20" r="18.5" class="wc-dial"/>
+      ${[0, 3, 6, 9].map(i => {
+        const a = i * 30 * Math.PI / 180;
+        return `<line x1="${20 + 14.5 * Math.sin(a)}" y1="${20 - 14.5 * Math.cos(a)}"
+                      x2="${20 + 16.8 * Math.sin(a)}" y2="${20 - 16.8 * Math.cos(a)}" class="wc-tk"/>`;
+      }).join('')}
+      <line x1="20" y1="20" x2="20" y2="11.5" class="wc-h" transform="rotate(${hh} 20 20)"/>
+      <line x1="20" y1="20" x2="20" y2="7.5"  class="wc-m" transform="rotate(${mm} 20 20)"/>
+      <circle cx="20" cy="20" r="1.5" class="wc-pin"/>
+    </svg>`;
+  };
+
+  /* The globe is ornament, and is built so that it costs nothing: one SVG,
+   * rotated by a CSS animation rather than a script. It therefore stops on
+   * its own in a background tab, needs no requestAnimationFrame — which does
+   * not run in a hidden tab anyway — and disappears entirely under
+   * prefers-reduced-motion. The dots are the six exchanges at their real
+   * longitudes, so the one that is lit is the one that is trading. */
+  const globe = live => `<svg class="wc-globe" viewBox="0 0 120 120" role="img"
+      aria-label="A globe marking the six exchanges on this board">
+    <defs><clipPath id="gclip"><circle cx="60" cy="60" r="52"/></clipPath></defs>
+    <circle cx="60" cy="60" r="52" class="wc-sea"/>
+    <g clip-path="url(#gclip)">
+      ${[-40, -20, 0, 20, 40].map(lat =>
+        `<ellipse cx="60" cy="${60 + lat * 1.15}" rx="52" ry="${Math.max(2, 52 - Math.abs(lat) * 1.05)}"
+                  class="wc-par"/>`).join('')}
+      <g class="wc-spin">
+        ${Array.from({ length: 12 }, (_, i) =>
+          `<ellipse cx="60" cy="60" rx="${52 * Math.abs(Math.cos(i * Math.PI / 12))}" ry="52"
+                    class="wc-mer"/>`).join('')}
+      </g>
+    </g>
+    <circle cx="60" cy="60" r="52" class="wc-rim"/>
+    ${EXCHANGES.map(([city, , , , , lon], i) => {
+      // Longitude to x across the disc; latitude is stylised, not surveyed.
+      const x = 60 + (lon / 180) * 46, y = 60 - [8, 14, 18, 2, 30, 20][i];
+      return `<circle cx="${x.toFixed(1)}" cy="${y}" r="${live[i] ? 3.4 : 2.2}"
+                class="wc-city${live[i] ? ' on' : ''}"><title>${esc(city)}</title></circle>`;
+    }).join('')}
+  </svg>`;
+
+  function worldClocksHtml() {
+    const st = EXCHANGES.map(([, , tz, o, c]) => exchangeState(tz, o, c));
+    const openCount = st.filter(x => x.open).length;
+    return { openCount, html: `<div class="wc">
+      <div class="wc-g">${globe(st.map(x => x.open))}</div>
+      <div class="wc-r">${EXCHANGES.map(([city, code], i) => {
+        const x = st[i];
+        return `<div class="wc-i${x.open ? ' on' : ''}">
+          ${clockFace(x.t.h, x.t.m)}
+          <div class="wc-x">
+            <span class="wc-c">${esc(city)}</span>
+            <span class="wc-t">${String(x.t.h).padStart(2, '0')}:${String(x.t.m).padStart(2, '0')}</span>
+            <span class="wc-e">${esc(code)} · <b>${x.open ? 'Open' : 'Closed'}</b></span>
+            <span class="wc-n">${esc(x.label)}</span>
+          </div>
+        </div>`;
+      }).join('')}</div></div>` };
+  }
+
+  // One timer for all six faces, ticking on setInterval rather than rAF so it
+  // keeps correct time in a background tab and costs one DOM write a second.
+  function wireWorldClocks() {
+    const host = document.getElementById('wcHost');
+    if (!host) return;
+    const tick = () => {
+      const { html, openCount } = worldClocksHtml();
+      host.innerHTML = html;
+      const n = document.getElementById('wcN');
+      if (n) n.textContent = openCount === 0 ? 'all shut'
+        : `${openCount} of ${EXCHANGES.length} open`;
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    main.addEventListener('sig:teardown', () => clearInterval(id), { once: true });
+  }
+
   R['/markets'] = async () => {
     paint(head('Markets', 'The board live, and what the 750-name screen underneath it did.', 'The board') +
       sec('Breadth', `<div class="sk" style="height:104px"></div>`) +
@@ -1099,6 +1282,15 @@
     const [m, p] = await Promise.all([get('/api/markets'), get('/pulse.json')]);
     let out = head('Markets', 'The board live, and what the 750-name screen underneath it did.', 'The board');
     const pu = p.ok ? p.data : {};
+
+    /* The world strip goes FIRST, above breadth. Whether the exchange behind a
+     * number is currently trading qualifies every number below it, the same
+     * way the freshness badge in the header qualifies the page. */
+    out += sec('The trading day', `<div id="wcHost"></div>
+      <p class="hint">Local time at each exchange, with regular cash-session hours.
+        <b>Holidays are not tracked</b> — on Diwali or Thanksgiving a market will show
+        as open here when it is shut.</p>`,
+      '', 'Six exchanges, and which of them is awake.');
 
     out += sec('Breadth', breadthWidget(pu.breadth) || `<div class="empty">Screen not built yet.</div>`,
       '', 'How many names went up, out of every name measured.');
@@ -1136,9 +1328,16 @@
         '', 'The other half of the same week.');
     const before = out;
     paint(out + movers());
+    wireWorldClocks();          // starts the one-second tick; teardown clears it
     // Then join the technical columns and repaint those two tables in place.
     // The markup is identical apart from four cells, so nothing moves.
-    fillLevels(() => { if (routeOf() === '/markets') paint(before + movers()); });
+    // Repainting drops the clock strip's timer with the DOM, so it is restarted
+    // alongside every repaint of this route rather than only the first.
+    fillLevels(() => {
+      if (routeOf() !== '/markets') return;
+      paint(before + movers());
+      wireWorldClocks();
+    });
   };
 
   R['/ideas'] = async () => {
@@ -1257,7 +1456,13 @@
    * which is the whole reason the digest exists and why both can coexist.
    */
   let SCREEN = null;
-  let scrQ = '', scrPreset = 'all', scrSort = 'comp', scrPage = 0;
+  /* FILTERS COMBINE. They used to be radio buttons wearing the shape of
+   * chips: picking "Debt-free" threw away "Breaking out", so the one question
+   * a screen exists to answer — which names clear SEVERAL bars at once — was
+   * the one question it could not be asked. scrPresets is a Set and the
+   * predicates are ANDed. Empty means everything, which is what "All" now
+   * does rather than being a filter that happens to return true. */
+  let scrQ = '', scrPresets = new Set(), scrSort = 'comp', scrPage = 0;
   const PRESETS = {
     all:        ['Everything',     () => true],
     breakout:   ['Breaking out',   r => (r.setup?.tags || []).some(t => /BREAKOUT/.test(t))],
@@ -1288,7 +1493,7 @@
     const draw = () => {
       const q = scrQ.trim().toLowerCase();
       const rows = SCREEN
-        .filter(PRESETS[scrPreset][1])
+        .filter(r => [...scrPresets].every(k => PRESETS[k][1](r)))
         .filter(r => !q || (r.sym || '').toLowerCase().includes(q)
                         || (r.name || '').toLowerCase().includes(q)
                         || (r.sector || '').toLowerCase().includes(q))
@@ -1303,10 +1508,16 @@
               `<option value="${k}"${scrSort === k ? ' selected' : ''}>Rank by ${esc(l)}</option>`).join('')}
           </select>
         </div>
-        <div class="chips" role="group" aria-label="Screen preset">${
-          Object.entries(PRESETS).map(([k, [l]]) =>
-            `<button type="button" class="chip" data-p="${k}" aria-pressed="${scrPreset === k}">${esc(l)}</button>`).join('')}
-        </div>` +
+        <div class="chips" role="group" aria-label="Screen filters">${
+          Object.entries(PRESETS).map(([k, [l]]) => {
+            const on = k === 'all' ? scrPresets.size === 0 : scrPresets.has(k);
+            return `<button type="button" class="chip${on ? ' on' : ''}" data-p="${k}"
+                     aria-pressed="${on}">${esc(l)}</button>`;
+          }).join('')}
+        </div>
+        <p class="hint chips-hint">${scrPresets.size > 1
+          ? `Showing names that clear <b>all ${scrPresets.size}</b> of these at once.`
+          : 'Filters combine — pick as many as you like.'}</p>` +
         // 40, not 60: /api/signals?px= takes 40 symbols a call, so a 40-row
         // page is exactly one request and every visible row can carry a live
         // mark. A 60-row page would leave a third of the screen showing the
@@ -1336,7 +1547,10 @@
             <span><i class="k50"></i>50-day</span>
             <span><i class="k20"></i>20-day</span>
             <span>— the levels these engines trade against.</span></p>`;
-          return sec(PRESETS[scrPreset][0], rows.length ? screenTable(page, from) + key + nav
+          const title = scrPresets.size
+            ? [...scrPresets].map(k => PRESETS[k][0]).join(' + ')
+            : PRESETS.all[0];
+          return sec(title, rows.length ? screenTable(page, from) + key + nav
             : `<div class="empty">Nothing matches. Try a different preset or clear the search.</div>`,
             `${rows.length} of ${SCREEN.length}`);
         })());
@@ -1361,7 +1575,14 @@
       });
       main.querySelector('#scrs').addEventListener('change', e => { scrSort = e.target.value; draw(); });
       main.querySelectorAll('.chip').forEach(b =>
-        b.addEventListener('click', () => { scrPreset = b.dataset.p; scrPage = 0; draw(); }));
+        b.addEventListener('click', () => {
+          const k = b.dataset.p;
+          if (k === 'all') scrPresets.clear();
+          else if (scrPresets.has(k)) scrPresets.delete(k);
+          else scrPresets.add(k);
+          scrPage = 0;   // a changed filter invalidates the page number
+          draw();
+        }));
       /* No per-row listener here. A delegated handler on `document` already
        * opens any [data-sym], so this bound forty more on every repaint — and
        * being bound directly to the element it also fired for clicks on the
@@ -1474,6 +1695,124 @@
    * and did nothing. That is why COFORGE, QPOWER and ATHERENERG would not
    * open. The universe is now fetched on first use from wherever the reader
    * is, and cached for the session. */
+
+  /* ── THE PRICE HISTORY ON A COMPANY CARD ─────────────────────────────────
+   *
+   * Daily, weekly and monthly are three different questions, not three zoom
+   * levels of one: daily is "what has it done lately", monthly is "what has
+   * it done at all". So each timeframe shows the window that timeframe is
+   * good for, and says which window that is, rather than pretending 24 points
+   * and 130 points are the same chart at different magnifications.
+   *
+   * One 2-year daily request per card feeds all three. Weekly and monthly are
+   * the LAST CLOSE of each week and month — the same convention the rest of
+   * this site uses for a period's price, and the only one that can be derived
+   * from closes without inventing a high or a low the feed never sent.
+   */
+  const CHARTC = new Map();          // sym -> 2y of daily closes, per session
+
+  const isoWeekKey = d => {
+    // Thursday of the same week decides the year, which is what makes an ISO
+    // week in late December belong to the right one.
+    const t = new Date(d + 'T00:00:00Z');
+    t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+    const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return `${t.getUTCFullYear()}-W${String(Math.ceil(((t - y0) / 86400000 + 1) / 7)).padStart(2, '0')}`;
+  };
+
+  // Last close per bucket, order preserved.
+  const bucketLast = (pts, keyOf) => {
+    const m = new Map();
+    for (const p of pts) m.set(keyOf(p.t), p);
+    return [...m.values()];
+  };
+
+  const TFS = {
+    d: ['Daily',   p => p.slice(-130)],
+    w: ['Weekly',  p => bucketLast(p, isoWeekKey)],
+    m: ['Monthly', p => bucketLast(p, t => t.slice(0, 7))],
+  };
+
+  /* THE LABEL IS MEASURED FROM THE DATA, NOT DECLARED ABOVE IT.
+   *
+   * These captions were fixed strings — "2 years of weekly closes" — and were
+   * wrong for every name younger than the window. QPOWER listed in 2025, so
+   * its weekly chart is eighteen months and was captioned two years, with the
+   * axis underneath printing the real first date and contradicting it. The
+   * request asks for two years; what came back is what the company has. */
+  const humanSpan = (a, b) => {
+    const months = Math.round((new Date(b) - new Date(a)) / 2629800000);
+    if (months < 2) return 'a few weeks';
+    if (months < 22) return `${months} months`;
+    const y = months / 12;
+    return `${y % 1 < 0.15 ? Math.round(y) : y.toFixed(1)} years`;
+  };
+
+  /* Area + line + endpoint. Coloured by the direction of the WINDOW being
+   * shown, not of the day — on a monthly chart the day's move is not the
+   * story. viewBox units with preserveAspectRatio="none" so it stretches to
+   * whatever width the card has without a resize listener. */
+  function cardChart(pts) {
+    if (!pts || pts.length < 2) return `<div class="empty">No price history for this name.</div>`;
+    const W = 600, H = 150, PAD = 4;
+    const ys = pts.map(p => p.c);
+    const lo = Math.min(...ys), hi = Math.max(...ys), span = (hi - lo) || 1;
+    const x = i => (i / (pts.length - 1)) * W;
+    const y = v => PAD + (1 - (v - lo) / span) * (H - PAD * 2);
+    const d = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.c).toFixed(1)}`).join('');
+    const up = ys[ys.length - 1] >= ys[0];
+    const chg = ((ys[ys.length - 1] - ys[0]) / ys[0]) * 100;
+    return `<div class="cc-w">
+      <svg class="cc-s ${up ? 'up' : 'dn'}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
+           role="img" aria-label="${esc(pts.length)} closes, ${pct(chg)} over the window">
+        <path class="cc-a" d="${d}L${W},${H}L0,${H}Z"/>
+        <path class="cc-l" d="${d}"/>
+      </svg>
+      <div class="cc-ax">
+        <span>${esc(pts[0].t)}</span>
+        <span class="cc-hl">low <b>${fmtN(lo)}</b> · high <b>${fmtN(hi)}</b></span>
+        <span>${esc(pts[pts.length - 1].t)}</span>
+      </div>
+      <div class="cc-sum">
+        <b class="${up ? 'up' : 'dn'}">${pct(chg)}</b> over this window ·
+        ${pts.length} closes
+      </div>
+    </div>`;
+  }
+
+  async function wireCardChart(sym) {
+    const host = document.getElementById('ccHost');
+    if (!host) return;
+    let pts = CHARTC.get(sym);
+    if (!pts) {
+      const r = await get(`/api/signals?series=${encodeURIComponent(sym)}&range=2y`);
+      if (!r.ok || !(r.data.points || []).length) {
+        host.innerHTML = `<div class="empty">Price history did not load${r.ok ? '' : ' — ' + esc(r.error)}.</div>`;
+        return;
+      }
+      pts = r.data.points;
+      CHARTC.set(sym, pts);
+    }
+    let tf = 'd';
+    const draw = () => {
+      const [label, fn] = TFS[tf];
+      const shown = fn(pts);
+      const blurb = shown.length > 1
+        ? `${humanSpan(shown[0].t, shown[shown.length - 1].t)} of ${label.toLowerCase()} closes`
+        : 'not enough history';
+      host.innerHTML = `<div class="cc-h">
+          <div class="chips cc-tabs" role="group" aria-label="Timeframe">
+            ${Object.entries(TFS).map(([k, [l]]) =>
+              `<button type="button" class="chip" data-tf="${k}" aria-pressed="${k === tf}">${esc(l)}</button>`).join('')}
+          </div>
+          <span class="cc-b">${esc(blurb)}</span>
+        </div>${cardChart(shown)}`;
+      host.querySelectorAll('[data-tf]').forEach(b =>
+        b.addEventListener('click', () => { tf = b.dataset.tf; draw(); }));
+    };
+    draw();
+  }
+
   async function openStock(sym) {
     if (!SCREEN) {
       sheet(esc(sym), `<div class="sk" style="height:210px"></div>
@@ -1529,6 +1868,7 @@
         ₹${r.mcap_cr != null ? Math.round(r.mcap_cr).toLocaleString('en-IN') : '—'} cr ·
         accounts to ${esc(r.fy || '—')}</p>
       ${cardLine}
+      <div id="ccHost" class="cc"><div class="sk" style="height:150px"></div></div>
       <div class="tags">${(r.setup?.tags || []).map(t => `<span class="pill pill-ac">${esc(t)}</span>`).join('')}
         ${r.risk?.level ? `<span class="pill ${r.risk.level === 'LOW' ? 'pill-up' : r.risk.level === 'HIGH' ? 'pill-dn' : 'pill-wn'}">RISK ${esc(r.risk.level)}</span>` : ''}</div>
       <div class="scores">
@@ -1572,6 +1912,9 @@
           ${mv != null ? `<span class="lv-s">${pct(mv)} vs the ${esc(String(r.last_date || 'screen'))} close</span>` : ''}
         </div>`);
     });
+
+    // After the sheet exists: one 2-year request, cached per symbol.
+    wireCardChart(r.sym);
   }
 
   let sigFilter = 'all';
@@ -2413,6 +2756,23 @@
                   <span class="tr"><i data-w="${Number.isFinite(v) ? v.toFixed(0) : 0}" style="background:${col}"></i></span></span>
                 <span class="sc">${Number.isFinite(v) ? Math.round(v) : '—'}</span></button>`;
             }).join('')}
+            <p class="b-verdict ${score == null ? '' : score >= 70 ? 'is-hi' : score >= 50 ? 'is-mid' : 'is-lo'}">
+              ${score == null
+                ? 'Not enough measured components to score this setup. Treat it as unrated.'
+                : score >= 70
+                  ? `<b>${Math.round(score)} of 100.</b> Most of what this site measures agrees. That is
+                     what a high reading means and nothing more — it is not a forecast, and the ledger
+                     on the Signals page is the honest record of how these have actually done.`
+                  : score >= 50
+                    ? `<b>${Math.round(score)} of 100.</b> The components disagree with each other. A
+                       middling score is the site saying it does not have a strong read, not a
+                       softened yes.`
+                    : `<b>${Math.round(score)} of 100 — this is a weak setup by this site's own
+                       measure.</b> It appears here because it is the best-scoring signal open right
+                       now, which is not the same as a good one. On a reading this low the honest
+                       answer to "should I take this" is no, or not at this size. What a low score
+                       buys you is a documented reason to skip it.`}
+            </p>
             <p class="b-p" style="font-size:13px">The score is the mean of the components that could be
               measured. A component with no data is left out rather than filled in${have.length < COMPS.length
                 ? `, which is why the denominator here is <b style="color:var(--b-ink)">${have.length}</b>,
@@ -3052,6 +3412,7 @@
     ['/ipo', 'IPO', 'Books open now, and how last year’s listings did'],
     ['/screen', 'Screen', 'All 750 names, searchable'],
     ['/watch', 'Watchlist', 'Names you starred, and your price alerts'],
+    ['/news', 'News', 'The full wire, and the screened names each story touches'],
     ['/signals', 'Signals', 'The public ledger — wins and losses'],
     ['/brief', 'Brief', 'Today’s setup, in full'],
     ['/methodology', 'Methodology', 'How every number on this site is made'],
@@ -3222,6 +3583,153 @@
    */
   const prose = (eyebrow, title, sub, body) =>
     head(title, sub, eyebrow) + `<div class="prose">${body}</div>`;
+
+
+  /* ── NEWS ─────────────────────────────────────────────────────────────────
+   *
+   * The front page showed six of eighteen stories under a caption that said
+   * eighteen. This is the rest of them, and the reason the section is worth
+   * its own route rather than a longer list.
+   *
+   * WHAT "IMPACT" MEANS HERE, AND WHAT IT DOES NOT.
+   *
+   * The obvious version of this feature is a paragraph of generated
+   * commentary under each headline explaining why it matters. This site does
+   * not do that, for the same reason it draws closing prices instead of
+   * candles: it would be inventing the part the reader cannot check.
+   *
+   * What it does instead is a join. Each story's text is matched against the
+   * 750 screened names, and every name it mentions is shown with the move
+   * that name actually made. That is a measured reaction, not an opinion
+   * about one — and it answers the question a reader of a market wire is
+   * really asking, which is not "what does this mean" but "does this touch
+   * anything I hold".
+   *
+   * The matcher is deliberately conservative. It requires a whole-word hit on
+   * either the ticker or a distinctive leading phrase of the company name,
+   * both at least five characters, with a stoplist for the words that would
+   * otherwise match half the market ("Energy", "Finance", "India"). A missed
+   * link costs the reader nothing; a wrong one puts a price move under a
+   * headline it has nothing to do with, which is the failure that matters.
+   */
+  const NEWS_STOP = new Set(['india','energy','finance','power','motors','steel','bank',
+    'industries','limited','ltd','corporation','company','national','general','united',
+    'first','global','capital','holdings','services','technologies','international']);
+
+  // "Zydus Lifesciences Ltd." -> "zydus lifesciences". Legal suffixes carry no
+  // identifying information and stop the phrase matching running text.
+  const newsPhrase = name => String(name || '')
+    .replace(/\b(ltd|limited|inc|plc|corp|corporation|company|co)\b\.?/gi, '')
+    .replace(/[^A-Za-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
+    .split(' ').slice(0, 2).join(' ');
+
+  /* CAPITALISATION IS THE EVIDENCE.
+   *
+   * The first cut of this matched lower-cased text against lower-cased names
+   * and produced, out of four matches, three wrong ones: "US central bank
+   * chair" was filed under Central Bank of India, and "Every bank says I need
+   * her signature" under Signatureglobal. Both are the same mistake — an
+   * English phrase that happens to spell a company.
+   *
+   * A stoplist cannot fix that; the list would have to be the dictionary. The
+   * fix is to stop throwing away the evidence that was in the text all along.
+   * A company is a proper noun and is capitalised: "HDFC Bank" in a headline
+   * is the bank, "central bank" is not a company, and a ticker written in
+   * prose is upper-case. So the search runs against the ORIGINAL casing and a
+   * hit only counts if it looks like a name where it was found.
+   *
+   * This trades recall for precision on purpose. A story whose only mention
+   * of a company is lower-cased goes unlinked, and that costs the reader
+   * nothing. A price move printed under a headline it has nothing to do with
+   * is the site telling the reader something false.
+   */
+  const reEsc = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  function newsMatch(story, universe) {
+    const raw = `${story.title || ''} — ${story.summary || ''}`;
+    const hits = [];
+    for (const r of universe) {
+      const sym = String(r.sym || '').trim();
+      const phrase = newsPhrase(r.name);
+      let hit = false;
+
+      // A ticker in running prose is upper-case. Case-SENSITIVE on purpose:
+      // this is what separates the ticker SIGNATURE from the word signature.
+      if (sym.length >= 4 && new RegExp(`\\b${reEsc(sym)}\\b`).test(raw)) hit = true;
+
+      // A company phrase must be capitalised where it appears. Found case-
+      // insensitively, then checked against the original text.
+      if (!hit && phrase.length >= 5 && !NEWS_STOP.has(phrase.split(' ')[0])) {
+        const m = raw.match(new RegExp(`\\b${reEsc(phrase).replace(/ /g, '\\s+')}\\b`, 'i'));
+        if (m && m[0].split(/\s+/).every(w => /^[A-Z0-9]/.test(w))) hit = true;
+      }
+
+      if (hit) hits.push(r);
+      if (hits.length >= 4) break;   // a headline touching five names is a match bug
+    }
+    return hits;
+  }
+
+  let newsQ = '', newsSrc = '';
+  R['/news'] = async () => {
+    const [n, sc] = await Promise.all([get('/news.json'), get('/screen.json')]);
+    if (!n.ok) { paint(head('The wire', '', 'Every story') + fail('The wire', n.error)); return; }
+    const all = Array.isArray(n.data) ? n.data : [];
+    const universe = sc.ok ? (sc.data.rows || sc.data.data || []) : [];
+
+    const draw = () => {
+      const q = newsQ.trim().toLowerCase();
+      const rows = all.filter(x =>
+        (!newsSrc || (x.source || '') === newsSrc) &&
+        (!q || `${x.title} ${x.summary} ${x.source}`.toLowerCase().includes(q)));
+      const sources = [...new Set(all.map(x => x.source).filter(Boolean))].sort();
+
+      const body = rows.length ? `<div class="nw">${rows.map(x => {
+        const hits = universe.length ? newsMatch(x, universe) : [];
+        return `<article class="nw-i">
+          <div class="nw-m"><span class="nw-s">${esc(x.source || 'wire')}</span></div>
+          <h3 class="nw-t">${x.link
+            ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title || '')}</a>`
+            : esc(x.title || '')}</h3>
+          ${x.summary ? `<p class="nw-d">${esc(x.summary)}</p>` : ''}
+          ${hits.length ? `<div class="nw-h">
+            <span class="nw-hl">On the screen</span>
+            ${hits.map(r => `<a class="nw-c ${dir(r.r1d)}" href="#/screen"
+                 title="${esc(r.name || '')} — ${esc(r.sector || '')}">
+               <b>${esc(r.sym)}</b><i>${pct(r.r1d)}</i></a>`).join('')}
+          </div>` : ''}
+        </article>`;
+      }).join('')}</div>`
+        : `<div class="empty">No story matches that.</div>`;
+
+      paint(head('The wire', 'Every story on the tape today, and the screened names each one mentions.', 'The full file') +
+        sec('Filter', `<div class="tools">
+            <input type="search" id="nwq" class="scr-in" value="${esc(newsQ)}"
+                   placeholder="Search headlines, summaries or sources" aria-label="Search the wire">
+          </div>
+          <div class="chips" role="group" aria-label="Source">
+            <button type="button" class="chip${newsSrc ? '' : ' on'}" data-s="" aria-pressed="${!newsSrc}">All sources</button>
+            ${sources.map(sv => `<button type="button" class="chip${newsSrc === sv ? ' on' : ''}"
+               data-s="${esc(sv)}" aria-pressed="${newsSrc === sv}">${esc(sv)}</button>`).join('')}
+          </div>`, `${rows.length} of ${all.length}`) +
+        sec('Stories', body, null,
+          'The names under a headline are a text match against the 750-name screen, shown with the move that name actually made — not a view on what the story means.'));
+
+      const qi = document.getElementById('nwq');
+      if (qi) {
+        qi.addEventListener('input', () => {
+          newsQ = qi.value;
+          const at = qi.selectionStart;
+          draw();
+          const again = document.getElementById('nwq');
+          if (again) { again.focus(); try { again.setSelectionRange(at, at); } catch (e) { /* not text */ } }
+        });
+      }
+      document.querySelectorAll('.chip[data-s]').forEach(b =>
+        b.addEventListener('click', () => { newsSrc = b.dataset.s; draw(); }));
+    };
+    draw();
+  };
 
   R['/methodology'] = async () => {
     paint(prose('How this works', 'Every number, and where it comes from.',
@@ -3643,6 +4151,8 @@
     main.classList.remove('route-in');
     void main.offsetWidth;                       // restart the animation
     main.classList.add('route-in');
+    // A new route reads a different set of feeds; the probe must follow it.
+    routeUrls = new Set();
     try { await R[path](); } catch (err) {
       paint(fail('This section', err && err.message ? err.message : 'unexpected error'));
     }
@@ -3690,6 +4200,21 @@
       .map(b => (b.querySelector('.mk-nm') || {}).textContent)
       .filter(Boolean).map(t => t.trim());
     const y = window.scrollY;
+
+    /* PROBE BEFORE PAINTING.
+     *
+     * Re-fetch exactly the feeds this route read last time and compare their
+     * bodies. If not one of them changed there is nothing to show, and the
+     * cheapest, least annoying repaint is the one that does not happen. The
+     * render that follows a changed probe re-reads the same URLs out of MICRO,
+     * so this costs one set of requests, not two. */
+    const probe = [...routeUrls];
+    if (probe.length) {
+      const rev = feedRev;
+      try { await Promise.all(probe.map(u => get(u))); }
+      catch (e) { return; }                    // offline: keep what is on screen
+      if (feedRev === rev) return;             // nothing moved
+    }
 
     /* What the numbers said BEFORE the repaint, so the ones that moved can be
      * pointed at afterwards. See flashChanged(). */
@@ -3857,8 +4382,30 @@
   // the choice persists. Deliberately not following prefers-color-scheme: the
   // page is designed light first, and an OS set to dark should not silently
   // serve a different design than the one a first-time reader is shown.
+  /* THE MACHINE GETS A VOTE, THE READER GETS A VETO.
+   *
+   * This read "saved === 'dark' ? dark : light", so a reader whose every
+   * other application is dark landed on a white page and had to say so by
+   * hand, on every device. The OS preference is a preference; ignoring it is
+   * a choice this site had made by accident.
+   *
+   * An explicit choice still wins and still persists — that is the veto. Only
+   * when nothing has been chosen does the system decide. And once a reader has
+   * chosen, later OS changes leave them where they put themselves. */
   const saved = (() => { try { return localStorage.getItem('sig:theme'); } catch (e) { return null; } })();
-  root.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+  const prefersDark = matchMedia('(prefers-color-scheme: dark)');
+  root.setAttribute('data-theme',
+    saved === 'dark' || saved === 'light' ? saved
+      : (prefersDark.matches ? 'dark' : 'light'));
+
+  // A reader who has never chosen follows the system as it changes — someone
+  // on an automatic day/night schedule should not have this one tab stay lit.
+  prefersDark.addEventListener('change', e => {
+    let chosen = null;
+    try { chosen = localStorage.getItem('sig:theme'); } catch (err) { /* private mode */ }
+    if (chosen === 'dark' || chosen === 'light') return;
+    root.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+  });
   document.getElementById('cmdkBtn')?.addEventListener('click', openCmd);
   document.getElementById('themeBtn').addEventListener('click', () => {
     const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';

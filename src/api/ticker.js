@@ -187,23 +187,33 @@ export default async function handler(req, res) {
         return { ...it, note: m && m.target ? `T ₹${fmtNum(m.target, 0)}` : null };
       });
 
+    /* ORDER IS AN EDITORIAL CLAIM, NOT AN ARRAY LITERAL.
+     *
+     * The board opened on ASIA — so the first thing an Indian reader saw on a
+     * page about Indian markets was the Nikkei. The order now reads outward
+     * from home: India and everything derived from it, then the rest of the
+     * world's equity in the sequence the trading day actually arrives (Asia,
+     * Europe, US), then the cross-asset tail. Commodities and crypto sit last
+     * because they are the only rows that keep moving after every equity
+     * market on this list has closed — the bottom of the board is the part
+     * still worth looking at at midnight. */
     const segments = [
-      seg("asia", "ASIA", "🌏", pick(ASIA)),
       seg("india", "INDIA", "🇮🇳", pick(INDIA)),
       seg("gainers", "NIFTY 50 GAINERS", "🚀", gainers),
       seg("losers", "NIFTY 50 LOSERS", "🔻", losers),
-      seg("europe", "EUROPE", "🇪🇺", pick(EUROPE)),
-      seg("us", "US", "🇺🇸", pick(US_INDICES)),
-      seg("ustop", "US TOP 10", "🏛", pick(US_TOP10)),
-      seg("commodities", "COMMODITIES", "🛢", pick(COMMODITIES)),
-      seg("fx", "FX", "💱", pick(FX)),
-      seg("crypto", "CRYPTO", "₿", pick(CRYPTO)),
       // Labelled WEEKLY, because it is. The five names come from the Saturday
       // scan's newest row and do not change until the next Saturday — the
       // prices beside them are live, which makes a stalled-looking list of
       // names look like a bug rather than the design. Every other weekly
       // artefact on this site prints its vintage; this one did not.
       seg("multibagger", "MULTIBAGGER IDEAS · WEEKLY", "💎", mbItems),
+      seg("asia", "ASIA", "🌏", pick(ASIA)),
+      seg("europe", "EUROPE", "🇪🇺", pick(EUROPE)),
+      seg("us", "US", "🇺🇸", pick(US_INDICES)),
+      seg("ustop", "US TOP 10", "🏛", pick(US_TOP10)),
+      seg("fx", "FX", "💱", pick(FX)),
+      seg("commodities", "COMMODITIES", "🛢", pick(COMMODITIES)),
+      seg("crypto", "CRYPTO", "₿", pick(CRYPTO)),
     ].filter((s) => s.items.length);
 
     // "Markets advancing" in the hero counts headline instruments only —

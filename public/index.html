@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -47,6 +47,21 @@
      and CLS is a promise not to move what someone is reading. 22 KB, latin. -->
 <link rel="preload" href="/fonts/Newsreader-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/signal.css">
+<script>
+/* THEME BEFORE FIRST PAINT.
+   data-theme was hardcoded to "light" on <html>, so a reader on a dark
+   machine got a full white page for as long as the deferred renderer took to
+   load, then a flip. This is the one script that has to be inline and
+   blocking: anything deferred is by definition after the paint it is meant to
+   prevent. It repeats the rule in signal.js — an explicit choice wins, the
+   system decides otherwise — and signal.js remains the owner of the toggle. */
+(function(){try{
+  var c=localStorage.getItem('sig:theme');
+  if(c!=='dark'&&c!=='light')
+    c=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+  document.documentElement.setAttribute('data-theme',c);
+}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -91,6 +106,7 @@
   <a href="#/ideas"   data-route="/ideas"   ><span>Ideas</span></a>
   <a href="#/ipo"     data-route="/ipo"     ><span>IPO</span></a>
   <a href="#/screen"  data-route="/screen"  ><span>Screen</span></a>
+  <a href="#/news"    data-route="/news"    ><span>News</span></a>
   <a href="#/signals" data-route="/signals" ><span>Signals</span></a>
   <a href="#/brief"   data-route="/brief"   ><span>Brief</span></a>
   <a href="#/watch"   data-route="/watch"   ><span>Watch</span></a>
@@ -113,7 +129,6 @@
   <p class="foot-link">
     <a href="https://www.linkedin.com/in/akkothari" rel="me noopener" target="_blank">LinkedIn</a> ·
     <a href="https://askakshay.com/" rel="me noopener" target="_blank">askakshay.com</a> ·
-    <a href="https://www.instagram.com/askakshayfinance" rel="me noopener" target="_blank">Instagram</a> ·
     <a href="mailto:ca.akshayk1@gmail.com">Email</a>
   </p>
   <p><a href="#/methodology">Methodology</a> · <a href="#/sources">Data sources</a> ·
@@ -135,7 +150,6 @@
   "url":"https://askakshay.com/",
   "knowsAbout":["Indian equity markets","Financial planning and analysis","Technical analysis","Quantitative screening"],
   "sameAs":["https://www.linkedin.com/in/akkothari",
-            "https://www.instagram.com/askakshayfinance",
             "https://askakshay.com/",
             "https://news.askakshay.com/"]}]}
 </script>
