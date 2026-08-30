@@ -777,18 +777,40 @@ body::before{display:none}
    and UI. Both already self-hosted here.                                    */
 /* Faces are declared once, at the top of this file. */
 
+/* THE BRIEF FOLLOWS THE SITE'S THEME NOW.
+ *
+ * It used to be dark unconditionally, on a site that is light by default. The
+ * reasoning was that a thesis is read at 6am — but the effect on a reader who
+ * has not chosen dark is that one tab of the product is a different product.
+ * Clicking Brief turned the lights off without being asked.
+ *
+ * So the --b-* tokens are derived from the site's own in light, and keep their
+ * original hand-tuned values in dark. The brief's identity was never the black
+ * background: it is the serif headlines, the level map and the numbered
+ * thesis, and all of those survive the switch. Anyone who wants it dark still
+ * has the toggle, and now the whole site goes with it.
+ *
+ * The directional tones stay slightly muted against the site's --up/--down on
+ * purpose. A saturated green on every positive number is how a research page
+ * starts reading like a casino. */
 .brief{
-  --b-bg:#0A0C0F; --b-sur:#13161B; --b-hi:#191D23;
-  --b-line:rgba(255,255,255,.08); --b-line2:rgba(255,255,255,.15);
-  --b-ink:#F3F5F8; --b-mut:#98A0AB; --b-dim:#6E7681;
-  /* One primary accent, two controlled directional tones, gold for levels.
-     Nothing is bright: a saturated green on every positive number is how a
-     research page starts reading like a casino. */
-  --b-acc:#7A9BEE; --b-bull:#4E9E72; --b-bear:#C15F54; --b-gold:#C9A961;
+  --b-bg:var(--bg); --b-sur:var(--surface); --b-hi:var(--raised);
+  --b-line:var(--line); --b-line2:var(--line2);
+  --b-ink:var(--text); --b-mut:var(--muted); --b-dim:var(--dim);
+  --b-acc:var(--accent); --b-bull:var(--up); --b-bear:var(--down); --b-gold:#8A6208;
   --b-serif:'Newsreader',Georgia,serif;
   background:var(--b-bg);color:var(--b-ink);
   margin:-20px calc(var(--gut) * -1) -40px;padding:0 var(--gut) 64px;
   font-family:var(--ui);
+}
+/* Dark keeps the values the brief was designed against, rather than inheriting
+   the site's — these were tuned for a full-bleed dark surface and the site's
+   dark tokens are tuned for cards on a dark ground. */
+:root[data-theme="dark"] .brief{
+  --b-bg:#0A0C0F; --b-sur:#13161B; --b-hi:#191D23;
+  --b-line:rgba(255,255,255,.08); --b-line2:rgba(255,255,255,.15);
+  --b-ink:#F3F5F8; --b-mut:#98A0AB; --b-dim:#6E7681;
+  --b-acc:#7A9BEE; --b-bull:#4E9E72; --b-bear:#C15F54; --b-gold:#C9A961;
 }
 .brief ::selection{background:var(--b-acc);color:#0A0C0F}
 .b-wrap{max-width:1180px;margin:0 auto}
@@ -813,7 +835,7 @@ body::before{display:none}
 .b-dir-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
 .b-tag{font:500 10.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;
   padding:5px 8px;border:1px solid var(--b-line2);border-radius:4px;color:var(--b-mut)}
-.b-tag.is-live{color:var(--b-bull);border-color:transparent;background:rgba(78,158,114,.14);
+.b-tag.is-live{color:var(--b-bull);border-color:transparent;background:color-mix(in srgb,var(--b-bull) 14%,transparent);
   display:inline-flex;align-items:center;gap:6px}
 .b-tag.is-live i{width:6px;height:6px;border-radius:50%;background:var(--b-bull);
   animation:bpulse 2.4s ease-in-out infinite}
@@ -863,8 +885,13 @@ body::before{display:none}
   padding:14px 0}
 .b-ladder .b-lvl,.b-ladder .b-band{margin-top:14px}
 .b-band{position:absolute;left:0;right:0;border-radius:4px}
-.b-band.risk{background:linear-gradient(180deg,rgba(193,95,84,.13),rgba(193,95,84,.03))}
-.b-band.reward{background:linear-gradient(180deg,rgba(78,158,114,.03),rgba(78,158,114,.13))}
+/* Tinted from the live directional tokens so the bands work on either ground. */
+.b-band.risk{background:linear-gradient(180deg,
+  color-mix(in srgb,var(--b-bear) 14%,transparent),
+  color-mix(in srgb,var(--b-bear) 3%,transparent))}
+.b-band.reward{background:linear-gradient(180deg,
+  color-mix(in srgb,var(--b-bull) 3%,transparent),
+  color-mix(in srgb,var(--b-bull) 14%,transparent))}
 .b-lvl{position:absolute;left:0;right:0;display:flex;align-items:center;gap:10px;
   transform:translateY(-50%);opacity:0;animation:blvl .5s cubic-bezier(.2,.8,.2,1) forwards}
 @keyframes blvl{from{opacity:0;transform:translateY(-50%) translateX(-6px)}to{opacity:1;transform:translateY(-50%)}}
@@ -1205,7 +1232,7 @@ body::before{display:none}
     border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
 .b-px-h .rgs button:hover{color:var(--b-ink);background:var(--b-hi)}
 .b-px-h .rgs button[aria-pressed="true"]{color:var(--b-ink);border-color:var(--b-line2)}
-.b-px-c{position:relative;touch-action:pan-y}
+.b-px-c{position:relative;touch-action:pan-y;color:var(--b-acc)}
 .b-px-c svg{display:block;width:100%;height:clamp(240px,32vw,340px)}
 .b-px-c .grid line{stroke:var(--b-line);stroke-width:1}
 .b-px-c .price{fill:none;stroke:var(--b-acc);stroke-width:1.75;
@@ -1258,12 +1285,12 @@ body::before{display:none}
 .b-zone-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .b-zst{font:500 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;
   padding:7px 11px;border-radius:6px;border:1px solid transparent}
-.b-zst.wait{color:var(--b-gold);background:rgba(201,169,97,.14)}
-.b-zst.active{color:var(--b-bull);background:rgba(78,158,114,.15)}
+.b-zst.wait{color:var(--b-gold);background:color-mix(in srgb,var(--b-gold) 14%,transparent)}
+.b-zst.active{color:var(--b-bull);background:color-mix(in srgb,var(--b-bull) 15%,transparent)}
 .b-zst.missed{color:var(--b-mut);border-color:var(--b-line2)}
-.b-zst.invalid{color:var(--b-bear);background:rgba(193,95,84,.15)}
+.b-zst.invalid{color:var(--b-bear);background:color-mix(in srgb,var(--b-bear) 15%,transparent)}
 .b-zt{position:relative;height:6px;border-radius:4px;background:var(--b-hi);margin:22px 0 10px}
-.b-zt .band{position:absolute;top:0;bottom:0;background:rgba(78,158,114,.28);border-radius:4px}
+.b-zt .band{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--b-bull) 28%,transparent);border-radius:4px}
 .b-zt .stop{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--b-bear)}
 .b-zt .tgt{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--b-bull)}
 .b-zt .now{position:absolute;top:50%;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:50%;
@@ -1357,9 +1384,9 @@ body::before{display:none}
              background var(--t-fast) var(--ease)}
 .b-scb button:hover{color:var(--b-ink)}
 .b-scb button[aria-pressed="true"]{color:var(--b-ink);border-color:currentColor}
-.b-scb button.bull[aria-pressed="true"]{color:var(--b-bull);background:rgba(78,158,114,.12)}
-.b-scb button.base[aria-pressed="true"]{color:var(--b-acc);background:rgba(122,155,238,.12)}
-.b-scb button.bear[aria-pressed="true"]{color:var(--b-bear);background:rgba(193,95,84,.12)}
+.b-scb button.bull[aria-pressed="true"]{color:var(--b-bull);background:color-mix(in srgb,var(--b-bull) 12%,transparent)}
+.b-scb button.base[aria-pressed="true"]{color:var(--b-acc);background:color-mix(in srgb,var(--b-acc) 12%,transparent)}
+.b-scb button.bear[aria-pressed="true"]{color:var(--b-bear);background:color-mix(in srgb,var(--b-bear) 12%,transparent)}
 .b-scp{margin-top:22px;border:1px solid var(--b-line);border-radius:12px;background:var(--b-sur);
   padding:clamp(20px,3vw,28px)}
 .b-scp h4{font:400 clamp(19px,2.4vw,25px)/1.22 var(--b-serif);color:var(--b-ink);max-width:30ch}
@@ -1379,8 +1406,8 @@ body::before{display:none}
 .b-rrb .row{display:grid;grid-template-columns:74px 1fr auto;gap:12px;align-items:center}
 .b-rrb .row .k{font:500 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--b-dim)}
 .b-rrb .row .b{height:26px;border-radius:5px;transition:width var(--t-slow) var(--ease-out);min-width:2px}
-.b-rrb .row .b.loss{background:linear-gradient(90deg,rgba(193,95,84,.75),rgba(193,95,84,.35))}
-.b-rrb .row .b.gain{background:linear-gradient(90deg,rgba(78,158,114,.75),rgba(78,158,114,.35))}
+.b-rrb .row .b.loss{background:linear-gradient(90deg,color-mix(in srgb,var(--b-bear) 75%,transparent),color-mix(in srgb,var(--b-bear) 35%,transparent))}
+.b-rrb .row .b.gain{background:linear-gradient(90deg,color-mix(in srgb,var(--b-bull) 75%,transparent),color-mix(in srgb,var(--b-bull) 35%,transparent))}
 .b-rrb .row .v{font:500 13.5px/1 var(--mono);font-variant-numeric:tabular-nums}
 .b-sl{display:grid;gap:16px}
 .b-sl label{display:block;font:500 9.5px/1 var(--mono);letter-spacing:.12em;
@@ -1462,13 +1489,10 @@ body::before{display:none}
 .brief .tipb{color:var(--b-dim)}
 .brief .tipb::before{border-color:var(--b-line2)}
 .brief .tipb:hover,.brief .tipb[aria-expanded="true"]{color:var(--b-ink)}
-/* The card lives on <body>, outside .brief, so it cannot be selected by a
-   descendant rule. openTip() tags it instead when its trigger is in the brief. */
-.tipc.on-dark{background:#191D23;color:#F3F5F8;border:1px solid rgba(255,255,255,.15);
-  box-shadow:0 8px 26px rgba(0,0,0,.45)}
-.tipc.on-dark::after{border-top-color:#191D23}
-.tipc.on-dark.below::after{border-top-color:transparent;border-bottom-color:#191D23}
-.tipc.on-dark b{color:#98A0AB;opacity:1}
+/* The forced-dark tooltip variant is gone. .tipc is painted with --text on
+   --bg, which invert with the theme by themselves — it only needed overriding
+   while the brief was dark on a light site, and the brief follows the theme
+   now. One fewer special case. */
 
 /* ── TOUCH TARGETS ────────────────────────────────────────────────────────
    Two elements were under the 24px minimum once they became interactive.
@@ -1716,3 +1740,38 @@ body::before{display:none}
   text-align:center;flex:1 1 auto;min-width:0}
 .pg-n b{color:var(--text);font-weight:500}
 @media(max-width:520px){.pg-n{order:-1;flex-basis:100%}}
+
+/* ── IDEA CARD CHARTS ─────────────────────────────────────────────────────
+   Six months of real closes with the target and stop drawn to scale, so the
+   distance being asked for is visible before any number is read. The slot is
+   reserved at its final height and filled after paint — nothing shifts. */
+.idea-cx{position:relative;height:72px;margin:2px 0 2px;display:flex;
+  align-items:center;justify-content:center}
+.ic{display:block;width:100%;height:64px}
+.ic-p{fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round;
+  vector-effect:non-scaling-stroke}
+.ic-f{fill:currentColor;opacity:.07;stroke:none}
+.ic.up{color:var(--up)} .ic.dn{color:var(--down)}
+.ic-l{stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
+.ic-l.t{stroke:var(--up);opacity:.75} .ic-l.s{stroke:var(--down);opacity:.75}
+.idea-cxl{position:absolute;right:2px;bottom:-2px;font:400 9px/1 var(--mono);
+  letter-spacing:.05em;color:var(--dim);opacity:.7;pointer-events:none}
+/* A symbol with no published history keeps its slot and says so, rather than
+   collapsing the card and making the grid ragged. */
+.idea-nocx{font:400 10px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--dim);opacity:.6}
+/* A footnote under a fact in the brief's definition grid. */
+.b-fn{margin:5px 0 0;font:400 11px/1.4 var(--ui);color:var(--b-dim)}
+
+/* ── ROUTE TRANSITION ─────────────────────────────────────────────────────
+   The last of the three gaps: a route change swapped the whole page in one
+   frame, which reads as a reload rather than a navigation. 120ms of opacity
+   and 4px of travel is enough to say "this is the same product, showing you
+   something else". Opacity and transform only, so it composites.
+
+   Deliberately NOT applied to the 60-second refresh — that repaints the same
+   route, and fading the page someone is reading would be worse than not
+   animating at all. render() adds the class; refresh() does not. */
+main.route-in{animation:routeIn 200ms var(--ease-out) both}
+@keyframes routeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){main.route-in{animation:none}}

@@ -299,7 +299,6 @@
     b.setAttribute('aria-expanded', 'true');
     tipCard.innerHTML = `<b>${esc(t[0])}</b>${esc(t[1])}`;
     // Inside the brief the ground is near-black, so the card inverts there.
-    tipCard.classList.toggle('on-dark', !!b.closest('.brief'));
     tipCard.classList.add('on');
 
     const pad = 10;
@@ -861,6 +860,10 @@
         <span class="num ${dir(p.change_1d)}" style="font-size:13px">${pct(p.change_1d)}</span>
       </div>
       ${lead && p.target_basis ? `<div class="card-body">Target is ${esc(p.target_basis)}; the stop is ${esc(p.stop_basis || 'below the trend')}.</div>` : ''}
+      <!-- The chart slot is emitted EMPTY and filled after paint, at its final
+           height, so the six-month line arriving shifts nothing. A card whose
+           series never loads keeps a labelled blank rather than collapsing. -->
+      <div class="idea-cx" data-cx="${esc(p.symbol || '')}" aria-hidden="true"></div>
       <div class="kv">
         <div><span class="kk">Price</span><span class="vv">${cur}${esc(p.price)}</span></div>
         <div><span class="kk">Target</span><span class="vv up">${cur}${esc(p.target)}</span></div>
@@ -871,6 +874,51 @@
       </div>
     </article>`;
   };
+
+  /* ── IDEA CARD CHARTS ────────────────────────────────────────────────────
+   * Six months of real daily closes on every idea, with the target and the
+   * stop drawn as rules across it — so the reader can see whether the level
+   * being asked for is a short step or a long one before reading a number.
+   *
+   * Fetched one symbol at a time and drawn as it arrives, deliberately: a
+   * dozen cards means a dozen small requests the browser pipelines, against a
+   * cache that already holds most of them, and no card waits on any other. A
+   * symbol with no published history keeps its slot and says so, which is the
+   * same rule the markets board follows.
+   */
+  async function fillIdeaCharts(picks) {
+    const slots = [...main.querySelectorAll('.idea-cx[data-cx]')];
+    await Promise.all(slots.map(async el => {
+      const sym = el.dataset.cx;
+      if (!sym) return;
+      const pick = (picks || []).find(x => (x.symbol || '') === sym) || {};
+      const r = await get('/api/signals?series=' + encodeURIComponent(sym) + '&range=6mo');
+      if (!el.isConnected) return;                 // route changed while fetching
+      const pts = r.ok && Array.isArray(r.data.points) ? r.data.points : null;
+      if (!pts || pts.length < 5) {
+        el.innerHTML = `<span class="idea-nocx">no published price history</span>`;
+        return;
+      }
+      const closes = pts.map(x => x.c);
+      const lv = [Number(pick.target), Number(pick.stop_loss)].filter(Number.isFinite);
+      const lo = Math.min(...closes, ...lv), hi = Math.max(...closes, ...lv);
+      const span = (hi - lo) || 1, W = 300, H = 64, PAD = 3;
+      const X = i => (i / Math.max(1, closes.length - 1)) * W;
+      const Y = v => PAD + (1 - (v - lo) / span) * (H - PAD * 2);
+      const d = closes.map((v, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(2)).join(' ');
+      const rule = (v, cls) => Number.isFinite(v)
+        ? `<line class="ic-l ${cls}" x1="0" x2="${W}" y1="${Y(v).toFixed(2)}" y2="${Y(v).toFixed(2)}"/>` : '';
+      const up = closes[closes.length - 1] >= closes[0];
+      el.innerHTML = `<svg class="ic ${up ? 'up' : 'dn'}" viewBox="0 0 ${W} ${H}"
+          preserveAspectRatio="none" role="img"
+          aria-label="${esc(sym)}: ${pts.length} daily closes from ${esc(pts[0].t || '')} to ${esc(pts[pts.length - 1].t || '')}">
+          <path class="ic-f" d="${d} L${W} ${H} L0 ${H} Z"/>
+          <path class="ic-p" d="${d}"/>
+          ${rule(Number(pick.target), 't')}${rule(Number(pick.stop_loss), 's')}
+        </svg>
+        <span class="idea-cxl">6M closes · target and stop to scale</span>`;
+    }));
+  }
 
   // The verdict leads. Someone deciding whether to apply wants the call and
   // the reason before the lot size.
@@ -1027,6 +1075,8 @@
           </article>`; }).join('') : `<div class="empty">No orders clear the mandate today.</div>`));
     }
     paint(out);
+    fillIdeaCharts(picks);   // six months of real closes on every idea, after paint
+
   };
 
   R['/ipo'] = async () => {
@@ -1735,8 +1785,8 @@
       html: `<div class="b-px-c" id="pxc">
         <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" focusable="false">
           <defs><linearGradient id="bgrad" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stop-color="#7A9BEE" stop-opacity=".16"/>
-            <stop offset="100%" stop-color="#7A9BEE" stop-opacity="0"/></linearGradient></defs>
+            <stop offset="0%" stop-color="currentColor" stop-opacity=".16"/>
+            <stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
           ${zone(cur.stop, cur.entry, 'r', 6)}
           ${zone(cur.entry, cur.t2, 'g', 7)}
           <path class="parea" d="${d} L${W} ${H} L0 ${H} Z"/>
@@ -2120,7 +2170,12 @@
                 ${(() => {
                   const R = 50, C = 2 * Math.PI * R;
                   const n = COMPS.length, seg = C / n, gap = 3;
-                  const col = ['#4E9E72', '#7A9BEE', '#C9A961', '#98A0AB', '#C15F54'];
+                  // Read from the live tokens so the dial matches whichever
+                  // theme is on, rather than the dark palette it was drawn for.
+                  const cs = getComputedStyle(document.documentElement);
+                  const tok = n => (cs.getPropertyValue(n) || '').trim();
+                  const col = [tok('--up') || '#4E9E72', tok('--accent') || '#7A9BEE',
+                               '#8A6208', tok('--dim') || '#98A0AB', tok('--down') || '#C15F54'];
                   return COMPS.map(([nm, , v], i) => {
                     const len = Number.isFinite(v) ? (seg - gap) * (v / 100) : 0;
                     return `<circle class="seg" data-seg="${i}" cx="60" cy="60" r="${R}"
@@ -2139,7 +2194,11 @@
           </div>
           <div id="crows">
             ${COMPS.map(([nm, , v, why], i) => {
-              const col = ['#4E9E72', '#7A9BEE', '#C9A961', '#98A0AB', '#C15F54'][i];
+              // Same five, from the live tokens — see the dial above.
+              const _cs = getComputedStyle(document.documentElement);
+              const _t = n => (_cs.getPropertyValue(n) || '').trim();
+              const col = [_t('--up') || '#4E9E72', _t('--accent') || '#7A9BEE', '#8A6208',
+                           _t('--dim') || '#98A0AB', _t('--down') || '#C15F54'][i];
               return `<button type="button" class="b-crow" data-seg="${i}" aria-expanded="false">
                 <span class="dot" style="background:${col}" aria-hidden="true"></span>
                 <span><span class="nm">${esc(nm)}</span><span class="why">${esc(why)}</span>
@@ -2171,6 +2230,71 @@
         <p class="b-p" style="font-size:13px">A stance is scored, not asserted: 60 and above reads bullish,
           40 to 60 neutral, below 40 bearish, on the same component scores shown above. Tap a row for the
           reason.</p>
+      </section>
+
+      <section class="b-sec b-reveal">
+        <div class="b-lab">The business</div>
+        <h2 class="b-h2">What the company behind the trade actually earns.</h2>
+        ${(() => {
+          /* A SETUP IS NOT A COMPANY. Everything above this section is price:
+           * levels, momentum, structure, volume. None of it knows whether the
+           * business makes money. These are the screen's own fundamental
+           * fields for the same name, on the same build — so a reader can see
+           * that a clean chart sits on a 78x earnings multiple, or that a
+           * breakout is happening in a business whose profit is not arriving
+           * as cash.
+           *
+           * ANNUAL, NOT QUARTERLY, and it says so. The screen carries
+           * year-on-year growth off the filings; there is no quarterly series
+           * anywhere in this product, so none is shown or implied. */
+          const n = v => Number.isFinite(Number(v)) ? Number(v) : null;
+          const cell = (k, v, note) => `<div class="b-vi"><dt>${esc(k)}</dt>
+            <dd${v == null ? ' class="txt" style="color:var(--b-dim)"' : ''}>${v == null ? 'Not measured' : v}</dd>
+            ${note ? `<dd class="b-fn">${esc(note)}</dd>` : ''}</div>`;
+          const money = v => n(v) == null ? null
+            : n(v) >= 1e5 ? '₹' + (n(v) / 1e5).toFixed(2) + ' lakh cr'
+            : '₹' + Math.round(n(v)).toLocaleString('en-IN') + ' cr';
+          const x = v => n(v) == null ? null : n(v).toFixed(2) + '×';
+          const p1 = v => n(v) == null ? null : n(v).toFixed(1) + '%';
+          const has = ['roce', 'roe', 'pe', 'rev_yoy', 'pat_yoy', 'mcap_cr']
+            .some(k => n(row[k]) != null);
+          if (!has) return `<div class="empty" style="margin-top:22px">This name is not on the
+            750-name screen, so no fundamental data is published for it here. The price half of
+            this brief still stands; the business half is simply not measured.</div>`;
+          return `<dl class="b-view" style="margin-top:22px">
+            ${cell('Market cap', money(row.mcap_cr))}
+            ${cell('Sector', row.sector ? esc(row.sector) : null)}
+            ${cell('P / E', x(row.pe), n(row.pe) != null && n(row.pe) > 50 ? 'richly valued' : '')}
+            ${cell('P / B', x(row.pb))}
+            ${cell('ROCE', p1(row.roce), n(row.roce_med) != null ? `median ${n(row.roce_med).toFixed(1)}%` : '')}
+            ${cell('ROE', p1(row.roe))}
+            ${cell('Debt / equity', x(row.de), n(row.de) != null && n(row.de) < 0.5 ? 'lightly geared' : '')}
+            ${cell('Piotroski', n(row.piotroski) != null ? `${n(row.piotroski)} / ${n(row.piotroski_of) || 9}` : null)}
+          </dl>
+
+          <div class="b-lab" style="margin-top:34px">Latest reported year ${row.fy ? '· ' + esc(row.fy) : ''}</div>
+          <dl class="b-view" style="margin-top:14px">
+            ${cell('Revenue', n(row.rev_yoy) != null ? `<span class="${dir(row.rev_yoy)}">${pct(row.rev_yoy)}</span>` : null, 'year on year')}
+            ${cell('EBITDA', n(row.ebitda_yoy) != null ? `<span class="${dir(row.ebitda_yoy)}">${pct(row.ebitda_yoy)}</span>` : null, 'year on year')}
+            ${cell('Profit', n(row.pat_yoy) != null ? `<span class="${dir(row.pat_yoy)}">${pct(row.pat_yoy)}</span>` : null, 'year on year')}
+            ${cell('EPS', n(row.eps_yoy) != null ? `<span class="${dir(row.eps_yoy)}">${pct(row.eps_yoy)}</span>` : null, 'year on year')}
+            ${cell('Net margin', p1(row.net_margin))}
+            ${cell('Cash conversion', x(row.cfo_pat),
+                   n(row.cfo_pat) != null && n(row.cfo_pat) < 0.8 ? 'profit is not all arriving as cash' : '')}
+            ${cell('Interest cover', x(row.icover),
+                   n(row.icover) != null && n(row.icover) < 3 ? 'thin' : '')}
+            ${cell('Promoter holding', p1(row.insiders))}
+          </dl>
+
+          <p class="b-p" style="font-size:13px">Figures come from company filings as aggregated by
+            the same 750-name screen the rest of this site runs on${row.fy ? `, for ${esc(row.fy)}` : ''}${
+            n(row.fy_count) ? ` across ${n(row.fy_count)} reported years` : ''}.
+            <b style="color:var(--b-ink)">They are annual, not quarterly</b> — no quarterly series
+            exists in this product, so none is shown. Filings get restated and these figures move.
+            Anything the screen does not carry reads <b style="color:var(--b-ink)">Not measured</b>
+            rather than being estimated. <a href="#/methodology" style="color:var(--b-acc)">How the
+            screen is built →</a></p>`;
+        })()}
       </section>
 
       <section class="b-sec b-reveal">
@@ -2469,7 +2593,13 @@
     const jump = id => {
       const el = $(id); if (!el) return;
       const top = el.getBoundingClientRect().top + window.scrollY - stickyOffset();
-      window.scrollTo({ top, behavior: REDUCED ? 'auto' : 'smooth' });
+      /* Smooth ONLY for a short hop. The brief grew long enough that a jump
+       * from the hero to the trade plan travels ~6,500px, and smooth-scrolling
+       * six screens takes two seconds of blurred content going past — which is
+       * slower and more disorienting than simply arriving. Beyond two
+       * viewports it cuts. */
+      const far = Math.abs(top - window.scrollY) > window.innerHeight * 2;
+      window.scrollTo({ top, behavior: (REDUCED || far) ? 'auto' : 'smooth' });
     };
     const qlinks = [...main.querySelectorAll('#qnav a')];
     const jnodes = [...main.querySelectorAll('.b-jn')];
@@ -3170,6 +3300,12 @@
     // Scroll first, then paint: painting first lets the old route's height
     // hold the scroll position and the new route lands mid-page.
     window.scrollTo(0, 0);
+    /* Only a real navigation animates. The 60-second refresh calls R[path]()
+     * directly and never comes through here, so the page someone is reading is
+     * never faded out from under them. */
+    main.classList.remove('route-in');
+    void main.offsetWidth;                       // restart the animation
+    main.classList.add('route-in');
     try { await R[path](); } catch (err) {
       paint(fail('This section', err && err.message ? err.message : 'unexpected error'));
     }

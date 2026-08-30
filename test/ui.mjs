@@ -187,7 +187,15 @@ try {
 
   // Section jump must clear all three sticky layers.
   await p.keyboard.press("4");
-  await p.waitForTimeout(1000);
+  /* Wait for the scroll to SETTLE rather than a fixed timeout. The page grows
+   * as sections are added, so a jump that used to take 300ms started taking
+   * two seconds and the old fixed wait measured it mid-flight — a green test
+   * turning red because the page got longer, not because it broke. */
+  await p.waitForFunction(() => {
+    const y = Math.round(window.scrollY);
+    if (window.__lastY === y) return true;
+    window.__lastY = y; return false;
+  }, null, { timeout: 8000, polling: 200 });
   const planTop = await p.locator("#b-plan").evaluate(e => Math.round(e.getBoundingClientRect().top));
   ok("a section jump clears the sticky stack", planTop > 90 && planTop < 240, planTop);
 
