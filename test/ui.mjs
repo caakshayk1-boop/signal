@@ -321,8 +321,12 @@ try {
     const t = await p.locator("main").innerText();
     console.log("  NOTE  no closed trades since launch — checking the explanation instead");
     ok("the empty curve says the record starts here", /The record starts here/.test(t));
-    ok("the pre-launch history is disclosed, not dropped",
-       /Before this site existed/.test(t) || /did not answer/.test(t));
+    /* The pre-launch summary was REMOVED on request. It was extra context, not
+     * a disclosure the site depended on: this site never counted those trades
+     * as its own, the launch record is empty and says so, and Methodology
+     * still explains that the ledger has been re-graded twice. Asserting its
+     * absence so it does not creep back in unnoticed. */
+    ok("the pre-launch record is not shown", !/Before this site existed/.test(t));
   }
 
   ok("the manifest is linked", await p.locator('link[rel="manifest"]').count() === 1);
@@ -364,8 +368,10 @@ try {
   await p.waitForTimeout(SETTLE + 4000);
   ok("the watchlist shows the starred name",
      (await p.locator("main").innerText()).includes(wSym));
-  ok("the browser-only limitation is disclosed",
-     /lives in this browser/i.test(await p.locator("main").innerText()));
+  // Reworded in plain language: "lives in this browser" read as jargon.
+  const wtxt = await p.locator("main").innerText();
+  ok("the device-only limitation is stated plainly",
+     /Saved on this device only/i.test(wtxt) && /will not appear on your phone/i.test(wtxt));
 
   // An alert below any real price must actually fire, not merely save.
   await p.locator("#alSym").fill(wSym);

@@ -599,6 +599,7 @@
           <span class="s">${watchBtn(r.sym)}<b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span></span>
           <span class="x" style="color:var(--dim)">${r.rsi != null ? 'RSI ' + Math.round(r.rsi) : ''}</span>
           <span class="m ${dir(r[k])}">${pct(r[k])}</span>
+          <span class="pl-w">${priceLine(r)}</span>
         </div>`).join('')}</div>` : `<div class="empty">No names.</div>`;
     sheet(`${esc(name)}`,
       `<p class="hint" style="margin:0 0 14px">Median <b class="${dir(s.median)}">${pct(s.median)}</b>
@@ -798,6 +799,7 @@
           <span class="x" style="color:${hot(sc.rsi)}">${sc.rsi != null ? Math.round(sc.rsi) : '—'}</span>
           <span class="x" style="color:${hot(sc.rsi_m)}">${sc.rsi_m != null ? Math.round(sc.rsi_m) : '—'}</span>
           <span class="m ${dir(r.r1w)}">${pct(r.r1w)}</span>
+          <span class="pl-w">${priceLine(sc)}</span>
         </div>`; }).join('')}</div>`;
 
   const COLHEAD = {
@@ -1501,10 +1503,27 @@
     const yoy = (l, v, unit = '%') => v == null ? '' :
       `<div class="yy"><span>${esc(l)}</span><b class="${dir(v)}">${v > 0 ? '+' : ''}${Number(v).toFixed(1)}${unit}</b></div>`;
 
+    /* THE SAME LINE THE TABLES USE, AT CARD SIZE. It is the first thing on the
+     * card because it answers the first question — where is this price in its
+     * own year, and which of its own moving averages is it under — before any
+     * ratio is read. Labelled here, unlike in a table row, because a card is
+     * read on its own rather than under a header. */
+    const cardLine = priceLine(r) ? `<div class="cardline">
+      ${priceLine(r)}
+      <div class="cardline-k">
+        <span><b>₹${esc(r.low52)}</b> 52w low</span>
+        <span><i class="k200"></i>200-day <b>₹${esc(r.sma200 ?? '—')}</b></span>
+        <span><i class="k50"></i>50-day <b>₹${esc(r.sma50 ?? '—')}</b></span>
+        <span><i class="k20"></i>20-day <b>₹${esc(r.sma20 ?? '—')}</b></span>
+        <span><b>₹${esc(r.high52)}</b> 52w high</span>
+      </div>
+    </div>` : '';
+
     sheet(`${esc(r.sym)} <small>${esc(r.name || '')}</small>`, `
       <p class="hint" style="margin:0 0 12px">₹${esc(r.price)} · ${esc(r.ind || r.sector || '')} ·
         ₹${r.mcap_cr != null ? Math.round(r.mcap_cr).toLocaleString('en-IN') : '—'} cr ·
         accounts to ${esc(r.fy || '—')}</p>
+      ${cardLine}
       <div class="tags">${(r.setup?.tags || []).map(t => `<span class="pill pill-ac">${esc(t)}</span>`).join('')}
         ${r.risk?.level ? `<span class="pill ${r.risk.level === 'LOW' ? 'pill-up' : r.risk.level === 'HIGH' ? 'pill-dn' : 'pill-wn'}">RISK ${esc(r.risk.level)}</span>` : ''}</div>
       <div class="scores">
@@ -1592,7 +1611,6 @@
      * summarised below with its own dates attached, so nothing is hidden and
      * nothing is passed off as this site's own result. */
     const CURVE = rCurve(every.filter(sinceLaunch));
-    const PRIOR = rCurve(every.filter(r => !sinceLaunch(r)));
     const all = every.filter(r => dayOf(r) >= LAUNCH);
 
     // Filter on the row's OWN badge, not on arithmetic over pnl_pct.
@@ -1684,13 +1702,7 @@
                  point — up or down.`
               : `The live ledger did not answer, and the morning snapshot does not record graded
                  R multiples, so the curve cannot be drawn from it.`}
-            ${PRIOR ? `<br><br><span style="color:var(--dim)">Before this site existed the same
-              engines closed <b style="color:var(--muted)">${PRIOR.used}</b> graded trades, ending
-              at <b style="color:var(--muted)">${PRIOR.end >= 0 ? '+' : ''}${PRIOR.end.toFixed(2)}R</b>
-              between ${esc(PRIOR.pts[0].t)} and ${esc(PRIOR.pts[PRIOR.pts.length - 1].t)}. That
-              history is real and is not deleted, but it was produced under a different
-              configuration and a ledger that has been re-graded twice, so it is not counted as
-              this site's record.</span>` : ''}
+
           </div>`, '', 'Every closed signal, in the order it closed.')) +
         sec('The record', `<div class="grid">
           ${tile(all.length, 'Signals published', 'since ' + esc(LAUNCH), 'ac')}
@@ -2169,7 +2181,6 @@
      * The all-time figures are not discarded; they are shown beneath, labelled
      * as the engine before this site, with their own dates. */
     const HERE = recordOf(rows.filter(sinceLaunch));
-    const PRE = recordOf(rows.filter(r => !sinceLaunch(r)));
     const H = HERE.trades ? HERE : null;
     const S_ALL = S && S.headline ? S.headline : null;
     /* EVERY FIELD OFF /api/stats IS OPTIONAL.
@@ -2644,12 +2655,7 @@
               rows.filter(r => (r.badge || '') === 'open' && sinceLaunch(r)).length
             } signals are open and none has resolved, so there is no win rate, no expectancy and no
             record to show. It appears the moment one closes.
-            ${PRE.trades ? `<br><br><span style="color:var(--b-dim)">Before ${esc(LAUNCH)} the same
-              engines closed <b style="color:var(--b-mut)">${PRE.trades}</b> graded trades —
-              ${PRE.wins}W / ${PRE.losses}L, expectancy
-              <b style="color:var(--b-mut)">${PRE.expectancy_r}R</b>. Real, kept, and not counted as
-              this site's record: it was produced under a different configuration and a ledger that
-              has been re-graded twice.</span>` : ''}
+
           </div>` : ''}
         ${closedRows.length ? `<div class="b-hist"><table>
           <thead><tr><th>Date</th><th>Asset</th><th>Direction</th>
@@ -3493,11 +3499,13 @@
     let out = head('Watchlist', 'Names you starred and price levels you asked to be told about.',
       'Yours, on this device');
 
-    out += `<div class="note"><b>This list lives in this browser.</b> There is no account and
-      nothing is sent anywhere — which also means clearing your site data clears the list, and it
-      will not follow you to your phone. Alerts are checked against the prices this page fetches,
-      so they fire while the site is open and not when it is closed.
-      <a href="#/privacy" style="color:var(--accent)">What is stored →</a></div>`;
+    out += `<div class="note"><b>Saved on this device only.</b>
+      <span style="display:block;margin-top:7px">Your list and alerts are stored in this browser.
+      Nothing is sent to a server, so nobody — including me — can see them.</span>
+      <span style="display:block;margin-top:7px"><b>Two things follow from that:</b> the list will
+      not appear on your phone, and it is lost if you clear this browser's site data.</span>
+      <span style="display:block;margin-top:7px">Alerts are checked whenever this page loads a
+      price, so they can only reach you while the site is open in a tab.</span></div>`;
 
     out += sec('Watching', syms.length ? `<div class="rank">
       <div class="rank-r scr-r rank-head"><span class="i">#</span><span class="s">Name</span>

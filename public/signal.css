@@ -1862,3 +1862,78 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 .foot a{color:var(--accent)}
 .foot a:hover{text-decoration:underline;text-underline-offset:2px}
 .foot p + p{margin-top:7px}
+
+/* ═══════════ THE DATA TABLES, ALIGNED ════════════════════════════════════
+   THE BUG: `repeat(5, auto)` sized every column to its OWN row's content, and
+   the header is a separate grid container from each row — so the header
+   computed 20px 824px 44px 44px… while the first row computed
+   20px 806px 54px 44px 47.75px… Every column was out by up to 18px and the
+   numbers did not sit under their labels.
+
+   FIXED TRACKS, identical for the header and every row. The widths are set
+   from the widest real value each column carries: ₹1,431.20 at 11.5px mono is
+   ~56px, +38.74% is ~48px. Tabular numerals mean those widths never move. */
+.scr-r,
+.rank-r.lvl-r{
+  grid-template-columns:24px minmax(0,1fr) 70px 62px 62px 62px 50px 66px;
+  gap:0 10px;
+  align-items:baseline;
+  padding:13px 16px;
+}
+.scr-r .x,.rank-r.lvl-r .x,
+.scr-r .m,.rank-r.lvl-r .m{min-width:0;text-align:right;white-space:nowrap}
+.scr-r .i,.rank-r.lvl-r .i{text-align:right;font-variant-numeric:tabular-nums}
+.scr-r .s,.rank-r.lvl-r .s{display:flex;align-items:baseline;gap:0;flex-wrap:wrap}
+.scr-r .s b,.rank-r.lvl-r .s b{flex:0 0 auto}
+.scr-r .s span,.rank-r.lvl-r .s span{flex:1 1 100%}
+/* The star sits on the baseline of the ticker rather than floating above it. */
+.scr-r .s .wstar,.rank-r.lvl-r .s .wstar{align-self:center;vertical-align:baseline}
+
+/* NO STICKY HEADER, and the reason is worth recording so it is not tried
+   again: `.rank` is a horizontal scroll container (overflow-x:auto, so wide
+   tables scroll inside themselves instead of the page). A position:sticky
+   child sticks to its nearest scrolling ancestor, not the viewport — so the
+   header detached and parked itself in the middle of the table, over row two,
+   with an empty band where it used to be. A header in the wrong place is worse
+   than one that simply scrolls away.
+
+   It is a plain header row, distinguished by weight and a rule. */
+.scr-r.rank-head,.rank-r.lvl-r.rank-head{
+  background:var(--raised);
+  border-bottom:1px solid var(--line2);
+  padding-top:11px;padding-bottom:11px}
+.scr-r.rank-head .x,.scr-r.rank-head .m,
+.rank-r.lvl-r.rank-head .x,.rank-r.lvl-r.rank-head .m{
+  font:500 9.5px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+
+/* The price line gets the full row width under the data it belongs to, and a
+   little more air than a hairline needs, so it reads as part of the row rather
+   than as a divider between rows. */
+.pl-w{grid-column:1/-1;margin:11px 0 1px;padding-left:34px}
+
+/* NARROW: the five numeric columns do not fit a phone. Rather than shrinking
+   them to illegibility, the two least load-bearing are dropped — vs 50D and
+   RSI — because the price line already shows where price sits against every
+   moving average, which is the same information drawn instead of tabulated. */
+@media(max-width:700px){
+  .scr-r,.rank-r.lvl-r{grid-template-columns:20px minmax(0,1fr) 66px 58px 58px;
+    gap:0 8px;padding:12px 12px}
+  .scr-r > .x:nth-of-type(3),.rank-r.lvl-r > .x:nth-of-type(3),
+  .scr-r > .x:nth-of-type(5),.rank-r.lvl-r > .x:nth-of-type(5){display:none}
+  .pl-w{padding-left:28px;margin-top:10px}
+}
+
+/* The price line at card size: taller, and labelled, because a card is read on
+   its own rather than under a table header. */
+.cardline{margin:0 0 16px;padding:14px 0 0;border-top:1px solid var(--line)}
+.cardline .pl{height:7px}
+.cardline .pl-now{width:11px;height:11px;margin:-5.5px 0 0 -5.5px}
+.cardline .pl-m{top:-4px;bottom:-4px;width:2px}
+.cardline-k{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;
+  font:400 10.5px/1.5 var(--mono);letter-spacing:.03em;color:var(--dim);
+  font-variant-numeric:tabular-nums}
+.cardline-k span{display:inline-flex;align-items:center;gap:6px}
+.cardline-k b{color:var(--text);font-weight:500}
+.cardline-k i{width:2px;height:11px;border-radius:1px;display:inline-block}
+.cardline-k i.k200{background:var(--warn)} .cardline-k i.k50{background:var(--accent)}
+.cardline-k i.k20{background:var(--dim)}
