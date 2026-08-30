@@ -1,0 +1,9 @@
+# Signal — signal.askakshay.com
+# Everything here is public and meant to be read. The API is excluded because
+# crawling it costs upstream quota and returns nothing a reader would want in
+# a search result.
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://signal.askakshay.com/sitemap.xml

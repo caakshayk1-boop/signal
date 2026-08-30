@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This site is a single document with hash routes. A crawler sees one URL,
+     so the sitemap declares one URL. Listing #/markets and the rest would be
+     declaring the same page seven times, which is worse than declaring it
+     once: duplicate entries dilute rather than add. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://signal.askakshay.com/</loc>
+    <lastmod>2026-08-31</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>

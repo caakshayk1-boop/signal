@@ -13,6 +13,9 @@
      README.md, "Going live". -->
 <meta name="robots" content="index,follow,max-image-preview:large">
 <meta name="author" content="Akshay Kothari">
+<link rel="me" href="https://www.linkedin.com/in/akkothari">
+<link rel="me" href="https://askakshay.com/">
+<link rel="author" href="https://askakshay.com/">
 <link rel="canonical" href="https://signal.askakshay.com/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://signal.askakshay.com/">
@@ -96,14 +99,34 @@
 
 <footer class="foot">
   <p>Built by <b>Akshay Kothari</b> · CA · FP&amp;A · Data from NSE, Yahoo Finance and company filings.</p>
+  <p class="foot-link">
+    <a href="https://www.linkedin.com/in/akkothari" rel="me noopener" target="_blank">LinkedIn</a> ·
+    <a href="https://askakshay.com/" rel="me noopener" target="_blank">askakshay.com</a> ·
+    <a href="https://www.instagram.com/askakshayfinance" rel="me noopener" target="_blank">Instagram</a> ·
+    <a href="mailto:ca.akshayk1@gmail.com">Email</a>
+  </p>
+  <p><a href="#/methodology">Methodology</a> · <a href="#/sources">Data sources</a> ·
+     <a href="#/terms">Terms</a> · <a href="#/privacy">Privacy</a></p>
   <p>A public ledger — wins <i>and</i> losses. Not investment advice.</p>
 </footer>
 
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"WebSite","name":"Signal",
- "description":"Indian markets in one screen: sector heat, IPO books open now, ranked trade ideas and a public signal ledger.",
- "inLanguage":"en-IN",
- "publisher":{"@type":"Person","name":"Akshay Kothari","jobTitle":"CA, FP&A"}}
+{"@context":"https://schema.org","@graph":[
+ {"@type":"WebSite","@id":"https://signal.askakshay.com/#website",
+  "url":"https://signal.askakshay.com/","name":"Signal",
+  "description":"Indian markets in one screen: sector heat, IPO books open now, ranked trade ideas and a public signal ledger.",
+  "inLanguage":"en-IN",
+  "publisher":{"@id":"https://signal.askakshay.com/#akshay"}},
+ {"@type":"Person","@id":"https://signal.askakshay.com/#akshay",
+  "name":"Akshay Kothari","givenName":"Akshay","familyName":"Kothari",
+  "jobTitle":"Chartered Accountant · FP&A",
+  "email":"mailto:ca.akshayk1@gmail.com",
+  "url":"https://askakshay.com/",
+  "knowsAbout":["Indian equity markets","Financial planning and analysis","Technical analysis","Quantitative screening"],
+  "sameAs":["https://www.linkedin.com/in/akkothari",
+            "https://www.instagram.com/askakshayfinance",
+            "https://askakshay.com/",
+            "https://news.askakshay.com/"]}]}
 </script>
 
 <script src="/signal.js" defer></script>

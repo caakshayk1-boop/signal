@@ -3650,8 +3650,49 @@
   async function refresh(force) {
     if (!force && document.visibilityState === 'hidden') return;
     if (document.getElementById('sheet')?.open) return;   // never yank an open card
+    if (document.querySelector('dialog.cmd[open]')) return;      // nor an open search
+    /* NEVER REPAINT UNDER SOMEONE'S HANDS. Typing in the screen search or the
+     * alert form and having the field replaced mid-word is the worst version
+     * of this. The data can wait sixty seconds. */
+    const ae = document.activeElement;
+    if (!force && ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA'
+                      || ae.tagName === 'SELECT' || ae.isContentEditable)) return;
+
+    /* THE REFRESH USED TO CLOSE WHAT YOU HAD OPEN.
+     *
+     * Expand a market row to read its 52-week detail and sixty seconds later
+     * it shut by itself — measured: openDrawers 1 → 0 at the refresh tick.
+     * The route repaints wholesale, so every expanded row went with it, and
+     * the reader had no idea why.
+     *
+     * The instrument NAME is the stable key here: the drawer ids are minted
+     * fresh on every paint, so they cannot be matched across one. */
+    const wasOpen = [...document.querySelectorAll('.mk[aria-expanded="true"]')]
+      .map(b => (b.querySelector('.mk-nm') || {}).textContent)
+      .filter(Boolean).map(t => t.trim());
+    const y = window.scrollY;
+
     lastRefresh = Date.now();
     try { await R[routeOf()](); } catch (e) { /* a failed refresh keeps what is on screen */ }
+
+    if (wasOpen.length) {
+      document.querySelectorAll('.mk').forEach(b => {
+        const nm = ((b.querySelector('.mk-nm') || {}).textContent || '').trim();
+        if (!wasOpen.includes(nm)) return;
+        const d = document.getElementById(b.getAttribute('aria-controls'));
+        if (!d) return;
+        const inner = d.firstElementChild;
+        if (inner && !inner.innerHTML) {
+          const r = MKDATA.get(b.getAttribute('aria-controls'));
+          if (r) inner.innerHTML = mkDrawer(r);
+        }
+        b.setAttribute('aria-expanded', 'true');
+        d.classList.add('open');
+      });
+    }
+    // A repaint can change the document height; put the reader back where they
+    // were rather than wherever the new layout happens to land them.
+    if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
   }
   setInterval(() => refresh(false), 60000);
   document.addEventListener('visibilitychange', () => {

@@ -1857,3 +1857,8 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 .toast button:hover{opacity:1}
 @keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.toast{animation:none}}
+/* The footer carries the author's own links — the same set the Person schema
+   declares in sameAs, so a crawler and a reader see one consistent identity. */
+.foot a{color:var(--accent)}
+.foot a:hover{text-decoration:underline;text-underline-offset:2px}
+.foot p + p{margin-top:7px}
