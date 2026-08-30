@@ -10,7 +10,8 @@
     "test": "node test/ui.mjs http://127.0.0.1:8787",
     "test:prod": "node test/ui.mjs $SIGNAL_URL",
     "tail": "wrangler tail",
-    "set-domain": "node scripts/set-domain.mjs"
+    "set-domain": "node scripts/set-domain.mjs",
+    "go-live": "bash scripts/go-live.sh"
   },
   "dependencies": {
     "@libsql/client": "^0.15.7"

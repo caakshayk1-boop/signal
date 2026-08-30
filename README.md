@@ -108,27 +108,32 @@ turso dev --port 8080             # no auth when run locally
 Four steps. Nothing below has been done yet — the Worker has only ever run
 locally.
 
-**1. Authenticate and deploy.**
+**1. Log in to both services.** Each opens a browser once.
 
 ```bash
 npx wrangler login
-npx wrangler deploy
+turso auth login
 ```
 
-**2. Set the two secrets.** `wrangler secret put` stores them encrypted; they
-must never enter `wrangler.jsonc` or any committed file.
+**2. Deploy and wire the secrets — one command.**
 
 ```bash
-npx wrangler secret put TURSO_URL
-npx wrangler secret put TURSO_TOKEN
+npm run go-live
 ```
 
-Both values already exist as GitHub Actions secrets on `trading-dashboard`,
-but GitHub secrets are **write-only** — they cannot be read back. Take them
-from the Turso dashboard, or mint a fresh token with
-`turso db tokens create <db>`. A second token against the same database is
-fine and is the safer choice: it can be revoked without touching the
-newspaper.
+That deploys the Worker, then pipes the database URL and a **freshly minted**
+token straight from Turso into `wrangler secret put`. The values are never
+printed, never pasted and never written to disk. It refuses with a named fix if
+either login is missing, and it verifies `/api/health` at the end rather than
+assuming a green deploy means the site is up.
+
+A second token is minted on purpose: it can be revoked without touching the
+newspaper's own access to the same database. The existing values are also
+GitHub Actions secrets on `trading-dashboard`, but GitHub secrets are
+**write-only** and cannot be read back, so a fresh token is the only route
+anyway.
+
+Pass a different database name with `npm run go-live -- my-db`.
 
 **3. Point a domain at it.** Until then the site is on `*.workers.dev` and is
 deliberately `noindex` — `public/index.html` is otherwise a byte-for-byte
