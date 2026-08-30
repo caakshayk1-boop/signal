@@ -757,6 +757,20 @@
           * Offered only when there is a card to open: the button is drawn from
           * the row's bare symbol and openStock() is what decides whether that
           * symbol is in the 750-name screen. */''}
+      ${/* WHERE A PICK CAME FROM. A weekly idea shown beside a live price and a
+          * target, with no date and no entry, cannot be checked by the person
+          * reading it — the two numbers that would let them judge it are the
+          * ones that were being dropped. */''}
+      ${r.pick_date || r.pick_entry != null ? `<div class="mk-prov">
+        <b>Picked by the weekly scan.</b>
+        ${r.pick_date ? ` Selected <b>${esc(r.pick_date)}</b>` : ''}${
+          r.pick_entry != null ? ` at <b>₹${esc(fmtN(r.pick_entry))}</b>` : ''}${
+          r.pick_target != null ? `, target <b>₹${esc(fmtN(r.pick_target))}</b>` : ''}${
+          r.pick_score != null ? `, score <b>${esc(Math.round(r.pick_score))}</b>` : ''}.
+        ${r.pick_entry != null && Number.isFinite(Number(r.price_raw))
+          ? `Since then it is <b class="${dir((r.price_raw - r.pick_entry) / r.pick_entry * 100)}">${
+              pct((r.price_raw - r.pick_entry) / r.pick_entry * 100)}</b>.` : ''}
+      </div>` : ''}
       ${mkStockSym(r) ? `<div class="mk-more">
         <button type="button" class="mk-card" data-card="${esc(mkStockSym(r))}">
           Open the full company card for ${esc(mkStockSym(r))} &rarr;</button>
@@ -904,9 +918,9 @@
       sec('Where the money went', `<div class="sk" style="height:104px"></div>`) +
       sec('The wire', skel('sk-card', 3)));
 
-    const [t, p, n, m, fl] = await Promise.all(
+    const [t, p, n, m, fl, cl, sr] = await Promise.all(
       [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets'),
-       get('/api/flows')]);
+       get('/api/flows'), get('/api/calendar'), get('/screen.json')]);
     /* ── THE HERO ────────────────────────────────────────────────────────
      * The first viewport has to answer four things: what this is, what state
      * the market is in, what to do next, and how long that takes. It replaces
@@ -993,19 +1007,61 @@
      * same number a second time, 263px lower — measured. A four-tile summary
      * that spends a quarter of itself repeating the line above it is three
      * tiles long. Sensex is the other index an Indian reader checks. */
-    out += sec('The tape', `<div class="grid">
-        ${/* Nifty AND Sensex now sit in the hero, so an index tile here would
-            * be the third printing of the same number on one screen. This slot
-            * carries the thing the indices cannot say: how wide the move was. */''}
-        ${tile(br.down != null ? `${br.down}<span style="color:var(--dim)">/${br.counted}</span>` : '—',
-               'Declining', br.at_52w_low != null ? `${br.at_52w_low} at 52-week lows` : '',
-               br.down > br.up ? 'dn' : '')}
-        ${tile(br.up != null ? `${br.up}<span style="color:var(--dim)">/${br.counted}</span>` : '—',
-               'Advancing', br.median != null ? `median ${pct(br.median)} on the week` : '',
-               br.up > br.down ? 'up' : 'dn')}
-        ${tile(br.at_52w_high ?? '—', 'At 52-week highs', 'across the screened universe', 'ac')}
-        ${tile((d.picks || []).length, 'Ideas this week', 'ranked once per ISO week')}
-      </div>`);
+    /* ── TODAY'S FIVE ──────────────────────────────────────────────────────
+     *
+     * This row used to be four breadth tiles — advancing, declining, names at
+     * 52-week highs, ideas this week. Two of those numbers are printed again
+     * on the Markets page and one of them was the same figure twice on this
+     * one, so the top of the front page spent itself restating a count.
+     *
+     * Breadth is a summary of the day. These five are the day's EVENTS: the
+     * story that touches the most names on the screen, the shares trading
+     * abnormally against their own average volume, the corporate actions that
+     * change a share count or a quoted price, the results calendar and the
+     * next day the exchange is shut. Each opens.
+     *
+     * Every tile states its own count, so an empty one reads as "nothing today"
+     * rather than as a panel that failed to load — and a tile whose source did
+     * not answer says that instead of showing a zero. */
+    const wire = n.ok ? n.data : [];
+    const cal = cl.ok && cl.data && cl.data.ok ? cl.data : null;
+    const wireTop = (() => {
+      const uni = sr.ok ? (sr.data.rows || []) : [];
+      if (!wire.length) return null;
+      // "Impactful" measured, not asserted: the story naming the most companies
+      // on the 750-name screen.
+      const scored = wire.map(x => ({ x, n: uni.length ? newsMatch(x, uni).length : 0 }));
+      scored.sort((a, b) => b.n - a.n);
+      return scored[0];
+    })();
+    const spurts = (() => {
+      const uni = sr.ok ? (sr.data.rows || []) : [];
+      return uni.filter(r => Number(r.vol_spike) >= 1.5 && r.liquid !== false)
+                .sort((a, b) => Number(b.vol_spike) - Number(a.vol_spike)).slice(0, 5);
+    })();
+    TODAY5 = { wire, wireTop, spurts, cal };
+
+    const t5 = (id, v, k, sub, cls) => `<button type="button" class="tile tile-go" data-t5="${id}">
+      <div class="v ${cls || ''}">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}
+      <div class="k">${esc(k)}</div></button>`;
+
+    out += sec('Today', `<div class="grid grid-5">
+        ${t5('news', wireTop && wireTop.n ? wireTop.n : (wire.length ? '—' : '0'),
+             'Most-connected story',
+             wireTop && wireTop.n ? `names ${wireTop.n} screened ${wireTop.n > 1 ? 'companies' : 'company'}`
+                                  : (wire.length ? 'none names a screened company' : 'the wire is quiet'), 'ac')}
+        ${t5('vol', spurts.length, 'Volume spurts', 'trading above 1.5× their own average',
+             spurts.length ? 'ac' : '')}
+        ${t5('acts', cal ? (cal.actions.rows || []).length : '—', 'Corporate actions',
+             cal ? (() => { const b = (cal.actions.rows || []).filter(x => x.kind === 'Bonus' || x.kind === 'Split').length;
+                            return b ? `${b} bonus or split` : 'dividends only'; })()
+                 : 'NSE did not answer')}
+        ${t5('res', cal ? (cal.results.rows || []).filter(x => x.isResult).length : '—', 'Results due',
+             cal ? `of ${(cal.results.rows || []).length} board meetings` : 'NSE did not answer')}
+        ${t5('hol', cal && (cal.holidays.rows || []).length ? (cal.holidays.rows[0].date || '').slice(5) : '—',
+             'Next market holiday',
+             cal && (cal.holidays.rows || []).length ? esc(cal.holidays.rows[0].why || '') : 'NSE did not answer')}
+      </div>`, '', 'The day’s events, not the day’s averages.');
 
     // Today, over the 250 largest — not a week over all 750. A daily paper's
     // front page should answer "what happened today", and a 750-name median is
@@ -1021,7 +1077,6 @@
         Tap a sector for the names behind it.</p>`,
       dayMap ? 'today · large caps' : 'this week · all 750');
 
-    const wire = n.ok ? n.data : [];
     out += sec('The wire', wire.length ? `<div class="wire">${wire.slice(0, 6).map(x => `
         <a href="${esc(x.link || '#')}" ${x.link ? 'target="_blank" rel="noopener"' : ''}>
           <span class="ws">${esc(x.source || 'wire')}</span>
@@ -1062,6 +1117,7 @@
   };
 
   const convictionCard = p => `<article class="card cv" data-sym="${esc(p.sym)}" role="button" tabindex="0">
+    ${watchBtn(p.sym)}
     <div class="card-h">
       <span class="sym">${esc(p.sym)}</span>
       <span class="pill pill-ac">${esc(p.score)}</span>
@@ -1340,6 +1396,116 @@
     const id = setInterval(tick, 1000);
     main.addEventListener('sig:teardown', () => clearInterval(id), { once: true });
   }
+
+
+  /* ── THE FIVE TILES, OPENED ───────────────────────────────────────────────
+   * Parked on one object at paint time rather than re-fetched on click: every
+   * dataset behind these was already loaded to draw the tile, and asking NSE
+   * again to show what is on screen is a request for nothing. */
+  let TODAY5 = null;
+
+  const t5Date = d => {
+    if (!d) return '';
+    const dt = new Date(d + 'T00:00:00');
+    return isNaN(dt) ? esc(d)
+      : dt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  };
+
+  function openToday5(which) {
+    const T = TODAY5;
+    if (!T) return;
+    const rowsOf = k => (T.cal && T.cal[k] && T.cal[k].rows) || [];
+    const dead = k => T.cal && T.cal[k] && T.cal[k].ok === false
+      ? `<div class="empty">NSE did not answer: ${esc(T.cal[k].error || 'no reason given')}.</div>` : null;
+
+    if (which === 'news') {
+      const uni = [];
+      const list = (T.wire || []).map(x => ({ x, n: T.wireTop ? 0 : 0 }));
+      return sheet('The wire, by reach', `
+        <p class="hint" style="margin:0 0 14px">Ordered by how many of the 750 screened names each
+          story mentions. That is a measure of reach, not of importance — this feed carries no data
+          that would support ranking importance.</p>
+        ${(T.wire || []).length ? `<div class="t5l">${(T.wire || []).slice(0, 18).map(x => `
+          <a class="t5i" href="${esc(x.link || '#')}" ${x.link ? 'target="_blank" rel="noopener"' : ''}>
+            <span class="t5s">${esc(x.source || 'wire')}</span>
+            <span class="t5t">${esc(x.title || '')}</span>
+            ${x.summary ? `<span class="t5d">${esc(String(x.summary).slice(0, 170))}</span>` : ''}
+          </a>`).join('')}</div>
+          <p class="hint"><a class="more-l" href="#/news">Open the full wire, with the names each story touches &rarr;</a></p>`
+        : `<div class="empty">The wire is quiet.</div>`}`);
+    }
+
+    if (which === 'vol') {
+      const v = T.spurts || [];
+      return sheet('Volume spurts', `
+        <p class="hint" style="margin:0 0 14px">Names trading at <b>1.5×</b> or more of their own
+          recent average volume, largest first. Volume confirms a move or contradicts it; on its own
+          it says only that more people than usual are trading this name today.</p>
+        ${v.length ? `<div class="t5l">${v.map(r => `
+          <button type="button" class="t5i t5b" data-card="${esc(r.sym)}">
+            <span class="t5s">${esc(r.sym)} · ${esc(r.sector || '')}</span>
+            <span class="t5t">${esc(r.name || '')}</span>
+            <span class="t5m"><b>${Number(r.vol_spike).toFixed(2)}×</b> average volume
+              · <i class="${dir(r.r1d)}">${pct(r.r1d)}</i> today
+              · ₹${esc(fmtN(r.price))}</span>
+          </button>`).join('')}</div>`
+        : `<div class="empty">No screened name is trading at 1.5× its average volume today.</div>`}`);
+    }
+
+    if (which === 'acts') {
+      const rows = rowsOf('actions');
+      return sheet('Corporate actions', dead('actions') || `
+        <p class="hint" style="margin:0 0 14px">From NSE, ordered with the ones that change a share
+          count or a quoted price first — <b>bonus, split, rights</b> — then buybacks and dividends.
+          The ex-date is the day the price adjusts.</p>
+        ${rows.length ? `<div class="t5l">${rows.slice(0, 30).map(r => `
+          <div class="t5i">
+            <span class="t5s"><b class="t5k t5k-${esc(String(r.kind).toLowerCase())}">${esc(r.kind)}</b>
+              ${esc(r.sym || '')}</span>
+            <span class="t5t">${esc(r.company || '')}</span>
+            <span class="t5m">${esc(r.detail || '')}${r.ex ? ` · ex ${t5Date(r.ex)}` : ''}</span>
+          </div>`).join('')}</div>`
+        : `<div class="empty">NSE lists no corporate actions in this window.</div>`}`);
+    }
+
+    if (which === 'res') {
+      const rows = rowsOf('results');
+      const res = rows.filter(x => x.isResult), rest = rows.filter(x => !x.isResult);
+      return sheet('Results and board meetings', dead('results') || `
+        <p class="hint" style="margin:0 0 14px">NSE's board-meeting calendar. Meetings called to
+          approve <b>results</b> are listed first; the rest are fund-raising and administrative
+          filings, kept because a board meeting is itself news.</p>
+        ${rows.length ? `<div class="t5l">${[...res, ...rest].slice(0, 30).map(r => `
+          <div class="t5i">
+            <span class="t5s">${r.isResult ? '<b class="t5k t5k-result">Results</b> ' : ''}${esc(r.sym || '')}
+              ${r.date ? `· ${t5Date(r.date)}` : ''}</span>
+            <span class="t5t">${esc(r.company || '')}</span>
+            <span class="t5m">${esc(r.purpose || '')}</span>
+          </div>`).join('')}</div>`
+        : `<div class="empty">NSE lists no board meetings in this window.</div>`}`);
+    }
+
+    if (which === 'hol') {
+      const rows = rowsOf('holidays');
+      return sheet('Market holidays', dead('holidays') || `
+        <p class="hint" style="margin:0 0 14px">Cash-market trading holidays from NSE, from today
+          onward. On these days no Indian price on this site will move, and the clock strip on
+          Markets will still show the exchange as open — it tracks session hours, not the calendar.</p>
+        ${rows.length ? `<div class="t5l">${rows.map(r => `
+          <div class="t5i t5h">
+            <span class="t5t">${t5Date(r.date)}</span>
+            <span class="t5m">${esc(r.why || '')}</span>
+          </div>`).join('')}</div>`
+        : `<div class="empty">NSE lists no further holidays this year.</div>`}`);
+    }
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-t5]');
+    if (!b) return;
+    e.preventDefault();
+    openToday5(b.dataset.t5);
+  });
 
   R['/markets'] = async () => {
     paint(head('Markets', 'The board live, and what the 750-name screen underneath it did.', 'The board') +
@@ -1924,6 +2090,24 @@
     /* yoy() colours by sign, which is right for a growth rate and wrong for a
      * PE, a current ratio or a tax rate — none of which is "good" for being
      * positive. fact() states the number and lets the reader judge it. */
+    /* One bounded reading. `zones` is [from, to, class, word] and decides both
+     * the colour and the word beside the number, so the bar is never the only
+     * carrier of meaning — the zone is written out for anyone who cannot see
+     * the colour, or is reading it in grayscale. */
+    const baro = (label, v, lo, hi, zones, fmt) => {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return `<div class="bar-r"><span class="bar-l">${esc(label)}</span>
+        <span class="bar-v na">Not measured</span></div>`;
+      const at = Math.max(0, Math.min(100, ((n - lo) / (hi - lo)) * 100));
+      const z = zones.find(x => n >= x[0] && n < x[1]) || zones[zones.length - 1];
+      return `<div class="bar-r">
+        <span class="bar-l">${esc(label)}</span>
+        <span class="bar-t"><i class="bar-f is-${esc(z[2] || 'flat')}" style="width:${at.toFixed(1)}%"></i>
+          <i class="bar-p" style="left:${at.toFixed(1)}%"></i></span>
+        <span class="bar-v ${esc(z[2] || '')}">${fmt(n)}<em>${esc(z[3])}</em></span>
+      </div>`;
+    };
+
     const fact = (l, v, unit = '%') => v == null || v === '' ? '' :
       `<div class="yy"><span>${esc(l)}</span><b>${
         typeof v === 'number' ? Number(v).toFixed(2).replace(/\.00$/, '') : esc(v)
@@ -1948,10 +2132,20 @@
       </div>
     </div>` : '';
 
-    sheet(`${esc(r.sym)} <small>${esc(r.name || '')}</small>`, `
-      <p class="hint" style="margin:0 0 12px">₹${esc(r.price)} · ${esc(r.ind || r.sector || '')} ·
-        ₹${r.mcap_cr != null ? Math.round(r.mcap_cr).toLocaleString('en-IN') : '—'} cr ·
-        accounts to ${esc(r.fy || '—')}</p>
+    sheet(`${watchBtn(r.sym)}${esc(r.sym)} <small>${esc(r.name || '')}</small>`, `
+      ${/* LABEL THE NUMBERS. This line read "₹1363.1 · Capital Goods ·
+          * ₹10,556 cr · accounts to FY26" — two unexplained figures on the
+          * first line of a company card. The first is the close the screen was
+          * built from (the live mark is in the box below and will differ); the
+          * second is market capitalisation. Neither says so, and a reader
+          * asking "what is 1363?" is asking a fair question. */''}
+      <div class="cardmeta">
+        <span><i>Screen close</i><b>₹${esc(r.price)}</b></span>
+        <span><i>Market cap</i><b>₹${r.mcap_cr != null
+          ? Math.round(r.mcap_cr).toLocaleString('en-IN') : '—'} cr</b></span>
+        <span><i>Industry</i><b>${esc(r.ind || r.sector || '—')}</b></span>
+        <span><i>Accounts to</i><b>${esc(r.fy || '—')}</b></span>
+      </div>
       ${cardLine}
       <div id="ccHost" class="cc"><div class="sk" style="height:150px"></div></div>
       <div class="tags">${(r.setup?.tags || []).map(t => `<span class="pill pill-ac">${esc(t)}</span>`).join('')}
@@ -1980,6 +2174,26 @@
           * invented to look like one. It is nine yes/no tests on profitability,
           * leverage and operating efficiency, and it is the closest thing in
           * this data to a capital-allocation grade. */''}
+      ${/* BAROMETERS, NOT A LIST OF NUMBERS.
+          * RSI 66 and "+38.74% vs 200D" are readings on bounded scales, and a
+          * bar shows where on the scale they sit in a way a numeral cannot.
+          * Colour is by ZONE, not by sign: an RSI of 78 is not "good for being
+          * high", it is overbought, and the bar says so. */''}
+      <h4 class="sh">Where it is trading</h4>
+      <div class="baro">
+        ${baro('RSI (14)', r.rsi, 0, 100, [[0,30,'dn','oversold'],[30,50,'','soft'],[50,70,'up','firm'],[70,100,'wn','overbought']], v => Math.round(v))}
+        ${baro('vs 20-day', r.sma20 && r.price ? (r.price - r.sma20) / r.sma20 * 100 : null, -20, 20,
+               [[-20,-2,'dn','below'],[-2,2,'','at'],[2,20,'up','above']], v => pct(v))}
+        ${baro('vs 50-day', r.sma50 && r.price ? (r.price - r.sma50) / r.sma50 * 100 : null, -30, 30,
+               [[-30,-3,'dn','below'],[-3,3,'','at'],[3,30,'up','above']], v => pct(v))}
+        ${baro('vs 200-day', r.sma200 && r.price ? (r.price - r.sma200) / r.sma200 * 100 : null, -50, 60,
+               [[-50,-5,'dn','below'],[-5,5,'','at'],[5,60,'up','above']], v => pct(v))}
+        ${baro('Volume vs own average', r.vol_spike, 0, 4,
+               [[0,0.8,'dn','thin'],[0.8,1.5,'','normal'],[1.5,4,'up','heavy']], v => v.toFixed(2) + '×')}
+        ${baro('From 52-week high', r.from_high, -60, 0,
+               [[-60,-20,'dn','well below'],[-20,-5,'','below'],[-5,0,'up','near high']], v => pct(v))}
+      </div>
+
       ${r.piotroski != null ? `<h4 class="sh">Capital allocation</h4>
       <div class="alloc">
         <div class="alloc-s">
@@ -2617,10 +2831,31 @@
       ['Volume', '', clamp(N(row.vol_spike), .7, 4),
         Number.isFinite(N(row.vol_spike)) ? `Volume is running at ${N(row.vol_spike).toFixed(2)}× its own recent average. Above 1.0 means participation is confirming the move.`
                                           : 'No volume ratio published for this name.'],
+      /* NOT COUNTED IN THE SCORE. Flagged false, and the reason matters.
+       *
+       * The other four components are measurements of the market: where price
+       * sits against its 200-day, what it did over a month, whether volume
+       * confirmed it, how many structural conditions the screen tags. Reward
+       * to risk is not a measurement of anything. It is the ratio between two
+       * numbers this engine CHOSE — the stop and the target — and it can be
+       * set to whatever the engine likes by moving either one.
+       *
+       * Averaging it with the other four let a setup score itself up. On the
+       * signal this page was showing, the measured components read 26, 4, 0
+       * and 0 — a name below its 200-day, on below-average volume, down over a
+       * month — and the published conviction was 26 only because reward-to-
+       * risk contributed a full 100. The evidence alone gives 7.5.
+       *
+       * A conviction score is an answer to "what does the evidence say". The
+       * trade plan's geometry is a separate question, shown separately below
+       * and in the trade plan, where it is genuinely useful. */
       ['Risk / reward', 'is-stop', clamp(rr, 1, 5),
-        `The first target is ${rr.toFixed(1)} times as far from entry as the stop is. Anything under 1.5 is a setup that has to win more often than it loses to break even.`],
+        `The first target is ${rr.toFixed(1)} times as far from entry as the stop is. Anything under 1.5 is a setup that has to win more often than it loses to break even. This is a property of the plan, not of the market, so it is shown here but not counted in the score.`,
+        false],
     ];
-    const have = COMPS.map(c => c[2]).filter(v => Number.isFinite(v));
+    /* MEASURED ONLY. See the note on the last component. */
+    const MEASURED = COMPS.filter(c => c[4] !== false);
+    const have = MEASURED.map(c => c[2]).filter(v => Number.isFinite(v));
     const score = have.length ? Math.round(have.reduce((x, y) => x + y, 0) / have.length) : null;
     const conviction = score == null ? 'UNSCORED' : score >= 70 ? 'HIGH CONVICTION'
                      : score >= 50 ? 'MODERATE CONVICTION' : 'LOW CONVICTION';
@@ -2924,7 +3159,9 @@
                 <span class="dot" style="background:${col}" aria-hidden="true"></span>
                 <span><span class="nm">${esc(nm)}</span><span class="why">${esc(why)}</span>
                   <span class="tr"><i data-w="${Number.isFinite(v) ? v.toFixed(0) : 0}" style="background:${col}"></i></span></span>
-                <span class="sc">${Number.isFinite(v) ? Math.round(v) : '—'}</span></button>`;
+                <span class="sc">${Number.isFinite(v) ? Math.round(v) : '—'}${
+                  COMPS[i] && COMPS[i][4] === false ? '<i class="sc-x">not counted</i>' : ''
+                }</span></button>`;
             }).join('')}
             <p class="b-verdict ${score == null ? '' : score >= 70 ? 'is-hi' : score >= 50 ? 'is-mid' : 'is-lo'}">
               ${score == null
@@ -2951,8 +3188,11 @@
                                 : ''}.`
                            : ''}`}
             </p>
-            <p class="b-p" style="font-size:13px">The score is the mean of the components that could be
-              measured. A component with no data is left out rather than filled in${have.length < COMPS.length
+            <p class="b-p" style="font-size:13px">The score is the mean of the <b>measured</b>
+              components — what the market did. Reward to risk is listed with them but excluded from
+              it, because the stop and the target are chosen by the engine rather than observed:
+              folding them in let a setup raise its own score by moving its own target.
+              A component with no data is left out rather than filled in${have.length < COMPS.length
                 ? `, which is why the denominator here is <b style="color:var(--b-ink)">${have.length}</b>,
                    not ${COMPS.length} — ${COMPS.length - have.length} component${COMPS.length - have.length > 1 ? 's are' : ' is'}
                    unmeasured for this name`
@@ -3881,13 +4121,19 @@
          * whether a story names a company in the 750-name screen, and what
          * that company and its sector actually did. That is the badge. */
         const secs = [...new Set(hits.map(h => h.sector).filter(Boolean))];
+        const secs0 = secs;
         const mv = secs.length === 1 ? secMove.get(secs[0]) : null;
         return `<article class="nwc">
           <div class="nwc-h">
             <span class="nwc-s">${esc(x.source || 'wire')}</span>
-            <span class="nwc-b ${hits.length ? 'is-on' : ''}">${hits.length
-              ? `Names ${hits.length} screened ${hits.length > 1 ? 'companies' : 'company'}`
-              : 'No screened company named'}</span>
+            ${/* A story that names no screened company gets no badge at all.
+                * "No screened company named" was a label announcing an absence
+                * on two thirds of the wire — noise that told the reader
+                * nothing they could use. Where there IS a link, the badge says
+                * the sector it lands in, which is the useful half. */''}
+            ${hits.length ? `<span class="nwc-b is-on">${
+              secs0.length === 1 ? esc(secs0[0]) : `${hits.length} sectors`
+            }</span>` : ''}
           </div>
           <h3 class="nwc-t">${x.link
             ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title || '')}</a>`
@@ -4212,6 +4458,7 @@
   };
 
 
+  let watchQ = '', watchSort = 'sym', watchSec = '', WVIEW = null;
   R['/watch'] = async () => {
     const syms = watchAll();
     paint(head('Watchlist', 'Names you starred and price levels you asked to be told about.',
@@ -4232,11 +4479,56 @@
       <span style="display:block;margin-top:7px">Alerts are checked whenever this page loads a
       price, so they can only reach you while the site is open in a tab.</span></div>`;
 
+    /* ── FILTERS FOR A LIST THAT GROWS ────────────────────────────────────
+     * A watchlist is the one table on this site whose length the reader
+     * controls, and the only one with no way to search or order it. At ten
+     * names that is fine; at eighty it is a wall. Search, sector and sort,
+     * with the same grammar as the Screen so nothing new has to be learned. */
+    const WSORT = { sym: 'Symbol', r1d: 'Today', r1m: '1 month', rsi: 'RSI',
+                    from_high: 'From 52w high', mcap_cr: 'Size' };
+    const wSectors = [...new Set(syms.map(x => (idx && idx[x] || {}).sector).filter(Boolean))].sort();
+    out += sec('Filter your list', `<div class="tools">
+        <input type="search" id="wq" class="scr-in" value="${esc(watchQ)}"
+               placeholder="Search your watchlist" aria-label="Search your watchlist">
+        <select id="wsort" class="scr-sel" aria-label="Order by">
+          ${Object.entries(WSORT).map(([k, l]) =>
+            `<option value="${k}"${watchSort === k ? ' selected' : ''}>Order by ${esc(l)}</option>`).join('')}
+        </select>
+      </div>
+      ${wSectors.length > 1 ? `<div class="chips" role="group" aria-label="Sector">
+        <button type="button" class="chip" data-wsec="" aria-pressed="${!watchSec}">All ${syms.length}</button>
+        ${wSectors.map(sv => `<button type="button" class="chip" data-wsec="${esc(sv)}"
+           aria-pressed="${watchSec === sv}">${esc(sv)}</button>`).join('')}
+      </div>` : ''}`, syms.length ? `${syms.length} starred` : '');
+
     out += sec('Watching', syms.length ? `<div class="rank">
       <div class="rank-r scr-r rank-head"><span class="i">#</span><span class="s">Name</span>
         <span class="x">Price</span><span class="x">Today</span><span class="x">vs 50D</span>
         <span class="x">vs 200D</span><span class="x">RSI 14D</span><span class="m">1M</span></div>
-      ${syms.map((sym, i) => {
+      ${(() => {
+        /* FILTER AND ORDER, THEN NUMBER. The row number has to follow the
+         * list the reader is looking at — numbering the unfiltered list and
+         * then hiding rows leaves gaps that read as missing data. */
+        const wq = watchQ.trim().toLowerCase();
+        const rowOf = x => (idx && idx[x]) || { sym: x };
+        let view = syms.filter(x => {
+          const r = rowOf(x);
+          if (watchSec && r.sector !== watchSec) return false;
+          if (!wq) return true;
+          return `${x} ${r.name || ''} ${r.sector || ''} ${r.ind || ''}`.toLowerCase().includes(wq);
+        });
+        const val = x => {
+          const r = rowOf(x);
+          if (watchSort === 'sym') return null;             // handled below
+          const n = Number(r[watchSort]);
+          return Number.isFinite(n) ? n : -Infinity;        // unmeasured sorts last
+        };
+        view = watchSort === 'sym'
+          ? view.slice().sort((a, b) => String(a).localeCompare(String(b)))
+          : view.slice().sort((a, b) => val(b) - val(a));
+        WVIEW = view;
+        return view;
+      })().map((sym, i) => {
         const r = (idx && idx[sym]) || { sym };
         const live = q[sym];
         const px = live ? live.price : r.price;
@@ -4257,6 +4549,10 @@
          or any company card and press the star.</div>`,
       syms.length ? `${syms.length} name${syms.length > 1 ? 's' : ''}` : '');
     if (syms.length) out = out.replace(/<\/section>$/, PLKEY + '</section>');
+    // Filtered down to nothing is a different state from "nothing starred".
+    if (syms.length && WVIEW && !WVIEW.length)
+      out = out.replace(/<div class="rank">[\s\S]*?<\/div>\s*(?=<p class="pl-key")/,
+        '<div class="empty">None of your starred names match that filter.</div>');
 
     /* ── ALERTS ─────────────────────────────────────────────────────────── */
     const al = alertsAll();
@@ -4313,6 +4609,22 @@
     main.querySelectorAll('.alx').forEach(b => b.addEventListener('click', () => {
       dropAlert(Number(b.dataset.al)); R['/watch']();
     }));
+
+    /* The filters redraw the whole route, so the caret has to be put back or
+     * the field empties itself out from under whoever is typing in it. Same
+     * pattern as the Screen and the wire. */
+    const wqi = document.getElementById('wq');
+    if (wqi) wqi.addEventListener('input', async () => {
+      watchQ = wqi.value;
+      const at = wqi.selectionStart;
+      await R['/watch']();
+      const again = document.getElementById('wq');
+      if (again) { again.focus(); try { again.setSelectionRange(at, at); } catch (e) { /* not text */ } }
+    });
+    const wso = document.getElementById('wsort');
+    if (wso) wso.addEventListener('change', () => { watchSort = wso.value; R['/watch'](); });
+    main.querySelectorAll('[data-wsec]').forEach(b =>
+      b.addEventListener('click', () => { watchSec = b.dataset.wsec; R['/watch'](); }));
     const nb = document.getElementById('notifBtn');
     if (nb) {
       if (Notification.permission === 'granted') nb.textContent = 'Browser notifications are on';

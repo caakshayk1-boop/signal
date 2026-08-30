@@ -2381,3 +2381,95 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
   color:var(--accent);font:500 12.5px/1 var(--ui);padding:11px 13px;border-radius:8px;
   cursor:pointer;min-height:40px}
 .mk-card:hover{background:var(--raised);border-color:var(--accent)}
+
+/* The component that is listed but deliberately not averaged in. */
+.sc-x{display:block;font:400 9.5px/1 var(--mono);font-style:normal;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--b-dim);margin-top:4px;white-space:nowrap}
+@media(max-width:700px){.sc-x{font-size:10px}}
+
+/* ── TODAY'S FIVE ─────────────────────────────────────────────────────────
+   Five events, each one a way in. They are buttons, so they carry the focus
+   ring and the keyboard behaviour a link would — a tile that opens something
+   and does not look like it can be opened is a tile nobody opens. */
+.grid-5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.tile-go{text-align:left;cursor:pointer;font:inherit;position:relative;
+  transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
+.tile-go::after{content:"›";position:absolute;top:11px;right:13px;color:var(--dim);
+  font-size:15px;line-height:1;transition:transform var(--t-fast) var(--ease-out),color var(--t-fast) var(--ease)}
+.tile-go:hover{border-color:var(--line2);background:var(--raised)}
+.tile-go:hover::after{transform:translateX(3px);color:var(--accent)}
+
+.t5l{display:flex;flex-direction:column}
+.t5i{display:block;width:100%;text-align:left;padding:14px 0;border-top:1px solid var(--line);
+  border-left:0;border-right:0;border-bottom:0;background:none;text-decoration:none;color:inherit;font:inherit}
+.t5i:first-child{border-top:0}
+.t5b{cursor:pointer}
+.t5b:hover .t5t,.t5i[href]:hover .t5t{color:var(--accent)}
+.t5s{display:block;font:500 10.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:6px}
+.t5t{display:block;font:400 16px/1.35 var(--serif);color:var(--text);margin-bottom:4px}
+.t5d{display:block;font:400 13px/1.5 var(--ui);color:var(--muted)}
+.t5m{display:block;font:400 12.5px/1.5 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+.t5m b{color:var(--text);font-weight:600}
+.t5m i{font-style:normal} .t5m i.up{color:var(--up)} .t5m i.dn{color:var(--down)}
+.t5h .t5t{font-family:var(--mono);font-size:14px}
+/* The kinds that change a share count are marked; a dividend is routine. */
+.t5k{display:inline-block;font:600 9.5px/1 var(--mono);letter-spacing:.07em;text-transform:uppercase;
+  padding:4px 6px;border-radius:4px;margin-right:6px;
+  background:color-mix(in srgb,var(--dim) 14%,transparent);color:var(--muted)}
+.t5k-bonus,.t5k-split,.t5k-rights{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
+.t5k-result{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
+
+@media(max-width:1000px){.grid-5{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){
+  .grid-5{grid-template-columns:1fr}
+  .t5t{font-size:15.5px}
+}
+
+/* ── CARD HEADER FACTS ────────────────────────────────────────────────────
+   Four labelled figures instead of four bare ones separated by dots. */
+.cardmeta{display:flex;flex-wrap:wrap;gap:6px 26px;margin:0 0 15px;padding-bottom:14px;
+  border-bottom:1px solid var(--line)}
+.cardmeta span{display:flex;flex-direction:column;gap:3px;min-width:0}
+.cardmeta i{font:400 10px/1 var(--mono);font-style:normal;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--dim)}
+.cardmeta b{font:600 14.5px/1.2 var(--ui);color:var(--text)}
+
+/* ── BAROMETERS ───────────────────────────────────────────────────────────
+   Bounded readings on their own scales. Colour marks the ZONE, never the
+   sign: a high RSI is not good for being high, it is overbought, and the
+   word beside the number says so — so the colour is never the only cue. */
+.baro{display:flex;flex-direction:column;gap:11px;margin-bottom:4px}
+.bar-r{display:grid;grid-template-columns:132px minmax(0,1fr) 116px;gap:0 14px;align-items:center}
+.bar-l{font:400 12px/1.3 var(--ui);color:var(--muted)}
+.bar-t{position:relative;height:7px;border-radius:4px;background:var(--line);overflow:visible}
+.bar-f{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--dim);opacity:.42}
+.bar-f.is-up{background:var(--up)} .bar-f.is-dn{background:var(--down)}
+.bar-f.is-wn{background:var(--warn)} .bar-f.is-flat{background:var(--dim)}
+.bar-p{position:absolute;top:-3px;width:2px;height:13px;border-radius:1px;background:var(--text);
+  margin-left:-1px}
+.bar-v{font:600 13px/1.2 var(--mono);font-variant-numeric:tabular-nums;text-align:right;color:var(--text)}
+.bar-v.up{color:var(--up)} .bar-v.dn{color:var(--down)} .bar-v.wn{color:var(--warn)}
+.bar-v.na{font-weight:400;color:var(--dim);font-size:11.5px}
+.bar-v em{display:block;font:400 10px/1.3 var(--mono);font-style:normal;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--dim);margin-top:2px}
+@media(max-width:700px){
+  .bar-r{grid-template-columns:1fr auto;gap:5px 12px}
+  .bar-l{grid-column:1;font-size:12.5px}
+  .bar-v{grid-column:2;grid-row:1}
+  .bar-t{grid-column:1/-1;grid-row:2}
+  .bar-v em{display:inline;margin-left:6px}
+}
+
+/* The star, promoted to the card heading and the conviction cards. */
+.sheet-h .wstar{flex:none;margin-right:9px}
+.cv{position:relative}
+.cv > .wstar{position:absolute;top:12px;right:12px;z-index:2}
+
+/* Where a weekly pick came from — date, entry, target, score, and what it has
+   done since. Without these a pick beside a live price cannot be checked. */
+.mk-prov{grid-column:1/-1;margin-top:6px;padding:11px 13px;border-radius:8px;
+  background:var(--surface);border:1px solid var(--line);
+  font:400 12.5px/1.6 var(--ui);color:var(--muted)}
+.mk-prov b{color:var(--text);font-weight:600}
+.mk-prov b.up{color:var(--up)} .mk-prov b.dn{color:var(--down)}

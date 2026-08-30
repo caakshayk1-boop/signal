@@ -26,6 +26,7 @@ import signals from "./api/signals.js";
 import stats from "./api/stats.js";
 import markets from "./api/markets.js";
 import flows from "./api/flows.js";
+import calendar from "./api/calendar.js";
 import subscribe from "./api/subscribe.js";
 
 const ROUTES = {
@@ -34,6 +35,7 @@ const ROUTES = {
   "/api/stats": stats,
   "/api/markets": markets,
   "/api/flows": flows,
+  "/api/calendar": calendar,
   "/api/subscribe": subscribe,
 };
 

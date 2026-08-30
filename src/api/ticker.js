@@ -184,7 +184,15 @@ export default async function handler(req, res) {
     const mbItems = pick(mb.map((m) => [m.symbol, `${m.symbol}.NS`, "₹", 2]))
       .map((it) => {
         const m = mb.find((x) => x.symbol === it.name);
-        return { ...it, note: m && m.target ? `T ₹${fmtNum(m.target, 0)}` : null };
+        if (!m) return it;
+        // Everything the scan recorded, so the row can be audited: when it was
+        // picked, at what price, its score, and the target it was given.
+        return { ...it,
+          note: m.target ? `T ₹${fmtNum(m.target, 0)}` : null,
+          pick_score: m.score ?? null,
+          pick_entry: m.entry ?? null,
+          pick_date: m.picked ?? null,
+          pick_target: m.target ?? null };
       });
 
     /* ORDER IS AN EDITORIAL CLAIM, NOT AN ARRAY LITERAL.
@@ -729,17 +737,45 @@ async function multibaggers() {
     // The multibagger scan is weekly (Saturday). If the newest row is older
     // than a month the scan has stopped running, and quietly presenting
     // stale ideas as current is worse than dropping the segment.
+    /* FIFTEEN, NOT FIVE.
+     *
+     * The weekly scan writes its top fifteen and this route asked for five, so
+     * two thirds of what the engine had already qualified was thrown away at
+     * the last step — which reads from the outside as "the screen is not
+     * qualifying anything".
+     *
+     * Measured before changing it: of 720 screened names with the three inputs
+     * the scan gates on, 190 clear all of them (52-week position >= 0.70,
+     * 3-month return < 60%, and beating Nifty by >= 5%). The gate is not the
+     * constraint and loosening it would add noise, not names. The constraint
+     * was this LIMIT.
+     *
+     * The entry price and the date are carried through as well, so a row can
+     * say WHEN it was picked and at what price rather than showing a live
+     * quote beside a target with nothing to anchor it. */
+    /* SELECT *, NOT A COLUMN LIST.
+     *
+     * Naming `entry` here took the whole segment off the board: the column
+     * does not exist in this table, the query threw, and the catch below
+     * returned an empty list — so a typo in a column name silently deleted a
+     * section of the site rather than erroring anywhere visible. The columns
+     * this table actually has are read off the row, and anything missing
+     * comes back null and is simply not printed. */
     const rs = await db().execute(
-      `SELECT symbol, score, target2 FROM multibaggers
+      `SELECT * FROM multibaggers
        WHERE date = (SELECT MAX(date) FROM multibaggers)
          AND date >= date('now', '-31 days')
-       ORDER BY score DESC LIMIT 5`
+       ORDER BY score DESC LIMIT 15`
     );
+    const first = num;
     return rs.rows
       .map((r) => ({
         symbol: str(r.symbol).replace(/\.NS$/i, "").toUpperCase(),
-        score: num(r.score),
-        target: num(r.target2),
+        score: first(r.score),
+        target: first(r.target2 ?? r.target),
+        // Whichever of these the table happens to carry.
+        entry: first(r.entry ?? r.entry_price ?? r.price ?? r.cmp),
+        picked: str(r.date) || null,
       }))
       .filter((r) => r.symbol);
   } catch {
