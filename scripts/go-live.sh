@@ -36,8 +36,22 @@ fi
 printf '  database    %s\n' "$DB"
 
 # ── 2. the Worker must exist before a secret can be attached to it ─────────
+#
+# The URL is captured HERE, from the deploy's own output. The first version
+# went looking for it afterwards with `wrangler deployments list --json`, which
+# does not carry a workers.dev URL — so a run that had deployed correctly and
+# set both secrets ended on a red "the URL could not be read". Everything had
+# worked; only the reporting had failed, which is the kind of false alarm that
+# teaches you to ignore the output.
 say "2/5  deploying the Worker"
-npx --yes wrangler deploy
+# Written to a file and echoed back, rather than `tee /dev/tty` — that fails
+# outright with "Device not configured" anywhere there is no controlling
+# terminal, which includes CI and any agent-run shell.
+LOG="$(mktemp -t golive)"
+npx --yes wrangler deploy >"$LOG" 2>&1 || { cat "$LOG"; rm -f "$LOG"; die "wrangler deploy failed"; }
+cat "$LOG"
+URL="$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' "$LOG" | head -1 || true)"
+rm -f "$LOG"
 
 # ── 3. secrets, piped — never printed, never stored on disk ────────────────
 say "3/5  setting secrets (values are piped, never displayed)"
@@ -48,15 +62,16 @@ printf '  TURSO_URL   set\n'
 turso db tokens create "$DB" | npx --yes wrangler secret put TURSO_TOKEN >/dev/null
 printf '  TURSO_TOKEN set (a new token, revocable on its own)\n'
 
-# ── 4. find the URL wrangler just published to ─────────────────────────────
+# ── 4. the URL was captured from the deploy above ──────────────────────────
 say "4/5  locating the deployment"
-URL="$(npx --yes wrangler deployments list --json 2>/dev/null \
-  | grep -oE 'https://[a-z0-9.-]+workers\.dev' | head -1 || true)"
-if [ -z "$URL" ]; then
-  SUB="$(npx --yes wrangler whoami 2>/dev/null | grep -oE '[a-z0-9-]+\.workers\.dev' | head -1 || true)"
-  URL="${SUB:+https://signal.$SUB}"
+if [ -z "${URL:-}" ]; then
+  # A custom-domain-only Worker prints no workers.dev URL, which is not a
+  # failure — the secrets are already set and the deploy already succeeded.
+  printf '  no workers.dev URL in the deploy output (custom domain only?)\n'
+  printf '  secrets are set and the Worker is deployed; skipping the health check.\n'
+  say "done"
+  exit 0
 fi
-[ -n "$URL" ] || die "deployed, but the URL could not be read. Find it with: npx wrangler deployments list"
 printf '  %s\n' "$URL"
 
 # ── 5. prove it actually works, rather than assuming a green deploy means up ─
