@@ -60,6 +60,8 @@
   if(c!=='dark'&&c!=='light')
     c=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
   document.documentElement.setAttribute('data-theme',c);
+  var dn=localStorage.getItem('sig:density');
+  if(dn==='compact') document.documentElement.setAttribute('data-density','compact');
 }catch(e){document.documentElement.setAttribute('data-theme','light');}})();
 </script>
 </head>
@@ -92,6 +94,10 @@
       <span class="cta-l">Today’s brief</span>
       <span class="cta-s" id="ctaSub">60 seconds</span>
     </a>
+    <button type="button" class="icon-btn" id="densBtn" aria-label="Row density"
+            aria-pressed="false" title="Row density">
+      <span class="dens-i" aria-hidden="true"><i></i><i></i><i></i></span>
+    </button>
     <button type="button" class="icon-btn" id="themeBtn" aria-label="Switch theme">
       <span aria-hidden="true">◐</span>
     </button>

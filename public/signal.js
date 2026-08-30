@@ -1146,7 +1146,7 @@
     </div>
     ${trailPlan(p.entry, p.stop, p.t1, p.t2, 'BUY')}` : ''}
     <div class="card-foot">
-      <span class="mono" style="font-size:11px;color:var(--dim)">₹${p.turnover_cr != null ? Math.round(p.turnover_cr) : '—'} cr traded · not advice</span>
+      <span class="mono" style="font-size:var(--t-2);color:var(--dim)">₹${p.turnover_cr != null ? Math.round(p.turnover_cr) : '—'} cr traded · not advice</span>
       ${symLinks(p.sym)}
     </div>
   </article>`;
@@ -1158,7 +1158,7 @@
         <span class="sym">${esc(p.symbol || '')}</span>
         ${p.score != null ? `<span class="pill pill-ac">${esc(p.score)}/100</span>` : ''}
         <span class="spacer"></span>
-        <span class="num ${dir(p.change_1d)}" style="font-size:13px">${pct(p.change_1d)}</span>
+        <span class="num ${dir(p.change_1d)}" style="font-size:var(--t-4)">${pct(p.change_1d)}</span>
       </div>
       ${lead && p.target_basis ? `<div class="card-body">Target is ${esc(p.target_basis)}; the stop is ${esc(p.stop_basis || 'below the trend')}.</div>` : ''}
       <!-- The chart slot is emitted EMPTY and filled after paint, at its final
@@ -1171,7 +1171,7 @@
         <div><span class="kk">Stop</span><span class="vv dn">${cur}${esc(p.stop_loss)}</span></div>
         <div><span class="kk">R:R</span><span class="vv">${esc(p.rr)}</span></div>
         <div><span class="kk">1M</span><span class="vv ${dir(p.mom_1m)}">${pct(p.mom_1m)}</span></div>
-        <div><span class="kk">Horizon</span><span class="vv" style="font-size:11.5px">${esc(p.timeframe || '—')}</span></div>
+        <div><span class="kk">Horizon</span><span class="vv" style="font-size:var(--t-3)">${esc(p.timeframe || '—')}</span></div>
       </div>
     </article>`;
   };
@@ -1241,10 +1241,10 @@
       ${isFinite(sub) ? `<div class="subs">
         <span class="subs-v">${sub.toFixed(2)}×</span>
         <span class="subs-bar" style="--one:10%"><i style="width:${pctOfTen.toFixed(0)}%"></i></span>
-        <span class="subs-v" style="color:var(--dim);font-size:11px">of 10×</span>
+        <span class="subs-v" style="color:var(--dim);font-size:var(--t-2)">of 10×</span>
       </div>` : ''}
       <div class="kv">
-        <div><span class="kk">Band</span><span class="vv" style="font-size:11.5px">${esc(r.price_band || '—')}</span></div>
+        <div><span class="kk">Band</span><span class="vv" style="font-size:var(--t-3)">${esc(r.price_band || '—')}</span></div>
         <div><span class="kk">Lot</span><span class="vv">${esc(r.lot_size ?? '—')}</span></div>
         <div><span class="kk">Min</span><span class="vv">${r.min_investment ? money(r.min_investment) : '—'}</span></div>
         <div><span class="kk">Size</span><span class="vv">${r.issue_size_cr ? '₹' + Math.round(r.issue_size_cr) + 'cr' : '—'}</span></div>
@@ -1621,7 +1621,7 @@
               <div><span class="kk">Stop</span><span class="vv dn">₹${esc(o.stop ?? '—')}</span></div>
               <div><span class="kk">Size</span><span class="vv">${sh != null ? sh.toFixed(1) + '% of book' : '—'}</span></div>
               <div><span class="kk">Risk</span><span class="vv">${o.risk_pct != null ? o.risk_pct + '%' : (d.capital ? (Number(o.risk_amount) / d.capital * 100).toFixed(2) + '%' : '—')}</span></div>
-              <div><span class="kk">Hold</span><span class="vv" style="font-size:11px">${esc(o.hold_days || o.horizon || '—')}</span></div>
+              <div><span class="kk">Hold</span><span class="vv" style="font-size:var(--t-2)">${esc(o.hold_days || o.horizon || '—')}</span></div>
             </div>
             ${(o.legs || []).length ? `<div class="ladder">
               ${o.legs.map(l => `<div class="leg">
@@ -1634,7 +1634,7 @@
             </div>` : ''}
             ${o.trail_note ? `<div class="trail"><span>Trailing stop</span>${esc(o.trail_note)}</div>` : ''}
             <div class="card-foot">
-              <span class="mono" style="font-size:11px;color:var(--dim)">${sh != null ? 'sized at ' + sh.toFixed(1) + '% — scale to your own book' : ''}${o.hold_days ? ' · hold ' + esc(o.hold_days) : ''}</span>
+              <span class="mono" style="font-size:var(--t-2);color:var(--dim)">${sh != null ? 'sized at ' + sh.toFixed(1) + '% — scale to your own book' : ''}${o.hold_days ? ' · hold ' + esc(o.hold_days) : ''}</span>
               ${symLinks(o.symbol)}
             </div>
           </article>`; }).join('') : `<div class="empty">No orders clear the mandate today.</div>`));
@@ -2352,7 +2352,7 @@
           ? progressToTarget(Number(r.entry), Number(r.sl), Number(r.target1), live.price, r.action) : ''}
         ${open ? trailPlan(r.entry, r.sl, r.target1, r.target2, r.action) : ''}
         <div class="card-foot">
-          <span class="mono" style="font-size:11px;color:var(--dim)">${esc(String(r.alert_date || r.date || '').slice(0, 10))}
+          <span class="mono" style="font-size:var(--t-2);color:var(--dim)">${esc(String(r.alert_date || r.date || '').slice(0, 10))}
             ${r.status ? ' · ' + esc(String(r.status).replace(/_/g, ' ').toLowerCase()) : ''}</span>
           ${open ? `<a class="brief-link" href="#/brief" data-brief="${esc(r.symbol)}">Full brief →</a>` : ''}
           ${symLinks(r.symbol, r.tv)}
@@ -3015,10 +3015,10 @@
           <div class="b-m"><span class="k">R:R to T1</span><span class="v gold">${rrT1.toFixed(1)} : 1</span></div>
           <div class="b-m"><span class="k">R:R to T2</span><span class="v gold">${rrT2.toFixed(1)} : 1</span></div>
           <div class="b-m"><span class="k">Signal age</span><span class="v">${ageDays == null ? '—' : ageDays + 'd'}</span></div>
-          <div class="b-m"><span class="k">Sector</span><span class="v" style="font-family:var(--ui);font-size:14px">${esc(row.sector || 'Not on screen')}</span></div>
+          <div class="b-m"><span class="k">Sector</span><span class="v" style="font-family:var(--ui);font-size:var(--t-5)">${esc(row.sector || 'Not on screen')}</span></div>
         </div>
       </section>
-      <p class="b-p" style="margin-top:14px;font-size:13px">${esc(stateChip[2])}
+      <p class="b-p" style="margin-top:14px;font-size:var(--t-4)">${esc(stateChip[2])}
         Reward to risk is shown against <b style="color:var(--b-ink)">both</b> targets, because they are
         different numbers and the trade plan acts on the first one. The ledger's own published field
         reads ${Number.isFinite(rrLedger) ? rrLedger.toFixed(1) : '—'}, which is the reading to target 2.
@@ -3057,7 +3057,7 @@
             <span class="now" id="zNow" style="left:${zAt(last).toFixed(1)}%"></span>
           </div>
           <div class="b-zl"><span>Stop ${f(stop)}</span><span>Entry ${f(entry)}</span><span>Target 1 ${f(t1)}</span></div>
-          <p class="b-p" style="font-size:13.5px">${esc(zoneState[2])}</p>
+          <p class="b-p" style="font-size:var(--t-5)">${esc(zoneState[2])}</p>
         </div>
       </section>
 
@@ -3188,7 +3188,7 @@
                                 : ''}.`
                            : ''}`}
             </p>
-            <p class="b-p" style="font-size:13px">The score is the mean of the <b>measured</b>
+            <p class="b-p" style="font-size:var(--t-4)">The score is the mean of the <b>measured</b>
               components — what the market did. Reward to risk is listed with them but excluded from
               it, because the stop and the target are chosen by the engine rather than observed:
               folding them in let a setup raise its own score by moving its own target.
@@ -3213,7 +3213,7 @@
             <span class="b-mxd"><span>${st_ == null ? 'Not measured — this factor has no data on the screen for this name, so it takes no stance.' : esc(why)}</span></span>
           </button>`).join('')}
         </div>
-        <p class="b-p" style="font-size:13px">A stance is scored, not asserted: 60 and above reads bullish,
+        <p class="b-p" style="font-size:var(--t-4)">A stance is scored, not asserted: 60 and above reads bullish,
           40 to 60 neutral, below 40 bearish, on the same component scores shown above. Tap a row for the
           reason.</p>
       </section>
@@ -3272,7 +3272,7 @@
             ${cell('Promoter holding', p1(row.insiders))}
           </dl>
 
-          <p class="b-p" style="font-size:13px">Figures come from company filings as aggregated by
+          <p class="b-p" style="font-size:var(--t-4)">Figures come from company filings as aggregated by
             the same 750-name screen the rest of this site runs on${row.fy ? `, for ${esc(row.fy)}` : ''}${
             n(row.fy_count) ? ` across ${n(row.fy_count)} reported years` : ''}.
             <b style="color:var(--b-ink)">They are annual, not quarterly</b> — no quarterly series
@@ -3316,7 +3316,7 @@
           <button type="button" class="bear" data-sc="2" aria-pressed="false">Bearish</button>
         </div>
         <div class="b-scp" id="scPane"></div>
-        <p class="b-p" style="font-size:13px">These are scenarios, not forecasts. No probability is
+        <p class="b-p" style="font-size:var(--t-4)">These are scenarios, not forecasts. No probability is
           attached to any of them, because the engine publishes no probability model — what is shown
           instead is the ledger's own base rate over every closed signal, which describes the engine's
           history and not this trade.</p>
@@ -3359,7 +3359,7 @@
               <div class="row"><span class="k">Gain T2</span><span class="b gain" id="barG2"></span><span class="v" id="barG2v" style="color:var(--b-bull)"></span></div>
             </div>
             <div class="b-metrics" style="margin-top:22px" id="rkOut"></div>
-            <p class="b-p" style="font-size:13px">Position size is the risk amount divided by the distance
+            <p class="b-p" style="font-size:var(--t-4)">Position size is the risk amount divided by the distance
               from entry to stop, rounded down to whole shares. It is arithmetic on the numbers you set —
               not a recommendation, and it takes no account of your other positions, liquidity in the name,
               or what you can afford to lose.</p>
@@ -3413,7 +3413,7 @@
                ? `That is ${pct((last - entry) / entry * 100)} against the published entry — unrealised, and not a booked result.` : 'No current price is available.'}`],
           ].filter(Boolean).map(([w, t]) => `<div class="b-tli"><span class="w">${esc(w)}</span><span class="t">${t}</span></div>`).join('')}
         </div>
-        <p class="b-p" style="font-size:13px">The ledger records when a signal was generated, when it was
+        <p class="b-p" style="font-size:var(--t-4)">The ledger records when a signal was generated, when it was
           sent, and how it closed. It does <b style="color:var(--b-ink)">not</b> record intraday development
           — there is no row saying momentum confirmed at 09:24 — so none is shown. A timeline of events that
           were never logged would be a story, not a record.</p>
@@ -3753,7 +3753,7 @@
       scPane.innerHTML = `<h4>${esc(h)}</h4><p>${esc(body)}</p>
         <div class="b-scg">${grid.map(([k, v]) => `<div><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join('')}
           <div><span class="k">Engine base rate</span><span class="v">${baseRate == null ? '—' : baseRate + '%'}</span></div></div>
-        ${baseRate == null ? '' : `<p style="font-size:12.5px;color:var(--b-dim);margin-top:14px;line-height:1.6">
+        ${baseRate == null ? '' : `<p style="font-size:var(--t-4);color:var(--b-dim);margin-top:14px;line-height:1.6">
           ${baseRate}% is the share of <b style="color:var(--b-mut)">all ${hNum(H.trades)} closed signals</b> that
           ended in profit. It describes the engine's history, not this trade, and it is the same number
           whichever scenario is selected.</p>`}`;
@@ -3980,7 +3980,7 @@
         <div class="board" style="margin-top:14px">
           ${ds.map(d => `<div class="board-row">
             <span class="n">${esc(d.dataset || '')}<br>
-              <em style="font-style:normal;color:var(--dim);font-size:11.5px">${esc(d.source || '')}</em></span>
+              <em style="font-style:normal;color:var(--dim);font-size:var(--t-3)">${esc(d.source || '')}</em></span>
             <span class="p">${esc(d.freshness_age || '—')}</span>
             <span class="c ${/current|fresh|ok/i.test(String(d.status)) ? 'up' : 'wn'}">${esc(d.status || '—')}</span>
           </div>`).join('')}
@@ -4578,7 +4578,7 @@
           ? ((Number(a.px) - px) / px * 100) : null;
         return `<div class="board-row">
           <span class="n"><b>${esc(a.sym)}</b> ${esc(a.op === 'above' ? '≥' : '≤')} ${esc(a.px)}
-            ${a.note ? `<br><em style="font-style:normal;color:var(--dim);font-size:11.5px">${esc(a.note)}</em>` : ''}</span>
+            ${a.note ? `<br><em style="font-style:normal;color:var(--dim);font-size:var(--t-3)">${esc(a.note)}</em>` : ''}</span>
           <span class="p">${px != null ? '₹' + esc(px) : '—'}</span>
           <span class="c ${away == null ? '' : dir(away)}">${away == null ? '—' : pct(away) + ' away'}</span>
           <button type="button" class="alx" data-al="${i}" aria-label="Delete this alert">✕</button>
@@ -4673,13 +4673,39 @@
     /* Only a real navigation animates. The 60-second refresh calls R[path]()
      * directly and never comes through here, so the page someone is reading is
      * never faded out from under them. */
-    main.classList.remove('route-in');
-    void main.offsetWidth;                       // restart the animation
-    main.classList.add('route-in');
+    /* THE CROSS-FADE IS THE BROWSER'S IF IT HAS ONE.
+     *
+     * startViewTransition snapshots the old page, runs the callback, and
+     * cross-fades to the new one — which is smoother than the class-driven
+     * routeIn below because the OLD content is still on screen during the
+     * fade rather than being replaced by a blank frame first.
+     *
+     * Feature-detected and never awaited: where it does not exist, or the
+     * reader has asked for reduced motion, the existing animation runs and
+     * nothing else changes. */
+    const useVT = typeof document.startViewTransition === 'function'
+      && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!useVT) {
+      main.classList.remove('route-in');
+      void main.offsetWidth;                     // restart the animation
+      main.classList.add('route-in');
+    } else {
+      main.classList.remove('route-in');
+    }
     // A new route reads a different set of feeds; the probe must follow it.
     routeUrls = new Set();
-    try { await R[path](); } catch (err) {
-      paint(fail('This section', err && err.message ? err.message : 'unexpected error'));
+    const run = async () => {
+      try { await R[path](); } catch (err) {
+        paint(fail('This section', err && err.message ? err.message : 'unexpected error'));
+      }
+    };
+    if (useVT) {
+      // The transition resolves when the callback does; nothing downstream
+      // depends on the animation having finished, so `finished` is not awaited.
+      try { await document.startViewTransition(run).updateCallbackDone; }
+      catch (e) { await run(); }                 // a rejected transition still renders
+    } else {
+      await run();
     }
   }
 
@@ -4989,6 +5015,28 @@
     root.setAttribute('data-theme', e.matches ? 'dark' : 'light');
   });
   document.getElementById('cmdkBtn')?.addEventListener('click', openCmd);
+  /* DENSITY. Stamped before first paint by the inline script in index.html
+   * for the same reason the theme is: a reader who chose compact should not
+   * watch the page relax and then tighten. */
+  const densBtn = document.getElementById('densBtn');
+  if (densBtn) {
+    const syncDens = () => {
+      const on = root.getAttribute('data-density') === 'compact';
+      densBtn.setAttribute('aria-pressed', String(on));
+      densBtn.title = on ? 'Comfortable rows' : 'Compact rows';
+      densBtn.setAttribute('aria-label', densBtn.title);
+    };
+    syncDens();
+    densBtn.addEventListener('click', () => {
+      const on = root.getAttribute('data-density') === 'compact';
+      if (on) root.removeAttribute('data-density');
+      else root.setAttribute('data-density', 'compact');
+      try { localStorage.setItem('sig:density', on ? 'comfortable' : 'compact'); }
+      catch (e) { /* private mode */ }
+      syncDens();
+    });
+  }
+
   document.getElementById('themeBtn').addEventListener('click', () => {
     const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
