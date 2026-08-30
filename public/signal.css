@@ -1775,3 +1775,85 @@ body::before{display:none}
 main.route-in{animation:routeIn 200ms var(--ease-out) both}
 @keyframes routeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){main.route-in{animation:none}}
+
+/* ── THE PRICE LINE ───────────────────────────────────────────────────────
+   One linear scale from the 52-week low to the high, on every one of the 750
+   names, marking the 200/50/20-day averages and the current price. Those
+   averages are the support and resistance this screen's engines trade
+   against — drawn rather than listed, so "above the 50, under the 200" is a
+   glance instead of three subtractions. No extra requests: every field is
+   already on the row. */
+.scr-r{position:relative}
+.pl-w{grid-column:1/-1;margin-top:9px;display:block}
+.pl{position:relative;display:block;height:5px}
+.pl-t{position:absolute;inset:0;border-radius:3px;background:var(--raised);
+  border:1px solid var(--line)}
+.pl-f{position:absolute;left:0;top:0;bottom:0;border-radius:3px;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--down) 26%,transparent),
+                                   color-mix(in srgb,var(--up) 34%,transparent))}
+/* The averages are ticks, not dots: a tick reads as a level, a dot reads as a
+   position, and only one of these four things is a position. */
+.pl-m{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;border-radius:1px;cursor:help}
+.pl-m.is-200{background:var(--warn)}
+.pl-m.is-50{background:var(--accent);opacity:.75}
+.pl-m.is-20{background:var(--dim);opacity:.6}
+.pl-now{position:absolute;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;
+  border-radius:50%;background:var(--text);border:2px solid var(--surface)}
+/* The legend sits once above the table, not on every row. */
+.pl-key{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 0;
+  font:400 10.5px/1 var(--mono);letter-spacing:.04em;color:var(--dim)}
+.pl-key span{display:inline-flex;align-items:center;gap:6px}
+.pl-key i{width:2px;height:11px;border-radius:1px;display:inline-block}
+.pl-key i.k200{background:var(--warn)} .pl-key i.k50{background:var(--accent)}
+.pl-key i.k20{background:var(--dim)}
+.pl-key i.know{width:9px;height:9px;border-radius:50%;background:var(--text)}
+
+/* ── WATCHLIST STAR ───────────────────────────────────────────────────────
+   Inside a row that is itself a button, so the star stops the click before it
+   opens the card behind it. 28px target inside a 40px row. */
+.wstar{background:none;border:0;padding:0;margin:0 7px 0 0;cursor:pointer;
+  width:28px;height:28px;display:inline-grid;place-items:center;vertical-align:-8px;
+  color:var(--dim);border-radius:6px;flex:none;
+  transition:color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
+.wstar svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.4;
+  stroke-linejoin:round}
+.wstar:hover{color:var(--text);background:var(--raised)}
+.wstar[aria-pressed="true"]{color:var(--warn)}
+.wstar[aria-pressed="true"] svg{fill:currentColor;stroke:currentColor}
+
+/* ── ALERT FORM ───────────────────────────────────────────────────────────── */
+.alform{display:grid;gap:12px;align-items:end;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.alform label{display:block;font:500 10px/1 var(--mono);letter-spacing:.12em;
+  text-transform:uppercase;color:var(--dim);margin-bottom:7px}
+.alform input,.alform select{width:100%;background:var(--surface);color:var(--text);
+  border:1px solid var(--line2);border-radius:8px;padding:0 12px;min-height:44px;
+  font:400 14px/1 var(--ui)}
+.alform input:focus,.alform select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.btn-ghost-solid{background:var(--ink-btn);color:var(--on-ink);border:0;border-radius:8px;
+  min-height:44px;padding:0 18px;font:600 13.5px/1 var(--ui);cursor:pointer}
+.btn-ghost-solid:hover{opacity:.92}
+.alx{background:none;border:0;color:var(--dim);cursor:pointer;font-size:13px;
+  min-width:32px;min-height:32px;border-radius:6px}
+.alx:hover{color:var(--down);background:var(--raised)}
+.lnk{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;
+  font:inherit;text-decoration:underline;text-underline-offset:2px}
+.board-row:has(.alx){grid-template-columns:1fr auto auto 32px}
+
+/* ── TOASTS ───────────────────────────────────────────────────────────────
+   Alerts announce on the page first and always. A browser notification is an
+   addition for readers who opt in, never the only channel — the site cannot
+   assume permission it has not been given. */
+#toasts{position:fixed;right:14px;bottom:calc(var(--tabh) + 14px);z-index:70;
+  display:grid;gap:9px;max-width:min(92vw,340px)}
+@media(min-width:760px){#toasts{bottom:18px}}
+.toast{background:var(--text);color:var(--bg);border-radius:10px;padding:13px 40px 13px 15px;
+  position:relative;box-shadow:0 12px 34px rgba(0,0,0,.24);
+  animation:toastIn 240ms var(--ease-out) both}
+.toast b{display:block;font:600 13.5px/1.3 var(--ui)}
+.toast span{display:block;font:400 12.5px/1.45 var(--ui);opacity:.78;margin-top:3px}
+.toast button{position:absolute;top:8px;right:8px;background:none;border:0;color:inherit;
+  opacity:.6;cursor:pointer;min-width:28px;min-height:28px;border-radius:6px}
+.toast button:hover{opacity:1}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.toast{animation:none}}

@@ -80,9 +80,13 @@
    * Batched into one request — 30 cards asking individually is 30 round trips
    * and Yahoo rate-limits long before that. */
   async function quotes(syms) {
+    // Every quote this page fetches is also an alert check. No worker, no
+    // push, no server — an alert fires while you are looking at the site,
+    // which is the honest limit of a static front end over a read-only API.
     const list = [...new Set((syms || []).filter(Boolean))].slice(0, 40);
     if (!list.length) return {};
     const r = await get('/api/signals?px=' + encodeURIComponent(list.join(',')));
+    if (r.ok && r.data.quotes) { try { checkAlerts(r.data.quotes); } catch (e) { /* never break a quote fetch */ } }
     return (r.ok && r.data && r.data.quotes) ? r.data.quotes : {};
   }
   // Unrealised move on an unfilled order or an open signal. Direction-aware:
@@ -121,6 +125,26 @@
    * seconds to get the setup, the stop and the target — which is what the CTA
    * promises. Stated here once so the header and the hero cannot disagree. */
   const CURVE_MIN = '60 seconds';
+
+  /* DAY ONE. Every performance figure on this site counts from here and says
+   * so. It was a local inside the signals route, which is why the brief's own
+   * record section was still quoting the all-time ledger — two populations
+   * under one product. */
+  const LAUNCH = '2026-08-29';
+  const sinceLaunch = r => String(r.closed_at || r.date || '').slice(0, 10) >= LAUNCH;
+
+  /* Wins, losses and expectancy over an arbitrary set of ledger rows. The site
+   * used /api/stats for this, which is all-time and cannot be filtered. */
+  const recordOf = rows => {
+    const closed = rows.filter(
+      r => Number.isFinite(Number(r.r_multiple)) && (r.badge || '') !== 'open');
+    if (!closed.length) return { trades: 0, wins: 0, losses: 0, win_rate: null, expectancy_r: null };
+    const wins = closed.filter(r => Number(r.r_multiple) > 0).length;
+    const sum = closed.reduce((a, r) => a + Number(r.r_multiple), 0);
+    return { trades: closed.length, wins, losses: closed.length - wins,
+             win_rate: Math.round(wins / closed.length * 1000) / 10,
+             expectancy_r: Math.round(sum / closed.length * 1000) / 1000 };
+  };
 
   const head = (title, sub, eyebrow) =>
     `<div class="route-h"><span class="eyebrow">${esc(eyebrow || 'Signal')}</span>
@@ -413,6 +437,106 @@
     if (idx && typeof render === 'function') render();
   }
 
+
+  /* ══ WATCHLIST AND ALERTS ══════════════════════════════════════════════
+   *
+   * ON localStorage, AND NOT ON AN ACCOUNT. Deliberately. An account would
+   * mean a password to store, a session to protect, a deletion request to
+   * honour and a support burden — for a feature whose entire job is to
+   * remember a dozen ticker symbols. This site collects one email address for
+   * one purpose and nothing else, and the Privacy page says so; adding auth to
+   * hold a watchlist would make that page start lying.
+   *
+   * The cost is stated plainly in the UI rather than hidden: it lives in THIS
+   * browser. Clear your site data and it is gone. That is a real limitation
+   * and a reader deserves to know it before they build a list of forty names.
+   *
+   * Alerts are evaluated on the SAME quotes the page already fetches — there
+   * is no background worker, no push, no server. An alert fires when you are
+   * looking at the site, which is the honest limit of what a static front end
+   * over a read-only API can promise.
+   */
+  const WKEY = 'sig:watch', AKEY = 'sig:alerts', AFIRED = 'sig:fired';
+  const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; }
+                            catch (e) { return false; } };   // private mode, quota
+
+  const watchAll = () => lsGet(WKEY, []);
+  const isWatched = sym => watchAll().includes(sym);
+  const toggleWatch = sym => {
+    const w = watchAll();
+    const i = w.indexOf(sym);
+    if (i >= 0) w.splice(i, 1); else w.push(sym);
+    lsSet(WKEY, w);
+    // Repaint every star for this symbol wherever it appears on the page.
+    document.querySelectorAll(`[data-watch="${CSS.escape(sym)}"]`).forEach(b => {
+      const on = w.includes(sym);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.setAttribute('aria-label', (on ? 'Remove ' : 'Add ') + sym + (on ? ' from' : ' to') + ' your watchlist');
+    });
+    return w.includes(sym);
+  };
+  const watchBtn = sym => !sym ? '' : `<button type="button" class="wstar" data-watch="${esc(sym)}"
+      aria-pressed="${isWatched(sym)}"
+      aria-label="${isWatched(sym) ? 'Remove' : 'Add'} ${esc(sym)} ${isWatched(sym) ? 'from' : 'to'} your watchlist"
+    ><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4 4.2 13.4l.7-4.3-3.1-3 4.3-.6z"/></svg></button>`;
+
+  // A star anywhere on the page toggles, without each route wiring it up.
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest && ev.target.closest('.wstar');
+    if (!b) return;
+    ev.stopPropagation();                 // never open the card behind the star
+    ev.preventDefault();
+    toggleWatch(b.dataset.watch);
+  });
+
+  /* ── ALERTS ──────────────────────────────────────────────────────────────
+   * {sym, op:'above'|'below', px, note, made}. Checked against whatever quote
+   * the page last fetched for that symbol. A fired alert is recorded so it
+   * announces once rather than on every sixty-second repaint. */
+  const alertsAll = () => lsGet(AKEY, []);
+  const addAlert = a => { const l = alertsAll(); l.push(a); return lsSet(AKEY, l); };
+  const dropAlert = i => { const l = alertsAll(); l.splice(i, 1); lsSet(AKEY, l); };
+
+  function checkAlerts(quotes) {
+    const list = alertsAll();
+    if (!list.length || !quotes) return;
+    const fired = lsGet(AFIRED, {});
+    const hits = [];
+    list.forEach((a, i) => {
+      const q = quotes[a.sym];
+      const px = q && Number(q.price);
+      if (!Number.isFinite(px)) return;
+      const hit = a.op === 'above' ? px >= Number(a.px) : px <= Number(a.px);
+      const key = `${a.sym}|${a.op}|${a.px}`;
+      if (hit && !fired[key]) { fired[key] = Date.now(); hits.push({ ...a, px_now: px }); }
+      if (!hit && fired[key]) delete fired[key];        // re-arm once it crosses back
+    });
+    lsSet(AFIRED, fired);
+    hits.forEach(h => toast(`${h.sym} is ${h.op} ${h.px}`,
+      `Now ${h.px_now}. ${h.note || ''}`.trim()));
+    // The browser notification is an ADDITION, never the only channel — it is
+    // off unless the reader has granted it, and the toast fires regardless.
+    if (hits.length && 'Notification' in window && Notification.permission === 'granted') {
+      hits.forEach(h => { try {
+        new Notification(`${h.sym} ${h.op} ${h.px}`, { body: `Now ${h.px_now}`, tag: h.sym });
+      } catch (e) { /* some browsers refuse outside a user gesture */ } });
+    }
+  }
+
+  function toast(title, body) {
+    let host = document.getElementById('toasts');
+    if (!host) { host = document.createElement('div'); host.id = 'toasts'; document.body.appendChild(host); }
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.setAttribute('role', 'status');
+    el.innerHTML = `<b>${esc(title)}</b>${body ? `<span>${esc(body)}</span>` : ''}
+      <button type="button" aria-label="Dismiss">✕</button>`;
+    el.querySelector('button').addEventListener('click', () => el.remove());
+    host.appendChild(el);
+    setTimeout(() => el.remove(), 12000);
+  }
+
   /* ── shared widgets ────────────────────────────────────────────────────── */
 
   // Five steps each way, on the sector's own median. A continuous ramp reads
@@ -450,11 +574,17 @@
     const bl = ev.target.closest('[data-brief]');
     if (bl) { briefSym = bl.dataset.brief; return; }   // the href does the routing
     if (ev.target.closest('a')) return;          // never hijack a real link
+    /* A click that started on the watchlist star is NOT a click on the row.
+     * stopPropagation() in the star's own handler cannot prevent this one:
+     * both are delegated on `document`, and stopping propagation does not stop
+     * other listeners already bound to the same node. The row has to check. */
+    if (ev.target.closest('.wstar')) return;
     const n = ev.target.closest('[data-sym]');
     if (n && n.dataset.sym) openStock(n.dataset.sym);
   });
   document.addEventListener('keydown', ev => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    if (ev.target.closest && ev.target.closest('.wstar')) return;
     const n = ev.target.closest && ev.target.closest('[data-sym]');
     if (n && n.dataset.sym) { ev.preventDefault(); openStock(n.dataset.sym); }
   });
@@ -466,7 +596,7 @@
     const list = rows => rows && rows.length ? `<div class="rank">${rows.map((r, i) => `
         <div class="rank-r" data-sym="${esc(r.sym)}" role="button" tabindex="0">
           <span class="i">${i + 1}</span>
-          <span class="s"><b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span></span>
+          <span class="s">${watchBtn(r.sym)}<b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span></span>
           <span class="x" style="color:var(--dim)">${r.rsi != null ? 'RSI ' + Math.round(r.rsi) : ''}</span>
           <span class="m ${dir(r[k])}">${pct(r[k])}</span>
         </div>`).join('')}</div>` : `<div class="empty">No names.</div>`;
@@ -1197,7 +1327,14 @@
               · page ${scrPage + 1} of ${pages}</span>
             <button type="button" class="pg" data-pg="next" ${scrPage >= pages - 1 ? 'disabled' : ''}>Next →</button>
           </div>`;
-          return sec(PRESETS[scrPreset][0], rows.length ? screenTable(page) + nav
+          const key = `<p class="pl-key">
+            <span>Each row's line runs from its <b>52-week low</b> to its <b>high</b>:</span>
+            <span><i class="know"></i>price now</span>
+            <span><i class="k200"></i>200-day</span>
+            <span><i class="k50"></i>50-day</span>
+            <span><i class="k20"></i>20-day</span>
+            <span>— the levels these engines trade against.</span></p>`;
+          return sec(PRESETS[scrPreset][0], rows.length ? screenTable(page, from) + key + nav
             : `<div class="empty">Nothing matches. Try a different preset or clear the search.</div>`,
             `${rows.length} of ${SCREEN.length}`);
         })());
@@ -1223,8 +1360,11 @@
       main.querySelector('#scrs').addEventListener('change', e => { scrSort = e.target.value; draw(); });
       main.querySelectorAll('.chip').forEach(b =>
         b.addEventListener('click', () => { scrPreset = b.dataset.p; scrPage = 0; draw(); }));
-      main.querySelectorAll('[data-sym]').forEach(el =>
-        el.addEventListener('click', () => openStock(el.dataset.sym)));
+      /* No per-row listener here. A delegated handler on `document` already
+       * opens any [data-sym], so this bound forty more on every repaint — and
+       * being bound directly to the element it also fired for clicks on the
+       * watchlist star inside it, which the delegated handler correctly
+       * ignores. Forty listeners fewer, and one bug fewer. */
 
       /* Live marks for the rows actually on screen. Fired after paint so the
        * table is readable immediately and the quotes fill in — a screen that
@@ -1257,7 +1397,43 @@
   // Turnover is out. It says how much traded, which almost never changes a
   // decision — where price sits against its own 50 and 200 day, and whether
   // it is stretched, does.
-  const screenTable = rows => `<div class="rank">
+  /* ── THE PRICE LINE ──────────────────────────────────────────────────────
+   * The markets board's range bar, stretched into a full price ladder and
+   * given to every one of the 750 names.
+   *
+   * On one linear scale from the 52-week low to the 52-week high it marks the
+   * 200-day, the 50-day, the 20-day and where the price is now. Those three
+   * averages ARE the support and resistance most of this screen's engines
+   * trade against — drawn rather than listed, so "price is above the 50 but
+   * under the 200" is a glance instead of three subtractions.
+   *
+   * ZERO EXTRA REQUESTS. Every field is already on the screen row: 720 of 750
+   * carry the 52-week range, 750 carry the 20 and 50-day, 736 the 200-day. A
+   * name missing its range gets no line rather than a made-up one.
+   */
+  const priceLine = r => {
+    const n = v => Number.isFinite(Number(v)) ? Number(v) : null;
+    const lo = n(r.low52), hi = n(r.high52), px = n(r.price);
+    if (lo == null || hi == null || px == null || hi <= lo) return '';
+    const at = v => Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100));
+    const mark = (v, cls, label) => v == null ? ''
+      : `<i class="pl-m ${cls}" style="left:${at(v).toFixed(2)}%" title="${esc(label)} ${esc(fmtN(v))}"></i>`;
+    return `<span class="pl" role="img"
+        aria-label="${esc(r.sym)} at ${esc(fmtN(px))}, ${at(px).toFixed(0)} per cent of the way from its 52-week low ${esc(fmtN(lo))} to its high ${esc(fmtN(hi))}">
+      <i class="pl-t"></i>
+      <i class="pl-f" style="width:${at(px).toFixed(2)}%"></i>
+      ${mark(n(r.sma200), 'is-200', '200-day')}
+      ${mark(n(r.sma50), 'is-50', '50-day')}
+      ${mark(n(r.sma20), 'is-20', '20-day')}
+      <i class="pl-now" style="left:${at(px).toFixed(2)}%"></i>
+    </span>`;
+  };
+  // Compact Indian-format number for the labels and titles above.
+  const fmtN = v => Number(v) >= 1000
+    ? Math.round(Number(v)).toLocaleString('en-IN')
+    : String(Math.round(Number(v) * 100) / 100);
+
+  const screenTable = (rows, offset) => `<div class="rank">
     <div class="rank-r rank-head scr-r">
       <span class="i">#</span><span class="s">Name</span>
       <span class="x">Price</span><span class="x">Today</span><span class="x">vs 50D</span>
@@ -1267,14 +1443,18 @@
       const v50 = r.sma50 ? (r.price - r.sma50) / r.sma50 * 100 : null;
       const v200 = r.sma200 ? (r.price - r.sma200) / r.sma200 * 100 : null;
       return `<div class="rank-r scr-r" data-sym="${esc(r.sym)}" role="button" tabindex="0">
-        <span class="i">${i + 1}</span>
-        <span class="s"><b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span></span>
+        <span class="i">${(offset || 0) + i + 1}</span>
+        <span class="s">${watchBtn(r.sym)}<b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span></span>
         <span class="x" data-px>₹${esc(r.price ?? '—')}</span>
-        <span class="x" data-day style="color:var(--dim)">·</span>
+        <!-- Filled by the live quote call below. An em dash, not a bullet: a
+             cell that never fills should read as "not measured" like every
+             other unmeasured cell on this site, not as a decorative dot. -->
+        <span class="x" data-day style="color:var(--dim)">—</span>
         <span class="x ${dir(v50)}">${v50 == null ? '—' : pct(v50)}</span>
         <span class="x ${dir(v200)}">${v200 == null ? '—' : pct(v200)}</span>
         <span class="x" style="color:${(r.rsi ?? 50) > 70 ? 'var(--warn)' : (r.rsi ?? 50) < 35 ? 'var(--accent)' : 'var(--dim)'}">${r.rsi != null ? Math.round(r.rsi) : '—'}</span>
         <span class="m ${dir(r.r1m)}">${pct(r.r1m)}</span>
+        <span class="pl-w">${priceLine(r)}</span>
       </div>`; }).join('')}</div>`;
 
   /* THE CARD. Same fields the broadsheet's modal shows, from the same
@@ -1395,7 +1575,6 @@
      * Anything sent on or after LAUNCH counts. When there is nothing yet, the
      * page says so rather than showing an empty table that reads as a fault.
      */
-    const LAUNCH = '2026-08-29';
 
     const dayOf = r => String(r.alert_date || r.date || '').slice(0, 10);
     const every = a.rows;
@@ -1412,7 +1591,6 @@
      * as positions close. The pre-launch history is not deleted — it is
      * summarised below with its own dates attached, so nothing is hidden and
      * nothing is passed off as this site's own result. */
-    const sinceLaunch = r => String(r.closed_at || r.date || '').slice(0, 10) >= LAUNCH;
     const CURVE = rCurve(every.filter(sinceLaunch));
     const PRIOR = rCurve(every.filter(r => !sinceLaunch(r)));
     const all = every.filter(r => dayOf(r) >= LAUNCH);
@@ -1980,14 +2158,28 @@
 
     /* ── BASE RATE, not a probability. */
     const S = st.ok ? st.data : null;
-    const H = S && S.headline ? S.headline : null;
+    /* THE BRIEF'S RECORD IS THIS SITE'S RECORD, NOT THE ENGINE'S WHOLE LIFE.
+     *
+     * This read /api/stats, which is all-time and cannot be filtered — so the
+     * brief published "48 closed since 2026-08-03, 16.7%, −0.414R" on a site
+     * whose every other performance figure counts from LAUNCH. Same defect as
+     * the curve, in a second place. Computed from the ledger rows this page
+     * already has, so it can be scoped.
+     *
+     * The all-time figures are not discarded; they are shown beneath, labelled
+     * as the engine before this site, with their own dates. */
+    const HERE = recordOf(rows.filter(sinceLaunch));
+    const PRE = recordOf(rows.filter(r => !sinceLaunch(r)));
+    const H = HERE.trades ? HERE : null;
+    const S_ALL = S && S.headline ? S.headline : null;
     /* EVERY FIELD OFF /api/stats IS OPTIONAL.
      * The tiles interpolated H.wins and H.losses straight into the markup, so
      * a headline missing either printed the literal word "undefined" on a page
      * about money. num() renders a missing figure as an em dash, which is the
      * same thing the rest of this site does with anything it cannot measure. */
     const hNum = (v, suffix) => Number.isFinite(Number(v)) ? Number(v) + (suffix || '') : '—';
-    const closedRows = rows.filter(r => r.pnl_pct != null && (r.badge || '') !== 'open').slice(0, 8);
+    const closedRows = rows.filter(r => r.pnl_pct != null && (r.badge || '') !== 'open'
+                                     && sinceLaunch(r)).slice(0, 8);
 
     const thesis = [
       ['Market structure', 'The trend is doing the heavy lifting.',
@@ -2443,10 +2635,22 @@
           <div class="b-m"><span class="k">Losses</span><span class="v dn">${hNum(H.losses)}</span></div>
           <div class="b-m"><span class="k">Expectancy</span><span class="v ${H.expectancy_r >= 0 ? 'up' : 'dn'}">${hNum(H.expectancy_r, 'R')}</span></div>
         </div>
-        <p class="b-p">${tip('expectancy')} Measured over ${hNum(H.trades)} closed signals since ${esc((S.totals || {}).first_date || '')}.
+        <p class="b-p">${tip('expectancy')} Measured over ${hNum(H.trades)} signals closed since <b style="color:var(--b-ink)">${esc(LAUNCH)}</b>, the day this site started counting.
           Expectancy is <b style="color:var(--b-ink)">${hNum(H.expectancy_r, 'R')}</b>${H.expectancy_r < 0
             ? ' — the engine is currently losing money per trade on this sample, and that is published here for the same reason the winners are.'
             : ' per closed trade on this sample.'}</p>` : ''}
+        ${!H ? `<div class="empty" style="text-align:left;padding:22px 20px;margin-top:22px">
+            <b style="color:var(--b-ink)">Nothing has closed yet.</b> ${
+              rows.filter(r => (r.badge || '') === 'open' && sinceLaunch(r)).length
+            } signals are open and none has resolved, so there is no win rate, no expectancy and no
+            record to show. It appears the moment one closes.
+            ${PRE.trades ? `<br><br><span style="color:var(--b-dim)">Before ${esc(LAUNCH)} the same
+              engines closed <b style="color:var(--b-mut)">${PRE.trades}</b> graded trades —
+              ${PRE.wins}W / ${PRE.losses}L, expectancy
+              <b style="color:var(--b-mut)">${PRE.expectancy_r}R</b>. Real, kept, and not counted as
+              this site's record: it was produced under a different configuration and a ledger that
+              has been re-graded twice.</span>` : ''}
+          </div>` : ''}
         ${closedRows.length ? `<div class="b-hist"><table>
           <thead><tr><th>Date</th><th>Asset</th><th>Direction</th>
             <th class="num">Entry</th><th class="num">Exit</th><th>Result</th><th class="num">P&amp;L</th></tr></thead>
@@ -2836,6 +3040,7 @@
     ['/ideas', 'Ideas', 'Ranked names and the orders a sized book would place'],
     ['/ipo', 'IPO', 'Books open now, and how last year’s listings did'],
     ['/screen', 'Screen', 'All 750 names, searchable'],
+    ['/watch', 'Watchlist', 'Names you starred, and your price alerts'],
     ['/signals', 'Signals', 'The public ledger — wins and losses'],
     ['/brief', 'Brief', 'Today’s setup, in full'],
     ['/methodology', 'Methodology', 'How every number on this site is made'],
@@ -3275,6 +3480,119 @@
     hit.addEventListener('pointercancel', clear);
   };
 
+
+  R['/watch'] = async () => {
+    const syms = watchAll();
+    paint(head('Watchlist', 'Names you starred and price levels you asked to be told about.',
+      'Yours, on this device') + skel('sk-row', 4));
+
+    // The screen supplies every fundamental and level; live prices come from
+    // the same quote route the rest of the site uses.
+    const idx = await screenIndex();
+    const q = syms.length ? await quotes(syms) : {};
+    let out = head('Watchlist', 'Names you starred and price levels you asked to be told about.',
+      'Yours, on this device');
+
+    out += `<div class="note"><b>This list lives in this browser.</b> There is no account and
+      nothing is sent anywhere — which also means clearing your site data clears the list, and it
+      will not follow you to your phone. Alerts are checked against the prices this page fetches,
+      so they fire while the site is open and not when it is closed.
+      <a href="#/privacy" style="color:var(--accent)">What is stored →</a></div>`;
+
+    out += sec('Watching', syms.length ? `<div class="rank">
+      <div class="rank-r scr-r rank-head"><span class="i">#</span><span class="s">Name</span>
+        <span class="x">Price</span><span class="x">Today</span><span class="x">vs 50D</span>
+        <span class="x">vs 200D</span><span class="x">RSI 14D</span><span class="m">1M</span></div>
+      ${syms.map((sym, i) => {
+        const r = (idx && idx[sym]) || { sym };
+        const live = q[sym];
+        const px = live ? live.price : r.price;
+        const v50 = r.sma50 && px ? (px - r.sma50) / r.sma50 * 100 : null;
+        const v200 = r.sma200 && px ? (px - r.sma200) / r.sma200 * 100 : null;
+        return `<div class="rank-r scr-r" data-sym="${esc(sym)}" role="button" tabindex="0">
+          <span class="i">${i + 1}</span>
+          <span class="s">${watchBtn(sym)}<b>${esc(sym)}</b><span>${esc(r.name || 'not on the screen')}</span></span>
+          <span class="x">${px != null ? '₹' + esc(px) : '—'}</span>
+          <span class="x ${live && dir(live.change_pct)}">${live && Number.isFinite(live.change_pct) ? pct(live.change_pct) : '—'}</span>
+          <span class="x ${dir(v50)}">${v50 == null ? '—' : pct(v50)}</span>
+          <span class="x ${dir(v200)}">${v200 == null ? '—' : pct(v200)}</span>
+          <span class="x">${r.rsi != null ? Math.round(r.rsi) : '—'}</span>
+          <span class="m ${dir(r.r1m)}">${pct(r.r1m)}</span>
+          <span class="pl-w">${priceLine(r)}</span>
+        </div>`; }).join('')}</div>`
+      : `<div class="empty">Nothing starred yet. Open <a href="#/screen" style="color:var(--accent)">Screen</a>
+         or any company card and press the star.</div>`,
+      syms.length ? `${syms.length} name${syms.length > 1 ? 's' : ''}` : '');
+
+    /* ── ALERTS ─────────────────────────────────────────────────────────── */
+    const al = alertsAll();
+    out += sec('Price alerts', `
+      <form class="alform" id="alform">
+        <div><label for="alSym">Symbol</label>
+          <input id="alSym" list="alSyms" placeholder="e.g. RELIANCE" autocomplete="off" required></div>
+        <datalist id="alSyms">${(syms.length ? syms : (idx ? Object.keys(idx).slice(0, 400) : []))
+          .map(x => `<option value="${esc(x)}">`).join('')}</datalist>
+        <div><label for="alOp">When price is</label>
+          <select id="alOp"><option value="above">at or above</option>
+            <option value="below">at or below</option></select></div>
+        <div><label for="alPx">Level</label>
+          <input id="alPx" type="number" step="any" min="0" placeholder="0.00" required></div>
+        <div><label for="alNote">Note <span style="color:var(--dim)">optional</span></label>
+          <input id="alNote" maxlength="80" placeholder="why this level matters"></div>
+        <button type="submit" class="btn-ghost-solid">Add alert</button>
+      </form>
+      ${al.length ? `<div class="board" style="margin-top:16px">${al.map((a, i) => {
+        const live = q[a.sym];
+        const px = live ? live.price : ((idx && idx[a.sym] || {}).price);
+        const away = Number.isFinite(px) && Number(a.px)
+          ? ((Number(a.px) - px) / px * 100) : null;
+        return `<div class="board-row">
+          <span class="n"><b>${esc(a.sym)}</b> ${esc(a.op === 'above' ? '≥' : '≤')} ${esc(a.px)}
+            ${a.note ? `<br><em style="font-style:normal;color:var(--dim);font-size:11.5px">${esc(a.note)}</em>` : ''}</span>
+          <span class="p">${px != null ? '₹' + esc(px) : '—'}</span>
+          <span class="c ${away == null ? '' : dir(away)}">${away == null ? '—' : pct(away) + ' away'}</span>
+          <button type="button" class="alx" data-al="${i}" aria-label="Delete this alert">✕</button>
+        </div>`; }).join('')}</div>`
+        : `<div class="empty">No alerts set. They are checked against the prices this page fetches —
+           so they fire while the site is open, not in the background.</div>`}
+      ${'Notification' in window ? `<p class="sec-note" id="notifRow">Alerts always show on the page.
+        <button type="button" class="lnk" id="notifBtn">Also allow browser notifications</button>
+        — optional, and it changes nothing about what is stored.</p>` : ''}`,
+      al.length ? `${al.length} set` : '');
+
+    paint(out);
+
+    const f = document.getElementById('alform');
+    f.addEventListener('submit', ev => {
+      ev.preventDefault();
+      const sym = document.getElementById('alSym').value.trim().toUpperCase();
+      const px = Number(document.getElementById('alPx').value);
+      if (!sym || !Number.isFinite(px) || px <= 0) return;
+      const okSaved = addAlert({ sym, op: document.getElementById('alOp').value, px,
+        note: document.getElementById('alNote').value.trim(), made: new Date().toISOString() });
+      if (!okSaved) { toast('Could not save', 'This browser is blocking local storage.'); return; }
+      // Star it too: an alert on a name you are not watching is a name you
+      // will forget you set an alert on.
+      if (!isWatched(sym)) toggleWatch(sym);
+      R['/watch']();
+    });
+    main.querySelectorAll('.alx').forEach(b => b.addEventListener('click', () => {
+      dropAlert(Number(b.dataset.al)); R['/watch']();
+    }));
+    const nb = document.getElementById('notifBtn');
+    if (nb) {
+      if (Notification.permission === 'granted') nb.textContent = 'Browser notifications are on';
+      else if (Notification.permission === 'denied') nb.textContent = 'Browser notifications are blocked';
+      else nb.addEventListener('click', async () => {
+        // Requested from a real click, which is the only place browsers allow it.
+        const r = await Notification.requestPermission();
+        nb.textContent = r === 'granted' ? 'Browser notifications are on'
+                       : r === 'denied' ? 'Browser notifications are blocked'
+                       : 'Also allow browser notifications';
+      });
+    }
+  };
+
   /* ── router ────────────────────────────────────────────────────────────── */
   const routeOf = () => {
     const h = (location.hash || '#/').replace(/^#/, '');
@@ -3284,7 +3602,7 @@
   /* The route's own name, shown beside the brand. Empty on Today, because a
    * breadcrumb reading "Today" while you are looking at Today is noise. */
   const WHERE = { '/': '', '/markets': 'Markets', '/ideas': 'Ideas', '/ipo': 'IPO',
-                  '/screen': 'Screen', '/signals': 'Signals', '/brief': 'Brief',
+                  '/screen': 'Screen', '/signals': 'Signals', '/brief': 'Brief', '/watch': 'Watchlist',
                   '/join': 'The brief', '/methodology': 'Methodology',
                   '/sources': 'Data sources', '/terms': 'Terms', '/privacy': 'Privacy' };
 

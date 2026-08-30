@@ -329,6 +329,57 @@ try {
   ok("the service worker is served",
      await p.evaluate(async () => (await fetch("/sw.js")).ok) === true);
 
+
+  /* ══ WATCHLIST, ALERTS AND THE PRICE LINE ════════════════════════════════
+   * All three are localStorage-only by design — no account, no server. The
+   * assertions that matter are that starring persists, that it does NOT open
+   * the card behind it (two delegated handlers plus one direct one all wanted
+   * that click), and that an alert actually fires rather than merely saving.
+   */
+  console.log("\n  watchlist and alerts");
+  await p.goto(SITE + "#/screen", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE + 6000);
+  ok("the price line is drawn for the screen rows", await p.locator(".scr-r .pl").count() > 20);
+  ok("its 200-day and 50-day markers are placed",
+     await p.locator(".pl-m.is-200").count() > 0 && await p.locator(".pl-m.is-50").count() > 0);
+  ok("the line has a legend", await p.locator(".pl-key").count() === 1);
+
+  const firstRow = p.locator(".scr-r:not(.rank-head)").first();
+  const wSym = (await firstRow.locator(".s b").innerText()).trim();
+  await firstRow.locator(".wstar").click();
+  await p.waitForTimeout(500);
+  ok("starring persists to localStorage",
+     (await p.evaluate(() => JSON.parse(localStorage.getItem("sig:watch") || "[]"))).includes(wSym));
+  ok("starring does not open the card behind it",
+     await p.locator("dialog#sheet[open]").count() === 0);
+
+  // Row numbers must continue across pages, not restart.
+  const pg1 = (await p.locator(".scr-r:not(.rank-head) .i").first().innerText()).trim();
+  await p.locator('[data-pg="next"]').click();
+  await p.waitForTimeout(1500);
+  const pg2 = (await p.locator(".scr-r:not(.rank-head) .i").first().innerText()).trim();
+  ok("row numbering continues onto page two", pg1 === "1" && pg2 === "41", { pg1, pg2 });
+
+  await p.goto(SITE + "#/watch", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE + 4000);
+  ok("the watchlist shows the starred name",
+     (await p.locator("main").innerText()).includes(wSym));
+  ok("the browser-only limitation is disclosed",
+     /lives in this browser/i.test(await p.locator("main").innerText()));
+
+  // An alert below any real price must actually fire, not merely save.
+  await p.locator("#alSym").fill(wSym);
+  await p.locator("#alPx").fill("1");
+  await p.locator("#alform button[type=submit]").click();
+  await p.waitForTimeout(6000);
+  ok("the alert is stored",
+     (await p.evaluate(() => JSON.parse(localStorage.getItem("sig:alerts") || "[]"))).length === 1);
+  ok("a triggered alert actually announces", await p.locator(".toast").count() > 0);
+  await p.locator(".alx").click();
+  await p.waitForTimeout(1200);
+  ok("the alert can be deleted",
+     (await p.evaluate(() => JSON.parse(localStorage.getItem("sig:alerts") || "[]"))).length === 0);
+
   await ctx.close();
 
 
