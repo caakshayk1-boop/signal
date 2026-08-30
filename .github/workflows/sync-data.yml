@@ -57,44 +57,20 @@ jobs:
       # is the source of truth and is reachable even when the site is not.
       # A public repo needs no token; GITHUB_TOKEN is passed anyway so this
       # keeps working if the upstream is ever made private.
-      # THE FRONTEND MIRRORS TOO, AND IT HAS TO.
+      # THE FRONTEND IS NO LONGER MIRRORED — THIS REPO OWNS IT.
       #
-      # public/signal.{js,css} are copies of static/next.{js,css} upstream, and
-      # for one day they were not: four fixes landed there — the brief no longer
-      # swapping instruments, the ladder labels, the live ledger, the removed
-      # broadsheet link — and this repo still had the old file. Nobody noticed
-      # because both repos have their own passing tests; only a diff catches it.
+      # There was a step here that pulled static/next.{js,css} from the
+      # newspaper repo twice a day. It existed because the two copies had
+      # drifted and both repos had passing tests, so nothing caught it.
       #
-      # index.html is deliberately NOT mirrored. It is the one file that
-      # genuinely differs: different asset names, no canonical, noindex until
-      # this site has a domain.
+      # It is removed because the direction is now the other way round: this is
+      # the site being built, news.askakshay.com is frozen, and a mirror
+      # pointing inward would silently overwrite every change made here within
+      # twelve hours. That is a worse failure than drift — drift is visible in
+      # a diff, this would look like the edits never happened.
       #
-      # When the upstream page is eventually retired, delete this step and this
-      # repo simply owns its frontend.
-      - name: Mirror the frontend
-        env:
-          GH_TOKEN: ${{ secrets.UPSTREAM_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          mkdir -p .incoming
-          for pair in "next.js:signal.js" "next.css:signal.css"; do
-            up="${pair%%:*}"; here="${pair##*:}"
-            if gh api "repos/$UPSTREAM/contents/static/$up" \
-                 -H "Accept: application/vnd.github.raw" > ".incoming/$here" 2>/dev/null \
-               && [ -s ".incoming/$here" ]; then
-              # A 404 body is still a non-empty file. Sanity-check it looks like
-              # the asset it claims to be before it is allowed to replace one.
-              if head -c 400 ".incoming/$here" | grep -qE "next\.css|Signal|:root|\(function|const "; then
-                printf '  ok    %-12s %s\n' "$here" "$(du -h ".incoming/$here" | cut -f1)"
-              else
-                printf '  BAD   %-12s does not look like source — keeping ours\n' "$here"
-                rm -f ".incoming/$here"
-              fi
-            else
-              printf '  MISS  %-12s upstream did not answer — keeping ours\n' "$here"
-              rm -f ".incoming/$here"
-            fi
-          done
+      # The DATA still mirrors, below, because the nine JSON feeds are genuinely
+      # build artefacts of generate.py upstream and are not authored here.
 
       - name: Fetch the nine feeds
         env:
