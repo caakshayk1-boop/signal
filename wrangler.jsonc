@@ -37,7 +37,14 @@
   // index,follow and writes a canonical, and a canonical pointing at a
   // hostname that does not resolve is a dead end a crawler holds against you.
   //
-  // "routes": [{ "pattern": "signal.askakshay.com", "custom_domain": true }],
+  "routes": [{ "pattern": "signal.askakshay.com", "custom_domain": true }],
+
+  // Declaring a route turns workers.dev OFF by default. Kept ON deliberately:
+  // signal.askakshay.workers.dev stays useful as a staging URL to check a
+  // deploy before pointing anyone at the real domain. It is not an SEO problem
+  // once set-domain has run — the canonical tag on every page names
+  // signal.askakshay.com, which is precisely what canonical is for.
+  "workers_dev": true,
 
   // NO secrets here. TURSO_URL and TURSO_TOKEN are set with
   // `wrangler secret put`, which stores them encrypted and keeps them out of

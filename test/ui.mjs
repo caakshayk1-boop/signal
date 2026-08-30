@@ -38,7 +38,14 @@ const ok = (name, cond, detail) => {
 // The routes fetch several feeds each; the brief also fetches a price series.
 const SETTLE = 7000;
 
-const browser = await chromium.launch();
+/* HOST_RESOLVER lets a run target a hostname whose DNS has not propagated to
+ * THIS machine yet — the site is live for everyone else. Format is Chromium's:
+ *   HOST_RESOLVER="MAP signal.askakshay.com 104.21.24.26" node test/ui.mjs https://signal.askakshay.com
+ * Unset, it changes nothing. */
+const browser = await chromium.launch(
+  process.env.HOST_RESOLVER
+    ? { args: [`--host-resolver-rules=${process.env.HOST_RESOLVER}`] }
+    : {});
 try {
   console.log(`next-ui: ${SITE}\n`);
 
