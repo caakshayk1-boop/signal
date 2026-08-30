@@ -791,7 +791,10 @@
   /* Delegated, like the row toggle below it: the drawers are built on first
    * open, so a listener bound at paint time would miss every one of them. */
   document.addEventListener('click', e => {
-    const b = e.target.closest && e.target.closest('.mk-card[data-card]');
+    // ANY element carrying data-card, not just the board's button. The volume,
+    // corporate-action and results rows all open the same card, and scoping
+    // this to one class is why they did not.
+    const b = e.target.closest && e.target.closest('[data-card]');
     if (!b) return;
     e.preventDefault();
     e.stopPropagation();
@@ -1037,7 +1040,7 @@
     const spurts = (() => {
       const uni = sr.ok ? (sr.data.rows || []) : [];
       return uni.filter(r => Number(r.vol_spike) >= 1.5 && r.liquid !== false)
-                .sort((a, b) => Number(b.vol_spike) - Number(a.vol_spike)).slice(0, 5);
+                .sort((a, b) => Number(b.vol_spike) - Number(a.vol_spike)).slice(0, 20);
     })();
     TODAY5 = { wire, wireTop, spurts, cal };
 
@@ -1058,7 +1061,9 @@
                  : 'NSE did not answer')}
         ${t5('res', cal ? (cal.results.rows || []).filter(x => x.isResult).length : '—', 'Results due',
              cal ? `of ${(cal.results.rows || []).length} board meetings` : 'NSE did not answer')}
-        ${t5('hol', cal && (cal.holidays.rows || []).length ? (cal.holidays.rows[0].date || '').slice(5) : '—',
+        ${/* "09-14" is a slice of an ISO string, not a date anyone reads.
+            * t5DM renders 14 Sep, which is how the day is spoken. */''}
+        ${t5('hol', cal && (cal.holidays.rows || []).length ? t5DM(cal.holidays.rows[0].date) : '—',
              'Next market holiday',
              cal && (cal.holidays.rows || []).length ? esc(cal.holidays.rows[0].why || '') : 'NSE did not answer')}
       </div>`, '', 'The day’s events, not the day’s averages.');
@@ -1398,11 +1403,109 @@
   }
 
 
+  /* ── RSI, AND DIVERGENCE AGAINST IT ──────────────────────────────────────
+   *
+   * The screen publishes a single RSI value per name. A DIVERGENCE is not a
+   * value, it is a relationship between two series over time — price making a
+   * higher high while RSI makes a lower one — so it cannot be read off the
+   * screen and has to be computed from the daily closes. That is one request
+   * per name, which is why it is a button the reader presses rather than
+   * something this page does to twenty symbols on open.
+   *
+   * Wilder's smoothing, not a simple moving average: the first average is the
+   * mean of the opening `period` changes and every one after it is smoothed
+   * by (prev*(n-1) + current)/n. A simple average gives a different number and
+   * every chart package in the world uses Wilder's, so a simple one would
+   * disagree with whatever the reader is comparing against.
+   */
+  function rsiSeries(closes, period = 14) {
+    if (!closes || closes.length <= period) return [];
+    const out = new Array(closes.length).fill(null);
+    let gain = 0, loss = 0;
+    for (let i = 1; i <= period; i++) {
+      const d = closes[i] - closes[i - 1];
+      if (d >= 0) gain += d; else loss -= d;
+    }
+    gain /= period; loss /= period;
+    out[period] = loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
+    for (let i = period + 1; i < closes.length; i++) {
+      const d = closes[i] - closes[i - 1];
+      gain = (gain * (period - 1) + (d > 0 ? d : 0)) / period;
+      loss = (loss * (period - 1) + (d < 0 ? -d : 0)) / period;
+      out[i] = loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
+    }
+    return out;
+  }
+
+  /* Swing points, not the highest bar in the window. A divergence drawn
+   * between "the max of the last 30 closes" and "the max of the 30 before
+   * that" will fire on any trending series; it has to be drawn between two
+   * PIVOTS — a bar higher (or lower) than the `w` bars on both sides of it. */
+  function pivotsOf(arr, w, kind) {
+    const out = [];
+    for (let i = w; i < arr.length - w; i++) {
+      const v = arr[i];
+      if (v == null) continue;
+      let ok = true;
+      for (let j = i - w; j <= i + w && ok; j++) {
+        if (j === i || arr[j] == null) continue;
+        if (kind === 'high' ? arr[j] > v : arr[j] < v) ok = false;
+      }
+      if (ok) out.push(i);
+    }
+    return out;
+  }
+
+  /* Regular divergence over the recent window. Returns null when there are not
+   * two comparable pivots — "no divergence found" and "not enough history to
+   * look" are different answers and the caller says which. */
+  function rsiDivergence(closes, lookback = 90) {
+    const px = closes.slice(-lookback);
+    if (px.length < 40) return { ok: false, why: 'not enough daily history' };
+    const rsi = rsiSeries(px);
+    if (!rsi.length) return { ok: false, why: 'not enough daily history' };
+    const W = 4;
+    const hi = pivotsOf(px, W, 'high').filter(i => rsi[i] != null).slice(-2);
+    const lo = pivotsOf(px, W, 'low').filter(i => rsi[i] != null).slice(-2);
+
+    if (hi.length === 2 && px[hi[1]] > px[hi[0]] && rsi[hi[1]] < rsi[hi[0]])
+      return { ok: true, kind: 'bearish', bars: px.length - hi[1],
+               note: `price made a higher high (${fmtN(px[hi[0]])} → ${fmtN(px[hi[1]])}) while RSI made a lower one (${Math.round(rsi[hi[0]])} → ${Math.round(rsi[hi[1]])})` };
+    if (lo.length === 2 && px[lo[1]] < px[lo[0]] && rsi[lo[1]] > rsi[lo[0]])
+      return { ok: true, kind: 'bullish', bars: px.length - lo[1],
+               note: `price made a lower low (${fmtN(px[lo[0]])} → ${fmtN(px[lo[1]])}) while RSI made a higher one (${Math.round(rsi[lo[0]])} → ${Math.round(rsi[lo[1]])})` };
+    return { ok: true, kind: 'none', note: 'the last two swings in price and RSI point the same way' };
+  }
+
+  /* One at a time in fours: twenty symbols at once is twenty concurrent
+   * requests to the same origin, which the browser queues anyway and the
+   * upstream is entitled to refuse. */
+  async function mapLimit(items, limit, fn) {
+    const out = new Array(items.length);
+    let i = 0;
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (i < items.length) {
+        const k = i++;
+        try { out[k] = await fn(items[k], k); } catch (e) { out[k] = null; }
+      }
+    }));
+    return out;
+  }
+
   /* ── THE FIVE TILES, OPENED ───────────────────────────────────────────────
    * Parked on one object at paint time rather than re-fetched on click: every
    * dataset behind these was already loaded to draw the tile, and asking NSE
    * again to show what is on screen is a request for nothing. */
   let TODAY5 = null;
+
+  // "2026-09-14" -> "14 Sep". Day first, because that is the part that
+  // answers "how soon".
+  const t5DM = d => {
+    if (!d) return '—';
+    const dt = new Date(d + 'T00:00:00');
+    return isNaN(dt) ? esc(d)
+      : `${dt.getDate()} ${dt.toLocaleDateString('en-GB', { month: 'short' }).replace(/\.$/, '').slice(0, 3)}`;
+  };
 
   const t5Date = d => {
     if (!d) return '';
@@ -1437,19 +1540,83 @@
 
     if (which === 'vol') {
       const v = T.spurts || [];
-      return sheet('Volume spurts', `
-        <p class="hint" style="margin:0 0 14px">Names trading at <b>1.5×</b> or more of their own
+      const rsiZone = n => n == null ? ['', 'not measured']
+        : n < 30 ? ['dn', 'oversold'] : n < 50 ? ['', 'soft']
+        : n < 70 ? ['up', 'firm'] : ['wn', 'overbought'];
+      const rowHtml = (r, div) => {
+        const [zc, zw] = rsiZone(r.rsi);
+        return `<div class="t5i t5v" data-sym="${esc(r.sym)}">
+          <span class="t5s">${esc(r.sym)} · ${esc(r.sector || '')}</span>
+          <span class="t5row">
+            <button type="button" class="t5name" data-card="${esc(r.sym)}">${esc(r.name || '')}</button>
+            ${watchBtn(r.sym)}
+          </span>
+          <span class="t5m"><b>${Number(r.vol_spike).toFixed(2)}×</b> average volume
+            · <i class="${dir(r.r1d)}">${pct(r.r1d)}</i> today
+            · ₹${esc(fmtN(r.price))}
+            · RSI <b class="${zc}">${r.rsi != null ? Math.round(r.rsi) : '—'}</b> <em>${esc(zw)}</em></span>
+          <span class="t5div" data-div="${esc(r.sym)}">${div || ''}</span>
+        </div>`;
+      };
+      sheet('Volume spurts', `
+        <p class="hint" style="margin:0 0 12px">Names trading at <b>1.5×</b> or more of their own
           recent average volume, largest first. Volume confirms a move or contradicts it; on its own
           it says only that more people than usual are trading this name today.</p>
-        ${v.length ? `<div class="t5l">${v.map(r => `
-          <button type="button" class="t5i t5b" data-card="${esc(r.sym)}">
-            <span class="t5s">${esc(r.sym)} · ${esc(r.sector || '')}</span>
-            <span class="t5t">${esc(r.name || '')}</span>
-            <span class="t5m"><b>${Number(r.vol_spike).toFixed(2)}×</b> average volume
-              · <i class="${dir(r.r1d)}">${pct(r.r1d)}</i> today
-              · ₹${esc(fmtN(r.price))}</span>
-          </button>`).join('')}</div>`
+        ${v.length ? `<div class="t5tools">
+            <button type="button" class="chip" id="divRun">Check RSI divergence on the daily chart</button>
+            <button type="button" class="chip" id="divOnly" aria-pressed="false" hidden>Only names with divergence</button>
+            <span class="t5note" id="divNote"></span>
+          </div>
+          <div class="t5l" id="volList">${v.map(r => rowHtml(r, '')).join('')}</div>`
         : `<div class="empty">No screened name is trading at 1.5× its average volume today.</div>`}`);
+
+      /* DIVERGENCE IS A BUTTON, NOT A DEFAULT.
+       * It needs one daily series per name — twenty requests — so it runs when
+       * asked and reports progress rather than making the sheet wait on it. */
+      const run = document.getElementById('divRun');
+      if (!run) return;
+      let results = null;
+      const note = document.getElementById('divNote');
+      const only = document.getElementById('divOnly');
+      const redraw = filtered => {
+        const list = document.getElementById('volList');
+        if (!list) return;
+        const rows = filtered ? v.filter(r => (results[r.sym] || {}).kind && results[r.sym].kind !== 'none') : v;
+        list.innerHTML = rows.length ? rows.map(r => {
+          const d = results && results[r.sym];
+          const tag = !d ? ''
+            : !d.ok ? `<em class="dv dv-na">${esc(d.why)}</em>`
+            : d.kind === 'none' ? `<em class="dv dv-na">No divergence — ${esc(d.note)}</em>`
+            : `<em class="dv dv-${esc(d.kind)}">${d.kind === 'bullish' ? 'Bullish' : 'Bearish'} RSI divergence</em>
+               <em class="dv-n">${esc(d.note)}, ${esc(d.bars)} bars ago</em>`;
+          return rowHtml(r, tag);
+        }).join('') : `<div class="empty">None of these names shows an RSI divergence.</div>`;
+      };
+      run.addEventListener('click', async () => {
+        run.disabled = true;
+        results = {};
+        let done = 0;
+        note.textContent = `reading ${v.length} daily charts…`;
+        await mapLimit(v, 4, async r => {
+          const res = await get(`/api/signals?series=${encodeURIComponent(r.sym)}&range=1y`);
+          const pts = res.ok ? (res.data.points || []) : [];
+          results[r.sym] = pts.length
+            ? rsiDivergence(pts.map(x => Number(x.c)).filter(Number.isFinite))
+            : { ok: false, why: 'no daily series' };
+          note.textContent = `read ${++done} of ${v.length}…`;
+        });
+        const n = Object.values(results).filter(d => d.ok && d.kind && d.kind !== 'none').length;
+        note.textContent = n ? `${n} of ${v.length} show a divergence` : `no divergence in these ${v.length}`;
+        run.hidden = true;
+        if (n) { only.hidden = false; }
+        redraw(false);
+      });
+      only.addEventListener('click', () => {
+        const on = only.getAttribute('aria-pressed') === 'true';
+        only.setAttribute('aria-pressed', String(!on));
+        redraw(!on);
+      });
+      return;
     }
 
     if (which === 'acts') {
@@ -1462,7 +1629,10 @@
           <div class="t5i">
             <span class="t5s"><b class="t5k t5k-${esc(String(r.kind).toLowerCase())}">${esc(r.kind)}</b>
               ${esc(r.sym || '')}</span>
-            <span class="t5t">${esc(r.company || '')}</span>
+            <span class="t5row">
+              <button type="button" class="t5name" data-card="${esc(r.sym || '')}">${esc(r.company || '')}</button>
+              ${watchBtn(r.sym)}
+            </span>
             <span class="t5m">${esc(r.detail || '')}${r.ex ? ` · ex ${t5Date(r.ex)}` : ''}</span>
           </div>`).join('')}</div>`
         : `<div class="empty">NSE lists no corporate actions in this window.</div>`}`);
@@ -1479,7 +1649,10 @@
           <div class="t5i">
             <span class="t5s">${r.isResult ? '<b class="t5k t5k-result">Results</b> ' : ''}${esc(r.sym || '')}
               ${r.date ? `· ${t5Date(r.date)}` : ''}</span>
-            <span class="t5t">${esc(r.company || '')}</span>
+            <span class="t5row">
+              <button type="button" class="t5name" data-card="${esc(r.sym || '')}">${esc(r.company || '')}</button>
+              ${watchBtn(r.sym)}
+            </span>
             <span class="t5m">${esc(r.purpose || '')}</span>
           </div>`).join('')}</div>`
         : `<div class="empty">NSE lists no board meetings in this window.</div>`}`);
@@ -1577,14 +1750,67 @@
   R['/ideas'] = async () => {
     paint(head('Ideas', 'Ranked names, and the orders a fully-sized book would place against them. Sizes are shown as a share of the book, so they scale to whatever you run.', 'Ranked ideas') +
       sec('Trade ideas', skel('sk-card', 3)));
-    const [t, mn, p] = await Promise.all([get('/today.json'), get('/mandate.json'), get('/pulse.json')]);
+    const [t, mn, p, tk] = await Promise.all(
+      [get('/today.json'), get('/mandate.json'), get('/pulse.json'), get('/api/ticker')]);
     let out = head('Ideas', 'Ranked names, and the orders a fully-sized book would place against them. Sizes are shown as a share of the book, so they scale to whatever you run.', 'Ranked ideas');
     if (!t.ok) { paint(out + fail('Ideas', t.error)); return; }
 
+    /* ── MULTIBAGGERS LEAD ────────────────────────────────────────────────
+     *
+     * This page opened on the daily engine's ranked picks. The weekly
+     * multibagger scan is the list that is actually meant to be held, and it
+     * was buried on the Markets board as a segment of five.
+     *
+     * Every row carries its own provenance — the date it was picked, the
+     * price it was picked at, the target it was given, its score, and what it
+     * has done since. A pick shown beside a live price with none of that
+     * cannot be checked by the person reading it, which is the whole problem
+     * with published ideas.
+     *
+     * "Replaced every week" is a property of the scan, not of this page: the
+     * query takes the newest scan date only, so the list turns over when the
+     * Saturday run writes a new one and shows its vintage in the meantime. */
+    const mbSeg = tk.ok
+      ? (tk.data.segments || []).find(x => /MULTIBAGGER/i.test(x.label || ''))
+      : null;
+    const mbRows = (mbSeg && mbSeg.items) || [];
+    const picked = mbRows.find(r => r.pick_date) || {};
+
+    out += sec('Multibaggers this week', mbRows.length ? `<div class="mbg">${mbRows.map(r => {
+        const since = r.pick_entry && Number.isFinite(Number(r.price_raw))
+          ? (r.price_raw - r.pick_entry) / r.pick_entry * 100 : null;
+        const up = r.pick_target && Number.isFinite(Number(r.price_raw))
+          ? (r.pick_target - r.price_raw) / r.price_raw * 100 : null;
+        return `<article class="mbc" data-sym="${esc(r.name)}">
+          <div class="mbc-h">
+            <button type="button" class="mbc-s" data-card="${esc(r.name)}">${esc(r.name)}</button>
+            ${watchBtn(r.name)}
+            ${r.pick_score != null ? `<span class="mbc-sc">${Math.round(r.pick_score)}</span>` : ''}
+          </div>
+          <div class="mbc-px">
+            <span><i>Now</i><b>${esc(r.price ?? '—')}</b></span>
+            <span><i>Picked at</i><b>${r.pick_entry != null ? '₹' + esc(fmtN(r.pick_entry)) : '—'}</b></span>
+            <span><i>Target</i><b>${r.pick_target != null ? '₹' + esc(fmtN(r.pick_target)) : '—'}</b></span>
+          </div>
+          <div class="mbc-m">
+            ${since != null ? `<span class="${dir(since)}"><b>${pct(since)}</b> since picked</span>` : ''}
+            ${up != null ? `<span><b>${pct(up)}</b> to target</span>` : ''}
+            ${r.pick_date ? `<span class="mbc-d">picked ${esc(r.pick_date)}</span>` : ''}
+          </div>
+        </article>`;
+      }).join('')}</div>
+      <p class="hint">The scan runs on a Saturday and this list is the newest run — it does not
+        change between runs, and the prices beside the names are live, which is what makes a
+        stalled-looking list look like a bug rather than the design.</p>`
+      : `<div class="empty">The weekly scan has not written a list in the last month, so there is
+         nothing current to show. Stale ideas presented as current would be worse.</div>`,
+      mbRows.length ? `${mbRows.length} names${picked.pick_date ? ` · ${esc(picked.pick_date)}` : ''}` : '',
+      'The weekly list, with what each name was picked at and what it has done since.');
+
     const picks = t.data.picks || [];
-    out += sec('Trade ideas', picks.length ? `<div class="cards-2">${picks.map(x => ideaCard(x, false)).join('')}</div>`
+    out += sec('The daily engine’s ranked picks', picks.length ? `<div class="cards-2">${picks.map(x => ideaCard(x, false)).join('')}</div>`
       : `<div class="empty">Nothing clears the bar this week. That is a result, not a gap.</div>`,
-      `${picks.length} ranked`, 'Names that cleared every floor, and the levels that define each one.');
+      `${picks.length} ranked`, 'A different engine, on a different clock — names that cleared every floor, and the levels that define each one.');
 
     const pu = p.ok ? p.data : {};
     out += sec('Breaking to 52-week highs',
@@ -2402,40 +2628,12 @@
                  `${wins}W / ${losses}L closed`, (wins + losses) && wins / (wins + losses) >= .5 ? 'up' : 'dn')}
           ${tile(closed.length, 'Closed and scored', 'expiries counted as losses')}
         </div>`) +
-        /* ── THE HISTORY THAT WAS BEING HIDDEN ─────────────────────────────
-         * Every figure above counts only from LAUNCH, which is correct — this
-         * site should be judged on what it published, not on what an engine
-         * did before anyone could read it. But two days after launch that
-         * window contains nothing closed, so the page said, in effect, "there
-         * is no record" while the ledger behind it held 80 resolved trades.
-         * A record page that shows nothing is worse than one that shows an
-         * uncomfortable number.
-         *
-         * So both are here, and the difference between them is stated rather
-         * than blurred: the block above is the published record and the block
-         * below is the engine's prior history, which was graded before launch
-         * and is not a claim about this site's live performance. */
-        (() => {
-          const prior = every.filter(r => dayOf(r) < LAUNCH);
-          const H = recordOf(prior);
-          if (!H.trades) return '';
-          const priorOpen = prior.length - H.trades;
-          return sec('Before this site published them', `<div class="grid">
-            ${tile(H.trades, 'Closed trades', 'graded before ' + esc(LAUNCH))}
-            ${tile(H.win_rate != null ? H.win_rate + '%' : '—', 'Win rate',
-                   `${H.wins}W / ${H.losses}L`, H.win_rate >= 50 ? 'up' : 'dn')}
-            ${tile(H.expectancy_r != null ? (H.expectancy_r > 0 ? '+' : '') + H.expectancy_r.toFixed(3) + 'R' : '—',
-                   'Expectancy per trade', 'average R across those trades',
-                   H.expectancy_r > 0 ? 'up' : 'dn')}
-            ${tile(priorOpen, 'Still open from then', 'marked to live prices')}
-          </div>
-          <p class="hint"><b>This is the engine's history, not this site's record.</b>
-            These trades closed before ${esc(LAUNCH)}, when nobody could act on them, and they were
-            graded in a rebuild rather than watched live. They are shown because hiding them would
-            leave this page claiming to have no record at all while ${H.trades} resolved trades sat
-            in the same ledger. Judge the site on the block above; judge the engine on this one.</p>`,
-            `${H.trades} closed`, 'What the engine did before launch, stated as such.');
-        })() +
+        /* NO PRE-LAUNCH RECORD ON THIS PAGE. A second block used to sit here
+         * carrying 80 trades closed before LAUNCH. Removed on instruction: the
+         * site is a fresh start, and until a published signal closes this page
+         * has no win rate and no expectancy. It says so above rather than
+         * filling the space with history nobody could have acted on. */
+
         `<div class="chips" role="group" aria-label="Signal filter">${chips.map(([k, l]) =>
           `<button type="button" class="chip" data-s="${k}" aria-pressed="${sigFilter === k}">${esc(l)}</button>`).join('')}</div>` +
         sec('Alerts', rows.length ? `<div class="cards-2">${rows.map(card).join('')}</div>`
@@ -2912,7 +3110,11 @@
 
     /* ── CONFLUENCE. The same five components, expressed as a stance. */
     const stance = v => !Number.isFinite(v) ? null : v >= 60 ? 0 : v >= 40 ? 1 : 2;
-    const MATRIX = COMPS.map(c => [c[0], stance(c[2]), c[3]]);
+    /* The fifth row carries its exclusion with it. The matrix reads as the
+     * evidence for the score directly above it, so a row that is not in the
+     * score has to say so here too — otherwise the page shows five factors
+     * and a number derived from four, and only one of them admits it. */
+    const MATRIX = COMPS.map(c => [c[0], stance(c[2]), c[3], c[4] !== false]);
 
     /* ── BASE RATE, not a probability. */
     const S = st.ok ? st.data : null;
@@ -2928,13 +3130,10 @@
      * as the engine before this site, with their own dates. */
     const HERE = recordOf(rows.filter(sinceLaunch));
     const H = HERE.trades ? HERE : null;
-    /* THE ENGINE'S PRIOR RECORD, FOR THE VERDICT BELOW.
-     * Two days after launch HERE is empty, so a brief that only cited the
-     * since-launch record could say nothing at all about whether setups like
-     * this one have worked. PRIOR is the same ledger before LAUNCH: 80 closed
-     * trades at the time of writing, and the number is not flattering. That is
-     * exactly why it belongs on the page that asks someone to act. */
-    const PRIOR = recordOf(rows.filter(r => !sinceLaunch(r)));
+    /* No pre-launch record is cited anywhere on this page. Those trades were
+     * graded in a rebuild rather than watched live, and this site is a fresh
+     * start — borrowing a number from before it existed to fill a gap is the
+     * comparison that number cannot support. */
     const S_ALL = S && S.headline ? S.headline : null;
     /* EVERY FIELD OFF /api/stats IS OPTIONAL.
      * The tiles interpolated H.wins and H.losses straight into the markup, so
@@ -3178,25 +3377,21 @@
                        measure.</b> It is here because it is the best-scoring signal open right now,
                        which is not the same as a good one: the screen ranks what it has, and on a
                        quiet day the top of a weak field is still a weak field. On a reading this
-                       low the honest answer to "should I take this" is no, or not at this size.${
-                         PRIOR && PRIOR.trades >= 20 && PRIOR.expectancy_r != null
-                           ? ` And the wider evidence agrees: across <b>${PRIOR.trades}</b> signals
-                              this engine has closed, the average outcome is
-                              <b>${PRIOR.expectancy_r > 0 ? '+' : ''}${PRIOR.expectancy_r.toFixed(3)}R</b>
-                              at a <b>${PRIOR.win_rate}%</b> win rate${PRIOR.expectancy_r < 0
-                                ? ' — that is a losing record, and nothing on this page should be read as if it were not'
-                                : ''}.`
-                           : ''}`}
+                       low the honest answer to "should I take this" is no, or not at this size.
+                       What a low score buys you is a documented reason to skip it.${
+                         H && H.trades ? '' : ` No signal published since ${esc(LAUNCH)} has closed
+                           yet, so there is no live record to weigh this against — that is the honest
+                           position of a ledger two days old, and it changes as trades close.`}`}
             </p>
             <p class="b-p" style="font-size:var(--t-4)">The score is the mean of the <b>measured</b>
               components — what the market did. Reward to risk is listed with them but excluded from
               it, because the stop and the target are chosen by the engine rather than observed:
               folding them in let a setup raise its own score by moving its own target.
-              A component with no data is left out rather than filled in${have.length < COMPS.length
+              A component with no data is left out rather than filled in${have.length < MEASURED.length
                 ? `, which is why the denominator here is <b style="color:var(--b-ink)">${have.length}</b>,
-                   not ${COMPS.length} — ${COMPS.length - have.length} component${COMPS.length - have.length > 1 ? 's are' : ' is'}
-                   unmeasured for this name`
-                : `. All ${COMPS.length} could be measured for this name`}.</p>
+                   not ${MEASURED.length} — ${MEASURED.length - have.length} measured component${MEASURED.length - have.length > 1 ? 's are' : ' is'}
+                   unavailable for this name`
+                : `. All ${MEASURED.length} measured components were available for this name`}.</p>
           </div>
         </div>
       </section>
@@ -3206,15 +3401,17 @@
         <h2 class="b-h2">Which factors agree, and which do not.</h2>
         <div class="b-mx">
           <div class="b-mxh"><span>Factor</span><span>Bullish</span><span>Neutral</span><span>Bearish</span></div>
-          ${MATRIX.map(([nm, st_, why], i) => `<button type="button" class="b-mxr" data-mx="${i}" aria-expanded="false">
-            <span class="f">${esc(nm)}</span>
+          ${MATRIX.map(([nm, st_, why, counted], i) => `<button type="button" class="b-mxr${counted ? '' : ' is-out'}" data-mx="${i}" aria-expanded="false">
+            <span class="f">${esc(nm)}${counted ? '' : '<i class="mx-out">not scored</i>'}</span>
             ${[0, 1, 2].map(k => `<span class="c ${['bull', 'neu', 'bear'][k]} ${st_ === k ? 'hit' : ''}"
               >${st_ === k ? `<u aria-label="${['Bullish', 'Neutral', 'Bearish'][k]}"></u>` : '<u></u>'}</span>`).join('')}
             <span class="b-mxd"><span>${st_ == null ? 'Not measured — this factor has no data on the screen for this name, so it takes no stance.' : esc(why)}</span></span>
           </button>`).join('')}
         </div>
         <p class="b-p" style="font-size:var(--t-4)">A stance is scored, not asserted: 60 and above reads bullish,
-          40 to 60 neutral, below 40 bearish, on the same component scores shown above. Tap a row for the
+          40 to 60 neutral, below 40 bearish, on the same component scores shown above.
+          <b>Risk / reward takes a stance but is not scored</b> — it is chosen by the engine rather than
+          measured off the market, so it is shown and excluded, here and in the score. Tap a row for the
           reason.</p>
       </section>
 
@@ -5015,6 +5212,42 @@
     root.setAttribute('data-theme', e.matches ? 'dark' : 'light');
   });
   document.getElementById('cmdkBtn')?.addEventListener('click', openCmd);
+  /* ── BACK TO TOP ────────────────────────────────────────────────────────
+   * The Screen runs to forty rows and the brief to roughly 1,400 words, and
+   * getting back to the tabs meant a long scroll or a keyboard shortcut
+   * nobody was told about. It appears past two viewports — before that there
+   * is nothing to come back from, and a button that does nothing is worse
+   * than no button.
+   *
+   * Scroll is listened to passively and read on a timer rather than on every
+   * event: a scroll handler that touches the DOM on each frame is how a
+   * sticky header ends up thrashing, which this codebase has done before. */
+  (function () {
+    const btn = document.getElementById('toTop');
+    if (!btn) return;
+    let ticking = false;
+    const sync = () => {
+      ticking = false;
+      const show = window.scrollY > window.innerHeight * 2;
+      if (show === !btn.hidden) return;          // only touch the DOM on a change
+      btn.hidden = !show;
+    };
+    window.addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      setTimeout(sync, 120);
+    }, { passive: true });
+    btn.addEventListener('click', () => {
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+      // Send focus somewhere sensible rather than leaving it on a button that
+      // just hid itself.
+      const first = document.querySelector('.tabs a[aria-current="page"]') || document.body;
+      if (first.focus) first.focus({ preventScroll: true });
+    });
+    sync();
+  })();
+
   /* DENSITY. Stamped before first paint by the inline script in index.html
    * for the same reason the theme is: a reader who chose compact should not
    * watch the page relax and then tighten. */

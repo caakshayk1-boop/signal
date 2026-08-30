@@ -171,5 +171,11 @@ if ('serviceWorker' in navigator) {
   addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 }
 </script>
+<!-- Back to top. Hidden until there is a page to come back up, so it is
+     never a control that does nothing. -->
+<button type="button" class="totop" id="toTop" aria-label="Back to top" hidden>
+  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"
+    fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</button>
 </body>
 </html>

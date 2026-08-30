@@ -2572,3 +2572,101 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 .dens-i i{display:block;height:1.5px;background:currentColor;border-radius:1px;margin-bottom:3px}
 .dens-i i:last-child{margin-bottom:0}
 :root[data-density="compact"] .dens-i i{margin-bottom:1.5px;height:1.5px}
+
+/* A matrix row that takes a stance but is not counted in the score. Dimmed
+   and named, so the table cannot be read as five factors behind a number
+   that is the mean of four. */
+.b-mxr.is-out{opacity:.72}
+.mx-out{display:inline-block;font:400 var(--t-1)/1 var(--mono);font-style:normal;
+  letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--b-dim);margin-left:8px}
+
+/* ── SCROLL LOCK BEHIND AN OPEN CARD ──────────────────────────────────────
+   showModal() blocks interaction outside the dialog but does NOT stop the
+   page behind it scrolling, so flicking through a company card dragged the
+   whole site underneath it. :has() does this with no JavaScript and no
+   scroll-position bookkeeping to get wrong.
+
+   scrollbar-gutter keeps the gutter reserved so removing the page scrollbar
+   does not shift the layout sideways the moment a card opens. */
+html{scrollbar-gutter:stable}
+html:has(dialog[open]){overflow:hidden}
+@supports not selector(:has(*)){
+  /* Older engines keep the previous behaviour rather than a broken one. */
+  html:has(dialog[open]){overflow:auto}
+}
+
+/* ── BACK TO TOP ──────────────────────────────────────────────────────────
+   Bottom-right on a desk. On a phone it lifts above the fixed tab bar and
+   the home indicator, because a control hidden under the navigation is a
+   control nobody can press. */
+.totop{
+  position:fixed;right:20px;bottom:20px;z-index:38;
+  width:42px;height:42px;display:grid;place-items:center;
+  border:1px solid var(--line2);border-radius:var(--r-pill);
+  background:var(--surface);color:var(--text);cursor:pointer;
+  box-shadow:0 6px 20px rgba(0,0,0,.14);
+  animation:toTopIn 220ms var(--ease-out) both;
+}
+.totop svg{width:16px;height:16px}
+.totop:hover{border-color:var(--accent);color:var(--accent)}
+@keyframes toTopIn{from{opacity:0;transform:translateY(8px) scale(.94)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.totop{animation:none}}
+@media(max-width:760px){
+  .totop{right:14px;bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 14px);
+    width:40px;height:40px}
+}
+
+/* ── EVENT ROWS THAT OPEN AND STAR ────────────────────────────────────────
+   A name in a list of events is the same object as a name anywhere else on
+   this site, so it opens the same card and takes the same star. The name is
+   a button rather than the whole row: the row also holds the star, and
+   nesting a control inside a clickable row is how a star ends up opening the
+   thing it was meant to bookmark. */
+.t5row{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.t5name{flex:1 1 auto;min-width:0;text-align:left;border:0;background:none;padding:0;
+  cursor:pointer;font:400 var(--t-6)/1.35 var(--serif);color:var(--text)}
+.t5name:hover{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.t5v .wstar{flex:none}
+
+.t5tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.t5note{font:400 var(--t-3)/1.4 var(--mono);color:var(--dim)}
+
+/* The divergence verdict, once it has been computed. Bearish and bullish are
+   findings; "no divergence" and "not enough history" are also findings and
+   are shown rather than left blank — a row with nothing under it reads as
+   still loading. */
+.t5div{display:block;margin-top:6px}
+.dv{display:inline-block;font:600 var(--t-1)/1 var(--mono);font-style:normal;
+  letter-spacing:var(--ls-wide);text-transform:uppercase;padding:5px 8px;border-radius:var(--r-1)}
+.dv-bearish{background:color-mix(in srgb,var(--down) 15%,transparent);color:var(--down)}
+.dv-bullish{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
+.dv-na{background:color-mix(in srgb,var(--dim) 12%,transparent);color:var(--dim);font-weight:400}
+.dv-n{display:block;margin-top:5px;font:400 var(--t-3)/1.5 var(--ui);font-style:normal;color:var(--muted)}
+
+@media(max-width:700px){
+  .t5name{font-size:var(--t-5)}
+  .t5tools{gap:6px}
+}
+
+/* ── THE WEEKLY MULTIBAGGER LIST ──────────────────────────────────────────
+   Three prices per card — now, picked at, target — because a pick without
+   the price it was picked at is an assertion nobody can check. */
+.mbg{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:12px}
+.mbc{border:1px solid var(--line);border-radius:var(--r-4);padding:14px 15px;background:var(--surface)}
+.mbc-h{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.mbc-s{flex:1 1 auto;min-width:0;text-align:left;border:0;background:none;padding:0;cursor:pointer;
+  font:600 var(--t-6)/1.2 var(--mono);letter-spacing:var(--ls-snug);color:var(--text)}
+.mbc-s:hover{color:var(--accent)}
+.mbc-sc{flex:none;font:600 var(--t-2)/1 var(--mono);color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 10%,transparent);padding:5px 7px;border-radius:var(--r-1)}
+.mbc-px{display:flex;gap:6px 18px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.mbc-px span{display:flex;flex-direction:column;gap:2px}
+.mbc-px i{font:400 var(--t-1)/1 var(--mono);font-style:normal;letter-spacing:var(--ls-wider);
+  text-transform:uppercase;color:var(--dim)}
+.mbc-px b{font:600 var(--t-5)/1.2 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.mbc-m{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;
+  font:400 var(--t-3)/1.5 var(--ui);color:var(--dim)}
+.mbc-m b{font-family:var(--mono);font-weight:600;color:var(--text)}
+.mbc-m .up b{color:var(--up)} .mbc-m .dn b{color:var(--down)}
+.mbc-d{font-family:var(--mono)}
+@media(max-width:700px){.mbg{grid-template-columns:1fr}}
