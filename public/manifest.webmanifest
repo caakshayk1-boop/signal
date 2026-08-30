@@ -1,0 +1,17 @@
+{
+  "name": "Signal — Indian markets, every morning",
+  "short_name": "Signal",
+  "description": "Sector heat, IPO books open now, ranked trade ideas and a public signal ledger — wins and losses both.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
+  "lang": "en-IN",
+  "categories": ["finance", "news", "productivity"],
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/og.png", "sizes": "1200x630", "type": "image/png", "purpose": "any" }
+  ]
+}

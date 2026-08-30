@@ -20,6 +20,7 @@
  * and 404s anything it does not have.
  */
 import { runVercelHandler } from "./adapter.js";
+import { providerInfo } from "./api/_providers.js";
 import ticker from "./api/ticker.js";
 import signals from "./api/signals.js";
 import stats from "./api/stats.js";
@@ -59,6 +60,9 @@ function health(env) {
     ok: true,
     service: "signal",
     turso_configured: Boolean(env.TURSO_URL && env.TURSO_TOKEN),
+    // The Data Sources page reads this rather than hardcoding a provider name,
+    // so the page cannot claim a feed the Worker is not actually using.
+    provider: providerInfo(),
     routes: Object.keys(ROUTES),
     at: new Date().toISOString(),
   }, { headers: { "Cache-Control": "no-store" } });

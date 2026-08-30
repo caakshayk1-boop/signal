@@ -116,6 +116,12 @@
   // A mono eyebrow, a serif headline, one line of standfirst — the brief's
   // masthead rhythm, now the rhythm of every route. `eyebrow` defaults to the
   // product name so a route that says nothing still gets the structure.
+  /* The brief runs to roughly 1,400 words plus its levels. At an unhurried
+   * 200 wpm that is about seven minutes to read in full, and about sixty
+   * seconds to get the setup, the stop and the target — which is what the CTA
+   * promises. Stated here once so the header and the hero cannot disagree. */
+  const CURVE_MIN = '60 seconds';
+
   const head = (title, sub, eyebrow) =>
     `<div class="route-h"><span class="eyebrow">${esc(eyebrow || 'Signal')}</span>
       <h1>${esc(title)}</h1>${sub ? `<p>${esc(sub)}</p>` : ''}</div>`;
@@ -664,7 +670,52 @@
 
     const [t, p, n, m] = await Promise.all(
       [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets')]);
-    let out = head('Today', 'India’s markets, in one screen — rebuilt every morning before the open.', 'The morning edition');
+    /* ── THE HERO ────────────────────────────────────────────────────────
+     * The first viewport has to answer four things: what this is, what state
+     * the market is in, what to do next, and how long that takes. It replaces
+     * a page head that answered only the first.
+     *
+     * Every figure in it is one this page already loaded. No photograph, no
+     * illustration, no number that is not measured elsewhere on the site. */
+    const heroMk = m.ok ? (m.data.markets || []) : [];
+    const heroNifty = heroMk.find(x => /nifty 50/i.test(x.name || ''));
+    const heroBr = (p.ok ? p.data : {}).breadth || {};
+    const adv = Number(heroBr.up), counted = Number(heroBr.counted);
+    // "Risk-on / neutral / risk-off" is NOT invented here — it is the breadth
+    // this site already computes, named. Two thirds advancing is the same
+    // threshold the breadth widget uses to colour itself.
+    const heroRegime = Number.isFinite(adv) && Number.isFinite(counted) && counted
+      ? (adv / counted >= 0.6 ? ['RISK-ON', 'up', 'Most of the screen is advancing.']
+        : adv / counted <= 0.4 ? ['RISK-OFF', 'dn', 'Most of the screen is declining.']
+        : ['NEUTRAL', '', 'The screen is split.'])
+      : null;
+
+    let out = `<section class="hero">
+      <div class="hero-l">
+        <span class="eyebrow">The morning edition · ${esc((t.ok && t.data.date_str) || '')}</span>
+        <h1>Numbers first.<br>Noise last.</h1>
+        <p class="hero-sub">India’s markets in one screen — sector heat, IPO books open now,
+          ranked ideas and a public signal ledger that shows the losses as well as the wins.
+          Rebuilt before every open.</p>
+        <div class="hero-cta">
+          <a class="btn-hero" href="#/brief">Today’s brief
+            <em>${CURVE_MIN} · what is set up and where it is wrong</em></a>
+          <a class="btn-ghost" href="#/signals">See the record →</a>
+        </div>
+      </div>
+      <div class="hero-r">
+        ${heroRegime ? `<div class="hero-reg ${heroRegime[1]}">
+          <span class="k">Market state</span>
+          <span class="v">${heroRegime[0]}</span>
+          <span class="s">${esc(heroRegime[2])} ${Number.isFinite(adv) ? `${adv} of ${counted} names advancing.` : ''}</span>
+        </div>` : ''}
+        ${heroNifty ? `<div class="hero-q">
+          <span class="k">Nifty 50</span>
+          <span class="v">${esc(heroNifty.price ?? '—')}</span>
+          <span class="c ${dir(heroNifty.change_pct)}">${pct(heroNifty.change_pct)}</span>
+        </div>` : ''}
+      </div>
+    </section>`;
     if (!t.ok && !p.ok) { paint(out + fail('Today', t.error || p.error)); return; }
 
     const d = t.ok ? t.data : {}, pu = p.ok ? p.data : {}, br = pu.breadth || {};
@@ -1227,6 +1278,9 @@
     const LAUNCH = '2026-08-29';
     const dayOf = r => String(r.alert_date || r.date || '').slice(0, 10);
     const every = a.rows;
+    // From the WHOLE ledger, not this page's launch window: a performance
+    // curve that starts today is not a performance curve.
+    const CURVE = rCurve(every);
     const all = every.filter(r => dayOf(r) >= LAUNCH);
 
     // Filter on the row's OWN badge, not on arithmetic over pnl_pct.
@@ -1303,6 +1357,8 @@
         return;
       }
       main.innerHTML = base +
+        (CURVE ? sec('Cumulative R', rCurveHtml(CURVE), `${CURVE.used} closed`,
+          'Every closed signal, in the order it closed.') : '') +
         sec('The record', `<div class="grid">
           ${tile(all.length, 'Signals published', 'since ' + esc(LAUNCH), 'ac')}
           ${tile(opens.length, 'Still open', 'marked to live prices')}
@@ -1314,6 +1370,7 @@
           `<button type="button" class="chip" data-s="${k}" aria-pressed="${sigFilter === k}">${esc(l)}</button>`).join('')}</div>` +
         sec('Alerts', rows.length ? `<div class="cards-2">${rows.map(card).join('')}</div>`
           : `<div class="empty">No signals with that state.</div>`, `${rows.length} shown`);
+      if (CURVE) wireRCurve(CURVE);
       main.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => {
         sigFilter = b.dataset.s; draw();
       }));
@@ -1769,6 +1826,12 @@
     /* ── BASE RATE, not a probability. */
     const S = st.ok ? st.data : null;
     const H = S && S.headline ? S.headline : null;
+    /* EVERY FIELD OFF /api/stats IS OPTIONAL.
+     * The tiles interpolated H.wins and H.losses straight into the markup, so
+     * a headline missing either printed the literal word "undefined" on a page
+     * about money. num() renders a missing figure as an em dash, which is the
+     * same thing the rest of this site does with anything it cannot measure. */
+    const hNum = (v, suffix) => Number.isFinite(Number(v)) ? Number(v) + (suffix || '') : '—';
     const closedRows = rows.filter(r => r.pnl_pct != null && (r.badge || '') !== 'open').slice(0, 8);
 
     const thesis = [
@@ -2145,14 +2208,14 @@
         <div class="b-lab">Signal history</div>
         <h2 class="b-h2">The record, including the part that hurts.</h2>
         ${H ? `<div class="b-metrics" style="margin-top:22px">
-          <div class="b-m"><span class="k">Closed</span><span class="v">${H.trades}</span></div>
-          <div class="b-m"><span class="k">Win rate</span><span class="v">${H.win_rate}%</span></div>
-          <div class="b-m"><span class="k">Wins</span><span class="v up">${H.wins}</span></div>
-          <div class="b-m"><span class="k">Losses</span><span class="v dn">${H.losses}</span></div>
-          <div class="b-m"><span class="k">Expectancy</span><span class="v ${H.expectancy_r >= 0 ? 'up' : 'dn'}">${H.expectancy_r}R</span></div>
+          <div class="b-m"><span class="k">Closed</span><span class="v">${hNum(H.trades)}</span></div>
+          <div class="b-m"><span class="k">Win rate</span><span class="v">${hNum(H.win_rate, '%')}</span></div>
+          <div class="b-m"><span class="k">Wins</span><span class="v up">${hNum(H.wins)}</span></div>
+          <div class="b-m"><span class="k">Losses</span><span class="v dn">${hNum(H.losses)}</span></div>
+          <div class="b-m"><span class="k">Expectancy</span><span class="v ${H.expectancy_r >= 0 ? 'up' : 'dn'}">${hNum(H.expectancy_r, 'R')}</span></div>
         </div>
-        <p class="b-p">${tip('expectancy')} Measured over ${H.trades} closed signals since ${esc((S.totals || {}).first_date || '')}.
-          Expectancy is <b style="color:var(--b-ink)">${H.expectancy_r}R</b>${H.expectancy_r < 0
+        <p class="b-p">${tip('expectancy')} Measured over ${hNum(H.trades)} closed signals since ${esc((S.totals || {}).first_date || '')}.
+          Expectancy is <b style="color:var(--b-ink)">${hNum(H.expectancy_r, 'R')}</b>${H.expectancy_r < 0
             ? ' — the engine is currently losing money per trade on this sample, and that is published here for the same reason the winners are.'
             : ' per closed trade on this sample.'}</p>` : ''}
         ${closedRows.length ? `<div class="b-hist"><table>
@@ -2463,7 +2526,7 @@
         <div class="b-scg">${grid.map(([k, v]) => `<div><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join('')}
           <div><span class="k">Engine base rate</span><span class="v">${baseRate == null ? '—' : baseRate + '%'}</span></div></div>
         ${baseRate == null ? '' : `<p style="font-size:12.5px;color:var(--b-dim);margin-top:14px;line-height:1.6">
-          ${baseRate}% is the share of <b style="color:var(--b-mut)">all ${H.trades} closed signals</b> that
+          ${baseRate}% is the share of <b style="color:var(--b-mut)">all ${hNum(H.trades)} closed signals</b> that
           ended in profit. It describes the engine's history, not this trade, and it is the same number
           whichever scenario is selected.</p>`}`;
       main.querySelectorAll('.b-scb button').forEach((b, k) =>
@@ -2522,14 +2585,448 @@
   };
 
 
+
+  /* ══ COMMAND PALETTE ═══════════════════════════════════════════════════
+   * ⌘K / Ctrl+K. Every destination it offers is a route that exists, and the
+   * symbol search runs against the screen this site already loads — nothing
+   * here promises a capability the product does not have.
+   *
+   * Built as a <dialog>, so the browser supplies the modal semantics, the
+   * focus trap and Escape for free. Rolling those by hand is how a search box
+   * ends up unreachable by keyboard.
+   */
+  const CMD_ROUTES = [
+    ['/', 'Today', 'The morning edition — tape, sector heat, the wire'],
+    ['/markets', 'Markets', 'The board: 71 instruments with a year of context'],
+    ['/ideas', 'Ideas', 'Ranked names and the orders a sized book would place'],
+    ['/ipo', 'IPO', 'Books open now, and how last year’s listings did'],
+    ['/screen', 'Screen', 'All 750 names, searchable'],
+    ['/signals', 'Signals', 'The public ledger — wins and losses'],
+    ['/brief', 'Brief', 'Today’s setup, in full'],
+    ['/methodology', 'Methodology', 'How every number on this site is made'],
+    ['/sources', 'Data sources', 'Where the prices come from, and what that means'],
+    ['/terms', 'Terms', 'What this is and is not'],
+    ['/privacy', 'Privacy', 'What is stored, which is almost nothing'],
+  ];
+
+  let cmdEl = null, cmdIdx = 0, cmdRows = [];
+  function buildCmd() {
+    if (cmdEl) return cmdEl;
+    cmdEl = document.createElement('dialog');
+    cmdEl.className = 'cmd';
+    cmdEl.innerHTML = `
+      <form method="dialog" class="cmd-in" role="search">
+        <input id="cmdQ" type="search" autocomplete="off" spellcheck="false"
+               placeholder="Search sections and companies…" aria-label="Search sections and companies">
+        <div class="cmd-list" id="cmdList" role="listbox" aria-label="Results"></div>
+        <div class="cmd-foot"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>↵</kbd> open · <kbd>esc</kbd> close</div>
+      </form>`;
+    document.body.appendChild(cmdEl);
+    cmdEl.addEventListener('click', e => { if (e.target === cmdEl) cmdEl.close(); });
+    const q = cmdEl.querySelector('#cmdQ');
+    q.addEventListener('input', () => drawCmd(q.value));
+    q.addEventListener('keydown', ev => {
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        cmdIdx = Math.max(0, Math.min(cmdRows.length - 1, cmdIdx + (ev.key === 'ArrowDown' ? 1 : -1)));
+        markCmd();
+      } else if (ev.key === 'Enter') {
+        ev.preventDefault();
+        const hit = cmdRows[cmdIdx];
+        if (hit) { cmdEl.close(); location.hash = '#' + hit.href; }
+      }
+    });
+    return cmdEl;
+  }
+  const markCmd = () => {
+    const list = cmdEl.querySelector('#cmdList');
+    [...list.children].forEach((el, i) => {
+      el.setAttribute('aria-selected', i === cmdIdx ? 'true' : 'false');
+      if (i === cmdIdx) el.scrollIntoView({ block: 'nearest' });
+    });
+  };
+  function drawCmd(term) {
+    const t = String(term || '').trim().toLowerCase();
+    const routes = CMD_ROUTES
+      .filter(([, name, desc]) => !t || name.toLowerCase().includes(t) || desc.toLowerCase().includes(t))
+      .map(([href, name, desc]) => ({ href, name, desc, kind: 'Section' }));
+    // Company search only searches what is loaded. If the screen has not been
+    // fetched yet it offers nothing rather than pretending to have looked.
+    const names = t.length >= 2 && SCREEN
+      ? SCREEN.filter(r => (r.sym || '').toLowerCase().includes(t)
+                        || (r.name || '').toLowerCase().includes(t))
+              .slice(0, 6)
+              .map(r => ({ href: '/screen', name: r.sym, desc: r.name || '', kind: 'Company',
+                           sym: r.sym }))
+      : [];
+    cmdRows = routes.concat(names);
+    cmdIdx = 0;
+    const list = cmdEl.querySelector('#cmdList');
+    list.innerHTML = cmdRows.length ? cmdRows.map((r, i) => `
+      <button type="button" class="cmd-r" role="option" aria-selected="${i === 0}" data-i="${i}">
+        <span class="k">${esc(r.kind)}</span>
+        <span class="n">${esc(r.name)}</span>
+        <span class="d">${esc(r.desc)}</span>
+      </button>`).join('')
+      : `<p class="cmd-none">Nothing matches “${esc(t)}”.${SCREEN ? ''
+          : ' Company search needs the Screen page opened once first.'}</p>`;
+    list.querySelectorAll('.cmd-r').forEach(b => b.addEventListener('click', () => {
+      const hit = cmdRows[Number(b.dataset.i)];
+      cmdEl.close();
+      if (hit.sym) { location.hash = '#/screen'; setTimeout(() => openStock(hit.sym), 400); }
+      else location.hash = '#' + hit.href;
+    }));
+    markCmd();
+  }
+  function openCmd() {
+    const d = buildCmd();
+    drawCmd('');
+    if (!d.open) d.showModal();
+    const q = d.querySelector('#cmdQ');
+    q.value = ''; q.focus();
+  }
+  document.addEventListener('keydown', ev => {
+    if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k') { ev.preventDefault(); openCmd(); }
+    // "/" is the other convention, but only when the reader is not typing.
+    const t = ev.target;
+    const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+    if (ev.key === '/' && !typing && !ev.metaKey && !ev.ctrlKey) { ev.preventDefault(); openCmd(); }
+  });
+
+  /* ══ DATA FRESHNESS ════════════════════════════════════════════════════
+   * "9 / 12 datasets current", from the same health artefact the newspaper
+   * build writes. It is a summary in the header and the full table behind a
+   * click — the detail belongs on Methodology, not in the chrome.
+   */
+  let HEALTH = null;
+  async function paintFreshness() {
+    const r = await get('/data-health.json');
+    const btn = document.getElementById('freshBtn');
+    if (!r.ok || !btn) return;
+    HEALTH = r.data;
+    const cur = Number(HEALTH.current), tot = Number(HEALTH.total);
+    if (!Number.isFinite(cur) || !Number.isFinite(tot)) return;
+    btn.hidden = false;
+    btn.className = 'fresh ' + (cur === tot ? 'all' : cur >= tot * 0.75 ? 'most' : 'few');
+    document.getElementById('freshTxt').textContent = `${cur}/${tot} current`;
+    btn.setAttribute('aria-label',
+      `${cur} of ${tot} datasets current. Open the freshness detail.`);
+    btn.onclick = () => {
+      const ds = HEALTH.datasets || [];
+      sheet('Data freshness', `
+        <p class="sheet-p">Every dataset this site renders, when it last updated, and how
+          often it is supposed to. A dataset that is behind is listed as behind — the page
+          that uses it still says so at the point of use.</p>
+        <div class="board" style="margin-top:14px">
+          ${ds.map(d => `<div class="board-row">
+            <span class="n">${esc(d.dataset || '')}<br>
+              <em style="font-style:normal;color:var(--dim);font-size:11.5px">${esc(d.source || '')}</em></span>
+            <span class="p">${esc(d.freshness_age || '—')}</span>
+            <span class="c ${/current|fresh|ok/i.test(String(d.status)) ? 'up' : 'wn'}">${esc(d.status || '—')}</span>
+          </div>`).join('')}
+        </div>
+        <p class="sheet-p" style="margin-top:14px">Generated ${esc(String(HEALTH.generated_at || '').slice(0, 16).replace('T', ' '))} UTC.
+          <a href="#/methodology" style="color:var(--accent)">How this is measured →</a></p>`);
+    };
+  }
+
+  /* ══ THE TRUST PAGES ═══════════════════════════════════════════════════
+   * Methodology, Data sources, Terms, Privacy. Four pages that did not exist,
+   * and the reason they now do is that this site publishes numbers about money
+   * — every claim on it should be checkable, and the things it CANNOT do
+   * should be as easy to find as the things it can.
+   *
+   * Written as prose rather than a wall of headings on purpose: a disclosure
+   * nobody reads is a disclosure that failed.
+   */
+  const prose = (eyebrow, title, sub, body) =>
+    head(title, sub, eyebrow) + `<div class="prose">${body}</div>`;
+
+  R['/methodology'] = async () => {
+    paint(prose('How this works', 'Every number, and where it comes from.',
+      'No figure on this site is produced by a model that cannot be re-run. This page is how each one is made.', `
+      <h3>The screen</h3>
+      <p>A universe of about 750 NSE names is rebuilt on a schedule. Each name carries price,
+        moving averages, returns over one day to one year, RSI, ATR, a volume ratio and a set of
+        fundamental fields where the filings support them. Every field on a company card comes
+        from that build; nothing is computed in your browser.</p>
+
+      <h3>The signals</h3>
+      <p>Signals come from named engines — <code>magic</code>, <code>magicmagic</code>,
+        <code>equity_measured</code>, <code>ohl</code>, <code>commodity</code> and others. Each
+        publishes an entry, a stop and one or two targets at the moment it fires, and those
+        levels are never edited afterwards. A signal is a thesis with a defined invalidation.
+        It is not a forecast.</p>
+
+      <h3>The confidence score</h3>
+      <p>Five components — structure, momentum, trend, volume and reward-to-risk — each scored
+        from the screen's own fields against a fixed range, then averaged. <b>A component with
+        no data is left out of the mean rather than filled in</b>, which is why the denominator
+        on a brief is sometimes four rather than five. The brief shows every component, its
+        score and the rule behind it.</p>
+
+      <h3>Reward to risk</h3>
+      <p>Measured from the published levels: the distance from entry to target divided by the
+        distance from entry to stop. It is shown against <b>both</b> targets, because they are
+        different numbers. The ledger's own <code>rr</code> field is measured to target 2; where
+        it disagrees with the arithmetic on its own levels, the brief says so and shows the
+        arithmetic.</p>
+
+      <h3>Position sizing</h3>
+      <p>Risk amount divided by the distance from entry to stop, rounded down to whole shares.
+        That is all it is. It takes no account of your other positions, of liquidity in the
+        name, or of what you can afford to lose.</p>
+
+      <h3>The record</h3>
+      <p>Every closed signal is scored in <b>R</b> — multiples of the risk originally taken. A
+        trade stopped out is −1R. Expectancy is the mean R across closed trades. Open signals
+        are excluded from every performance figure, because a position that has not closed has
+        no result yet, only a mark.</p>
+      <p>The ledger has been re-graded twice after grading defects were found, and both
+        re-grades moved the published numbers <b>down</b>. That history is kept rather than
+        quietly corrected.</p>
+
+      <h3>What is not measured</h3>
+      <p>There is no open-high-low-close feed here, so there are no candlesticks, no wicks, no
+        VWAP and no intraday charts. Where a chart is drawn it is drawn from closing prices and
+        says so. Scenario probabilities are not published because no model here computes one;
+        the ledger's base rate over all closed trades is shown instead, and it describes the
+        engine's history rather than any single trade.</p>
+
+      <p class="prose-note">Anything this site cannot measure prints <b>Not measured</b>. That is
+        a deliberate state, not a bug.</p>`));
+  };
+
+  R['/sources'] = async () => {
+    const h = await get('/api/health');
+    const p = h.ok && h.data.provider ? h.data.provider : null;
+    paint(prose('Data sources', 'Where the prices come from.',
+      'And, more usefully, what that does and does not entitle this site to do.', `
+      ${p ? `<div class="note"><b>Live provider: ${esc(p.label)}.</b> ${esc(p.terms)}</div>` : ''}
+      <h3>Quotes and price history</h3>
+      <p>Index levels, equity quotes, commodity and FX prices and every daily close on this site
+        come from <b>Yahoo Finance</b>'s public endpoints. Those endpoints are undocumented.
+        They carry no service level, no redistribution right and no guarantee of accuracy, and
+        they can change without notice. They are adequate for research read by one person. They
+        are <b>not</b> a licensed market-data feed, and this site does not resell, redistribute
+        or provide an API over them.</p>
+
+      <h3>Indian exchange data</h3>
+      <p>The IPO calendar and parts of the screen universe are read from NSE's public web
+        endpoints. NSE licenses real-time, delayed, snapshot and historical data as separate
+        commercial products. Nothing here is one of those products, and nothing here should be
+        treated as exchange-authorised.</p>
+
+      <h3>Fundamentals</h3>
+      <p>Revenue, profit, margin, cash-flow and ownership figures come from company filings as
+        aggregated by the screen build. Each company card names the financial year the figures
+        belong to. Filings are restated; figures can move.</p>
+
+      <h3>The ledger</h3>
+      <p>Signals, levels, exits and results are this site's own records, written by its own
+        engines, stored in its own database. They are the only data here that is not somebody
+        else's.</p>
+
+      <h3>Delay</h3>
+      <p>Nothing on this site is real-time. Quotes are fetched when a page loads and refreshed
+        about once a minute while it is open. Every price carries the time it was taken; the
+        market board shows the exchange's own session window, so a closed market says so.</p>
+
+      <p class="prose-note">If a source cannot be reached, the page shows that it could not be
+        reached. It never carries the last value forward and never fills a gap with an estimate.</p>`));
+  };
+
+  R['/terms'] = async () => {
+    paint(prose('Terms', 'What this is, and what it is not.',
+      'Read this before acting on anything here.', `
+      <div class="note err"><b>This is educational market-intelligence software. It is not
+        investment advice.</b> Nothing here is a recommendation to buy or sell any security,
+        and nothing here is personalised to your circumstances.</div>
+
+      <h3>No advice, no recommendation</h3>
+      <p>This site publishes what its engines computed and what its ledger recorded. It does not
+        know your income, your goals, your existing positions or your risk tolerance, and it
+        does not attempt to. A signal is a published thesis with a defined invalidation level.
+        Whether it is appropriate for you is a question this site cannot answer.</p>
+
+      <h3>No guarantees</h3>
+      <p>Markets carry risk, including total loss of capital. Past results — including every
+        figure in the record on this site — do not predict future results. No output here is a
+        prediction, a tip, or an assured return, and any figure can be wrong.</p>
+
+      <h3>Verify independently</h3>
+      <p>Prices come from a third party over undocumented endpoints and may be delayed, stale or
+        wrong. Check any number against your broker or the exchange before you act on it.</p>
+
+      <h3>No execution, no custody</h3>
+      <p>This site cannot place a trade, cannot connect to a broker and never holds money. The
+        position-size calculator is arithmetic on numbers you enter.</p>
+
+      <h3>Availability</h3>
+      <p>It is operated by one person on free infrastructure and may be unavailable, delayed or
+        wrong at any time, without notice.</p>
+
+      <p class="prose-note">Built by <b>Akshay Kothari</b>. Questions:
+        <a href="#/join" style="color:var(--accent)">get the brief</a> and reply to it.</p>`));
+  };
+
+  R['/privacy'] = async () => {
+    paint(prose('Privacy', 'What is stored, which is almost nothing.',
+      'There are no accounts on this site, so there is very little to collect.', `
+      <h3>No accounts</h3>
+      <p>You cannot sign in, because there is nothing to sign in to. No profile, no password,
+        no session, no tracking of what you looked at.</p>
+
+      <h3>What your browser keeps</h3>
+      <p>One item in local storage: your light or dark preference. It never leaves your device
+        and this site cannot read it from anywhere else.</p>
+
+      <h3>The one thing collected</h3>
+      <p>If you ask for the morning brief, your email address is stored so it can be sent to
+        you. It is used for that and nothing else — not sold, not shared, not used to profile
+        you. Reply to any brief asking to be removed and the record is deleted.</p>
+
+      <h3>Third parties</h3>
+      <p>Fonts are served from this domain, not a font network. There is no analytics script, no
+        advertising, no social pixel and no session recording. Price requests go to the data
+        providers named on the <a href="#/sources" style="color:var(--accent)">Data sources</a>
+        page; those requests come from the server, not from your browser.</p>
+
+      <h3>Logs</h3>
+      <p>The host keeps ordinary request logs. They are not used to build a profile of you.</p>`));
+  };
+
+  /* ══ CUMULATIVE R ══════════════════════════════════════════════════════
+   * The signature performance visual: every closed signal in order, each
+   * adding its own R multiple to a running total.
+   *
+   * IT CURRENTLY GOES DOWN. Over the closed ledger the curve peaks early and
+   * ends deeply negative. That is published rather than hidden, because a site
+   * whose entire argument is "here is the record including the losses" cannot
+   * then decline to draw the record. The equity curve of a losing engine is
+   * still the most honest chart on the page.
+   *
+   * Drawn from r_multiple only — the field the re-grades corrected. Rows
+   * without one are skipped rather than assumed flat, and the caption says how
+   * many were used out of how many closed.
+   */
+  const rCurve = rows => {
+    const closed = rows
+      .filter(r => Number.isFinite(Number(r.r_multiple)) && (r.badge || '') !== 'open')
+      .sort((a, b) => String(a.closed_at || a.date || '').localeCompare(String(b.closed_at || b.date || '')));
+    if (closed.length < 5) return null;
+    let cum = 0;
+    const pts = closed.map(r => {
+      cum += Number(r.r_multiple);
+      return { t: String(r.closed_at || r.date || '').slice(0, 10), sym: r.symbol,
+               r: Number(r.r_multiple), cum, eng: r.signal_type || '' };
+    });
+    const totalClosed = rows.filter(r => (r.badge || '') !== 'open' && r.badge).length;
+    return { pts, used: closed.length, totalClosed, end: cum,
+             peak: Math.max(...pts.map(p => p.cum)), trough: Math.min(...pts.map(p => p.cum)) };
+  };
+
+  /* Same drawing contract as the brief's chart: a stretched viewBox so it fits
+   * any box without a measurement pass, non-scaling strokes, and every label in
+   * HTML because stretched SVG text is unreadable. */
+  const rCurveHtml = c => {
+    const W = 1000, H = 300, PAD = 10;
+    const lo = Math.min(0, c.trough), hi = Math.max(0, c.peak);
+    const span = (hi - lo) || 1;
+    const X = i => (i / Math.max(1, c.pts.length - 1)) * W;
+    const Y = v => PAD + (1 - (v - lo) / span) * (H - PAD * 2);
+    const d = c.pts.map((p, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p.cum).toFixed(2)).join(' ');
+    const zero = Y(0).toFixed(2);
+    const down = c.end < 0;
+    return `<div class="rc ${down ? 'is-dn' : 'is-up'}">
+      <div class="rc-h">
+        <span>Cumulative R · ${c.used} closed signals</span>
+        <span class="rc-end ${down ? 'dn' : 'up'}">${c.end >= 0 ? '+' : ''}${c.end.toFixed(2)}R</span>
+      </div>
+      <div class="rc-c" id="rcC">
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+          <defs><linearGradient id="rcg" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="currentColor" stop-opacity=".16"/>
+            <stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
+          <line class="rc-zero" x1="0" x2="${W}" y1="${zero}" y2="${zero}"/>
+          <path class="rc-fill" d="${d} L${W} ${zero} L0 ${zero} Z"/>
+          <path class="rc-line" d="${d}"/>
+          <line class="rc-cross" id="rcX" x1="0" x2="0" y1="0" y2="${H}" style="opacity:0"/>
+        </svg>
+        <span class="rc-dot" id="rcDot"></span>
+        <div class="rc-t" id="rcT"></div>
+        <div class="rc-hit" id="rcHit" role="img"
+          aria-label="Cumulative R across ${c.used} closed signals, from ${esc(c.pts[0].t)} to ${esc(c.pts[c.pts.length - 1].t)}, ending at ${c.end.toFixed(2)} R"></div>
+      </div>
+      <div class="rc-f">
+        <span>Peak <b class="up">+${c.peak.toFixed(2)}R</b></span>
+        <span>Trough <b class="dn">${c.trough.toFixed(2)}R</b></span>
+        <span>First ${esc(c.pts[0].t)}</span>
+        <span>Last ${esc(c.pts[c.pts.length - 1].t)}</span>
+      </div>
+    </div>
+    <p class="sec-note"><b>One unit of R is one unit of the risk taken on that trade.</b> A signal
+      stopped out is −1R. The line adds each closed signal's result in the order it closed, so its
+      slope is the engine's expectancy and its shape is the order the results arrived in.
+      ${c.used} of ${c.totalClosed} closed signals carry a graded R multiple; the rest are
+      excluded rather than assumed flat. Open positions are not in this line at all — a position
+      that has not closed has a mark, not a result.
+      ${c.end < 0 ? `<b> This curve ends below zero. That is the record, and it is published for
+      the same reason the winners are.</b>` : ''}
+      <a href="#/methodology" style="color:var(--accent)">How R is measured →</a></p>`;
+  };
+
+  /* Crosshair. Same interaction as the brief's chart so the two read as one
+   * product rather than two charts that happen to share a page. */
+  const wireRCurve = c => {
+    const hit = document.getElementById('rcHit'), tip = document.getElementById('rcT'),
+          dot = document.getElementById('rcDot'), cross = document.getElementById('rcX');
+    if (!hit) return;
+    const W = 1000, H = 300, PAD = 10;
+    const lo = Math.min(0, c.trough), hi = Math.max(0, c.peak), span = (hi - lo) || 1;
+    const read = clientX => {
+      const b = hit.getBoundingClientRect();
+      const k = Math.max(0, Math.min(1, (clientX - b.left) / (b.width || 1)));
+      const i = Math.round(k * (c.pts.length - 1));
+      const p = c.pts[i];
+      if (!p) return;
+      const xPct = (i / Math.max(1, c.pts.length - 1)) * 100;
+      const yPct = ((PAD + (1 - (p.cum - lo) / span) * (H - PAD * 2)) / H) * 100;
+      cross.setAttribute('x1', (xPct * 10).toFixed(1));
+      cross.setAttribute('x2', (xPct * 10).toFixed(1));
+      cross.style.opacity = '1';
+      dot.style.left = xPct + '%'; dot.style.top = yPct + '%'; dot.style.opacity = '1';
+      tip.innerHTML = `<i>${esc(p.t)}</i><b>${esc(p.sym)}</b> ${esc(p.eng)}<br>
+        <em>this trade</em> <span class="${p.r >= 0 ? 'up' : 'dn'}">${p.r >= 0 ? '+' : ''}${p.r.toFixed(2)}R</span><br>
+        <em>running</em> <span class="${p.cum >= 0 ? 'up' : 'dn'}">${p.cum >= 0 ? '+' : ''}${p.cum.toFixed(2)}R</span>`;
+      tip.classList.add('on');
+      tip.style.left = xPct > 60 ? 'auto' : `calc(${xPct}% + 14px)`;
+      tip.style.right = xPct > 60 ? `calc(${100 - xPct}% + 14px)` : 'auto';
+    };
+    const clear = () => { tip.classList.remove('on'); dot.style.opacity = '0'; cross.style.opacity = '0'; };
+    hit.addEventListener('pointermove', e => read(e.clientX));
+    hit.addEventListener('pointerdown', e => read(e.clientX));
+    hit.addEventListener('pointerleave', clear);
+    hit.addEventListener('pointercancel', clear);
+  };
+
   /* ── router ────────────────────────────────────────────────────────────── */
   const routeOf = () => {
     const h = (location.hash || '#/').replace(/^#/, '');
     return R[h] ? h : '/';
   };
 
+  /* The route's own name, shown beside the brand. Empty on Today, because a
+   * breadcrumb reading "Today" while you are looking at Today is noise. */
+  const WHERE = { '/': '', '/markets': 'Markets', '/ideas': 'Ideas', '/ipo': 'IPO',
+                  '/screen': 'Screen', '/signals': 'Signals', '/brief': 'Brief',
+                  '/join': 'The brief', '/methodology': 'Methodology',
+                  '/sources': 'Data sources', '/terms': 'Terms', '/privacy': 'Privacy' };
+
   async function render() {
     const path = routeOf();
+    const where = document.getElementById('barWhere');
+    if (where) where.textContent = WHERE[path] || '';
     // Leaving the brief forgets which signal was pinned, so coming back by the
     // tab picks the best current setup rather than resurrecting an old one.
     if (path !== '/brief') briefPick = null;
@@ -2581,6 +3078,7 @@
   // serve a different design than the one a first-time reader is shown.
   const saved = (() => { try { return localStorage.getItem('sig:theme'); } catch (e) { return null; } })();
   root.setAttribute('data-theme', saved === 'dark' ? 'dark' : 'light');
+  document.getElementById('cmdkBtn')?.addEventListener('click', openCmd);
   document.getElementById('themeBtn').addEventListener('click', () => {
     const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
@@ -2607,6 +3105,7 @@
   setInterval(tickClock, 1000);
 
   /* ── edition stamp and data health ─────────────────────────────────────── */
+  paintFreshness();
   get('/edition.json').then(r => {
     if (r.ok && r.data && r.data.build_date) {
       document.getElementById('edition').textContent = r.data.build_date;

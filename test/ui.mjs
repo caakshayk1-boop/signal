@@ -236,7 +236,71 @@ try {
   ok("the lowest label clears the caption", capGap >= 8, capGap + "px");
 
   ok("no JS errors on either route", errs.length === 0, errs.slice(0, 3));
+  /* ══ THE PREMIUM BUILD ═══════════════════════════════════════════════════
+   * Hero, command palette, contextual header, freshness, trust pages and the
+   * cumulative-R chart. Each of these is JavaScript that can break while the
+   * page still looks finished, which is the failure this whole file exists for.
+   */
+  console.log("\n  premium build");
+  await p.goto(SITE + "#/", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE);
+
+  ok("the hero renders", await p.locator(".hero h1").count() === 1);
+  ok("the CTA states how long the brief takes",
+     (await p.locator(".btn-hero").innerText()).includes("60 seconds"));
+  ok("the header CTA names the product action",
+     (await p.locator(".btn-cta").innerText()).toLowerCase().includes("brief"));
+  ok("the freshness chip reports n of n",
+     /\d+\/\d+ current/.test(await p.locator("#freshTxt").innerText()));
+  // Empty on Today on purpose — a breadcrumb reading "Today" on Today is noise.
+  ok("the contextual label is empty on Today",
+     (await p.locator("#barWhere").innerText()).trim() === "");
+  await p.goto(SITE + "#/markets", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE);
+  ok("the contextual label follows the route",
+     (await p.locator("#barWhere").innerText()).trim() === "Markets");
+
+  await p.keyboard.press("Meta+k");
+  await p.waitForTimeout(400);
+  ok("Cmd-K opens the command palette", await p.locator("dialog.cmd[open]").count() === 1);
+  await p.locator("#cmdQ").fill("method");
+  await p.waitForTimeout(300);
+  const cmdN = await p.locator(".cmd-r").count();
+  ok("the palette filters as you type", cmdN > 0 && cmdN < 6, cmdN);
+  await p.keyboard.press("Enter");
+  await p.waitForTimeout(2500);
+  ok("the palette navigates on Enter",
+     (await p.evaluate(() => location.hash)) === "#/methodology");
+
+  // Four pages that publish what the product can and cannot do. A disclosure
+  // page that renders empty is worse than no page.
+  for (const [route, must] of [["#/methodology", "multiples of the risk"],
+                               ["#/sources", "Yahoo"],
+                               ["#/terms", "not investment advice"],
+                               ["#/privacy", "No accounts"]]) {
+    await p.goto(SITE + route, { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(3500);
+    const t = await p.locator("main").innerText();
+    ok(`${route} renders its disclosure`,
+       t.length > 600 && t.toLowerCase().includes(must.toLowerCase()), t.length);
+  }
+
+  await p.goto(SITE + "#/signals", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE);
+  ok("the cumulative-R curve is drawn", await p.locator(".rc-line").count() === 1);
+  ok("the curve prints its end value",
+     /[+-]?\d+\.\d+R/.test(await p.locator(".rc-end").innerText()));
+  const rcBox = await p.locator("#rcHit").boundingBox();
+  await p.mouse.move(rcBox.x + rcBox.width * 0.55, rcBox.y + rcBox.height / 2);
+  await p.waitForTimeout(300);
+  ok("the curve has a working crosshair", await p.locator("#rcT.on").count() === 1);
+
+  ok("the manifest is linked", await p.locator('link[rel="manifest"]').count() === 1);
+  ok("the service worker is served",
+     await p.evaluate(async () => (await fetch("/sw.js")).ok) === true);
+
   await ctx.close();
+
 
   /* ── REDUCED MOTION ──────────────────────────────────────────────────── */
   console.log("\n  prefers-reduced-motion: reduce");
@@ -257,10 +321,10 @@ try {
   await rmCtx.close();
 
   /* ── NARROW ──────────────────────────────────────────────────────────── */
-  console.log("\n  390 x 844");
-  const mCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  console.log("\n  320 x 568 — the narrowest phone in use");
+  const mCtx = await browser.newContext({ viewport: { width: 320, height: 568 } });
   const mp = await mCtx.newPage();
-  for (const route of ["#/", "#/markets", "#/brief"]) {
+  for (const route of ["#/", "#/markets", "#/brief", "#/signals", "#/methodology"]) {
     await mp.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await mp.waitForTimeout(SETTLE);
     const ox = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

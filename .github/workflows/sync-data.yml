@@ -72,14 +72,14 @@ jobs:
       # The DATA still mirrors, below, because the nine JSON feeds are genuinely
       # build artefacts of generate.py upstream and are not authored here.
 
-      - name: Fetch the nine feeds
+      - name: Fetch the data feeds
         env:
           GH_TOKEN: ${{ secrets.UPSTREAM_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p .incoming
           fail=0
-          for j in alerts conviction edition ipo mandate news pulse screen today; do
+          for j in alerts conviction data-health edition ipo mandate news pulse screen today; do
             if gh api "repos/$UPSTREAM/contents/docs/$j.json" \
                  -H "Accept: application/vnd.github.raw" > ".incoming/$j.json" 2>/dev/null \
                && [ -s ".incoming/$j.json" ]; then
@@ -102,7 +102,7 @@ jobs:
           echo "failed=$fail" >> "$GITHUB_OUTPUT"
           # Nine of nine failing means the upstream moved or the token died —
           # that is worth a red run. A few missing is a partial build upstream.
-          if [ "$fail" -ge 9 ]; then
+          if [ "$fail" -ge 10 ]; then
             echo "::error::every feed failed to fetch — check $UPSTREAM still publishes docs/*.json"
             exit 1
           fi

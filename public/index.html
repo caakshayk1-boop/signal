@@ -26,6 +26,10 @@
 <meta name="theme-color" content="#FFFFFF">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="/icon.svg">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Signal">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 
 <!-- Only two faces load, both already on this origin, both preloaded.
      Body text uses the system stack on purpose: it needs no download, so the
@@ -48,9 +52,26 @@
     <span class="brand-dot" aria-hidden="true"></span>
     <span class="brand-name">SIGNAL</span>
   </a>
+  <!-- The section the reader is in, beside the brand. Filled by the router,
+       empty on the front page — a breadcrumb that says "Today" while you are
+       looking at Today is noise. -->
+  <span class="bar-where" id="barWhere" aria-hidden="true"></span>
   <div class="bar-right">
     <span class="stat-live" id="edition" aria-live="polite">—</span>
-    <a class="btn-cta" href="#/join">Get the brief</a>
+    <!-- Freshness lives in the header because it qualifies every number on
+         every page. It is a button: the detail is a click, not a hover, so it
+         is reachable on a phone and by a keyboard. -->
+    <button type="button" class="fresh" id="freshBtn" hidden
+            aria-label="Data freshness">
+      <i aria-hidden="true"></i><span id="freshTxt">—</span>
+    </button>
+    <button type="button" class="cmdk" id="cmdkBtn" aria-label="Search and commands">
+      <span class="cmdk-l">Search</span><kbd>⌘K</kbd>
+    </button>
+    <a class="btn-cta" href="#/brief">
+      <span class="cta-l">Today’s brief</span>
+      <span class="cta-s" id="ctaSub">60 seconds</span>
+    </a>
     <button type="button" class="icon-btn" id="themeBtn" aria-label="Switch theme">
       <span aria-hidden="true">◐</span>
     </button>
@@ -83,5 +104,14 @@
 </script>
 
 <script src="/signal.js" defer></script>
+<script>
+/* The service worker caches the SHELL only — never a price. Registered after
+   load so it never competes with the first paint for bandwidth. Failure is
+   silent by design: an app that will not start because an optional offline
+   cache did not install is worse than one with no offline cache. */
+if ('serviceWorker' in navigator) {
+  addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+</script>
 </body>
 </html>
