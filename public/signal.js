@@ -793,7 +793,7 @@
         return `<div class="rank-r lvl-r" data-sym="${esc(r.sym)}" role="button" tabindex="0">
           <span class="i">${i + 1}</span>
           <span class="s"><b>${esc(r.sym)}</b><span>${esc(r.name || r.sector || '')}</span></span>
-          <span class="x" data-px>₹${esc(r.price ?? '—')}</span>
+          <span class="x" data-l="Price" data-px>₹${esc(r.price ?? '—')}</span>
           <span class="x ${dir(v50)}">${v50 == null ? '—' : pct(v50)}</span>
           <span class="x ${dir(v200)}">${v200 == null ? '—' : pct(v200)}</span>
           <span class="x" style="color:${hot(sc.rsi)}">${sc.rsi != null ? Math.round(sc.rsi) : '—'}</span>
@@ -1416,7 +1416,12 @@
   const priceLine = r => {
     const n = v => Number.isFinite(Number(v)) ? Number(v) : null;
     const lo = n(r.low52), hi = n(r.high52), px = n(r.price);
-    if (lo == null || hi == null || px == null || hi <= lo) return '';
+    // lo <= 0 is rejected as well as lo >= hi. A zero bound reaches the client
+  // from feeds this file does not control (see readMeta in src/api/ticker.js:
+  // Yahoo published a 52-week low of 0 for KOSPI), and a range anchored at
+  // zero draws every instrument pinned to the top of its own year. No line at
+  // all is the honest render; the row still carries price and change.
+  if (lo == null || hi == null || px == null || lo <= 0 || hi <= lo) return '';
     const at = v => Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100));
     const mark = (v, cls, label) => v == null ? ''
       : `<i class="pl-m ${cls}" style="left:${at(v).toFixed(2)}%" title="${esc(label)} ${esc(fmtN(v))}"></i>`;
@@ -1447,15 +1452,15 @@
       return `<div class="rank-r scr-r" data-sym="${esc(r.sym)}" role="button" tabindex="0">
         <span class="i">${(offset || 0) + i + 1}</span>
         <span class="s">${watchBtn(r.sym)}<b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span></span>
-        <span class="x" data-px>₹${esc(r.price ?? '—')}</span>
+        <span class="x" data-l="Price" data-px>₹${esc(r.price ?? '—')}</span>
         <!-- Filled by the live quote call below. An em dash, not a bullet: a
              cell that never fills should read as "not measured" like every
              other unmeasured cell on this site, not as a decorative dot. -->
-        <span class="x" data-day style="color:var(--dim)">—</span>
-        <span class="x ${dir(v50)}">${v50 == null ? '—' : pct(v50)}</span>
-        <span class="x ${dir(v200)}">${v200 == null ? '—' : pct(v200)}</span>
-        <span class="x" style="color:${(r.rsi ?? 50) > 70 ? 'var(--warn)' : (r.rsi ?? 50) < 35 ? 'var(--accent)' : 'var(--dim)'}">${r.rsi != null ? Math.round(r.rsi) : '—'}</span>
-        <span class="m ${dir(r.r1m)}">${pct(r.r1m)}</span>
+        <span class="x" data-l="Today" data-day style="color:var(--dim)">—</span>
+        <span class="x ${dir(v50)}" data-l="vs 50D">${v50 == null ? '—' : pct(v50)}</span>
+        <span class="x ${dir(v200)}" data-l="vs 200D">${v200 == null ? '—' : pct(v200)}</span>
+        <span class="x" data-l="RSI" style="color:${(r.rsi ?? 50) > 70 ? 'var(--warn)' : (r.rsi ?? 50) < 35 ? 'var(--accent)' : 'var(--dim)'}">${r.rsi != null ? Math.round(r.rsi) : '—'}</span>
+        <span class="m ${dir(r.r1m)}" data-l="1 month">${pct(r.r1m)}</span>
         <span class="pl-w">${priceLine(r)}</span>
       </div>`; }).join('')}</div>`;
 
@@ -3618,6 +3623,12 @@
     const path = routeOf();
     const where = document.getElementById('barWhere');
     if (where) where.textContent = WHERE[path] || '';
+    /* The tab bar scrolls on a phone, so the active tab can be off-screen.
+     * Bring it into view — a "you are here" marker nobody can see is not one. */
+    const activeTab = document.querySelector(`.tabs a[data-route="${path}"]`);
+    if (activeTab && activeTab.scrollIntoView) {
+      try { activeTab.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch (e) {}
+    }
     // Leaving the brief forgets which signal was pinned, so coming back by the
     // tab picks the best current setup rather than resurrecting an old one.
     if (path !== '/brief') briefPick = null;
@@ -3680,6 +3691,10 @@
       .filter(Boolean).map(t => t.trim());
     const y = window.scrollY;
 
+    /* What the numbers said BEFORE the repaint, so the ones that moved can be
+     * pointed at afterwards. See flashChanged(). */
+    const before = snapNums();
+
     lastRefresh = Date.now();
     try { await R[routeOf()](); } catch (e) { /* a failed refresh keeps what is on screen */ }
 
@@ -3701,12 +3716,140 @@
     // A repaint can change the document height; put the reader back where they
     // were rather than wherever the new layout happens to land them.
     if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
+
+    flashChanged(before);
   }
+
+  /* ── WHAT CHANGED, MADE VISIBLE ─────────────────────────────────────────
+   *
+   * A silent repaint is indistinguishable from a dead page. Sixty seconds
+   * pass, numbers move, and nothing tells the reader WHICH ones — so either
+   * they re-read the whole table or they trust none of it. Both are the same
+   * failure: the page is live and does not look it.
+   *
+   * The repaint rebuilds the DOM from scratch, so a cell cannot be followed
+   * across it by identity. It can be followed by MEANING: every row carries
+   * its instrument in data-sym and every cell its column in data-l, and that
+   * pair names the same quantity before and after.
+   *
+   * Only cells whose printed text actually changed are marked, and they are
+   * marked in the direction the number moved. A cell that merely re-rendered
+   * to the same value stays quiet — a flash that fires on every tick teaches
+   * the reader to ignore it, which is worse than not having one.
+   */
+  const NUMSEL = '[data-sym] .x, [data-sym] .m';
+  const numKey = c => {
+    const row = c.closest('[data-sym]');
+    const sym = row && row.getAttribute('data-sym');
+    return sym ? sym + '|' + (c.getAttribute('data-l') || c.className) : null;
+  };
+  function snapNums() {
+    const m = new Map();
+    document.querySelectorAll(NUMSEL).forEach(c => {
+      const k = numKey(c);
+      if (k) m.set(k, c.textContent.trim());
+    });
+    return m;
+  }
+  const numOf = t => {
+    const n = parseFloat(String(t).replace(/[^0-9.+-]/g, ''));
+    return isFinite(n) ? n : null;
+  };
+  function flashChanged(before) {
+    if (!before || !before.size) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.querySelectorAll(NUMSEL).forEach(c => {
+      const k = numKey(c);
+      if (!k || !before.has(k)) return;
+      const was = before.get(k), now = c.textContent.trim();
+      if (was === now) return;
+      const a = numOf(was), b = numOf(now);
+      c.classList.remove('chg-up', 'chg-dn', 'chg');
+      // Force a reflow. Without it a cell that moves on two consecutive ticks
+      // keeps the class it already had and sits still through the second one.
+      void c.offsetWidth;
+      c.classList.add(a != null && b != null && b !== a
+        ? (b > a ? 'chg-up' : 'chg-dn') : 'chg');
+      setTimeout(() => c.classList.remove('chg-up', 'chg-dn', 'chg'), 1500);
+    });
+  }
+
   setInterval(() => refresh(false), 60000);
   document.addEventListener('visibilitychange', () => {
     // Back on screen after more than a minute away: refresh at once.
     if (document.visibilityState === 'visible' && Date.now() - lastRefresh > 60000) refresh(true);
   });
+
+  /* ── EDITION FRESHNESS ──────────────────────────────────────────────────
+   *
+   * The feeds behind this site are rebuilt once a day. A tab left open
+   * overnight kept yesterday's edition and had nothing to say about it — two
+   * tabs on the same URL, opened a day apart, disagreeing.
+   *
+   * The broadsheet answers this by reloading the page, and it is right to:
+   * there the HTML *is* the edition, server-rendered once a day, so a reload
+   * is the only way to get the new one. Here it is not. Every number on this
+   * page was fetched by the renderer after load, which means a new edition is
+   * picked up by re-running the refresh the page already does every minute.
+   *
+   * So this does NOT reload. A reload would throw away the reader's scroll
+   * position, their open cards, their sort, their filter and their half-typed
+   * search — all of which refresh() is already careful to keep. It swaps the
+   * data underneath them and says that it did.
+   *
+   * Two details worth keeping:
+   *   · The first poll RECORDS the build id and announces nothing. Without
+   *     that, every cold load has no id to compare against and would either
+   *     announce a new edition to someone who just arrived on it, or need a
+   *     second request to say the same thing.
+   *   · A hidden tab is swapped silently. There is nobody to tell, and a
+   *     banner discovered on return is stale news about news.
+   */
+  (function () {
+    let mine = null, busy = false;
+    const bar = document.getElementById('editionBar');
+
+    async function check() {
+      if (busy) return;
+      busy = true;
+      try {
+        const r = await fetch('/edition.json?t=' + Date.now(), { cache: 'no-store' });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (!j || !j.build_id) return;
+        if (mine === null) { mine = j.build_id; return; }   // first look: record only
+        if (j.build_id === mine) return;
+        mine = j.build_id;
+
+        await refresh(true);                                // the data, swapped in place
+        if (document.visibilityState === 'hidden' || !bar) return;
+
+        // Name the edition. "A newer edition is available" gives the reader
+        // nothing to weigh it against and reads as chrome.
+        const w = bar.querySelector('.ed-when');
+        if (w) w.textContent = j.build_date || '';
+        bar.hidden = false;
+        // Next frame, so the transition has a from-state to animate out of.
+        requestAnimationFrame(() => bar.classList.add('on'));
+      } catch (e) {
+        /* offline, or a host serving no edition.json — neither is worth saying */
+      } finally { busy = false; }
+    }
+
+    if (bar) {
+      const dismiss = bar.querySelector('.ed-x');
+      if (dismiss) dismiss.addEventListener('click', () => {
+        bar.classList.remove('on');
+        setTimeout(() => { bar.hidden = true; }, 280);
+      });
+    }
+    document.addEventListener('visibilitychange', () => {
+      // Coming back to the tab in the morning is exactly when this has changed.
+      if (document.visibilityState === 'visible') check();
+    });
+    check();
+    setInterval(check, 10 * 60 * 1000);
+  })();
 
   /* ── theme ─────────────────────────────────────────────────────────────── */
   const root = document.documentElement;

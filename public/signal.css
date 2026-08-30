@@ -986,8 +986,13 @@ body::before{display:none}
 @media(prefers-reduced-motion:reduce){.b-reveal,.b-reveal.in{opacity:1;transform:none;transition:none}}
 
 /* Seven tabs now, not six. */
-@media(min-width:760px){.tabs{grid-template-columns:repeat(7,max-content)}}
-.tabs{grid-template-columns:repeat(7,1fr)}
+/* NO HARDCODED COLUMN COUNT. These said repeat(7, …) — written when there were
+   seven tabs, and silently wrong the moment Watch made it eight: an explicit
+   template beats grid-auto-columns, so the eighth tab was squeezed into a
+   track meant for seven and every label truncated to "Marke", "Scree",
+   "Signa". The base rule uses grid-auto-flow with auto-columns, which takes
+   however many tabs the markup has. This is the second time a fixed count here
+   has broken a tab; it should not be reintroduced. */
 .brief-link{font:500 10px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;
   color:var(--accent);border:1px solid var(--line);border-radius:5px;padding:7px 9px;
   min-height:30px;display:inline-flex;align-items:center}
@@ -1911,16 +1916,65 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
    than as a divider between rows. */
 .pl-w{grid-column:1/-1;margin:11px 0 1px;padding-left:34px}
 
-/* NARROW: the five numeric columns do not fit a phone. Rather than shrinking
-   them to illegibility, the two least load-bearing are dropped — vs 50D and
-   RSI — because the price line already shows where price sits against every
-   moving average, which is the same information drawn instead of tabulated. */
+/* ═══ THE ROW ON A PHONE IS NOT A TABLE ROW ═══════════════════════════════
+   Eight columns do not fit 390px, and the previous attempt made it worse in
+   two ways worth recording. It hid columns with `.x:nth-of-type(3)` — but
+   nth-of-type counts TAGS, and every cell is a span, so it hid Price rather
+   than vs 50D. And flex on `.s` let the ticker wrap BELOW the percentages, so
+   a row read: star, three numbers, then the company name, then a fourth
+   number on its own line.
+
+   FLEX, NOT GRID, for the phone layout. Named grid areas were the obvious
+   reach and the wrong one: every metric cell would land in the same area and
+   stack on top of the others. Flex with explicit `order` lets them flow as one
+   wrapping strip, which is what they are.
+
+   Identity and price first, the price line full width beneath, then the
+   numbers as a strip that labels each one — because there is no header row up
+   there to refer back to. Nothing is hidden; it is re-laid-out. */
 @media(max-width:700px){
-  .scr-r,.rank-r.lvl-r{grid-template-columns:20px minmax(0,1fr) 66px 58px 58px;
-    gap:0 8px;padding:12px 12px}
-  .scr-r > .x:nth-of-type(3),.rank-r.lvl-r > .x:nth-of-type(3),
-  .scr-r > .x:nth-of-type(5),.rank-r.lvl-r > .x:nth-of-type(5){display:none}
-  .pl-w{padding-left:28px;margin-top:10px}
+  .scr-r,.rank-r.lvl-r{
+    display:flex;flex-wrap:wrap;align-items:baseline;gap:0;
+    padding:15px 14px}
+  .scr-r > .i,.rank-r.lvl-r > .i{display:none}   /* a rank belongs to a table */
+
+  .scr-r > .s,.rank-r.lvl-r > .s{order:1;flex:1 1 55%;display:block;min-width:0}
+  .scr-r > .s b,.rank-r.lvl-r > .s b{font-size:14.5px;display:inline}
+  .scr-r > .s span,.rank-r.lvl-r > .s span{display:block;font-size:11.5px;margin-top:3px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
+  .scr-r > .s .wstar,.rank-r.lvl-r > .s .wstar{margin-right:5px}
+
+  /* Price is the one number that earns its own position. */
+  .scr-r > .x[data-l="Price"],.rank-r.lvl-r > .x[data-l="Price"]{
+    order:2;flex:0 0 auto;font-size:15.5px;font-weight:500;text-align:right}
+
+  .pl-w{order:3;flex:1 1 100%;padding-left:0;margin:14px 0 2px}
+
+  /* Every other number becomes a chip that names itself. */
+  .scr-r > .x:not([data-l="Price"]),.scr-r > .m,
+  .rank-r.lvl-r > .x:not([data-l="Price"]),.rank-r.lvl-r > .m{
+    order:4;flex:0 0 auto;display:inline-flex;align-items:baseline;gap:5px;
+    text-align:left;font-size:12.5px;margin:11px 16px 0 0;min-width:0}
+  .scr-r > .x:not([data-l="Price"])::before,.scr-r > .m::before,
+  .rank-r.lvl-r > .x:not([data-l="Price"])::before,.rank-r.lvl-r > .m::before{
+    content:attr(data-l);font:400 9.5px/1 var(--mono);letter-spacing:.07em;
+    text-transform:uppercase;color:var(--dim);flex:none}
+
+  /* A header for a card layout is meaningless — each card labels itself. */
+  .scr-r.rank-head,.rank-r.lvl-r.rank-head{display:none}
+}
+
+/* THE TAB BAR AT EIGHT TABS. Eight labels in 390px is 48px each, and
+   "Markets" was truncating to "Market:". It scrolls horizontally now, with the
+   active tab pulled into view — a label you cannot read is worse than one you
+   have to swipe to. */
+@media(max-width:760px){
+  .tabs{grid-auto-flow:column;grid-auto-columns:max-content;
+    overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;
+    justify-content:start;padding:0 10px}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs a{padding:0 15px;font-size:11.5px;letter-spacing:.01em}
+}
 }
 
 /* The price line at card size: taller, and labelled, because a card is read on
@@ -1937,3 +1991,74 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 .cardline-k i{width:2px;height:11px;border-radius:1px;display:inline-block}
 .cardline-k i.k200{background:var(--warn)} .cardline-k i.k50{background:var(--accent)}
 .cardline-k i.k20{background:var(--dim)}
+
+/* ── EDITION BAR ─────────────────────────────────────────────────────────
+   Shown once, when the daily rebuild lands under a tab that was already
+   open. It sits between the header and the tabs so it displaces the page
+   rather than covering it — a floating toast over a data table hides the
+   row the reader was reading, which on this site is the whole point of the
+   page. It leaves on its own terms: dismissed, or ignored. */
+.edbar{
+  /* STICKY, AND BELOW THE TABS. The first cut sat at the top of the document,
+     which meant the one reader who most needed it — someone scrolled deep into
+     a table when the numbers changed under them — was the one reader who could
+     not see it. It sticks to the bottom of the chrome instead. On a phone the
+     tab bar is fixed to the BOTTOM of the viewport, so there it hangs off the
+     header alone; the desktop offset clears the header and the tab strip. */
+  position:sticky;top:var(--barh);z-index:39;
+  display:flex;align-items:center;gap:10px;
+  padding:0 16px;border-bottom:1px solid var(--line);
+  background:color-mix(in srgb, var(--accent) 7%, var(--bg));
+  font:500 12.5px/1 var(--ui);color:var(--text);
+  /* Animate the BOX, not just the opacity: a bar that fades in at full height
+     shoves the page down in one jump. Height and padding carry it open. */
+  max-height:0;opacity:0;overflow:hidden;
+  transition:max-height .34s var(--ease-out),
+             opacity .24s ease, padding .34s var(--ease-out);
+}
+.edbar.on{max-height:52px;opacity:1;padding:11px 16px}
+@media(min-width:760px){ .edbar{top:calc(var(--barh) + 46px)} }
+.ed-dot{
+  width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none;
+  animation:edpulse 2.4s ease-in-out 3;
+}
+@keyframes edpulse{
+  0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent)}
+  50%    {box-shadow:0 0 0 5px color-mix(in srgb, var(--accent) 0%, transparent)}
+}
+.ed-t{flex:1 1 auto;min-width:0}
+.ed-when{font-family:var(--mono);font-size:11.5px;letter-spacing:.02em}
+.ed-when:not(:empty)::before{content:" · "}
+.ed-x{
+  flex:none;border:0;background:none;cursor:pointer;
+  font-size:17px;line-height:1;color:var(--dim);padding:4px 6px;border-radius:5px;
+}
+.ed-x:hover{color:var(--text);background:color-mix(in srgb, var(--text) 8%, transparent)}
+
+/* ── CHANGED SINCE THE LAST TICK ─────────────────────────────────────────
+   Marks the cells whose printed value actually moved on a repaint, in the
+   direction it moved. Background only — recolouring the TEXT would fight
+   the up/dn colour the cell already carries to mean something else.
+
+   The animation runs once and leaves nothing behind: no residual background,
+   so a cell that has been quiet for an hour looks identical to one that has
+   never moved. */
+@keyframes chgflash{
+  0%  {background:var(--chg-c);box-shadow:0 0 0 3px var(--chg-c)}
+  70% {background:var(--chg-c);box-shadow:0 0 0 3px var(--chg-c)}
+  100%{background:transparent;box-shadow:0 0 0 3px transparent}
+}
+.chg,.chg-up,.chg-dn{
+  --chg-c:color-mix(in srgb, var(--dim) 22%, transparent);
+  border-radius:3px;animation:chgflash 1.5s ease-out 1;
+}
+.chg-up{--chg-c:color-mix(in srgb, var(--up) 24%, transparent)}
+.chg-dn{--chg-c:color-mix(in srgb, var(--down) 24%, transparent)}
+
+@media(prefers-reduced-motion:reduce){
+  /* The flash is suppressed in JS too; this covers the bar, whose open is a
+     layout change rather than decoration — it still appears, just at once. */
+  .edbar{transition:none}
+  .ed-dot{animation:none}
+  .chg,.chg-up,.chg-dn{animation:none}
+}

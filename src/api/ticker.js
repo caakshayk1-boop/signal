@@ -413,6 +413,10 @@ export async function sparkSeries(symbols, range = "1mo", interval = "1d") {
   return out;
 }
 
+// A price that is not strictly positive is a placeholder. See the 52-week
+// note in readMeta() for why this is a rejection and not a passthrough.
+const pos = v => { const n = num(v); return n !== null && n > 0 ? n : null; };
+
 function readMeta(meta) {
   const price = num(meta.regularMarketPrice);
   if (price === null) return null;
@@ -432,8 +436,29 @@ function readMeta(meta) {
   const nowS = Math.floor(Date.now() / 1000);
   return {
     price, prev, basis: "market",
-    w52h: num(meta.fiftyTwoWeekHigh),
-    w52l: num(meta.fiftyTwoWeekLow),
+    // A 52-WEEK BOUND OF ZERO IS A PLACEHOLDER, NOT A PRICE.
+    //
+    // Yahoo reported fiftyTwoWeekLow = 0.0 for ^KS11, because one bar in its
+    // own year of history carries a low of 0.0 — a bad print it then takes the
+    // minimum of. The board believed it and drew KOSPI as a range from zero,
+    // which puts every index in the world at the top of its range and made the
+    // one component whose entire job is context say the opposite of the truth
+    // (the real 52-week low off the closes is 3,142.93, and the index sits
+    // mid-range, not near a high).
+    //
+    // Same rule as volume immediately below: a zero here means "not published",
+    // and printing it as a number states something false. Dropping the bound
+    // costs KOSPI its range bar and keeps its price and change — the row says
+    // less, and nothing it says is wrong.
+    //
+    // The bound is rejected at <= 0 rather than < 0. A genuinely negative low
+    // is possible for one instrument class on this board — crude futures did
+    // settle below zero in April 2020 — so this trades a suppressed range on a
+    // rerun of that event for a suppressed range on every bad print. Given the
+    // component exists to tell the reader where in a range a price sits, the
+    // silent failure is the right one.
+    w52h: pos(meta.fiftyTwoWeekHigh),
+    w52l: pos(meta.fiftyTwoWeekLow),
     dayH: num(meta.regularMarketDayHigh),
     dayL: num(meta.regularMarketDayLow),
     volume: vol && vol > 0 ? vol : null,

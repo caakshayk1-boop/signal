@@ -84,6 +84,7 @@
  </div>
 </header>
 
+
 <nav class="tabs" id="tabs" aria-label="Sections">
   <a href="#/"        data-route="/"        ><span>Today</span></a>
   <a href="#/markets" data-route="/markets" ><span>Markets</span></a>
@@ -94,6 +95,16 @@
   <a href="#/brief"   data-route="/brief"   ><span>Brief</span></a>
   <a href="#/watch"   data-route="/watch"   ><span>Watch</span></a>
 </nav>
+
+<!-- A new edition arrived and the page has already swapped to it. This is a
+     receipt, not a prompt: there is no "reload" to press, because nothing is
+     waiting to be loaded. role=status announces it once, politely, without
+     stealing focus from whatever the reader was doing. -->
+<div class="edbar" id="editionBar" role="status" hidden>
+  <span class="ed-dot" aria-hidden="true"></span>
+  <span class="ed-t">New edition<span class="ed-when"></span> — this page is now showing it.</span>
+  <button type="button" class="ed-x" aria-label="Dismiss">&times;</button>
+</div>
 
 <main id="main" tabindex="-1"></main>
 
