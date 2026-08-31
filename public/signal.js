@@ -1407,6 +1407,53 @@
   // The verdict leads. Someone deciding whether to apply wants the call and
   // the reason before the lot size.
   let IPO_AGE_H = null, IPO_STAMP = '', IPO_LIVE = null, IPO_LIVE_AT = null;
+
+  /* ONE RENDERER FOR THE SUBSCRIPTION BLOCK, USED TWICE.
+   *
+   * Once with the mirrored figure at paint, once with the live book when it
+   * arrives. Two copies of this markup is how the two states drift apart —
+   * the live one gaining a caveat the mirrored one never got, or the reverse. */
+  const subsInner = (mirrorX, lv) => {
+    const liveX = lv && Number.isFinite(Number(lv.total_x)) ? Number(lv.total_x) : null;
+    const shown = liveX != null ? liveX : (Number.isFinite(Number(mirrorX)) ? Number(mirrorX) : null);
+    if (shown == null) return '';
+    const wide = Math.min(100, shown / 10 * 100);
+    const cats = (lv && lv.categories) || [];
+    return `<span class="subs-v">${shown.toFixed(2)}×</span>
+      <span class="subs-bar" style="--one:10%"><i style="width:${wide.toFixed(0)}%"></i></span>
+      <span class="subs-v" style="color:var(--dim);font-size:var(--t-2)">of 10×</span>
+      ${liveX != null
+        ? `<span class="subs-age is-live">Live from NSE${IPO_LIVE_AT
+             ? ` · read ${esc(String(IPO_LIVE_AT).slice(11, 16))} UTC` : ''}</span>`
+        : (IPO_AGE_H != null ? `<span class="subs-age${IPO_AGE_H > 6 ? ' is-old' : ''}">
+            as at ${esc(IPO_STAMP)}${IPO_AGE_H > 6
+              ? ` · <b>${esc(ageWord(IPO_AGE_H))}</b>, and a book moves fastest on its last day`
+              : ''}</span>` : '')}
+      ${cats.length ? `<span class="subs-cat">${cats.slice(0, 4).map(c =>
+          `<i><u>${esc(c.cat)}</u><b>${Number(c.x).toFixed(2)}×</b></i>`).join('')}</span>` : ''}`;
+  };
+
+  /* Fetch the live book once and patch every card on screen. A targeted DOM
+   * update, not a re-render: re-entering a route when a deferred fetch
+   * resolves is what put the front page into an infinite repaint loop, and
+   * this cannot. A symbol NSE does not carry keeps its mirrored figure and
+   * its vintage. */
+  async function fillIpoLive() {
+    const hosts = [...document.querySelectorAll('.subs[data-ipo]')];
+    if (!hosts.length) return;
+    const r = await get('/api/ipo-live');
+    if (!r.ok || !r.data || !r.data.ok) return;
+    IPO_LIVE = r.data;
+    IPO_LIVE_AT = r.data.at || null;
+    const bySym = new Map((r.data.issues || []).map(x => [String(x.symbol).toUpperCase(), x]));
+    for (const host of hosts) {
+      const lv = bySym.get(host.getAttribute('data-ipo'));
+      if (!lv) continue;
+      const first = host.querySelector('.subs-v');
+      const mirror = first ? Number(String(first.textContent).replace(/[^0-9.]/g, '')) : NaN;
+      host.innerHTML = subsInner(mirror, lv);
+    }
+  }
   // NSE keys on the symbol; the mirror sometimes carries a name and no symbol.
   const ipoLiveFor = r => {
     if (!IPO_LIVE) return null;
@@ -1438,29 +1485,9 @@
           * ten times out of date, and nothing on the card said so. An IPO
           * subscription number moves fastest on the last day, which is exactly
           * when someone is deciding, so this one has to carry its own age. */''}
-      ${(() => {
-        const lv = ipoLiveFor(r);
-        const liveX = lv && Number.isFinite(Number(lv.total_x)) ? Number(lv.total_x) : null;
-        const shown = liveX != null ? liveX : (isFinite(sub) ? sub : null);
-        if (shown == null) return '';
-        const wide = Math.min(100, shown / 10 * 100);
-        return `<div class="subs">
-          <span class="subs-v">${shown.toFixed(2)}×</span>
-          <span class="subs-bar" style="--one:10%"><i style="width:${wide.toFixed(0)}%"></i></span>
-          <span class="subs-v" style="color:var(--dim);font-size:var(--t-2)">of 10×</span>
-          ${liveX != null
-            ? `<span class="subs-age is-live">Live from NSE${IPO_LIVE_AT
-                 ? ` · read ${esc(String(IPO_LIVE_AT).slice(11, 16))} UTC` : ''}</span>`
-            : (IPO_AGE_H != null ? `<span class="subs-age${IPO_AGE_H > 6 ? ' is-old' : ''}">
-                as at ${esc(IPO_STAMP)}${IPO_AGE_H > 6
-                  ? ` · <b>${esc(ageWord(IPO_AGE_H))}</b>, and a book moves fastest on its last day`
-                  : ''}</span>` : '')}
-          ${lv && lv.categories && lv.categories.length ? `<span class="subs-cat">${
-            lv.categories.slice(0, 4).map(c =>
-              `<i><u>${esc(c.cat)}</u><b>${c.x.toFixed(2)}×</b></i>`).join('')
-          }</span>` : ''}
-        </div>`;
-      })()}
+      ${isFinite(sub) ? `<div class="subs" data-ipo="${esc(String(r.symbol || r.sym || '').toUpperCase())}">
+        ${subsInner(sub, null)}
+      </div>` : ''}
       <div class="kv">
         <div><span class="kk">Band</span><span class="vv" style="font-size:var(--t-3)">${esc(r.price_band || '—')}</span></div>
         <div><span class="kk">Lot</span><span class="vv">${esc(r.lot_size ?? '—')}</span></div>
@@ -2196,9 +2223,19 @@
      * On 31 August the mirror showed ESDS at 1.54x while NSE's live book had
      * it at 19.6x. The live figure wins where NSE answers, and each card says
      * which of the two it is showing. */
-    const [io, il] = await Promise.all([get('/ipo.json'), get('/api/ipo-live')]);
-    IPO_LIVE = (il.ok && il.data && il.data.ok) ? il.data : null;
-    IPO_LIVE_AT = IPO_LIVE ? IPO_LIVE.at : null;
+    /* THE LIVE BOOK ARRIVES AFTER THE PAGE, NOT BEFORE IT.
+     *
+     * /api/ipo-live asks NSE for the current issue list and then one detail
+     * call per issue for the category split — measured at 5.0s on a cold edge
+     * cache and 0.13s warm. Awaiting it here made the first visitor of every
+     * fifteen-minute window wait five seconds for a page whose mirrored copy
+     * was already in hand.
+     *
+     * So the cards render from the mirror and are PATCHED in place when the
+     * live figures land. Patched, not re-rendered: re-entering a route when a
+     * deferred fetch resolves is what put the front page into an infinite
+     * repaint loop, and a targeted DOM update cannot loop. */
+    const io = await get('/ipo.json');
     IPO_STAMP = io.ok ? String(feedStamp(io.data) || '').slice(0, 16).replace('T', ' ') : '';
     IPO_AGE_H = io.ok ? ageHours(feedStamp(io.data)) : null;
     let out = head('IPO', 'Books open now, what is coming, and how the last year of listings actually did.', 'Primary market');
@@ -2230,6 +2267,7 @@
         </div>`).join('')}</div>` : `<div class="empty">No listings in the window.</div>`,
       `${rec.length} shown`);
     paint(out);
+    fillIpoLive();   // upgrades the mirrored figures in place, after paint
   };
 
   // The tool. Filters run over the pulse digest, not over screen.json — the
@@ -5929,6 +5967,12 @@
      * difference means the code on the server is not the code running here.
      */
     let edition = null, build = null, busy = false, offered = false;
+    // Last deliberate interaction. Passive listeners so this cannot cost a
+    // frame on scroll.
+    let lastTouch = 0;
+    const touch = () => { lastTouch = Date.now(); };
+    for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart'])
+      document.addEventListener(ev, touch, { passive: true });
     const bar = document.getElementById('editionBar');
     const txt = bar && bar.querySelector('.ed-t');
     const go  = bar && bar.querySelector('.ed-go');
@@ -5961,13 +6005,50 @@
           if (build === null) build = bd.build;             // first look: record
           else if (bd.build !== build && !offered) {
             offered = true;
+            /* CLEAR THE SHELL CACHE BEFORE ANY RELOAD.
+             *
+             * The service worker holds signal.js and signal.css. It is
+             * network-first, so a healthy reload picks up the new copy — but
+             * on a flaky connection it falls back to the cache and serves the
+             * OLD code again, which produces a page that keeps asking to be
+             * reloaded and never changes when you do. Deleting the caches
+             * first makes the reload unambiguous. */
+            try {
+              if (window.caches) {
+                const keys = await caches.keys();
+                await Promise.all(keys.map(k => caches.delete(k)));
+              }
+            } catch (e) { /* private mode, or no cache API */ }
             // Nothing is lost by reloading a tab nobody is looking at, and a
             // reader who returns to a stale tab should find it current.
             // Guarded once per build so a mid-deploy mismatch cannot loop.
             const KEY = 'sig:reloaded';
             let tried = null;
             try { tried = sessionStorage.getItem(KEY); } catch (e) { /* private mode */ }
-            if (document.visibilityState === 'hidden' && tried !== bd.build) {
+
+            /* RELOAD WITHOUT ASKING WHEN NOTHING WOULD BE LOST.
+             *
+             * The first version only did this for a hidden tab and showed a
+             * banner to a visible one. That is too polite: it makes a reader
+             * responsible for noticing a bar and tapping it, and when they do
+             * not, they sit on stale code looking at stale numbers and
+             * reasonably conclude nothing was fixed. That happened.
+             *
+             * "Nothing would be lost" is checkable rather than assumed: no
+             * open card or search, nothing focused, no text selected, and no
+             * interaction in the last fifteen seconds. If any of those is
+             * false the bar is shown and the reader decides — a page that
+             * reloads out from under someone mid-read is the worse failure.
+             *
+             * Guarded once per build id either way, so a mid-deploy mismatch
+             * cannot loop. */
+            const busyNow = document.getElementById('sheet')?.open
+              || document.querySelector('dialog.cmd[open]')
+              || (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))
+              || (window.getSelection && String(window.getSelection()).length > 0)
+              || (Date.now() - lastTouch < 15000);
+
+            if ((document.visibilityState === 'hidden' || !busyNow) && tried !== bd.build) {
               try { sessionStorage.setItem(KEY, bd.build); } catch (e) { /* private mode */ }
               location.reload();
               return;

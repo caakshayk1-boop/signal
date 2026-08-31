@@ -34,14 +34,24 @@ const num = (v) => {
  * the three a reader actually reads, and anything else is carried through
  * under its own name rather than dropped — a category this code has not seen
  * before is not a reason to hide a number. */
+/* NSE returns a HIERARCHY, not a list. Under Non Institutional Investors sit
+ * two more rows — bids above ten lakh, and bids from two to ten lakh — each
+ * with its own multiple, and under QIB sit FIIs, mutual funds and others with
+ * no multiple at all. Mapping every "non institutional" string to NII printed
+ * the same label three times with three different numbers, which reads as a
+ * bug even though every figure was real.
+ *
+ * Only the four headline categories are kept: the aggregate NII, not its two
+ * children. Returning null is how a row says "I am a sub-total, skip me". */
 const shortCat = (c) => {
-  const s = String(c || "");
+  const s = String(c || "").trim();
   if (/qualified institutional/i.test(s)) return "QIB";
-  if (/non institutional|nii|hni/i.test(s)) return "NII";
+  if (/^non\s*institutional\s*investors$/i.test(s)) return "NII";
+  if (/non\s*institutional/i.test(s)) return null;      // bNII / sNII sub-buckets
   if (/retail/i.test(s)) return "Retail";
-  if (/employee/i.test(s)) return "Employee";
+  if (/^employee/i.test(s)) return "Employees";
   if (/^total$/i.test(s)) return "Total";
-  return s.slice(0, 28);
+  return null;                                          // FIIs, mutual funds, cut-off rows
 };
 
 export default async function ipolive(req, res) {
@@ -76,8 +86,39 @@ export default async function ipolive(req, res) {
       else if (times != null) e.categories.push({ cat, x: times, offered: num(x.noOfSharesOffered), bid: num(x.noOfsharesBid) });
     }
 
-    const issues = [...bySym.values()].map((e) => {
-      e.categories.sort((a, b) => b.x - a.x);
+    /* THE PER-CATEGORY BOOK NEEDS A SECOND CALL.
+     *
+     * /api/ipo-current-issue carries one Total row per symbol and nothing
+     * else — the first cut of this read a `category` field that is only
+     * populated on some rows, so the split came back empty for every active
+     * issue and the UI rendered a heading with nothing under it.
+     *
+     * /api/ipo-detail carries bidDetails, which is the real split. It is one
+     * request per issue, which is why this route is cached for fifteen
+     * minutes: six calls per cache miss rather than six per visitor. A detail
+     * that fails leaves that issue with its headline multiple and no split,
+     * which is the honest degradation. */
+    const detail = async (sym) => {
+      try {
+        const r = await fetch(
+          `https://www.nseindia.com/api/ipo-detail?symbol=${encodeURIComponent(sym)}&series=EQ`,
+          { headers: UA, signal: AbortSignal.timeout(7000) });
+        if (!r.ok) return [];
+        const j = await r.json();
+        return (j.bidDetails || [])
+          .map((x) => ({ cat: shortCat(x.category), x: num(x.noOfTime),
+                         offered: num(x.noOfSharesOffered), bid: num(x.noOfsharesBid) }))
+          .filter((c) => c.cat && c.x != null && !/^total$/i.test(c.cat));
+      } catch { return []; }
+    };
+
+    const list = [...bySym.values()];
+    const splits = await Promise.all(list.map((e) => detail(e.symbol)));
+    const issues = list.map((e, i) => {
+      // Prefer the detail split; keep whatever the list gave us otherwise.
+      const cats = splits[i].length ? splits[i] : e.categories;
+      e.categories = cats.filter((c) => c.cat && Number.isFinite(c.x))
+                         .sort((a, b) => b.x - a.x);
       return e;
     });
 
