@@ -265,8 +265,22 @@ try {
      (await p.locator(".btn-hero").innerText()).includes("60 seconds"));
   ok("the header CTA names the product action",
      (await p.locator(".btn-cta").innerText()).toLowerCase().includes("brief"));
-  ok("the freshness chip reports n of n",
-     /\d+\/\d+ current/.test(await p.locator("#freshTxt").innerText()));
+  /* THE CHIP REPORTS A MEASUREMENT, NOT A LABEL.
+   *
+   * This asserted /n\/n current/, which was the old contract: the chip echoed
+   * a status string out of data-health.json. That file can itself be stale —
+   * it was 31 hours old on the morning this changed, while confidently
+   * reporting "5/6 current" — so the chip now measures the age of the feeds
+   * the page actually loaded and says either "n of n current" (everything
+   * inside a build cycle) or how old the worst one is.
+   *
+   * Both are valid outputs and the test accepts either. What it must never
+   * accept is an empty chip, which is what a silent failure of the new
+   * measurement path would look like. */
+  const freshTxt = (await p.locator("#freshTxt").innerText()).trim();
+  ok("the freshness chip reports a measurement",
+     /\d+\/\d+ current/.test(freshTxt) || /\d+\s*(h|d)\b/.test(freshTxt));
+  ok("the freshness chip is never blank", freshTxt.length > 0 && freshTxt !== "—");
   // Empty on Today on purpose — a breadcrumb reading "Today" on Today is noise.
   ok("the contextual label is empty on Today",
      (await p.locator("#barWhere").innerText()).trim() === "");

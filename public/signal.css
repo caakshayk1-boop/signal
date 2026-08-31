@@ -1346,7 +1346,12 @@ body::before{display:none}
 .b-zst{font:500 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-widest);text-transform:uppercase;
   padding:7px 11px;border-radius:var(--r-2);border:1px solid transparent}
 .b-zst.wait{color:var(--b-gold);background:color-mix(in srgb,var(--b-gold) 14%,transparent)}
-.b-zst.active{color:var(--b-bull);background:color-mix(in srgb,var(--b-bull) 15%,transparent)}
+/* The green sits on a 15% green tint, which measured 4.27:1 in light — under
+   AA on a chip that names the scenario currently in force. Darkened toward
+   the ink rather than swapping the hue, so it still reads as the bullish
+   colour and still passes. */
+.b-zst.active{color:color-mix(in srgb,var(--b-bull) 74%,var(--b-ink));
+  background:color-mix(in srgb,var(--b-bull) 15%,transparent)}
 .b-zst.missed{color:var(--b-mut);border-color:var(--b-line2)}
 .b-zst.invalid{color:var(--b-bear);background:color-mix(in srgb,var(--b-bear) 15%,transparent)}
 .b-zt{position:relative;height:6px;border-radius:var(--r-1);background:var(--b-hi);margin:22px 0 10px}
@@ -2489,8 +2494,9 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 
 /* The star, promoted to the card heading and the conviction cards. */
 .sheet-h .wstar{flex:none;margin-right:9px}
-.cv{position:relative}
-.cv > .wstar{position:absolute;top:12px;right:12px;z-index:2}
+/* The conviction card's star sits in the header row, not floated over the
+   card's top-right corner where the sector pill lives. */
+.cv .card-h > .wstar{flex:none;margin-right:2px}
 
 /* Where a weekly pick came from — date, entry, target, score, and what it has
    done since. Without these a pick beside a live price cannot be checked. */
@@ -2670,3 +2676,34 @@ html:has(dialog[open]){overflow:hidden}
 .mbc-m .up b{color:var(--up)} .mbc-m .dn b{color:var(--down)}
 .mbc-d{font-family:var(--mono)}
 @media(max-width:700px){.mbg{grid-template-columns:1fr}}
+
+/* ── THE SCORE'S SCALE ────────────────────────────────────────────────────
+   "8 of 100" is a number without a ruler. This is the ruler, with the reading
+   marked on it, using the same 40 / 60 bands as the confluence table — the
+   two used to disagree (70/50 against 60/40) on the same component numbers. */
+.b-bands{margin:16px 0 4px;width:100%;max-width:290px}
+.b-bt{position:relative;display:flex;height:6px;border-radius:var(--r-1);overflow:visible}
+.b-bt i{display:block;height:100%}
+.b-bt i.is-lo{flex:0 0 40%;background:color-mix(in srgb,var(--b-bear) 42%,transparent);
+  border-radius:var(--r-1) 0 0 var(--r-1)}
+.b-bt i.is-mid{flex:0 0 20%;background:color-mix(in srgb,var(--b-gold) 42%,transparent)}
+.b-bt i.is-hi{flex:0 0 40%;background:color-mix(in srgb,var(--b-bull) 42%,transparent);
+  border-radius:0 var(--r-1) var(--r-1) 0}
+.b-bt b{position:absolute;top:-4px;width:3px;height:14px;margin-left:-1.5px;
+  background:var(--b-ink);border-radius:var(--r-hair)}
+.b-bl{display:flex;justify-content:space-between;margin-top:7px;
+  font:400 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);
+  text-transform:uppercase;color:var(--b-dim)}
+@media(max-width:700px){.b-bands{max-width:none}}
+
+/* The age of a subscription figure, beside the figure. Amber once it has
+   missed a session, because that is when the number starts misleading. */
+.subs-age{flex:1 1 100%;margin-top:7px;font:400 var(--t-3)/1.45 var(--ui);color:var(--dim)}
+.subs-age.is-old{color:var(--warn)}
+.subs-age b{font-weight:600}
+
+/* A divergence found on the visible page, marked on the row that has it. */
+.scr-dv{display:inline-block;margin-left:8px;font:600 var(--t-1)/1 var(--mono);font-style:normal;
+  letter-spacing:var(--ls-wide);padding:3px 6px;border-radius:var(--r-1);vertical-align:1px}
+.scr-dv.dv-bullish{background:color-mix(in srgb,var(--up) 16%,transparent);color:var(--up)}
+.scr-dv.dv-bearish{background:color-mix(in srgb,var(--down) 16%,transparent);color:var(--down)}

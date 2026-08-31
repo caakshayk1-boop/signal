@@ -46,6 +46,15 @@
   let feedRev = 0;
   let routeUrls = new Set();
 
+  /* What get() already holds for a URL, without going to the network. Lets a
+   * route render immediately on the feeds it has and come back for the rest,
+   * instead of every caller awaiting the slowest thing it needs. */
+  const CACHED = url => {
+    const m = MICRO.get(url);
+    if (m && Date.now() - m.at < MICRO_MS) return { ...m.res, ready: true };
+    return { ok: false, ready: false, data: null, error: 'still loading' };
+  };
+
   async function get(url) {
     routeUrls.add(url);
     const micro = MICRO.get(url);
@@ -921,9 +930,32 @@
       sec('Where the money went', `<div class="sk" style="height:104px"></div>`) +
       sec('The wire', skel('sk-card', 3)));
 
-    const [t, p, n, m, fl, cl, sr] = await Promise.all(
+    /* ── TWO PHASES, BECAUSE ONE OF THESE IS 230 KB ───────────────────────
+     *
+     * The five event tiles and the wire's ranking both need the 750-name
+     * screen, and adding it here put a 230 KB download — by far the largest
+     * asset on the site — in front of the front page rendering at all. The
+     * shell reaches first paint in about 150ms; blocking the content behind
+     * a quarter-megabyte to decide the ORDER of ten headlines is the wrong
+     * trade.
+     *
+     * So the page renders on the four small feeds it actually needs, and the
+     * screen and the calendar arrive after. The second pass re-runs this
+     * route, which costs one repaint and no extra network: get() serves the
+     * first four out of its five-second window, so only the two new feeds go
+     * to the wire. Anything that changes between the passes is flagged by the
+     * usual change-flash rather than swapping silently. */
+    const [t, p, n, m, fl] = await Promise.all(
       [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets'),
-       get('/api/flows'), get('/api/calendar'), get('/screen.json')]);
+       get('/api/flows')]);
+    const heavy = [CACHED('/api/calendar'), CACHED('/screen.json')];
+    const cl = heavy[0], sr = heavy[1];
+    if (!cl.ready || !sr.ready) {
+      // Fire them, and come back through this route once they land.
+      Promise.all([get('/api/calendar'), get('/screen.json')]).then(() => {
+        if (routeOf() === '/') R['/']();
+      });
+    }
     /* ── THE HERO ────────────────────────────────────────────────────────
      * The first viewport has to answer four things: what this is, what state
      * the market is in, what to do next, and how long that takes. It replaces
@@ -1082,17 +1114,47 @@
         Tap a sector for the names behind it.</p>`,
       dayMap ? 'today · large caps' : 'this week · all 750');
 
-    out += sec('The wire', wire.length ? `<div class="wire">${wire.slice(0, 6).map(x => `
+    /* ── TEN OF EIGHTEEN, AND THE BOTTOM SIX ROTATE ───────────────────────
+     *
+     * The wire is a DAILY file. It does not gain stories between builds, so a
+     * "refreshes every 15 minutes" that re-fetched it would be churn dressed
+     * as news — the same eighteen headlines, re-requested.
+     *
+     * What can honestly change on that interval is how much of the file you
+     * have seen. The four stories that touch the most screened names are
+     * pinned for the day, because those are the ones a reader came for and
+     * rotating them away would hide the most useful items on the page. The
+     * remaining six slots cycle through the rest on a twenty-minute bucket,
+     * derived from the clock rather than from a timer, so every tab shows the
+     * same rotation and a reload does not reshuffle it.
+     */
+    const wireView = (() => {
+      const uni = sr.ok ? (sr.data.rows || []) : [];
+      const ranked = wire.map(x => ({ x, n: uni.length ? newsMatch(x, uni).length : 0 }))
+                         .sort((a, b) => b.n - a.n);
+      const pinned = ranked.slice(0, 4).map(r => r.x);
+      const rest = ranked.slice(4).map(r => r.x);
+      if (!rest.length) return pinned;
+      const SLOTS = 6, bucket = Math.floor(Date.now() / (20 * 60 * 1000));
+      const start = rest.length ? (bucket * SLOTS) % rest.length : 0;
+      const rotating = Array.from({ length: Math.min(SLOTS, rest.length) },
+                                  (_, i) => rest[(start + i) % rest.length]);
+      return pinned.concat(rotating);
+    })();
+
+    out += sec('The wire', wire.length ? `<div class="wire">${wireView.map(x => `
         <a href="${esc(x.link || '#')}" ${x.link ? 'target="_blank" rel="noopener"' : ''}>
           <span class="ws">${esc(x.source || 'wire')}</span>
           <span class="wt">${esc(x.title || '')}</span>
           ${x.summary ? `<span class="wd">${esc(String(x.summary).slice(0, 150))}</span>` : ''}
         </a>`).join('')}</div>
-        <p class="hint"><a href="#/news" class="more-l">Read all ${wire.length} stories, with the names each one touches &rarr;</a></p>`
+        <p class="hint">The first four are the stories touching the most screened names and stay put
+          for the day; the rest rotate every twenty minutes so you see more of the file.
+          <a href="#/news" class="more-l">Read all ${wire.length}, with the names each one touches &rarr;</a></p>`
       : `<div class="empty">The wire is quiet.</div>`,
       /* "18 stories" over a list of six is a caption contradicting the thing
        * it captions. Say what is on screen, and link to the rest. */
-      wire.length > 6 ? `6 of ${wire.length}` : `${wire.length} stories`);
+      wire.length > wireView.length ? `${wireView.length} of ${wire.length}` : `${wire.length} stories`);
 
     const cv = await get('/conviction.json');
     if (cv.ok && (cv.data.picks || []).length) {
@@ -1122,8 +1184,14 @@
   };
 
   const convictionCard = p => `<article class="card cv" data-sym="${esc(p.sym)}" role="button" tabindex="0">
-    ${watchBtn(p.sym)}
+    ${/* IN THE FLOW, NOT OVER IT. The star was absolutely positioned at the
+        * card's top right — which is exactly where the sector pill already
+        * sits, so at 390px it sat on top of "Healthcare", "Industrials" and
+        * every other sector name. Measured on four cards. It belongs in the
+        * header row, which is a flex row that already knows how to make
+        * room. */''}
     <div class="card-h">
+      ${watchBtn(p.sym)}
       <span class="sym">${esc(p.sym)}</span>
       <span class="pill pill-ac">${esc(p.score)}</span>
       ${p.brk52w ? `<span class="pill pill-up">52w high</span>` : ''}
@@ -1228,6 +1296,7 @@
 
   // The verdict leads. Someone deciding whether to apply wants the call and
   // the reason before the lot size.
+  let IPO_AGE_H = null, IPO_STAMP = '';
   const ipoCard = r => {
     const v = String(r.verdict || '').toUpperCase();
     const cls = v.startsWith('APPLY') ? 'v-apply' : v === 'AVOID' ? 'v-avoid' : 'v-watch';
@@ -1243,10 +1312,21 @@
         <span class="co">${esc(r.company || '')}</span>
       </div>
       ${r.verdict_why ? `<div class="ipo-why">${esc(r.verdict_why)}</div>` : ''}
+      ${/* A SUBSCRIPTION NUMBER WITHOUT ITS VINTAGE IS A TRAP.
+          * This feed is a daily mirror. On the day this was written it was 31
+          * hours old and showed Lumino at 2.86x while the book had reached
+          * 28.6x — the figure was not wrong when it was written, it was
+          * ten times out of date, and nothing on the card said so. An IPO
+          * subscription number moves fastest on the last day, which is exactly
+          * when someone is deciding, so this one has to carry its own age. */''}
       ${isFinite(sub) ? `<div class="subs">
         <span class="subs-v">${sub.toFixed(2)}×</span>
         <span class="subs-bar" style="--one:10%"><i style="width:${pctOfTen.toFixed(0)}%"></i></span>
         <span class="subs-v" style="color:var(--dim);font-size:var(--t-2)">of 10×</span>
+        ${IPO_AGE_H != null ? `<span class="subs-age${IPO_AGE_H > 6 ? ' is-old' : ''}">
+          as at ${esc(IPO_STAMP)}${IPO_AGE_H > 6
+            ? ` · <b>${esc(ageWord(IPO_AGE_H))}</b>, and a book moves fastest on its last day`
+            : ''}</span>` : ''}
       </div>` : ''}
       <div class="kv">
         <div><span class="kk">Band</span><span class="vv" style="font-size:var(--t-3)">${esc(r.price_band || '—')}</span></div>
@@ -1874,6 +1954,8 @@
     paint(head('IPO', 'Books open now, what is coming, and how the last year of listings actually did.', 'Primary market') +
       sec('Open now', skel('sk-card', 2)));
     const io = await get('/ipo.json');
+    IPO_STAMP = io.ok ? String(feedStamp(io.data) || '').slice(0, 16).replace('T', ' ') : '';
+    IPO_AGE_H = io.ok ? ageHours(feedStamp(io.data)) : null;
     let out = head('IPO', 'Books open now, what is coming, and how the last year of listings actually did.', 'Primary market');
     if (!io.ok) { paint(out + fail('The IPO radar', io.error)); return; }
     const d = io.data, c = d.counts || {};
@@ -1922,7 +2004,7 @@
    * the one question it could not be asked. scrPresets is a Set and the
    * predicates are ANDed. Empty means everything, which is what "All" now
    * does rather than being a filter that happens to return true. */
-  let scrQ = '', scrPresets = new Set(), scrSort = 'comp', scrPage = 0;
+  let scrQ = '', scrPresets = new Set(), scrSort = 'comp', scrPage = 0, SCRDIV = null;
   const PRESETS = {
     all:        ['Everything',     () => true],
     breakout:   ['Breaking out',   r => (r.setup?.tags || []).some(t => /BREAKOUT/.test(t))],
@@ -1974,6 +2056,15 @@
             return `<button type="button" class="chip${on ? ' on' : ''}" data-p="${k}"
                      aria-pressed="${on}">${esc(l)}</button>`;
           }).join('')}
+        </div>
+        <div class="t5tools" style="margin:2px 0 12px">
+          ${/* PER PAGE, NOT PER UNIVERSE. A divergence needs a daily series,
+              * and 750 names is 750 requests — which is not a filter, it is an
+              * outage. It runs on the forty rows on screen, which is also the
+              * only set the reader is looking at, and says so. */''}
+          <button type="button" class="chip" id="scrDiv">Check RSI divergence on this page</button>
+          <button type="button" class="chip" id="scrDivOnly" aria-pressed="false" hidden>Only divergences</button>
+          <span class="t5note" id="scrDivNote"></span>
         </div>
         <p class="hint chips-hint">${scrPresets.size > 1
           ? `Showing names that clear <b>all ${scrPresets.size}</b> of these at once.`
@@ -2028,15 +2119,72 @@
           const n = main.querySelector('#scrq'); n.focus(); n.setSelectionRange(at, at); }, 160);
       });
       main.querySelector('#scrs').addEventListener('change', e => { scrSort = e.target.value; draw(); });
-      main.querySelectorAll('.chip').forEach(b =>
+      /* [data-p], not every .chip on the page. This handler bound itself to
+       * ALL chips, so adding two unrelated ones to the Screen's toolbar made
+       * them behave as filter presets: b.dataset.p was undefined, undefined
+       * went into the preset Set, and the next draw threw on
+       * PRESETS[undefined][1]. A delegated handler has to name what it owns. */
+      main.querySelectorAll('.chip[data-p]').forEach(b =>
         b.addEventListener('click', () => {
           const k = b.dataset.p;
           if (k === 'all') scrPresets.clear();
           else if (scrPresets.has(k)) scrPresets.delete(k);
           else scrPresets.add(k);
           scrPage = 0;   // a changed filter invalidates the page number
+          SCRDIV = null; // and invalidates any divergence run against the old page
           draw();
         }));
+
+      /* The same engine the volume sheet uses, pointed at the visible page. */
+      const dv = document.getElementById('scrDiv');
+      if (dv) {
+        const note = document.getElementById('scrDivNote');
+        const only = document.getElementById('scrDivOnly');
+        const syms = [...document.querySelectorAll('.scr-r:not(.rank-head)')]
+          .map(r => r.getAttribute('data-sym')).filter(Boolean);
+        const mark = () => {
+          document.querySelectorAll('.scr-r:not(.rank-head)').forEach(row => {
+            const d = SCRDIV && SCRDIV[row.getAttribute('data-sym')];
+            row.querySelectorAll('.scr-dv').forEach(e => e.remove());
+            if (!d || !d.ok || !d.kind || d.kind === 'none') return;
+            const s2 = row.querySelector('.s');
+            if (s2) s2.insertAdjacentHTML('beforeend',
+              `<i class="scr-dv dv-${esc(d.kind)}">${d.kind === 'bullish' ? 'BULL' : 'BEAR'} RSI DIV</i>`);
+          });
+          if (only && only.getAttribute('aria-pressed') === 'true') {
+            document.querySelectorAll('.scr-r:not(.rank-head)').forEach(row => {
+              const d = SCRDIV && SCRDIV[row.getAttribute('data-sym')];
+              row.hidden = !(d && d.ok && d.kind && d.kind !== 'none');
+            });
+          } else {
+            document.querySelectorAll('.scr-r:not(.rank-head)').forEach(r => { r.hidden = false; });
+          }
+        };
+        dv.addEventListener('click', async () => {
+          dv.disabled = true;
+          SCRDIV = {};
+          let done = 0;
+          note.textContent = `reading ${syms.length} daily charts…`;
+          await mapLimit(syms, 4, async sym => {
+            const res = await get(`/api/signals?series=${encodeURIComponent(sym)}&range=1y`);
+            const pts = res.ok ? (res.data.points || []) : [];
+            SCRDIV[sym] = pts.length
+              ? rsiDivergence(pts.map(x => Number(x.c)).filter(Number.isFinite))
+              : { ok: false, why: 'no daily series' };
+            note.textContent = `read ${++done} of ${syms.length}…`;
+          });
+          const n = Object.values(SCRDIV).filter(d => d.ok && d.kind && d.kind !== 'none').length;
+          note.textContent = `${n} of ${syms.length} on this page show a divergence`;
+          dv.hidden = true;
+          if (n) only.hidden = false;
+          mark();
+        });
+        if (only) only.addEventListener('click', () => {
+          only.setAttribute('aria-pressed', String(only.getAttribute('aria-pressed') !== 'true'));
+          mark();
+        });
+        if (SCRDIV) mark();
+      }
       /* No per-row listener here. A delegated handler on `document` already
        * opens any [data-sym], so this bound forty more on every repaint — and
        * being bound directly to the element it also fired for clicks on the
@@ -2639,7 +2787,8 @@
         sec('Alerts', rows.length ? `<div class="cards-2">${rows.map(card).join('')}</div>`
           : `<div class="empty">No signals with that state.</div>`, `${rows.length} shown`);
       if (CURVE) wireRCurve(CURVE);
-      main.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => {
+      // Same reason as the Screen's: name the chips this handler owns.
+      main.querySelectorAll('.chip[data-s]').forEach(b => b.addEventListener('click', () => {
         sigFilter = b.dataset.s; draw();
       }));
     };
@@ -3055,8 +3204,17 @@
     const MEASURED = COMPS.filter(c => c[4] !== false);
     const have = MEASURED.map(c => c[2]).filter(v => Number.isFinite(v));
     const score = have.length ? Math.round(have.reduce((x, y) => x + y, 0) / have.length) : null;
-    const conviction = score == null ? 'UNSCORED' : score >= 70 ? 'HIGH CONVICTION'
-                     : score >= 50 ? 'MODERATE CONVICTION' : 'LOW CONVICTION';
+    /* ONE SET OF BANDS.
+     *
+     * The score used 70 / 50 and the confluence stance used 60 / 40 — two band
+     * systems on one page, applied to the same component numbers, so a
+     * component scoring 55 was "moderate" in one table and "neutral" in the
+     * other and the page never said they were different scales. They are the
+     * same scale now: 60 and above is strong, 40 to 60 is mixed, below 40 is
+     * weak, for the overall score and for every component stance. */
+    const BANDS = [[60, 'HIGH CONVICTION', 'up'], [40, 'MIXED', ''], [0, 'LOW CONVICTION', 'dn']];
+    const bandOf = v => BANDS.find(b => v >= b[0]) || BANDS[BANDS.length - 1];
+    const conviction = score == null ? 'UNSCORED' : bandOf(score)[1];
 
     /* ── THE LADDER. Every level on one scale, so distance is real. */
     const pts_ = [
@@ -3342,6 +3500,18 @@
               <div class="b-dial-c"><b id="dialN" data-cv="">${score == null ? '—' : '0'}</b>
                 <i id="dialL">${esc(conviction)}</i></div>
             </div>
+            ${/* THE NUMBER NEEDS A SCALE. "8 of 100" told the reader nothing about
+                * where 8 sits, and the bands were only ever stated in prose
+                * further down. This is the scale, with the reading marked on
+                * it — the same bands the confluence table uses. */''}
+            ${score == null ? '' : `<div class="b-bands" role="img"
+                 aria-label="Score ${Math.round(score)} of 100. Below 40 is weak, 40 to 60 mixed, 60 and above strong.">
+              <div class="b-bt">
+                <i class="is-lo"></i><i class="is-mid"></i><i class="is-hi"></i>
+                <b style="left:${Math.max(0, Math.min(100, score)).toFixed(1)}%"></b>
+              </div>
+              <div class="b-bl"><span>0</span><span>40 weak</span><span>60 mixed</span><span>100 strong</span></div>
+            </div>`}
             <div class="b-cbtns" role="group" aria-label="Confidence view">
               <button type="button" id="cvScore" aria-pressed="true">Score</button>
               <button type="button" id="cvComp" aria-pressed="false">Components</button>
@@ -4146,43 +4316,111 @@
     /world news/i,         // news.json — the wire on Today
   ];
   let HEALTH = null;
+  /* ── FRESHNESS, MEASURED HERE ─────────────────────────────────────────────
+   *
+   * This read a status string out of data-health.json and reported it. On the
+   * morning this was rewritten, that file said five of six datasets were
+   * "current" — and the file itself was 31 hours old, as was every feed it
+   * described. A freshness indicator that can be 31 hours stale about
+   * staleness is worse than none: it converts a visible gap into an invisible
+   * one, on the one part of the page whose entire job is telling the reader
+   * whether to trust the rest.
+   *
+   * So age is now measured against the clock, from the timestamp inside each
+   * file the page actually loaded. The upstream status is still shown in the
+   * detail — it says whether the SOURCE thinks a pipeline is healthy, which is
+   * a different question from how old this copy is — but it can no longer
+   * decide the badge.
+   */
+  const FEED_AGE = [
+    ['Stock screen',   '/screen.json'],
+    ['Market pulse',   '/pulse.json'],
+    ['Trade ideas',    '/today.json'],
+    ['Signal ledger',  '/alerts.json'],
+    ['IPO tracker',    '/ipo.json'],
+    ['Wire',           '/news.json'],
+    ['Conviction',     '/conviction.json'],
+    ['Edition',        '/edition.json'],
+  ];
+
+  // The timestamp a feed carries, whatever it happens to call it. A feed with
+  // no timestamp at all is reported as unknown rather than assumed fresh.
+  const feedStamp = d => {
+    if (!d || Array.isArray(d)) return null;
+    for (const k of ['generated_at', 'built_at', 'built_on', 'date', 'fetched_at']) {
+      if (d[k]) return String(d[k]);
+    }
+    return null;
+  };
+  const ageHours = ts => {
+    if (!ts) return null;
+    const t = ts.length > 10 ? ts : ts + 'T00:00:00';
+    const dt = new Date(t);
+    if (isNaN(dt)) return null;
+    return (Date.now() - dt.getTime()) / 36e5;
+  };
+  const ageWord = h => h == null ? 'no timestamp'
+    : h < 1 ? 'under an hour old'
+    : h < 24 ? `${Math.round(h)}h old`
+    : `${Math.floor(h / 24)}d ${Math.round(h % 24)}h old`;
+
   async function paintFreshness() {
-    const r = await get('/data-health.json');
     const btn = document.getElementById('freshBtn');
-    if (!r.ok || !btn) return;
-    const all = (r.data.datasets || []);
-    const mine = all.filter(d => OUR_DATASETS.some(re => re.test(String(d.dataset || ''))));
-    // If the artefact ever renames its datasets, showing NOTHING is safer than
-    // silently reporting 0/0 as though everything were broken.
-    if (!mine.length) return;
-    const isCurrent = d => /current|live|fresh|ok/i.test(String(d.status || ''));
-    HEALTH = { ...r.data, datasets: mine,
-               current: mine.filter(isCurrent).length, total: mine.length,
-               skipped: all.length - mine.length };
-    const cur = Number(HEALTH.current), tot = Number(HEALTH.total);
-    if (!Number.isFinite(cur) || !Number.isFinite(tot)) return;
+    if (!btn) return;
+
+    const rows = await Promise.all(FEED_AGE.map(async ([label, url]) => {
+      const r = await get(url);
+      const ts = r.ok ? feedStamp(r.data) : null;
+      return { label, url, ok: r.ok, ts, h: ageHours(ts) };
+    }));
+
+    const dated = rows.filter(x => x.h != null);
+    if (!dated.length) return;
+    // A DAY is the bar, because these are daily builds: a feed rebuilt this
+    // morning is current, one that missed a build is not, and there is no
+    // useful state in between for a reader deciding whether to act.
+    const FRESH_H = 26;
+    const fresh = dated.filter(x => x.h <= FRESH_H).length;
+    const worst = Math.max(...dated.map(x => x.h));
+
     btn.hidden = false;
-    btn.className = 'fresh ' + (cur === tot ? 'all' : cur >= tot * 0.75 ? 'most' : 'few');
-    document.getElementById('freshTxt').textContent = `${cur}/${tot} current`;
+    btn.className = 'fresh ' + (fresh === dated.length ? 'all'
+                               : fresh >= dated.length * 0.6 ? 'most' : 'few');
+    document.getElementById('freshTxt').textContent =
+      fresh === dated.length ? `${fresh}/${dated.length} current` : `${ageWord(worst)}`;
     btn.setAttribute('aria-label',
-      `${cur} of ${tot} datasets current. Open the freshness detail.`);
-    btn.onclick = () => {
-      const ds = HEALTH.datasets || [];
+      `Data freshness: oldest feed is ${ageWord(worst)}. Open the detail.`);
+
+    btn.onclick = async () => {
+      const hr = await get('/data-health.json');
+      const upstream = hr.ok ? (hr.data.datasets || []) : [];
+      const upstreamAge = ageHours(feedStamp(hr.ok ? hr.data : null));
       sheet('Data freshness', `
-        <p class="sheet-p">Every dataset <b>this site</b> renders, when it last updated, and how
-          often it is supposed to. A dataset that is behind is listed as behind — the page
-          that uses it still says so at the point of use.${HEALTH.skipped
-            ? ` ${HEALTH.skipped} other feeds exist in the source artefact and are not counted here,
-                because nothing on this site reads them.` : ''}</p>
+        <p class="sheet-p">Every feed <b>this page</b> loaded, and how old the copy it loaded is —
+          measured against your clock, from the timestamp inside the file. Anything past
+          <b>${FRESH_H} hours</b> has missed a daily build.</p>
         <div class="board" style="margin-top:14px">
-          ${ds.map(d => `<div class="board-row">
-            <span class="n">${esc(d.dataset || '')}<br>
-              <em style="font-style:normal;color:var(--dim);font-size:var(--t-3)">${esc(d.source || '')}</em></span>
-            <span class="p">${esc(d.freshness_age || '—')}</span>
-            <span class="c ${/current|fresh|ok/i.test(String(d.status)) ? 'up' : 'wn'}">${esc(d.status || '—')}</span>
+          ${rows.map(x => `<div class="board-row">
+            <span class="n">${esc(x.label)}<br>
+              <em style="font-style:normal;color:var(--dim);font-size:var(--t-3)">${esc(x.url)}</em></span>
+            <span class="p">${esc(x.ts ? String(x.ts).slice(0, 16).replace('T', ' ') : '—')}</span>
+            <span class="c ${x.h == null ? '' : x.h <= FRESH_H ? 'up' : 'dn'}">${
+              x.ok ? esc(ageWord(x.h)) : 'did not load'}</span>
           </div>`).join('')}
         </div>
-        <p class="sheet-p" style="margin-top:14px">Generated ${esc(String(HEALTH.generated_at || '').slice(0, 16).replace('T', ' '))} UTC.
+        ${upstream.length ? `<p class="sheet-p" style="margin-top:16px">
+          <b>What the source says about itself.</b> This is the pipeline's own health report, and it
+          is a different question from the ages above — it describes whether the build believes its
+          jobs ran, not how old this site's copy is. Its own file is
+          <b>${esc(ageWord(upstreamAge))}</b>, so read it accordingly.</p>
+          <div class="board" style="margin-top:10px">
+            ${upstream.slice(0, 14).map(d => `<div class="board-row">
+              <span class="n">${esc(d.dataset || '')}</span>
+              <span class="p">${esc(d.freshness_age || '—')}</span>
+              <span class="c ${/current|fresh|ok|live/i.test(String(d.status)) ? 'up' : 'wn'}">${esc(d.status || '—')}</span>
+            </div>`).join('')}
+          </div>` : ''}
+        <p class="sheet-p" style="margin-top:14px">
           <a href="#/methodology" style="color:var(--accent)">How this is measured →</a></p>`);
     };
   }
