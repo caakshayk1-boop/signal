@@ -3022,3 +3022,18 @@ html:has(dialog[open]){overflow:hidden}
   .rank-r.xtra{grid-template-columns:minmax(0,1fr) auto;gap:4px 10px}
   .rank-r.xtra .x:last-child{grid-column:1/-1;text-align:left}
 }
+
+/* A story's own age on the front-page wire. The wire is live now, so the
+   useful timestamp is the story's, not the file's. */
+.w-at{display:inline;font-style:normal;margin-left:8px;
+  font:400 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);
+  text-transform:none;color:var(--dim)}
+
+/* A SECTION COUNT MUST NEVER WIDEN THE PAGE.
+   .sec-h is a flex row with the count pushed right by margin-left:auto, so a
+   long count had nowhere to go and pushed the row past the viewport — measured
+   as a 2px horizontal scroll at 320px from the wire's "10 of 60 · read under
+   an hour old". The header wraps now and the count may shrink; a count is the
+   least important thing in that row and should be the first to give way. */
+.sec-h{flex-wrap:wrap}
+.sec-h .sec-n{min-width:0;flex:0 1 auto;overflow-wrap:anywhere}

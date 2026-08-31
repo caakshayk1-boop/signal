@@ -1026,9 +1026,9 @@
      * to the wire. Anything that changes between the passes is flagged by the
      * usual change-flash rather than swapping silently. */
     const n2 = { ok: false, data: null };   // filled below; the hero reads its length
-    const [t, p, n, m, fl, ed] = await Promise.all(
+    const [t, p, n, m, fl, ed, lw] = await Promise.all(
       [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets'),
-       get('/api/flows'), get('/edition.json')]);
+       get('/api/flows'), get('/edition.json'), get('/api/wire')]);
     const heavy = [CACHED('/api/calendar'), CACHED('/screen.json')];
     const cl = heavy[0], sr = heavy[1];
     /* ONCE PER VISIT, NOT ONCE PER RENDER.
@@ -1168,14 +1168,27 @@
      * Every tile states its own count, so an empty one reads as "nothing today"
      * rather than as a panel that failed to load — and a tile whose source did
      * not answer says that instead of showing a zero. */
-    const wire = n.ok ? n.data : [];
-    /* Fetched with the rest rather than read out of the micro-cache: the
-     * edition watcher requests /edition.json?t=… to defeat caching, which is a
-     * different key, so a lookup for the bare path never hit and the label
-     * silently rendered empty. */
+    /* LIVE FIRST, THE DAILY FILE AS A FALLBACK.
+     *
+     * /api/wire reads the same RSS publishers the daily build reads, but now,
+     * and every story carries its own pubDate. news.json stays as the fallback
+     * so a dead RSS host degrades to yesterday's wire rather than to nothing —
+     * and the label says which of the two is on screen. */
+    const liveWire = lw.ok && lw.data && lw.data.ok ? lw.data : null;
+    const wire = liveWire ? liveWire.stories : (n.ok ? n.data : []);
+    const wireIsLive = !!liveWire;
     const wireAge = (() => {
+      /* SHORT, BECAUSE EVERY STORY ALREADY CARRIES ITS OWN AGE.
+       * "read under an hour old" ran to 257px of header on a 320px screen and
+       * pushed the page two pixels sideways — while restating, less precisely,
+       * what the "35m ago" beside each headline already says. */
+      if (liveWire) return 'live';
+      /* The daily file has no timestamp of its own, so it borrows the build
+       * stamp of the edition it was written with. Fetched with the rest rather
+       * than read out of the micro-cache: the edition watcher requests
+       * /edition.json?t=… to defeat caching, which is a different key. */
       const h = ageHours(ed.ok ? feedStamp(ed.data) : null);
-      return h == null ? '' : `wire built ${ageWord(h)}`;
+      return h == null ? '' : `daily · ${ageWord(h)}`;
     })();
     const cal = cl.ok && cl.data && cl.data.ok ? cl.data : null;
     const wireTop = (() => {
@@ -1253,7 +1266,16 @@
       const pinned = ranked.slice(0, 4).map(r => r.x);
       const rest = ranked.slice(4).map(r => r.x);
       if (!rest.length) return pinned;
-      const SLOTS = 6, bucket = Math.floor(Date.now() / (20 * 60 * 1000));
+      const SLOTS = 6;
+      /* ROTATION WAS A WORKAROUND FOR A FILE THAT DID NOT CHANGE.
+       *
+       * When the wire was a daily build, cycling the lower slots was the only
+       * way a reader saw more than six of eighteen fixed stories. A live wire
+       * has the opposite problem — it changes on its own, and rotating it too
+       * would shuffle stories a reader is mid-way through for no reason. Live:
+       * newest first, which the endpoint already sorts. Daily: rotate. */
+      if (wireIsLive) return pinned.concat(rest.slice(0, SLOTS));
+      const bucket = Math.floor(Date.now() / (20 * 60 * 1000));
       const start = rest.length ? (bucket * SLOTS) % rest.length : 0;
       const rotating = Array.from({ length: Math.min(SLOTS, rest.length) },
                                   (_, i) => rest[(start + i) % rest.length]);
@@ -1262,12 +1284,17 @@
 
     out += sec('The wire', wire.length ? `<div class="wire">${wireView.map(x => `
         <a href="${esc(x.link || '#')}" ${x.link ? 'target="_blank" rel="noopener"' : ''}>
-          <span class="ws">${esc(x.source || 'wire')}</span>
+          <span class="ws">${esc(x.source || 'wire')}${
+            x.at ? `<i class="w-at">${esc(storyAge(x.at))}</i>` : ''}</span>
           <span class="wt">${esc(x.title || '')}</span>
           ${x.summary ? `<span class="wd">${esc(String(x.summary).slice(0, 150))}</span>` : ''}
         </a>`).join('')}</div>
-        <p class="hint">The first four are the stories touching the most screened names and stay put
-          for the day; the rest rotate every twenty minutes so you see more of the file.
+        <p class="hint">${wireIsLive
+          ? `Read live from <b>${liveWire.sources}</b> newswires, refreshed every fifteen minutes,
+             newest first. The four touching the most screened names are pinned; the rest rotate.`
+          : `The live wire did not answer, so this is the daily file. The first four are the stories
+             touching the most screened names and stay put for the day; the rest rotate every twenty
+             minutes so you see more of it.`}
           <a href="#/news" class="more-l">Read all ${wire.length}, with the names each one touches &rarr;</a></p>`
       : `<div class="empty">The wire is quiet.</div>`,
       /* "18 stories" over a list of six is a caption contradicting the thing
@@ -4934,33 +4961,68 @@
    * a different question from how old this copy is — but it can no longer
    * decide the badge.
    */
+  /* [label, url, hours before it counts as behind].
+   *
+   * ONE THRESHOLD FOR EVERYTHING WAS WRONG. It was 26 hours for every feed,
+   * which is right for a daily build and useless for anything faster: the IPO
+   * tracker showed green at 19 hours old while the book it describes had moved
+   * from 27x to 104x, and the live wire would have shown green a day after it
+   * stopped. A feed's tolerance belongs to the feed. */
   const FEED_AGE = [
-    ['Stock screen',   '/screen.json'],
-    ['Market pulse',   '/pulse.json'],
-    ['Trade ideas',    '/today.json'],
-    ['Signal ledger',  '/alerts.json'],
-    ['IPO tracker',    '/ipo.json'],
-    ['Wire',           '/news.json'],
-    ['Conviction',     '/conviction.json'],
-    ['Edition',        '/edition.json'],
+    ['Stock screen',   '/screen.json',     30],
+    ['Market pulse',   '/pulse.json',      30],
+    ['Trade ideas',    '/today.json',      30],
+    ['Signal ledger',  '/alerts.json',     30],
+    ['IPO tracker',    '/ipo.json',         8],   // a book moves through the day
+    ['Wire',           '/api/wire',         1],   // live, refreshed every 15 min
+    ['Conviction',     '/conviction.json', 30],
+    ['Edition',        '/edition.json',    30],
   ];
 
   // The timestamp a feed carries, whatever it happens to call it. A feed with
   // no timestamp at all is reported as unknown rather than assumed fresh.
   const feedStamp = d => {
     if (!d || Array.isArray(d)) return null;
-    for (const k of ['generated_at', 'built_at', 'built_on', 'date', 'fetched_at']) {
+    // 'at' is what the Worker's own routes stamp themselves with; without it
+    // /api/wire fell through to the inherited edition build time and reported
+    // itself as eleven hours old while being minutes old.
+    for (const k of ['generated_at', 'built_at', 'at', 'built_on', 'date', 'fetched_at']) {
       if (d[k]) return String(d[k]);
     }
     return null;
   };
+  /* A DATE IS NOT MIDNIGHT.
+   *
+   * This appended T00:00:00 to a date-only stamp, so pulse.json and today.json
+   * — which publish "2026-08-31" with no time — were aged from midnight. At
+   * 02:28 the following morning both read "1d 2h old" in red, when the build
+   * that wrote them had in fact run at 15:26 the previous afternoon and they
+   * were about eleven hours old. The panel was calling fresh feeds stale.
+   *
+   * A date-only stamp carries one day of uncertainty and the honest reading is
+   * the most favourable one inside it — the end of that day — with the display
+   * saying it is a date rather than a time. */
+  const isDateOnly = ts => /^\d{4}-\d{2}-\d{2}$/.test(String(ts || '').trim());
   const ageHours = ts => {
     if (!ts) return null;
-    const t = ts.length > 10 ? ts : ts + 'T00:00:00';
-    const dt = new Date(t);
+    const dateOnly = isDateOnly(ts);
+    const dt = new Date(dateOnly ? ts + 'T23:59:59' : ts);
     if (isNaN(dt)) return null;
-    return (Date.now() - dt.getTime()) / 36e5;
+    return Math.max(0, (Date.now() - dt.getTime()) / 36e5);
   };
+  /* How old a single story is. RSS gives every item a pubDate, which is the
+   * thing the daily wire never had: "12m ago" is what tells a reader the wire
+   * is moving, and no amount of restating the file's age does that. */
+  const storyAge = iso => {
+    if (!iso) return '';
+    const m = (Date.now() - Date.parse(iso)) / 60000;
+    if (!Number.isFinite(m) || m < 0) return '';
+    if (m < 1) return 'just now';
+    if (m < 60) return `${Math.round(m)}m ago`;
+    if (m < 48 * 60) return `${Math.round(m / 60)}h ago`;
+    return `${Math.round(m / 1440)}d ago`;
+  };
+
   const ageWord = h => h == null ? 'no timestamp'
     : h < 1 ? 'under an hour old'
     : h < 24 ? `${Math.round(h)}h old`
@@ -4970,20 +5032,29 @@
     const btn = document.getElementById('freshBtn');
     if (!btn) return;
 
-    const rows = await Promise.all(FEED_AGE.map(async ([label, url]) => {
+    /* Some feeds carry no stamp at all — alerts.json is a bare array, and the
+     * wire used to be one. They are written by the same build as edition.json,
+     * so that is their age, marked as inherited rather than claimed. */
+    const edr = await get('/edition.json');
+    const edTs = edr.ok ? feedStamp(edr.data) : null;
+
+    const rows = await Promise.all(FEED_AGE.map(async ([label, url, maxH]) => {
       const r = await get(url);
-      const ts = r.ok ? feedStamp(r.data) : null;
-      return { label, url, ok: r.ok, ts, h: ageHours(ts) };
+      let ts = r.ok ? feedStamp(r.data) : null;
+      let inherited = false;
+      if (!ts && r.ok && edTs && url !== '/edition.json') { ts = edTs; inherited = true; }
+      return { label, url, ok: r.ok, ts, inherited, maxH, h: ageHours(ts) };
     }));
 
     const dated = rows.filter(x => x.h != null);
     if (!dated.length) return;
-    // A DAY is the bar, because these are daily builds: a feed rebuilt this
-    // morning is current, one that missed a build is not, and there is no
-    // useful state in between for a reader deciding whether to act.
-    const FRESH_H = 26;
-    const fresh = dated.filter(x => x.h <= FRESH_H).length;
-    const worst = Math.max(...dated.map(x => x.h));
+    // Each feed against its OWN tolerance; "worst" is the one furthest past it,
+    // not simply the oldest — a weekly screen at 20 hours is fine and an IPO
+    // book at 20 hours is not.
+    const over = x => x.h / (x.maxH || 26);
+    const fresh = dated.filter(x => over(x) <= 1).length;
+    const worstRow = dated.reduce((a, b) => (over(b) > over(a) ? b : a));
+    const worst = worstRow.h;
 
     btn.hidden = false;
     btn.className = 'fresh ' + (fresh === dated.length ? 'all'
@@ -4999,14 +5070,19 @@
       const upstreamAge = ageHours(feedStamp(hr.ok ? hr.data : null));
       sheet('Data freshness', `
         <p class="sheet-p">Every feed <b>this page</b> loaded, and how old the copy it loaded is —
-          measured against your clock, from the timestamp inside the file. Anything past
-          <b>${FRESH_H} hours</b> has missed a daily build.</p>
+          measured against your clock, from the timestamp inside the file. Each is judged against its
+          own tolerance, because they do not move at the same speed: the wire is live and allowed an
+          hour, an IPO book eight, a daily build thirty. A stamp that carries a date and no time is
+          marked <b>(date only)</b> and read at the most favourable hour inside that day, since
+          nothing narrower is published.</p>
         <div class="board" style="margin-top:14px">
           ${rows.map(x => `<div class="board-row">
             <span class="n">${esc(x.label)}<br>
               <em style="font-style:normal;color:var(--dim);font-size:var(--t-3)">${esc(x.url)}</em></span>
-            <span class="p">${esc(x.ts ? String(x.ts).slice(0, 16).replace('T', ' ') : '—')}</span>
-            <span class="c ${x.h == null ? '' : x.h <= FRESH_H ? 'up' : 'dn'}">${
+            <span class="p">${x.ts
+              ? esc(isDateOnly(x.ts) ? String(x.ts) + ' (date only)' : String(x.ts).slice(0, 16).replace('T', ' '))
+              : '—'}${x.inherited ? '<br><em style="font-style:normal;color:var(--dim);font-size:var(--t-2)">from the edition build</em>' : ''}</span>
+            <span class="c ${x.h == null ? '' : x.h <= (x.maxH || 26) ? 'up' : 'dn'}">${
               x.ok ? esc(ageWord(x.h)) : 'did not load'}</span>
           </div>`).join('')}
         </div>
@@ -5127,14 +5203,16 @@
 
   let newsQ = '', newsSrc = '';
   R['/news'] = async () => {
-    const [n, sc, pu, ed] = await Promise.all(
-      [get('/news.json'), get('/screen.json'), get('/pulse.json'), get('/edition.json')]);
+    const [n, sc, pu, ed, lw] = await Promise.all(
+      [get('/news.json'), get('/screen.json'), get('/pulse.json'), get('/edition.json'),
+       get('/api/wire')]);
+    const live = lw.ok && lw.data && lw.data.ok ? lw.data : null;
     /* Same reasoning as the front page: the wire carries no timestamp of its
      * own, so it borrows the build stamp of the edition it was written with. */
     const wireStamp = ed.ok ? feedStamp(ed.data) : null;
     const wireH = ageHours(wireStamp);
     if (!n.ok) { paint(head('The wire', '', 'Every story') + fail('The wire', n.error)); return; }
-    const all = Array.isArray(n.data) ? n.data : [];
+    const all = live ? live.stories : (Array.isArray(n.data) ? n.data : []);
     const universe = sc.ok ? (sc.data.rows || sc.data.data || []) : [];
     // Median sector move today, so a matched story can say what its sector did
     // rather than only which company it named.
@@ -5166,7 +5244,8 @@
         const mv = secs.length === 1 ? secMove.get(secs[0]) : null;
         return `<article class="nwc">
           <div class="nwc-h">
-            <span class="nwc-s">${esc(x.source || 'wire')}</span>
+            <span class="nwc-s">${esc(x.source || 'wire')}${
+              x.at ? ` · ${esc(storyAge(x.at))}` : ''}</span>
             ${/* A story that names no screened company gets no badge at all.
                 * "No screened company named" was a label announcing an absence
                 * on two thirds of the wire — noise that told the reader
@@ -5204,7 +5283,9 @@
                data-s="${esc(sv)}" aria-pressed="${newsSrc === sv}">${esc(sv)}</button>`).join('')}
           </div>`, `${rows.length} of ${all.length}`) +
         sec('Stories', body,
-          `${linked} market-linked${wireH != null ? ` · ${ageWord(wireH)}` : ''}`,
+          `${linked} market-linked${live
+            ? ` · live from ${live.sources} wires`
+            : (wireH != null ? ` · daily file, ${ageWord(wireH)}` : '')}`,
           'A story is linked to a company only when it names it as a proper noun. Everything under a headline here is measured — which names it mentions, and what those names did. Nothing on this page grades a story’s importance, because this feed carries no data that would support it.') +
         sec('What is not here', `<p class="hint" style="margin-top:0">
           This wire carries a headline, a summary, a source and a link — and nothing else.
