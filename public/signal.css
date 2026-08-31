@@ -2030,11 +2030,22 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
    active tab pulled into view — a label you cannot read is worse than one you
    have to swipe to. */
 @media(max-width:760px){
-  .tabs{grid-auto-flow:column;grid-auto-columns:max-content;
-    overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;
-    justify-content:start;padding:0 10px}
-  .tabs::-webkit-scrollbar{display:none}
-  .tabs a{padding:0 15px;font-size:var(--t-3);letter-spacing:var(--ls-0)}
+  /* NO overflow-x HERE ANY MORE.
+   *
+   * This scrolled horizontally because nine tabs would not fit. Four do — and
+   * the scroll container became actively harmful once the groups arrived: an
+   * overflow value clips on BOTH axes, so the Discover menu, which opens
+   * upward out of the fixed bottom bar, was clipped away and the page behind
+   * it took the taps. Playwright caught it as "main subtree intercepts
+   * pointer events", which is what a clipped menu looks like from outside.
+   *
+   * Four items fit at 320px, so this is a plain equal-width grid again and
+   * the menus have somewhere to go. */
+  .tabs{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
+    justify-content:stretch;padding:0 4px;overflow:visible}
+  .tabs a{padding:0 8px;font-size:var(--t-3);letter-spacing:var(--ls-0)}
+  .tabg > summary{padding:0 8px;justify-content:center;width:100%}
+  .tabg.is-here > summary::before{left:8px;right:8px}
 }
 }
 
@@ -2707,3 +2718,98 @@ html:has(dialog[open]){overflow:hidden}
   letter-spacing:var(--ls-wide);padding:3px 6px;border-radius:var(--r-1);vertical-align:1px}
 .scr-dv.dv-bullish{background:color-mix(in srgb,var(--up) 16%,transparent);color:var(--up)}
 .scr-dv.dv-bearish{background:color-mix(in srgb,var(--down) 16%,transparent);color:var(--down)}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GROUPED NAVIGATION
+   Four items instead of nine. Today and Brief are the daily path and stay
+   flat; Discover and Track are disclosures over the five and two pages
+   underneath. Every route is still one click away — what changed is that the
+   bar stopped presenting nine pages as nine equal decisions.
+   ═════════════════════════════════════════════════════════════════════════ */
+.tabg{position:relative;display:flex;align-items:stretch}
+.tabg > summary{
+  display:inline-flex;align-items:center;gap:6px;height:100%;
+  padding:0 15px;cursor:pointer;list-style:none;white-space:nowrap;
+  font:500 var(--t-4)/1 var(--ui);color:var(--dim);
+  border:0;background:none;position:relative;
+}
+.tabg > summary::-webkit-details-marker{display:none}
+.tabg > summary:hover{color:var(--text)}
+.tabg > summary i{
+  width:0;height:0;flex:none;
+  border-left:3.5px solid transparent;border-right:3.5px solid transparent;
+  border-top:4px solid currentColor;opacity:.6;
+  transition:transform var(--t-fast) var(--ease-out);
+}
+.tabg[open] > summary i{transform:rotate(180deg)}
+.tabg[open] > summary{color:var(--text)}
+/* The same underline the flat tabs use, so a group holding the current page
+   is marked the same way a current tab is. */
+.tabg.is-here > summary{color:var(--text)}
+.tabg.is-here > summary::before{
+  content:"";position:absolute;left:15px;right:15px;bottom:0;height:2px;
+  background:var(--accent);border-radius:2px 2px 0 0;
+}
+
+.tabg-m{
+  position:absolute;top:100%;left:8px;z-index:60;min-width:296px;
+  background:var(--surface);border:1px solid var(--line2);
+  border-radius:var(--r-4);box-shadow:0 18px 44px rgba(0,0,0,.16);
+  padding:7px;display:flex;flex-direction:column;
+  animation:tabgIn 140ms var(--ease-out) both;
+}
+@keyframes tabgIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.tabg-m{animation:none}}
+.tabg-m a{
+  display:block;padding:10px 11px;border-radius:var(--r-3);text-decoration:none;
+  color:var(--text);
+}
+.tabg-m a:hover{background:var(--raised)}
+.tabg-m a[aria-current="page"]{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+.tabg-m b{display:block;font:600 var(--t-5)/1.25 var(--ui)}
+.tabg-m em{display:block;margin-top:2px;font:400 var(--t-3)/1.45 var(--ui);
+  font-style:normal;color:var(--dim)}
+
+@media(max-width:760px){
+  /* The bar is fixed to the bottom on a phone, so the menu opens UPWARD and
+     clears the tab strip and the home indicator. */
+  .tabg-m{
+    top:auto;bottom:100%;left:8px;right:8px;min-width:0;
+    margin-bottom:8px;max-height:58vh;overflow-y:auto;
+  }
+  .tabg > summary{padding:0 15px;font-size:var(--t-4)}
+  .tabg.is-here > summary::before{top:0;bottom:auto;border-radius:0 0 2px 2px}
+}
+
+/* ── WATCHLIST TRIAGE ─────────────────────────────────────────────────────
+   Three states, and the reason a name is in one of them. The colour is a
+   cue, never the cue: every row also carries the word and the measurement
+   that put it there. */
+.wtri-sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.wtri-c{border:1px solid var(--line);border-radius:var(--r-4);padding:14px 15px;
+  background:var(--surface);border-left-width:3px}
+.wtri-c.wtri-0{border-left-color:var(--down)}
+.wtri-c.wtri-1{border-left-color:var(--warn)}
+.wtri-c.wtri-2{border-left-color:var(--line2)}
+.wtri-c.is-none{opacity:.55}
+.wtri-c b{display:block;font:600 var(--t-9)/1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--text);letter-spacing:var(--ls-tight)}
+.wtri-c i{display:block;margin-top:6px;font:600 var(--t-2)/1 var(--mono);font-style:normal;
+  letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--dim)}
+.wtri-c em{display:block;margin-top:7px;font:400 var(--t-3)/1.5 var(--ui);font-style:normal;
+  color:var(--muted)}
+
+/* On the row itself. */
+.wtri{display:block;margin-top:5px}
+.wtri i{display:inline-block;font:600 var(--t-1)/1 var(--mono);font-style:normal;
+  letter-spacing:var(--ls-wide);text-transform:uppercase;padding:3px 6px;border-radius:var(--r-1);
+  background:color-mix(in srgb,var(--dim) 13%,transparent);color:var(--dim)}
+.wtri-0 i{background:color-mix(in srgb,var(--down) 15%,transparent);color:var(--down)}
+.wtri-1 i{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.wtri em{display:inline;margin-left:7px;font:400 var(--t-3)/1.4 var(--ui);font-style:normal;
+  color:var(--dim)}
+
+@media(max-width:760px){.wtri-sum{grid-template-columns:1fr;gap:8px}}
+@media(max-width:700px){
+  .wtri em{display:block;margin:4px 0 0}
+}

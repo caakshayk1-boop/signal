@@ -945,6 +945,7 @@
      * first four out of its five-second window, so only the two new feeds go
      * to the wire. Anything that changes between the passes is flagged by the
      * usual change-flash rather than swapping silently. */
+    const n2 = { ok: false, data: null };   // filled below; the hero reads its length
     const [t, p, n, m, fl] = await Promise.all(
       [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets'),
        get('/api/flows')]);
@@ -963,6 +964,7 @@
      *
      * Every figure in it is one this page already loaded. No photograph, no
      * illustration, no number that is not measured elsewhere on the site. */
+    n2.ok = n.ok; n2.data = n.ok ? n.data : null;
     const heroMk = m.ok ? (m.data.markets || []) : [];
     const heroNifty = heroMk.find(x => /nifty 50/i.test(x.name || ''));
     const heroSensex = heroMk.find(x => /sensex/i.test(x.name || ''));
@@ -984,10 +986,27 @@
     let out = `<section class="hero">
       <div class="hero-l">
         <span class="eyebrow">The morning edition · ${esc((t.ok && t.data.date_str) || '')}</span>
-        <h1>Numbers first.<br>Noise last.</h1>
-        <p class="hero-sub">India’s markets in one screen — sector heat, IPO books open now,
-          ranked ideas and a public signal ledger that shows the losses as well as the wins.
-          Rebuilt before every open.</p>
+        ${/* A CLAIM, THEN THE EVIDENCE FOR IT.
+            * "Numbers first. Noise last." is a mood. It tells a first-time
+            * reader nothing about what this is or why they would come back
+            * tomorrow. The headline now states what the site does; the line
+            * under it is the only honest proof — today's actual counts, from
+            * the feeds this page has already loaded. If the screen is empty
+            * the sentence says so rather than making the claim anyway. */''}
+        <h1>Indian markets,<br>decoded in 60 seconds.</h1>
+        <p class="hero-sub">${(() => {
+          const pu0 = p.ok ? p.data : {};
+          const n = Number(pu0.universe || (pu0.breadth || {}).counted) || null;
+          const up = Number((pu0.breadth || {}).up);
+          const wireN = (n_ok => n_ok ? n_ok.length : 0)(n2.ok ? n2.data : null);
+          return n
+            ? `Every session, <b>${n} names</b> re-screened, the wire read for what touches them,
+               and one setup written up in full — with the stop, the target and the reason it
+               would be wrong. ${Number.isFinite(up) ? `<b>${up}</b> of them are up today.` : ''}`
+            : `Every session: the full screen re-run, the wire read for what touches it, and one
+               setup written up in full — with the stop, the target and the reason it would be
+               wrong. Today's build has not landed yet.`;
+        })()}</p>
         <div class="hero-cta">
           <a class="btn-hero" href="#/brief">Today’s brief
             <em>${CURVE_MIN} · what is set up and where it is wrong</em></a>
@@ -4893,6 +4912,64 @@
   };
 
 
+  /* ── TRIAGE: ACTION, DEVELOPING, WAIT ─────────────────────────────────────
+   *
+   * A watchlist that is only a table asks the reader to re-derive, every
+   * morning, which of their names did something. With ten names that is a
+   * glance; with eighty it is work, and the work is identical every day.
+   *
+   * Every test below is measured off the screen row and the live quote — no
+   * interpretation, no sentiment, no invented score. A name is in ACTION
+   * because a level it was near has actually been reached, in DEVELOPING
+   * because it is close to one, and in WAIT because neither is true. The
+   * reason is printed with the name, so the classification can be argued with
+   * rather than trusted.
+   *
+   * A triggered price alert is always ACTION: the reader said, in advance,
+   * that this level mattered to them. Nothing this site computes outranks
+   * that.
+   */
+  function triage(sym, r, live, alerts) {
+    const px = live && Number.isFinite(live.price) ? live.price : Number(r.price);
+    const day = live && Number.isFinite(live.change_pct) ? live.change_pct : Number(r.r1d);
+    const near = (a, b, pct) => Number.isFinite(a) && Number.isFinite(b) && b !== 0
+      && Math.abs((a - b) / b) * 100 <= pct;
+    const reasons = [];
+    let rank = 2;                                   // 0 action, 1 developing, 2 wait
+
+    const hit = (alerts || []).find(a => a.sym === sym && Number.isFinite(Number(a.px))
+      && Number.isFinite(px)
+      && (a.op === 'above' ? px >= Number(a.px) : px <= Number(a.px)));
+    if (hit) { rank = 0; reasons.push(`your alert at ₹${esc(hit.px)} has been reached`); }
+
+    if (Number.isFinite(px) && Number.isFinite(Number(r.high52)) && px >= Number(r.high52))
+      { rank = 0; reasons.push('at or through its 52-week high'); }
+    if (Number.isFinite(px) && Number.isFinite(Number(r.low52)) && px <= Number(r.low52))
+      { rank = 0; reasons.push('at or through its 52-week low'); }
+    if (Number.isFinite(day) && Math.abs(day) >= 5)
+      { rank = 0; reasons.push(`moved ${pct(day)} today`); }
+    if (near(px, Number(r.sma200), 0.75))
+      { rank = 0; reasons.push('sitting on its 200-day average — the line it trends around'); }
+
+    if (rank > 1) {
+      if (near(px, Number(r.high52), 3)) { rank = 1; reasons.push('within 3% of its 52-week high'); }
+      else if (near(px, Number(r.low52), 3)) { rank = 1; reasons.push('within 3% of its 52-week low'); }
+      if (Number.isFinite(Number(r.rsi)) && (r.rsi >= 70 || r.rsi <= 30))
+        { rank = 1; reasons.push(`RSI ${Math.round(r.rsi)} — ${r.rsi >= 70 ? 'overbought' : 'oversold'}`); }
+      if (Number(r.vol_spike) >= 2)
+        { rank = 1; reasons.push(`trading at ${Number(r.vol_spike).toFixed(1)}× its average volume`); }
+      if (near(px, Number(r.sma50), 1))
+        { rank = 1; reasons.push('close to its 50-day average'); }
+    }
+    return { rank, why: reasons };
+  }
+
+  const TRIAGE = [
+    ['ACTION', 'Something a level you were watching has actually reached.'],
+    ['DEVELOPING', 'Close to a level, but not there. Worth a look, not a decision.'],
+    ['WAIT', 'Nothing measured has changed. Left here so the list stays complete.'],
+  ];
+
   let watchQ = '', watchSort = 'sym', watchSec = '', WVIEW = null;
   R['/watch'] = async () => {
     const syms = watchAll();
@@ -4936,6 +5013,24 @@
            aria-pressed="${watchSec === sv}">${esc(sv)}</button>`).join('')}
       </div>` : ''}`, syms.length ? `${syms.length} starred` : '');
 
+    /* Read once, above the first use: triage consults the alerts (a triggered
+     * one always outranks anything this site computes) and so does the alert
+     * table further down. */
+    const al = alertsAll();
+
+    /* The three counts, before the table. This is the answer to "is there
+     * anything for me today", which is the only question a watchlist is
+     * really asked. */
+    const tcount = [0, 0, 0];
+    for (const x of syms) tcount[triage(x, (idx && idx[x]) || { sym: x }, q[x], al).rank]++;
+    if (syms.length) out += sec('What needs you', `<div class="wtri-sum">
+        ${TRIAGE.map(([word, blurb], i) => `<div class="wtri-c wtri-${i}${tcount[i] ? '' : ' is-none'}">
+          <b>${tcount[i]}</b><i>${esc(word)}</i><em>${esc(blurb)}</em></div>`).join('')}
+      </div>
+      <p class="hint">Every test behind these is measured off the screen row and the live quote —
+        a level reached, a level approached, or neither. Nothing here is a view on the company.</p>`,
+      '', 'Your list, triaged by what actually moved.');
+
     out += sec('Watching', syms.length ? `<div class="rank">
       <div class="rank-r scr-r rank-head"><span class="i">#</span><span class="s">Name</span>
         <span class="x">Price</span><span class="x">Today</span><span class="x">vs 50D</span>
@@ -4958,8 +5053,15 @@
           const n = Number(r[watchSort]);
           return Number.isFinite(n) ? n : -Infinity;        // unmeasured sorts last
         };
+        /* TRIAGE ORDERS THE LIST UNLESS THE READER ASKED FOR SOMETHING ELSE.
+         * "Symbol" was the default, which is alphabetical — an order that has
+         * nothing to do with what changed overnight. */
         view = watchSort === 'sym'
-          ? view.slice().sort((a, b) => String(a).localeCompare(String(b)))
+          ? view.slice().sort((a, b) => {
+              const ta = triage(a, rowOf(a), q[a], al).rank;
+              const tb = triage(b, rowOf(b), q[b], al).rank;
+              return ta - tb || String(a).localeCompare(String(b));
+            })
           : view.slice().sort((a, b) => val(b) - val(a));
         WVIEW = view;
         return view;
@@ -4971,7 +5073,14 @@
         const v200 = r.sma200 && px ? (px - r.sma200) / r.sma200 * 100 : null;
         return `<div class="rank-r scr-r" data-sym="${esc(sym)}" role="button" tabindex="0">
           <span class="i">${i + 1}</span>
-          <span class="s">${watchBtn(sym)}<b>${esc(sym)}</b><span>${esc(r.name || 'not on the screen')}</span></span>
+          <span class="s">${watchBtn(sym)}<b>${esc(sym)}</b>
+            <span>${esc(r.name || 'not on the screen')}</span>
+            ${(() => {
+              const tg = triage(sym, r, live, al);
+              const [word] = TRIAGE[tg.rank];
+              return `<span class="wtri wtri-${tg.rank}">
+                <i>${esc(word)}</i>${tg.why.length ? `<em>${esc(tg.why[0])}</em>` : ''}</span>`;
+            })()}</span>
           <span class="x">${px != null ? '₹' + esc(px) : '—'}</span>
           <span class="x ${live && dir(live.change_pct)}">${live && Number.isFinite(live.change_pct) ? pct(live.change_pct) : '—'}</span>
           <span class="x ${dir(v50)}">${v50 == null ? '—' : pct(v50)}</span>
@@ -4990,7 +5099,6 @@
         '<div class="empty">None of your starred names match that filter.</div>');
 
     /* ── ALERTS ─────────────────────────────────────────────────────────── */
-    const al = alertsAll();
     out += sec('Price alerts', `
       <form class="alform" id="alform">
         <div><label for="alSym">Symbol</label>
@@ -5100,8 +5208,25 @@
     // Leaving the brief forgets which signal was pinned, so coming back by the
     // tab picks the best current setup rather than resurrecting an old one.
     if (path !== '/brief') briefPick = null;
+    /* A GROUP IS CURRENT WHEN SOMETHING INSIDE IT IS.
+     * Otherwise the bar shows no active state at all on five of the nine
+     * routes — the reader is on Screen and the navigation looks like they are
+     * nowhere. The group also names the page it is holding, so "Discover"
+     * reads "Discover · Screen" and the collapsed bar still answers "where am
+     * I" without being opened. */
     document.querySelectorAll('.tabs a').forEach(a =>
       a.dataset.route === path ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+    document.querySelectorAll('.tabs .tabg').forEach(g => {
+      const inside = g.querySelector(`a[data-route="${path}"]`);
+      g.classList.toggle('is-here', !!inside);
+      const label = g.querySelector('summary > span');
+      if (!label) return;
+      const base = label.dataset.base || (label.dataset.base = label.textContent.trim());
+      label.textContent = inside ? `${base} · ${inside.querySelector('b').textContent}` : base;
+      // Navigating closes the menu; leaving it open over the page you just
+      // asked for is a menu that will not get out of the way.
+      g.open = false;
+    });
     // Scroll first, then paint: painting first lets the old route's height
     // hold the scroll position and the new route lands mid-page.
     window.scrollTo(0, 0);
@@ -5143,6 +5268,23 @@
       await run();
     }
   }
+
+  /* <details> gives open/close and keyboard activation for free but does not
+   * close on outside click or Escape — both of which a reader expects from
+   * anything that behaves like a menu. */
+  document.addEventListener('click', e => {
+    document.querySelectorAll('.tabs .tabg[open]').forEach(g => {
+      if (!g.contains(e.target)) g.open = false;
+    });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const open = document.querySelector('.tabs .tabg[open]');
+    if (!open) return;
+    open.open = false;
+    const sum = open.querySelector('summary');
+    if (sum) sum.focus();
+  });
 
   window.addEventListener('hashchange', render);
 

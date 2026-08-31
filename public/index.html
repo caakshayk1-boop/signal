@@ -106,16 +106,39 @@
 </header>
 
 
+<!-- FOUR DECISIONS, NOT NINE.
+     Nine tabs is not a navigation, it is a list of every page — and it read as
+     nine equally-weighted choices when only two of them are the daily path.
+     TODAY is what happened. BRIEF is the one setup, in full. DISCOVER is where
+     you go looking; TRACK is what you already follow. The five pages under
+     Discover and the two under Track are unchanged and one click away; what
+     changed is that the bar no longer asks you to rank them.
+
+     The groups are <details>, so they open without JavaScript and close on
+     Escape for free. Each summary is a real button to the assistive tree. -->
 <nav class="tabs" id="tabs" aria-label="Sections">
-  <a href="#/"        data-route="/"        ><span>Today</span></a>
-  <a href="#/markets" data-route="/markets" ><span>Markets</span></a>
-  <a href="#/ideas"   data-route="/ideas"   ><span>Ideas</span></a>
-  <a href="#/ipo"     data-route="/ipo"     ><span>IPO</span></a>
-  <a href="#/screen"  data-route="/screen"  ><span>Screen</span></a>
-  <a href="#/news"    data-route="/news"    ><span>News</span></a>
-  <a href="#/signals" data-route="/signals" ><span>Signals</span></a>
-  <a href="#/brief"   data-route="/brief"   ><span>Brief</span></a>
-  <a href="#/watch"   data-route="/watch"   ><span>Watch</span></a>
+  <a href="#/"      data-route="/"      ><span>Today</span></a>
+
+  <details class="tabg" id="tabgDiscover">
+    <summary><span>Discover</span><i aria-hidden="true"></i></summary>
+    <div class="tabg-m">
+      <a href="#/markets" data-route="/markets"><b>Markets</b><em>The board — 71 instruments with a year of context</em></a>
+      <a href="#/ideas"   data-route="/ideas"  ><b>Ideas</b><em>This week's multibaggers, and what they were picked at</em></a>
+      <a href="#/screen"  data-route="/screen" ><b>Screen</b><em>All 750 names, filterable and searchable</em></a>
+      <a href="#/ipo"     data-route="/ipo"    ><b>IPO</b><em>Books open now, and how last year's listings did</em></a>
+      <a href="#/news"    data-route="/news"   ><b>News</b><em>The wire, and the screened names each story touches</em></a>
+    </div>
+  </details>
+
+  <details class="tabg" id="tabgTrack">
+    <summary><span>Track</span><i aria-hidden="true"></i></summary>
+    <div class="tabg-m">
+      <a href="#/watch"   data-route="/watch"  ><b>Watch</b><em>Your names, sorted by what needs attention</em></a>
+      <a href="#/signals" data-route="/signals"><b>Signals</b><em>The public ledger — every call, open and closed</em></a>
+    </div>
+  </details>
+
+  <a href="#/brief" data-route="/brief"><span>Brief</span></a>
 </nav>
 
 <!-- A new edition arrived and the page has already swapped to it. This is a
