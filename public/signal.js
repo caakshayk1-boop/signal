@@ -1026,9 +1026,9 @@
      * to the wire. Anything that changes between the passes is flagged by the
      * usual change-flash rather than swapping silently. */
     const n2 = { ok: false, data: null };   // filled below; the hero reads its length
-    const [t, p, n, m, fl] = await Promise.all(
+    const [t, p, n, m, fl, ed] = await Promise.all(
       [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets'),
-       get('/api/flows')]);
+       get('/api/flows'), get('/edition.json')]);
     const heavy = [CACHED('/api/calendar'), CACHED('/screen.json')];
     const cl = heavy[0], sr = heavy[1];
     /* ONCE PER VISIT, NOT ONCE PER RENDER.
@@ -1169,6 +1169,14 @@
      * rather than as a panel that failed to load — and a tile whose source did
      * not answer says that instead of showing a zero. */
     const wire = n.ok ? n.data : [];
+    /* Fetched with the rest rather than read out of the micro-cache: the
+     * edition watcher requests /edition.json?t=… to defeat caching, which is a
+     * different key, so a lookup for the bare path never hit and the label
+     * silently rendered empty. */
+    const wireAge = (() => {
+      const h = ageHours(ed.ok ? feedStamp(ed.data) : null);
+      return h == null ? '' : `wire built ${ageWord(h)}`;
+    })();
     const cal = cl.ok && cl.data && cl.data.ok ? cl.data : null;
     const wireTop = (() => {
       const uni = sr.ok ? (sr.data.rows || []) : [];
@@ -1264,7 +1272,17 @@
       : `<div class="empty">The wire is quiet.</div>`,
       /* "18 stories" over a list of six is a caption contradicting the thing
        * it captions. Say what is on screen, and link to the rest. */
-      wire.length > wireView.length ? `${wireView.length} of ${wire.length}` : `${wire.length} stories`);
+      /* THE WIRE'S VINTAGE.
+       *
+       * news.json is a bare array — no timestamp inside it, and the asset is
+       * served without a Last-Modified header, so there is nothing on the file
+       * itself to read. It is written by the same build that writes
+       * edition.json, which does carry built_at, so that is the wire's age and
+       * it is stated rather than left to be guessed. Without it a reader
+       * refreshing a page whose stories do not change has no way to tell
+       * whether the wire is quiet or stuck. */
+      `${wire.length > wireView.length ? `${wireView.length} of ${wire.length}` : `${wire.length} stories`}${
+        wireAge ? ` · ${esc(wireAge)}` : ''}`);
 
     const cv = await get('/conviction.json');
     if (cv.ok && (cv.data.picks || []).length) {
@@ -1457,6 +1475,50 @@
       const mirror = first ? Number(String(first.textContent).replace(/[^0-9.]/g, '')) : NaN;
       host.innerHTML = subsInner(mirror, lv);
     }
+
+    /* THE PROSE QUOTES THE FIGURE IT WAS WRITTEN WITH.
+     *
+     * verdict_why is generated during the daily build, so it opens
+     * "Subscribed 27.8x, but the book is small" — and once the headline number
+     * was upgraded to the live 104.69x the card carried both figures at once
+     * and contradicted itself in its own sentence.
+     *
+     * Only the subscription clause is rewritten; the rest of the sentence is
+     * about book size and is still true. A sentence that does not match the
+     * pattern is left exactly as the build wrote it rather than guessed at. */
+    /* Anything NSE calls active that the page has not already shown. */
+    const extra = document.getElementById('ipoExtra');
+    if (extra) {
+      const shown = new Set([...document.querySelectorAll('.subs[data-ipo]')]
+        .map(x => x.getAttribute('data-ipo')));
+      const missing = (r.data.issues || []).filter(x => !shown.has(String(x.symbol).toUpperCase()));
+      extra.innerHTML = missing.length ? `<section class="sec">
+        <div class="sec-h"><h2>Also open on NSE</h2>
+          <span class="sec-n">${missing.length} not in the screen</span></div>
+        <p class="sec-lead">Books NSE lists as active that this morning's build did not carry.</p>
+        <div class="rank">${missing.map(x => `<div class="rank-r xtra">
+          <span class="s"><b>${esc(x.symbol)}</b><span>${esc(x.company || '')}</span></span>
+          ${/* Number(null) is 0, not NaN, so an unpublished book rendered as
+              * "0.00×" — a real figure claiming nobody has bid. Check the value
+              * before coercing it. */''}
+          <span class="x">${x.total_x != null && Number.isFinite(Number(x.total_x))
+            ? Number(x.total_x).toFixed(2) + '×' : 'no book yet'}</span>
+          <span class="x">${esc(x.closes || '—')}</span>
+        </div>`).join('')}</div>
+        <p class="hint">Subscription is live from NSE. There is no verdict, band or lot for these —
+          the build had not enriched them when it ran, and a rating invented to fill the row would be
+          worth less than the gap.</p>
+      </section>` : '';
+    }
+
+    for (const el of document.querySelectorAll('.ipo-why[data-why]')) {
+      const lv = bySym.get(el.getAttribute('data-why'));
+      const x = lv && Number.isFinite(Number(lv.total_x)) ? Number(lv.total_x) : null;
+      if (x == null) continue;
+      const was = el.textContent;
+      const now = was.replace(/Subscribed\s+[\d.]+\s*x/i, `Subscribed ${x.toFixed(1)}x`);
+      if (now !== was) el.textContent = now;
+    }
   }
   // NSE keys on the symbol; the mirror sometimes carries a name and no symbol.
   const ipoLiveFor = r => {
@@ -1481,7 +1543,8 @@
         ${r.days_left != null ? `<span class="pill">${r.days_left === 0 ? 'closes today' : esc(r.days_left) + 'd left'}</span>` : ''}
         <span class="co">${esc(r.company || '')}</span>
       </div>
-      ${r.verdict_why ? `<div class="ipo-why">${esc(r.verdict_why)}</div>` : ''}
+      ${r.verdict_why ? `<div class="ipo-why" data-why="${esc(String(r.symbol || r.sym || '').toUpperCase())}">${
+        esc(r.verdict_why)}</div>` : ''}
       ${/* A SUBSCRIPTION NUMBER WITHOUT ITS VINTAGE IS A TRAP.
           * This feed is a daily mirror. On the day this was written it was 31
           * hours old and showed Lumino at 2.86x while the book had reached
@@ -2255,6 +2318,20 @@
 
     out += sec('Open now', (d.open || []).length ? `<div class="cards-2">${d.open.map(ipoCard).join('')}</div>`
       : `<div class="empty">No mainboard book is open today.</div>`);
+
+    /* NSE'S LIST IS LONGER THAN THE MIRROR'S.
+     *
+     * The daily build carries the issues it could enrich — band, lot, GMP,
+     * financials, a verdict. NSE was showing six active books this afternoon
+     * and the mirror had four, so two open issues were simply absent from a
+     * page headed "Open now". Absent is worse than thin: a reader cannot tell
+     * the difference between "not open" and "we did not cover it".
+     *
+     * Filled after paint by fillIpoLive() from the live list, with only what
+     * NSE gives — symbol, close date, subscription. No verdict, because none
+     * was computed for them, and inventing one to make the row look complete
+     * is the thing this site refuses. */
+    out += `<div id="ipoExtra"></div>`;
 
     if ((d.upcoming || []).length) out += sec('Upcoming', `<div class="cards-2">${d.upcoming.map(ipoCard).join('')}</div>`);
     if ((d.awaiting_listing || []).length)
@@ -5050,8 +5127,12 @@
 
   let newsQ = '', newsSrc = '';
   R['/news'] = async () => {
-    const [n, sc, pu] = await Promise.all(
-      [get('/news.json'), get('/screen.json'), get('/pulse.json')]);
+    const [n, sc, pu, ed] = await Promise.all(
+      [get('/news.json'), get('/screen.json'), get('/pulse.json'), get('/edition.json')]);
+    /* Same reasoning as the front page: the wire carries no timestamp of its
+     * own, so it borrows the build stamp of the edition it was written with. */
+    const wireStamp = ed.ok ? feedStamp(ed.data) : null;
+    const wireH = ageHours(wireStamp);
     if (!n.ok) { paint(head('The wire', '', 'Every story') + fail('The wire', n.error)); return; }
     const all = Array.isArray(n.data) ? n.data : [];
     const universe = sc.ok ? (sc.data.rows || sc.data.data || []) : [];
@@ -5122,7 +5203,8 @@
             ${sources.map(sv => `<button type="button" class="chip"
                data-s="${esc(sv)}" aria-pressed="${newsSrc === sv}">${esc(sv)}</button>`).join('')}
           </div>`, `${rows.length} of ${all.length}`) +
-        sec('Stories', body, `${linked} market-linked`,
+        sec('Stories', body,
+          `${linked} market-linked${wireH != null ? ` · ${ageWord(wireH)}` : ''}`,
           'A story is linked to a company only when it names it as a proper noun. Everything under a headline here is measured — which names it mentions, and what those names did. Nothing on this page grades a story’s importance, because this feed carries no data that would support it.') +
         sec('What is not here', `<p class="hint" style="margin-top:0">
           This wire carries a headline, a summary, a source and a link — and nothing else.
