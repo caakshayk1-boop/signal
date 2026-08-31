@@ -92,7 +92,14 @@ try {
 
   // Direction must never be carried by colour alone.
   const signs = await p.locator(".mk-c").evaluateAll(es => es.slice(0, 12).map(e => e.textContent.trim()));
-  ok("every change prints its own sign", signs.every(s => /^[+\-−]|—/.test(s)), signs.slice(0, 3));
+  /* Zero is the one value with no direction to encode, so it is allowed to
+   * carry no sign — and it must NOT carry one: "-0.00%" claims a direction
+   * the digits deny, which is the failure this assertion exists to catch,
+   * inverted. Anything non-zero still has to be signed. */
+  ok("every change prints its own sign",
+     signs.every(s => /^[+\-−]|^0\.00%$|—/.test(s)), signs.slice(0, 3));
+  ok("no change prints a signed zero", !signs.some(s => /^[+\-−]0\.00%$/.test(s)),
+     signs.filter(s => /^[+\-−]0\.00%$/.test(s)));
 
   const oxM = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok("no horizontal overflow at 1440", oxM === 0, oxM);

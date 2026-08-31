@@ -99,7 +99,23 @@
     return s + '₹' + Math.round(a).toLocaleString('en-IN');
   };
   const trim = x => String(x.toFixed(2)).replace(/\.?0+$/, '');
-  const pct = v => { const n = Number(v); return isFinite(n) ? (n > 0 ? '+' : '') + n.toFixed(2) + '%' : '—'; };
+  /* A SIGNED ZERO IS A LIE ABOUT DIRECTION.
+   *
+   * This printed the sign from the raw value and the digits from toFixed(2),
+   * which disagree either side of half a basis point: -0.001 came out as
+   * "-0.00%" and +0.0049 as "+0.00%". Both claim a direction the printed
+   * number does not support, on a page where the sign is deliberately the
+   * only carrier of direction that does not depend on colour.
+   *
+   * The sign is now taken from the ROUNDED value, so it always agrees with
+   * the digits beside it, and an unchanged instrument prints a bare 0.00% —
+   * which is the whole truth about a move of zero. */
+  const pct = v => {
+    const n = Number(v);
+    if (!isFinite(n)) return '—';
+    const r = Number(n.toFixed(2));
+    return (r > 0 ? '+' : '') + (r === 0 ? '0.00' : r.toFixed(2)) + '%';
+  };
   const dir = v => Number(v) > 0 ? 'up' : Number(v) < 0 ? 'dn' : '';
   const ago = ms => { const m = Math.round(ms / 60000); return m < 60 ? m + 'm' : Math.round(m / 60) + 'h'; };
 
@@ -155,7 +171,27 @@
    * binds a scroll handler and a keyboard handler that would otherwise stack
    * up one copy per repaint, and the page repaints itself every 60 seconds.
    * paint() fires a teardown first so those can remove themselves. */
+  /* THE FIRST SKELETON MUST NOT WIPE THE SNAPSHOT.
+   *
+   * index.html ships with a small pre-rendered summary of the day inside
+   * <main> (scripts/prerender.mjs), so anything that does not run JavaScript
+   * still gets content. Every route then opens by painting its skeleton — and
+   * on a fast connection that is invisible, but on a slow one it replaced real
+   * content with grey boxes and then put real content back. Measured at 1.2s
+   * per request: 986 characters of readable summary became 138 characters of
+   * skeleton for several seconds.
+   *
+   * So the very first paint is allowed to be skipped if it is only a skeleton.
+   * The snapshot holds until the route has something real — data, or an error
+   * state, both of which say more than a grey box. Exactly once: after any
+   * non-skeleton paint the flag drops and paint() behaves normally forever. */
+  let preIntact = !!main.querySelector('.pre');
   const paint = html => {
+    if (preIntact) {
+      // A skeleton-only payload is not an improvement on the snapshot.
+      if (/class="sk[ "]|class="sk-/.test(html)) return;
+      preIntact = false;
+    }
     main.dispatchEvent(new CustomEvent('sig:teardown'));
     main.innerHTML = html;
   };
@@ -173,7 +209,7 @@
    * so. It was a local inside the signals route, which is why the brief's own
    * record section was still quoting the all-time ledger — two populations
    * under one product. */
-  const LAUNCH = '2026-08-28';
+  const LAUNCH = '2026-08-29';
 
   /* ONE CUTOFF, ON THE PUBLISH DATE, EVERYWHERE.
    *
@@ -454,16 +490,44 @@
    * error. The caller is told which source answered so it can say so — a page
    * showing yesterday's data must never look like a page showing today's.
    */
+  /* ── WHICH ENGINES THIS SITE PUBLISHES ────────────────────────────────────
+   *
+   * The ledger carries eleven engines. This site surfaces five of them, and
+   * the filter is applied once here so every surface agrees — the ledger page,
+   * the brief's choice of setup, the record, the open count.
+   *
+   * OHL and commodities are excluded on instruction. So are breakout, cf_1h,
+   * top5_pick and sip_bucket, which are simply not on the list of what this
+   * site is for.
+   *
+   * BOTH magic AND magicmagic are kept, and the reason is worth stating: the
+   * instruction was to keep whichever is better, and the ledger cannot answer
+   * that. magic has FOUR closed trades and magicmagic has ONE. A single trade
+   * that happened to win is not a win rate, and picking the engine with the
+   * prettier number off one sample is exactly the kind of false precision the
+   * rest of this site refuses. They are shown as one family until enough have
+   * closed to separate them; the Signals page is where that will show up.
+   */
+  const ENGINES = new Set(['magic', 'magicmagic', 'equity_measured', 'multibagger', 'ai_longterm']);
+  const ENGINE_LABEL = {
+    magic: 'Magic', magicmagic: 'Magic', equity_measured: 'Equity, measured',
+    multibagger: 'Multibagger', ai_longterm: 'AI',
+  };
+  const engineOk = r => ENGINES.has(String(r.signal_type || ''));
+
   async function ledger() {
     const live = await get('/api/signals?limit=400');
     if (live.ok) {
-      const rows = live.data.signals || live.data.rows || [];
-      if (rows.length) return { ok: true, rows, live: true, at: live.data.generated_at };
+      const all = live.data.signals || live.data.rows || [];
+      const rows = all.filter(engineOk);
+      if (all.length) return { ok: true, rows, live: true, at: live.data.generated_at,
+                               dropped: all.length - rows.length };
     }
     const snap = await get('/alerts.json');
     if (!snap.ok) return { ok: false, error: live.error || snap.error };
-    const rows = Array.isArray(snap.data) ? snap.data : (snap.data.rows || []);
-    return { ok: true, rows, live: false, error: live.error };
+    const all = Array.isArray(snap.data) ? snap.data : (snap.data.rows || []);
+    const rows = all.filter(engineOk);
+    return { ok: true, rows, live: false, error: live.error, dropped: all.length - rows.length };
   }
 
   /* ── THE SCREEN INDEX ────────────────────────────────────────────────────
@@ -3494,6 +3558,55 @@
              was available at all.</p></div></div>`}
 
         <div class="b-chart" style="margin-top:${pts ? '26px' : '18px'}">
+          ${/* ── THE TRADE, AT THE TRADE'S OWN SCALE ─────────────────────────
+              * The ladder below is drawn on one linear scale from the stop to
+              * the 52-week high, which is correct and is also why it is hard
+              * to read: everything a reader has to decide about — now, entry,
+              * stop — sits inside about 4% of a range whose top half is empty
+              * air. The 52-week high is context; it is not part of the trade.
+              *
+              * This strip is the same numbers over the span that actually
+              * matters, stop to target 2, so the risk and the reward are drawn
+              * in proportion to each other and the shape of the trade is the
+              * first thing visible. The ladder keeps the full context
+              * underneath it — this replaces nothing, it answers first. */''}
+          ${(() => {
+            const lo = Math.min(stop, t2), hi = Math.max(stop, t2);
+            const span = (hi - lo) || 1;
+            const at2 = v => Math.max(0, Math.min(100, ((v - lo) / span) * 100));
+            /* The label is a SIBLING of the pin, not a child. A pin is a 2px
+             * coloured line and its label is a 40px word: nesting them makes
+             * the word's containing box that 2px line, which is both wrong for
+             * layout and unreadable to any contrast tool walking up from the
+             * text to find what it sits on. */
+            const pin = (v, cls, label) => Number.isFinite(v)
+              ? `<i class="ts-p ${cls}" style="left:${at2(v).toFixed(2)}%"></i>
+                 <u class="ts-u ${cls}" style="left:${at2(v).toFixed(2)}%">${esc(label)}</u>` : '';
+            return `<div class="ts">
+              <div class="ts-t">
+                <span class="ts-r" style="left:${at2(Math.min(stop, entry)).toFixed(2)}%;width:${
+                  Math.abs(at2(entry) - at2(stop)).toFixed(2)}%"></span>
+                <span class="ts-w1" style="left:${at2(entry).toFixed(2)}%;width:${
+                  Math.abs(at2(t1) - at2(entry)).toFixed(2)}%"></span>
+                <span class="ts-w2" style="left:${at2(t1).toFixed(2)}%;width:${
+                  Math.abs(at2(t2) - at2(t1)).toFixed(2)}%"></span>
+                ${pin(stop, 'is-stop', 'Stop')}
+                ${pin(entry, 'is-entry', 'Entry')}
+                ${pin(last, 'is-now', 'Now')}
+                ${pin(t1, 'is-t', 'T1')}
+                ${pin(t2, 'is-t', 'T2')}
+              </div>
+              <div class="ts-n">
+                <span><i>Risk per share</i><b>${f(risk)}</b></span>
+                <span><i>To target 1</i><b>${f(Math.abs(t1 - entry))}</b><em>${rrT1.toFixed(1)}×</em></span>
+                <span><i>To target 2</i><b>${f(Math.abs(t2 - entry))}</b><em>${rrT2.toFixed(1)}×</em></span>
+                <span><i>Now vs entry</i><b class="${dir(last - entry)}">${pct((last - entry) / entry * 100)}</b></span>
+              </div>
+              <p class="ts-c">Drawn stop to target 2, so the red band and the green are in the same
+                proportion as the money. The 52-week high is context and is on the ladder below,
+                not here — it is not part of this trade.</p>
+            </div>`;
+          })()}
           <div class="b-ladder">
             <div class="b-band risk" style="top:${at(entry).toFixed(1)}%;height:${Math.abs(at(stop) - at(entry)).toFixed(1)}%"></div>
             <div class="b-band reward" style="top:${at(t2).toFixed(1)}%;height:${Math.abs(at(entry) - at(t2)).toFixed(1)}%"></div>

@@ -6,7 +6,7 @@
   "description": "Indian markets in one screen \u2014 a live board and a trading signal brief, over a public ledger.",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "node scripts/pull-feeds.mjs && node scripts/stamp-build.mjs && wrangler deploy",
+    "deploy": "node scripts/pull-feeds.mjs && node scripts/prerender.mjs && node scripts/stamp-build.mjs && wrangler deploy",
     "test": "node test/ui.mjs http://127.0.0.1:8787",
     "test:prod": "node test/ui.mjs $SIGNAL_URL",
     "tail": "wrangler tail",

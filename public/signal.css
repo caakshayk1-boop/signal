@@ -2813,3 +2813,75 @@ html:has(dialog[open]){overflow:hidden}
 @media(max-width:700px){
   .wtri em{display:block;margin:4px 0 0}
 }
+
+/* ── THE PRE-RENDERED SNAPSHOT ────────────────────────────────────────────
+   Written into <main> at deploy time and replaced by the renderer on its
+   first paint. It exists for everything that does not run JavaScript — a
+   crawler, a link preview, a failed script load, a slow connection — and for
+   the few hundred milliseconds before the real page arrives. Styled to be
+   readable rather than to imitate the page it precedes: pretending to be the
+   real thing is how a snapshot gets mistaken for live prices. */
+.pre{max-width:64ch;padding:34px var(--gut) 12px}
+.pre-k{font:500 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-wider);
+  text-transform:uppercase;color:var(--dim);margin:0 0 14px}
+.pre-h{font:400 clamp(var(--t-9),5vw,44px)/1.06 var(--serif);letter-spacing:var(--ls-tight);
+  margin:0 0 16px;color:var(--text);text-wrap:balance}
+.pre-s{font:400 var(--t-6)/1.6 var(--ui);color:var(--muted);margin:0 0 18px;text-wrap:pretty}
+.pre-m{font:400 var(--t-5)/1.65 var(--ui);color:var(--muted);margin:0 0 12px}
+.pre-m b,.pre-s b{color:var(--text);font-weight:600}
+.pre-l{margin:6px 0 16px;padding-left:18px}
+.pre-l li{font:400 var(--t-4)/1.55 var(--ui);color:var(--muted);margin-bottom:7px}
+.pre-l b{font:500 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-wide);
+  text-transform:uppercase;color:var(--dim);margin-right:5px}
+.pre-n{font:400 var(--t-3)/1.55 var(--ui);color:var(--dim);margin:0}
+
+/* ── THE TRADE, AT ITS OWN SCALE ──────────────────────────────────────────
+   Stop to target 2, so the red band and the green sit in the same proportion
+   as the money at stake. The ladder underneath keeps the full 52-week
+   context; this answers the question first. */
+.ts{margin:0 0 22px}
+.ts-t{position:relative;height:10px;border-radius:var(--r-2);background:var(--b-sur);
+  border:1px solid var(--b-line);margin:30px 0 34px}
+.ts-t > span{position:absolute;top:0;bottom:0;display:block}
+.ts-r{background:color-mix(in srgb,var(--b-bear) 42%,transparent);
+  border-radius:var(--r-2) 0 0 var(--r-2)}
+.ts-w1{background:color-mix(in srgb,var(--b-bull) 40%,transparent)}
+.ts-w2{background:color-mix(in srgb,var(--b-bull) 20%,transparent);
+  border-radius:0 var(--r-2) var(--r-2) 0}
+.ts-p{position:absolute;top:-6px;width:2px;height:22px;margin-left:-1px;
+  background:var(--b-mut);border-radius:var(--r-hair)}
+.ts-u{position:absolute;top:-19px;transform:translateX(-50%);
+  font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);text-transform:uppercase;
+  text-decoration:none;color:var(--b-dim);white-space:nowrap}
+.ts-p.is-stop{background:var(--b-bear)}  .ts-u.is-stop{color:var(--b-bear)}
+.ts-p.is-entry{background:var(--b-ink)}  .ts-u.is-entry{color:var(--b-ink)}
+.ts-p.is-now{background:var(--b-acc);height:26px;top:-8px;width:3px}
+.ts-u.is-now{top:auto;bottom:-17px;color:var(--b-acc)}
+.ts-p.is-t{background:var(--b-bull)}     .ts-u.is-t{color:var(--b-bull)}
+
+.ts-n{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.ts-n span{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ts-n i{font:400 var(--t-1)/1 var(--mono);font-style:normal;letter-spacing:var(--ls-wider);
+  text-transform:uppercase;color:var(--b-dim)}
+.ts-n b{font:600 var(--t-6)/1.15 var(--mono);font-variant-numeric:tabular-nums;color:var(--b-ink)}
+.ts-n b.up{color:var(--b-bull)} .ts-n b.dn{color:var(--b-bear)}
+.ts-n em{font:500 var(--t-2)/1 var(--mono);font-style:normal;color:var(--b-dim)}
+.ts-c{margin:16px 0 0;font:400 var(--t-3)/1.6 var(--ui);color:var(--b-mut);max-width:70ch}
+
+@media(max-width:700px){
+  .ts-n{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}
+  .ts-p u{font-size:var(--t-1)}
+  .ts-t{margin:32px 0 36px}
+}
+
+/* ── ANCHORS MUST NOT LAND UNDER THE STICKY CHROME ────────────────────────
+   The brief's quick-nav is sticky, so scrolling to a section — by clicking a
+   quick-nav link, or by any scrollIntoView — parked the top of that section
+   underneath the bar. On the chart that meant the crosshair's hover area was
+   covered by the nav, which is how the regression suite found it: the read-out
+   never appeared because the pointer never reached the chart. */
+#b-chart, .b-sec, [id^="b-"]{scroll-margin-top:calc(var(--barh) + 46px + 56px)}
+@media(max-width:760px){
+  /* No sticky tab strip at the top on a phone — it is fixed to the bottom. */
+  #b-chart, .b-sec, [id^="b-"]{scroll-margin-top:calc(var(--barh) + 56px)}
+}
