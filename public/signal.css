@@ -2997,3 +2997,12 @@ html:has(dialog[open]){overflow:hidden}
 .b-rgw{margin:12px 0 0;padding-top:12px;border-top:1px solid var(--b-line);
   font:400 var(--t-3)/1.6 var(--ui);color:var(--b-mut)}
 .b-rgw b{color:var(--b-ink);font-weight:600}
+
+/* Reward-to-risk states its ratio across the three stance columns rather than
+   claiming one of them. It is a property of the plan's geometry, and a red dot
+   under BEARISH read as a factor arguing against the trade. */
+.b-mxr .c.mx-flat{grid-column:2 / -1;justify-self:stretch;text-align:right;
+  font:400 var(--t-3)/1.4 var(--mono);color:var(--b-dim);white-space:normal}
+@media(max-width:700px){
+  .b-mxr .c.mx-flat{text-align:left;font-size:var(--t-2)}
+}

@@ -1291,6 +1291,10 @@
         `${io.data.open.length} book${io.data.open.length === 1 ? '' : 's'} open`);
     }
     paint(out);
+    // The front page renders the same IPO card as the IPO route, so it needs
+    // the same upgrade to the live book. Wiring it to one route and not the
+    // other is why this page still showed a 14-hour-old 27.83x.
+    fillIpoLive();
   };
 
   const convictionCard = p => `<article class="card cv" data-sym="${esc(p.sym)}" role="button" tabindex="0">
@@ -3667,7 +3671,18 @@
      * evidence for the score directly above it, so a row that is not in the
      * score has to say so here too — otherwise the page shows five factors
      * and a number derived from four, and only one of them admits it. */
-    const MATRIX = COMPS.map(c => [c[0], stance(c[2]), c[3], c[4] !== false]);
+    /* A NON-DIRECTIONAL QUANTITY CANNOT TAKE A DIRECTIONAL STANCE.
+     *
+     * Reward-to-risk was passed through stance(), which buckets a number into
+     * bullish / neutral / bearish. A tight target scored 0 and therefore
+     * landed under BEARISH — so a reader saw four green dots and one red one
+     * and reasonably read it as a factor arguing against the trade. It is not.
+     * Bullish and bearish are claims about DIRECTION; the distance between a
+     * stop and a target has no view on which way price goes.
+     *
+     * The row keeps its place, because the geometry matters, and states its
+     * actual ratio instead of a colour it cannot earn. */
+    const MATRIX = COMPS.map(c => [c[0], c[4] === false ? null : stance(c[2]), c[3], c[4] !== false]);
 
     /* ── BASE RATE, not a probability. */
     const S = st.ok ? st.data : null;
@@ -4042,16 +4057,20 @@
           <div class="b-mxh"><span>Factor</span><span>Bullish</span><span>Neutral</span><span>Bearish</span></div>
           ${MATRIX.map(([nm, st_, why, counted], i) => `<button type="button" class="b-mxr${counted ? '' : ' is-out'}" data-mx="${i}" aria-expanded="false">
             <span class="f">${esc(nm)}${counted ? '' : '<i class="mx-out">not scored</i>'}</span>
-            ${[0, 1, 2].map(k => `<span class="c ${['bull', 'neu', 'bear'][k]} ${st_ === k ? 'hit' : ''}"
-              >${st_ === k ? `<u aria-label="${['Bullish', 'Neutral', 'Bearish'][k]}"></u>` : '<u></u>'}</span>`).join('')}
+            ${counted
+              ? [0, 1, 2].map(k => `<span class="c ${['bull', 'neu', 'bear'][k]} ${st_ === k ? 'hit' : ''}"
+                  >${st_ === k ? `<u aria-label="${['Bullish', 'Neutral', 'Bearish'][k]}"></u>` : '<u></u>'}</span>`).join('')
+              : `<span class="c mx-flat">${rrT1.toFixed(1)} : 1 to the first target${
+                  rrT2 > rrT1 ? `, ${rrT2.toFixed(1)} : 1 to the second` : ''} — geometry, not direction</span>`}
             <span class="b-mxd"><span>${st_ == null ? 'Not measured — this factor has no data on the screen for this name, so it takes no stance.' : esc(why)}</span></span>
           </button>`).join('')}
         </div>
         <p class="b-p" style="font-size:var(--t-4)">A stance is scored, not asserted: 60 and above reads bullish,
           40 to 60 neutral, below 40 bearish, on the same component scores shown above.
-          <b>Risk / reward takes a stance but is not scored</b> — it is chosen by the engine rather than
-          measured off the market, so it is shown and excluded, here and in the score. Tap a row for the
-          reason.</p>
+          <b>Risk / reward takes no stance at all.</b> Bullish and bearish are claims about
+          direction; the distance between a stop and a target is not one. It is chosen by the engine
+          rather than measured off the market, so it shows its ratio and is excluded from the score.
+          Tap a row for the reason.</p>
       </section>
 
       <section class="b-sec b-reveal">
