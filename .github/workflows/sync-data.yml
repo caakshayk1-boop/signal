@@ -162,3 +162,34 @@ jobs:
           done
           echo "::error::could not push after 3 attempts"
           exit 1
+
+      # ── PUBLISH ─────────────────────────────────────────────────────────────
+      # Committing a feed does not put it on the internet. These files are
+      # static assets uploaded by `wrangler deploy`, so until this step existed
+      # the live site only changed when somebody deployed from a laptop — and
+      # it then served whatever THAT laptop's public/ contained.
+      #
+      # The failure that produced this: on 2026-08-31 every feed on the live
+      # site was 31 hours old while the upstream repo held data from an hour
+      # earlier. The sync had been committing correctly the whole time. Each
+      # deploy that day re-published the stale local copies over it.
+      #
+      # Deploys on every sync, not only when the feeds changed: the repo may
+      # also carry front-end commits that nothing else publishes, and pushing
+      # identical assets costs nothing.
+      - name: Publish to Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN is not set, so the feeds committed above are NOT live."
+            echo "Set it once with:  gh secret set CLOUDFLARE_API_TOKEN --repo caakshayk1-boop/signal"
+            exit 0
+          fi
+          npm ci --omit=dev
+          # Stamp AFTER the feeds are in place so the build hash describes what
+          # is actually being uploaded.
+          node scripts/stamp-build.mjs
+          npx wrangler deploy

@@ -27,6 +27,7 @@ import stats from "./api/stats.js";
 import markets from "./api/markets.js";
 import flows from "./api/flows.js";
 import calendar from "./api/calendar.js";
+import { runWatchdog } from "./watchdog.js";
 import subscribe from "./api/subscribe.js";
 
 const ROUTES = {
@@ -73,11 +74,42 @@ function health(env) {
 }
 
 export default {
+  /* CRON ENTRY POINT.
+   *
+   * Cloudflare invokes this on the schedule in wrangler.jsonc. It exists
+   * because GitHub Actions' scheduler drops runs and its retries are more
+   * cron entries on the same scheduler — so a bad morning skips the scan and
+   * both of its retries, and nothing sends the day's signals.
+   *
+   * waitUntil, not await-and-return: the platform is entitled to end the
+   * invocation as soon as this resolves, and the dispatch calls must be
+   * allowed to finish.
+   */
+  async scheduled(event, env, ctx) {
+    mirrorEnv(env);
+    ctx.waitUntil(runWatchdog(env).then((r) => {
+      // One line per tick in the observability log, and only when it acted —
+      // a watchdog that logs "nothing to do" every twenty minutes buries the
+      // one line that matters.
+      const acted = (r.checked || []).filter((c) => c.dispatched || c.error);
+      if (acted.length) console.log("watchdog", JSON.stringify(acted));
+    }).catch((e) => console.log("watchdog failed", String(e))));
+  },
+
   async fetch(request, env, ctx) {
     mirrorEnv(env);
     const url = new URL(request.url);
 
     if (url.pathname === "/api/health") return health(env);
+    // Read-only on purpose: a status endpoint that starts builds because
+    // someone looked at it is a trap. The cron below is what acts.
+    if (url.pathname === "/api/pipeline") {
+      const r = await runWatchdog(env, { act: false });
+      return new Response(JSON.stringify(r, null, 2), {
+        status: 200,
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+      });
+    }
 
     const handler = ROUTES[url.pathname];
     if (handler) {

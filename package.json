@@ -6,13 +6,14 @@
   "description": "Indian markets in one screen \u2014 a live board and a trading signal brief, over a public ledger.",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "node scripts/stamp-build.mjs && wrangler deploy",
+    "deploy": "node scripts/pull-feeds.mjs && node scripts/stamp-build.mjs && wrangler deploy",
     "test": "node test/ui.mjs http://127.0.0.1:8787",
     "test:prod": "node test/ui.mjs $SIGNAL_URL",
     "tail": "wrangler tail",
     "set-domain": "node scripts/set-domain.mjs",
     "go-live": "bash scripts/go-live.sh",
-    "stamp": "node scripts/stamp-build.mjs"
+    "stamp": "node scripts/stamp-build.mjs",
+    "pull": "node scripts/pull-feeds.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.15.7"

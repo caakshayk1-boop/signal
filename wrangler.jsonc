@@ -25,6 +25,14 @@
     "not_found_handling": "404-page"
   },
 
+  // ── THE PIPELINE WATCHDOG ────────────────────────────────────────────────
+  // Every 20 minutes. GitHub Actions' own scheduler drops runs — on the
+  // morning this was added it had skipped daily_scan's 05:00 slot AND both of
+  // its retries, so the signals and Telegram alerts for the day never fired.
+  // src/watchdog.js compares what ran against what should have and dispatches
+  // only the difference; on a healthy day it does nothing at all.
+  "triggers": { "crons": ["*/20 * * * *"] },
+
   "observability": { "enabled": true },
 
   // CUSTOM DOMAIN — uncomment once DNS for the hostname is in this Cloudflare
