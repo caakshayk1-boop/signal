@@ -173,8 +173,24 @@
    * so. It was a local inside the signals route, which is why the brief's own
    * record section was still quoting the all-time ledger — two populations
    * under one product. */
-  const LAUNCH = '2026-08-29';
-  const sinceLaunch = r => String(r.closed_at || r.date || '').slice(0, 10) >= LAUNCH;
+  const LAUNCH = '2026-08-28';
+
+  /* ONE CUTOFF, ON THE PUBLISH DATE, EVERYWHERE.
+   *
+   * This read `closed_at || date`, which let a signal PUBLISHED on 3 August
+   * through the filter because it CLOSED after launch. The record tiles used a
+   * different rule — publish date — so one page reported "25 published, 0
+   * closed" beside a cumulative-R curve built from 13 closed signals, none of
+   * which this site had published. The curve was drawing an engine's history
+   * under a heading that said "every alert this site has sent".
+   *
+   * The question this page answers is "what has this site published and how
+   * did it do", so the only date that can decide membership is the date it was
+   * published. A trade that closes after launch but was called before it is
+   * not part of the record; it is part of what came before, which is not shown
+   * here at all. */
+  const pubDay = r => String(r.alert_date || r.date || '').slice(0, 10);
+  const sinceLaunch = r => pubDay(r) >= LAUNCH;
 
   /* Wins, losses and expectancy over an arbitrary set of ledger rows. The site
    * used /api/stats for this, which is all-time and cannot be filtered. */
@@ -2679,7 +2695,6 @@
      * page says so rather than showing an empty table that reads as a fault.
      */
 
-    const dayOf = r => String(r.alert_date || r.date || '').slice(0, 10);
     const every = a.rows;
     /* THE CURVE FOLLOWS THE SAME LAUNCH WINDOW AS THE REST OF THE PAGE.
      *
@@ -2695,7 +2710,7 @@
      * summarised below with its own dates attached, so nothing is hidden and
      * nothing is passed off as this site's own result. */
     const CURVE = rCurve(every.filter(sinceLaunch));
-    const all = every.filter(r => dayOf(r) >= LAUNCH);
+    const all = every.filter(sinceLaunch);   // same rule as the curve above
 
     // Filter on the row's OWN badge, not on arithmetic over pnl_pct.
     // `Number(null) <= 0` is true, so the first version put all 138 open
@@ -2780,12 +2795,24 @@
           'Every closed signal, in the order it closed.')
          : sec('Cumulative R', `<div class="empty" style="text-align:left;padding:22px 20px">
             <b style="color:var(--text)">The record starts here.</b><br>
-            ${a.live
-              ? `No signal published since ${esc(LAUNCH)} has closed yet, so there is no curve to
-                 draw. It appears the moment one does, and every closed trade after that adds a
-                 point — up or down.`
-              : `The live ledger did not answer, and the morning snapshot does not record graded
-                 R multiples, so the curve cannot be drawn from it.`}
+            ${/* THE EMPTY STATE HAS TO KNOW WHICH EMPTY IT IS.
+                * This said "no signal has closed yet" whether that was true or
+                * not. rCurve returns null below five closed trades — three
+                * points joined by two lines is not a curve, it is noise with a
+                * trend line through it — so on a page whose tiles read "3
+                * closed" the copy underneath flatly contradicted them. */''}
+            ${!a.live
+              ? `The live ledger did not answer, and the morning snapshot does not record graded
+                 R multiples, so the curve cannot be drawn from it.`
+              : closed.length === 0
+                ? `No signal published since ${esc(LAUNCH)} has closed yet, so there is no curve to
+                   draw. It appears the moment one does, and every closed trade after that adds a
+                   point — up or down.`
+                : `<b style="color:var(--text)">${closed.length}</b> of the
+                   ${all.length} signals published since ${esc(LAUNCH)} ${closed.length === 1 ? 'has' : 'have'}
+                   closed. A curve needs <b style="color:var(--text)">five</b> before its shape means
+                   anything — three points joined by two lines is noise with a trend drawn through
+                   it. The tiles below carry the record as it stands, and the line appears at five.`}
 
           </div>`, '', 'Every closed signal, in the order it closed.')) +
         sec('The record', `<div class="grid">
