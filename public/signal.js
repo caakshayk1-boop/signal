@@ -3389,20 +3389,82 @@
 
     /* ── SCORE. Five components, each a rule over the screen's own fields.
      * A score with no visible derivation is a number asking to be believed. */
+    /* ── SCORED AGAINST THE MARKET, NOT AGAINST A CONSTANT ────────────────
+     *
+     * These components used hand-picked bands: momentum ran -6% to +26%,
+     * trend -8% to +32%, volume 0.7x to 4x. Measured against the 750 names
+     * the screen actually holds, one of those was not merely off, it was
+     * inert:
+     *
+     *   vol_spike across the universe — median 0.37, p75 0.59, p90 0.94.
+     *
+     * The Volume band STARTED at 0.7, which is about the 80th percentile. So
+     * four names in five scored a flat zero on Volume no matter what they did,
+     * and a top-decile name scored six. One of four measured components was
+     * dead, and it dragged every score on the site down by roughly a quarter.
+     * That is the whole reason the brief kept reading 7 of 100.
+     *
+     * A band is a guess about the distribution. The distribution is right
+     * here, in the screen this page already loads, so the components are now
+     * PERCENTILES against it: 50 means the median screened name, 90 means top
+     * decile. That is a number a reader can act on, it cannot silently
+     * de-calibrate as the market changes, and it makes the four components
+     * directly comparable — which the old bands never were.
+     *
+     * clamp() is kept for the one component that is not a market measurement,
+     * and for the fallback when the screen has not loaded. */
     const clamp = (v, lo, hi) => Number.isFinite(v)
       ? Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100)) : null;
+
+    const UNIV = sc.ok ? (sc.data.rows || []).filter(x => x && typeof x === 'object') : [];
+    // One sorted column per metric, built once.
+    const column = fn => {
+      const v = UNIV.map(fn).filter(x => Number.isFinite(x)).sort((a, b) => a - b);
+      return v.length >= 50 ? v : null;      // too thin to rank against
+    };
+    const COL = {
+      r1m: column(x => Number(x.r1m)),
+      vol: column(x => Number(x.vol_spike)),
+      trend: column(x => (Number(x.price) && Number(x.sma200))
+        ? (x.price - x.sma200) / x.sma200 * 100 : NaN),
+      tags: column(x => ((x.setup && x.setup.tags) || []).length),
+    };
+    /* Share of the universe at or below v, as a percentage. Binary search so
+     * this is cheap enough to run per component without a memo. */
+    const pctl = (v, col) => {
+      if (!Number.isFinite(v) || !col) return null;
+      let lo = 0, hi = col.length;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (col[m] <= v) lo = m + 1; else hi = m; }
+      return Math.max(0, Math.min(100, (lo / col.length) * 100));
+    };
+    // Percentile where the universe allows it; the old band where it does not,
+    // so a missing screen degrades to the previous behaviour rather than to
+    // nothing.
+    const rank = (v, col, lo, hi) => {
+      const p = pctl(v, col);
+      return p == null ? clamp(v, lo, hi) : p;
+    };
+    const RANKED = !!(COL.r1m && COL.vol && COL.trend);
     const COMPS = [
-      ['Structure', 'is-target', row.setup ? Math.min(100, ((row.setup.tags || []).length) * 26 + (row.brk52w ? 22 : 0)) : null,
+      ['Structure', 'is-target', row.setup
+        ? (COL.tags
+            ? Math.min(100, (pctl((row.setup.tags || []).length, COL.tags) ?? 0) + (row.brk52w ? 12 : 0))
+            : Math.min(100, ((row.setup.tags || []).length) * 26 + (row.brk52w ? 22 : 0)))
+        : null,
         row.brk52w ? 'Price is at a 52-week high, and the screen tags this as a completed breakout.'
                    : `The screen tags ${(row.setup && (row.setup.tags || []).length) || 0} structural conditions on this name. A 52-week breakout is not one of them.`],
-      ['Momentum', 'is-now', clamp(N(row.r1m), -6, 26),
-        Number.isFinite(N(row.r1m)) ? `One month return is ${pct(N(row.r1m))}, three month ${pct(N(row.r3m))}, RSI ${row.rsi != null ? Math.round(row.rsi) : '—'}.`
+      ['Momentum', 'is-now', rank(N(row.r1m), COL.r1m, -6, 26),
+        Number.isFinite(N(row.r1m)) ? `One month return is ${pct(N(row.r1m))}, three month ${pct(N(row.r3m))}, RSI ${row.rsi != null ? Math.round(row.rsi) : '—'}.${
+          COL.r1m ? ` That one-month figure sits at the ${Math.round(pctl(N(row.r1m), COL.r1m))}th percentile of the screen.` : ''}`
                                     : 'No return history on the screen for this name, so momentum is unscored rather than assumed.'],
-      ['Trend', 'is-key', row.sma200 && row.price ? clamp((row.price - row.sma200) / row.sma200 * 100, -8, 32) : null,
-        row.sma200 && row.price ? `Price sits ${pct((row.price - row.sma200) / row.sma200 * 100)} against its 200-day average, with the 50-day ${row.sma50 > row.sma200 ? 'above' : 'below'} it.`
+      ['Trend', 'is-key', row.sma200 && row.price
+        ? rank((row.price - row.sma200) / row.sma200 * 100, COL.trend, -8, 32) : null,
+        row.sma200 && row.price ? `Price sits ${pct((row.price - row.sma200) / row.sma200 * 100)} against its 200-day average, with the 50-day ${row.sma50 > row.sma200 ? 'above' : 'below'} it.${
+          COL.trend ? ` Against the screen that is the ${Math.round(pctl((row.price - row.sma200) / row.sma200 * 100, COL.trend))}th percentile.` : ''}`
                                 : 'No 200-day average on the screen for this name.'],
-      ['Volume', '', clamp(N(row.vol_spike), .7, 4),
-        Number.isFinite(N(row.vol_spike)) ? `Volume is running at ${N(row.vol_spike).toFixed(2)}× its own recent average. Above 1.0 means participation is confirming the move.`
+      ['Volume', '', rank(N(row.vol_spike), COL.vol, .7, 4),
+        Number.isFinite(N(row.vol_spike)) ? `Volume is running at ${N(row.vol_spike).toFixed(2)}× its own recent average.${
+          COL.vol ? ` The median name on the screen runs ${COL.vol[Math.floor(COL.vol.length / 2)].toFixed(2)}×, so this is the ${Math.round(pctl(N(row.vol_spike), COL.vol))}th percentile — which is what the score reads, not a fixed threshold.` : ' Above 1.0 means participation is confirming the move.'}`
                                           : 'No volume ratio published for this name.'],
       /* NOT COUNTED IN THE SCORE. Flagged false, and the reason matters.
        *
@@ -3828,10 +3890,20 @@
                            yet, so there is no live record to weigh this against — that is the honest
                            position of a ledger two days old, and it changes as trades close.`}`}
             </p>
-            <p class="b-p" style="font-size:var(--t-4)">The score is the mean of the <b>measured</b>
-              components — what the market did. Reward to risk is listed with them but excluded from
-              it, because the stop and the target are chosen by the engine rather than observed:
-              folding them in let a setup raise its own score by moving its own target.
+            <p class="b-p" style="font-size:var(--t-4)">${RANKED
+              ? `Each measured component is a <b>percentile against the ${UNIV.length} names on the
+                 screen today</b>, so 50 is the median stock and 90 is the top decile. They used
+                 fixed bands, and one of them was inert: volume was scored from 0.7× upward while
+                 the median name across the universe runs 0.37× — four in five scored zero on it
+                 regardless of what they did, which pulled every score on this site down by about a
+                 quarter. A percentile cannot de-calibrate that way, and it makes the four
+                 components directly comparable, which the bands never were.`
+              : `The screen did not load, so the components fall back to fixed bands rather than to
+                 a rank against the market. Read them as rough.`}
+              The score is the mean of the <b>measured</b> components — what the market did. Reward
+              to risk is listed with them but excluded from it, because the stop and the target are
+              chosen by the engine rather than observed: folding them in let a setup raise its own
+              score by moving its own target.
               A component with no data is left out rather than filled in${have.length < MEASURED.length
                 ? `, which is why the denominator here is <b style="color:var(--b-ink)">${have.length}</b>,
                    not ${MEASURED.length} — ${MEASURED.length - have.length} measured component${MEASURED.length - have.length > 1 ? 's are' : ' is'}
