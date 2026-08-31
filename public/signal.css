@@ -2771,11 +2771,24 @@ html:has(dialog[open]){overflow:hidden}
   font-style:normal;color:var(--dim)}
 
 @media(max-width:760px){
-  /* The bar is fixed to the bottom on a phone, so the menu opens UPWARD and
-     clears the tab strip and the home indicator. */
+  /* FIXED, NOT ABSOLUTE — AND THIS IS THE WHOLE BUG.
+   *
+   * .tabg is position:relative, so an absolutely-positioned menu resolves
+   * left/right against the SUMMARY BUTTON, not the viewport. On desktop the
+   * 296px min-width hid that. On a phone min-width was set to 0 so the menu
+   * could span the screen — and instead it collapsed to the width of the word
+   * "Discover", about 74px, with every description truncated to "The board",
+   * "All 750 nar", "Books ope".
+   *
+   * position:fixed resolves against the viewport instead. .tabs is itself
+   * fixed but carries no transform, so it creates no containing block and the
+   * menu spans the screen as intended. It is pinned above the tab strip and
+   * the home indicator rather than to the button. */
   .tabg-m{
-    top:auto;bottom:100%;left:8px;right:8px;min-width:0;
-    margin-bottom:8px;max-height:58vh;overflow-y:auto;
+    position:fixed;top:auto;
+    bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 8px);
+    left:10px;right:10px;min-width:0;width:auto;
+    max-height:60vh;overflow-y:auto;
   }
   .tabg > summary{padding:0 15px;font-size:var(--t-4)}
   .tabg.is-here > summary::before{top:0;bottom:auto;border-radius:0 0 2px 2px}
@@ -2958,3 +2971,29 @@ html:has(dialog[open]){overflow:hidden}
    regression suite caught it as "the rules still sit in true price order"
    failing intermittently, which is exactly what a transient looks like. */
 .b-lvl{animation-delay:0s !important}
+
+/* Live subscription, and the per-category split underneath it. Retail at 3x
+   against QIB at 200x is a different issue from both at 20x, and the headline
+   multiple hides that. */
+.subs-age.is-live{color:var(--up)}
+.subs-cat{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:9px;
+  padding-top:9px;border-top:1px solid var(--line)}
+.subs-cat i{display:flex;flex-direction:column;gap:2px;font-style:normal}
+.subs-cat u{text-decoration:none;font:400 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);
+  text-transform:uppercase;color:var(--dim)}
+.subs-cat b{font:600 var(--t-4)/1.15 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+
+/* The score's arithmetic, printed. Four numbers and a division answer the
+   weighting question better than the sentence "the mean of the measured
+   components" ever did. */
+.b-sum{display:inline-block;font:500 var(--t-3)/1.5 var(--mono);
+  font-variant-numeric:tabular-nums;color:var(--b-ink);
+  background:var(--b-sur);border:1px solid var(--b-line);border-radius:var(--r-1);
+  padding:3px 8px;margin:0 2px}
+.b-sum b{font-weight:600}
+
+/* The consequence line under each regime reading. The block above it says how
+   the number was measured; this says what it means for the trade on screen. */
+.b-rgw{margin:12px 0 0;padding-top:12px;border-top:1px solid var(--b-line);
+  font:400 var(--t-3)/1.6 var(--ui);color:var(--b-mut)}
+.b-rgw b{color:var(--b-ink);font-weight:600}

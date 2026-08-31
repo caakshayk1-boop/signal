@@ -1406,7 +1406,16 @@
 
   // The verdict leads. Someone deciding whether to apply wants the call and
   // the reason before the lot size.
-  let IPO_AGE_H = null, IPO_STAMP = '';
+  let IPO_AGE_H = null, IPO_STAMP = '', IPO_LIVE = null, IPO_LIVE_AT = null;
+  // NSE keys on the symbol; the mirror sometimes carries a name and no symbol.
+  const ipoLiveFor = r => {
+    if (!IPO_LIVE) return null;
+    const sym = String(r.symbol || r.sym || '').trim().toUpperCase();
+    const nm = String(r.company || r.name || '').toLowerCase();
+    return (IPO_LIVE.issues || []).find(x =>
+      (sym && x.symbol === sym) ||
+      (nm && x.company && nm.startsWith(String(x.company).toLowerCase().split(' ')[0]))) || null;
+  };
   const ipoCard = r => {
     const v = String(r.verdict || '').toUpperCase();
     const cls = v.startsWith('APPLY') ? 'v-apply' : v === 'AVOID' ? 'v-avoid' : 'v-watch';
@@ -1429,15 +1438,29 @@
           * ten times out of date, and nothing on the card said so. An IPO
           * subscription number moves fastest on the last day, which is exactly
           * when someone is deciding, so this one has to carry its own age. */''}
-      ${isFinite(sub) ? `<div class="subs">
-        <span class="subs-v">${sub.toFixed(2)}×</span>
-        <span class="subs-bar" style="--one:10%"><i style="width:${pctOfTen.toFixed(0)}%"></i></span>
-        <span class="subs-v" style="color:var(--dim);font-size:var(--t-2)">of 10×</span>
-        ${IPO_AGE_H != null ? `<span class="subs-age${IPO_AGE_H > 6 ? ' is-old' : ''}">
-          as at ${esc(IPO_STAMP)}${IPO_AGE_H > 6
-            ? ` · <b>${esc(ageWord(IPO_AGE_H))}</b>, and a book moves fastest on its last day`
-            : ''}</span>` : ''}
-      </div>` : ''}
+      ${(() => {
+        const lv = ipoLiveFor(r);
+        const liveX = lv && Number.isFinite(Number(lv.total_x)) ? Number(lv.total_x) : null;
+        const shown = liveX != null ? liveX : (isFinite(sub) ? sub : null);
+        if (shown == null) return '';
+        const wide = Math.min(100, shown / 10 * 100);
+        return `<div class="subs">
+          <span class="subs-v">${shown.toFixed(2)}×</span>
+          <span class="subs-bar" style="--one:10%"><i style="width:${wide.toFixed(0)}%"></i></span>
+          <span class="subs-v" style="color:var(--dim);font-size:var(--t-2)">of 10×</span>
+          ${liveX != null
+            ? `<span class="subs-age is-live">Live from NSE${IPO_LIVE_AT
+                 ? ` · read ${esc(String(IPO_LIVE_AT).slice(11, 16))} UTC` : ''}</span>`
+            : (IPO_AGE_H != null ? `<span class="subs-age${IPO_AGE_H > 6 ? ' is-old' : ''}">
+                as at ${esc(IPO_STAMP)}${IPO_AGE_H > 6
+                  ? ` · <b>${esc(ageWord(IPO_AGE_H))}</b>, and a book moves fastest on its last day`
+                  : ''}</span>` : '')}
+          ${lv && lv.categories && lv.categories.length ? `<span class="subs-cat">${
+            lv.categories.slice(0, 4).map(c =>
+              `<i><u>${esc(c.cat)}</u><b>${c.x.toFixed(2)}×</b></i>`).join('')
+          }</span>` : ''}
+        </div>`;
+      })()}
       <div class="kv">
         <div><span class="kk">Band</span><span class="vv" style="font-size:var(--t-3)">${esc(r.price_band || '—')}</span></div>
         <div><span class="kk">Lot</span><span class="vv">${esc(r.lot_size ?? '—')}</span></div>
@@ -2168,7 +2191,14 @@
   R['/ipo'] = async () => {
     paint(head('IPO', 'Books open now, what is coming, and how the last year of listings actually did.', 'Primary market') +
       sec('Open now', skel('sk-card', 2)));
-    const io = await get('/ipo.json');
+    /* THE BOOK AS IT STANDS, WITH THE MIRROR AS A FALLBACK.
+     * ipo.json is a daily build; an IPO book moves fastest on its last day.
+     * On 31 August the mirror showed ESDS at 1.54x while NSE's live book had
+     * it at 19.6x. The live figure wins where NSE answers, and each card says
+     * which of the two it is showing. */
+    const [io, il] = await Promise.all([get('/ipo.json'), get('/api/ipo-live')]);
+    IPO_LIVE = (il.ok && il.data && il.data.ok) ? il.data : null;
+    IPO_LIVE_AT = IPO_LIVE ? IPO_LIVE.at : null;
     IPO_STAMP = io.ok ? String(feedStamp(io.data) || '').slice(0, 16).replace('T', ' ') : '';
     IPO_AGE_H = io.ok ? ageHours(feedStamp(io.data)) : null;
     let out = head('IPO', 'Books open now, what is coming, and how the last year of listings actually did.', 'Primary market');
@@ -3317,9 +3347,74 @@
       <p style="margin-top:22px"><span class="dstate nodata"><i></i>No data</span></p>
       </div></div></div>`); return; }
 
+    const UNIV = sc.ok ? (sc.data.rows || []).filter(x => x && typeof x === 'object') : [];
+    // One sorted column per metric, built once.
+    const column = fn => {
+      const v = UNIV.map(fn).filter(x => Number.isFinite(x)).sort((a, b) => a - b);
+      return v.length >= 50 ? v : null;      // too thin to rank against
+    };
+    const COL = {
+      r1m: column(x => Number(x.r1m)),
+      vol: column(x => Number(x.vol_spike)),
+      trend: column(x => (Number(x.price) && Number(x.sma200))
+        ? (x.price - x.sma200) / x.sma200 * 100 : NaN),
+      tags: column(x => ((x.setup && x.setup.tags) || []).length),
+    };
+    /* Share of the universe at or below v, as a percentage. Binary search so
+     * this is cheap enough to run per component without a memo. */
+    const pctl = (v, col) => {
+      if (!Number.isFinite(v) || !col) return null;
+      let lo = 0, hi = col.length;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (col[m] <= v) lo = m + 1; else hi = m; }
+      return Math.max(0, Math.min(100, (lo / col.length) * 100));
+    };
+    // Percentile where the universe allows it; the old band where it does not,
+    // so a missing screen degrades to the previous behaviour rather than to
+    // nothing.
+    const rank = (v, col, lo, hi) => {
+      const p = pctl(v, col);
+      return p == null ? clamp(v, lo, hi) : p;
+    };
+    const RANKED = !!(COL.r1m && COL.vol && COL.trend);
+
     if (sc.ok) SCREEN = SCREEN || (sc.data.rows || []).filter(x => x && x.sym);
     const inScreen = sym => (SCREEN || []).some(x => x.sym === sym);
-    const ranked = open.slice().sort((x, y) => (y.rr || 0) - (x.rr || 0));
+    /* ── WHAT THE BRIEF PICKS, AND WHY IT USED TO PICK BADLY ──────────────
+     *
+     * This ranked by `rr` — the ledger's reward-to-risk field. That is the
+     * ratio between two numbers the ENGINE chose, the stop and the target,
+     * and it is the single property already excluded from the conviction
+     * score for exactly that reason: a setup can widen its own target and
+     * improve its own ranking without anything happening in the market.
+     *
+     * So the page led every day with whichever open signal had the most
+     * generous target geometry, then scored that setup on the evidence and
+     * reported a low number. The two halves of the page were answering
+     * different questions, and the reader was left asking why a 37 was being
+     * put in front of them. It was not being recommended; it was being
+     * selected on the wrong axis.
+     *
+     * It now ranks on the same measured components the score is the mean of,
+     * so the setup shown IS the best-scoring open signal. rr breaks ties. */
+    const scoreOf = sym => {
+      const row = (SCREEN || []).find(x => x.sym === sym);
+      if (!row) return null;
+      const parts = [
+        COL.tags ? pctl(((row.setup && row.setup.tags) || []).length, COL.tags) : null,
+        rank(Number(row.r1m), COL.r1m, -6, 26),
+        (row.sma200 && row.price)
+          ? rank((row.price - row.sma200) / row.sma200 * 100, COL.trend, -8, 32) : null,
+        rank(Number(row.vol_spike), COL.vol, .7, 4),
+      ].filter(v => Number.isFinite(v));
+      return parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : null;
+    };
+    const ranked = open.slice().sort((x, y) => {
+      const sx = scoreOf(x.symbol), sy = scoreOf(y.symbol);
+      if (sx == null && sy == null) return (y.rr || 0) - (x.rr || 0);
+      if (sx == null) return 1;
+      if (sy == null) return -1;
+      return (sy - sx) || ((y.rr || 0) - (x.rr || 0));
+    });
     const want = briefSym || briefPick;
     const askedFor = briefSym;          // set only when the reader just clicked
     briefSym = null;
@@ -3416,35 +3511,7 @@
     const clamp = (v, lo, hi) => Number.isFinite(v)
       ? Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100)) : null;
 
-    const UNIV = sc.ok ? (sc.data.rows || []).filter(x => x && typeof x === 'object') : [];
-    // One sorted column per metric, built once.
-    const column = fn => {
-      const v = UNIV.map(fn).filter(x => Number.isFinite(x)).sort((a, b) => a - b);
-      return v.length >= 50 ? v : null;      // too thin to rank against
-    };
-    const COL = {
-      r1m: column(x => Number(x.r1m)),
-      vol: column(x => Number(x.vol_spike)),
-      trend: column(x => (Number(x.price) && Number(x.sma200))
-        ? (x.price - x.sma200) / x.sma200 * 100 : NaN),
-      tags: column(x => ((x.setup && x.setup.tags) || []).length),
-    };
-    /* Share of the universe at or below v, as a percentage. Binary search so
-     * this is cheap enough to run per component without a memo. */
-    const pctl = (v, col) => {
-      if (!Number.isFinite(v) || !col) return null;
-      let lo = 0, hi = col.length;
-      while (lo < hi) { const m = (lo + hi) >> 1; if (col[m] <= v) lo = m + 1; else hi = m; }
-      return Math.max(0, Math.min(100, (lo / col.length) * 100));
-    };
-    // Percentile where the universe allows it; the old band where it does not,
-    // so a missing screen degrades to the previous behaviour rather than to
-    // nothing.
-    const rank = (v, col, lo, hi) => {
-      const p = pctl(v, col);
-      return p == null ? clamp(v, lo, hi) : p;
-    };
-    const RANKED = !!(COL.r1m && COL.vol && COL.trend);
+
     const COMPS = [
       ['Structure', 'is-target', row.setup
         ? (COL.tags
@@ -3503,6 +3570,8 @@
     const BANDS = [[60, 'HIGH CONVICTION', 'up'], [40, 'MIXED', ''], [0, 'LOW CONVICTION', 'dn']];
     const bandOf = v => BANDS.find(b => v >= b[0]) || BANDS[BANDS.length - 1];
     const conviction = score == null ? 'UNSCORED' : bandOf(score)[1];
+    // Where this setup sits among everything open, for the standfirst below.
+    const openRank = ranked.findIndex(r => r.symbol === sig.symbol) + 1;
 
     /* ── THE LADDER. Every level on one scale, so distance is real. */
     const pts_ = [
@@ -3622,10 +3691,19 @@
 
     paint(`<div class="brief"><div class="b-wrap">
 
+      ${/* HOW THIS ONE GOT HERE. The page is a selection, not a
+          * recommendation, and until it said so a reader had no way to know
+          * whether the setup in front of them was the best available or
+          * simply the first. */''}
       <header class="b-hero" id="b-overview">
         <div class="b-eyebrow">Trading signal brief</div>
         <h1>${esc(sig.symbol)} is ${last > entry ? 'holding above' : 'testing'} its entry zone.</h1>
-        <p class="b-sub">A ${conviction.toLowerCase().replace(' conviction', '-conviction')} setup built from price
+        <p class="b-sub">${askedFor
+          ? `You asked for this one.`
+          : `<b>Chosen, not recommended.</b> This is the highest-scoring of the
+             <b>${ranked.length}</b> signals open right now, ranked on the measured components —
+             what the market did, not on how far the engine placed its own target.`}
+          A ${conviction.toLowerCase().replace(' conviction', '-conviction')} setup built from price
           structure, momentum, volume and defined risk. Every figure below comes from the published ledger,
           the same 750-name screen the rest of this site runs on, and ${pts ? `${pts.length} real daily closes` : 'the published levels'}.</p>
       </header>
@@ -3900,8 +3978,14 @@
                  components directly comparable, which the bands never were.`
               : `The screen did not load, so the components fall back to fixed bands rather than to
                  a rank against the market. Read them as rough.`}
-              The score is the mean of the <b>measured</b> components — what the market did. Reward
-              to risk is listed with them but excluded from it, because the stop and the target are
+              ${/* SHOW THE SUM. "The mean of the measured components" is a
+                  * description of arithmetic; the arithmetic itself is four
+                  * numbers and a division, and printing it removes any question
+                  * about weighting — every measured component counts once. */''}
+              <b>Every measured component carries equal weight.</b> Today that is
+              <span class="b-sum">${have.map(v => Math.round(v)).join(' + ')} = ${
+                Math.round(have.reduce((a, b) => a + b, 0))}, ÷ ${have.length} = <b>${score}</b></span>.
+              Reward to risk is listed with them but excluded, because the stop and the target are
               chosen by the engine rather than observed: folding them in let a setup raise its own
               score by moving its own target.
               A component with no data is left out rather than filled in${have.length < MEASURED.length
@@ -4007,7 +4091,23 @@
             <div class="b-rgl"><span>Below the mean</span><span>Above the mean</span></div>
             <p class="b-rgn">Over the last ${reg.look} closes, price finished above its own trailing
               20-day average <b style="color:var(--b-ink)">${reg.persist.toFixed(0)}%</b> of the time.
-              Sustained above 66% or below 34% reads as a trend; in between reads as a range.</p></div>
+              Sustained above 66% or below 34% reads as a trend; in between reads as a range.</p>
+            ${/* WHAT IT MEANS, NOT ONLY HOW IT IS MEASURED. This block explained
+                * its own method and stopped, so a reader learned that 58% is
+                * "ranging" and nothing about whether that helps or hurts the
+                * trade in front of them. */''}
+            <p class="b-rgw"><b>What that means here.</b> ${
+              reg.label === 'RANGING'
+                ? `A range keeps returning price to its middle, which is the market a breakout entry
+                   is most often given back in. It does not invalidate the setup — the stop does that
+                   — but it is the condition this kind of entry works least well in.`
+                : reg.label === 'TRENDING UP'
+                  ? `A sustained uptrend is the market a long continuation setup is built for: price
+                     spends most of its time above its own mean, so the drift is behind the entry
+                     rather than against it.`
+                  : `Price has spent most of this window below its own mean, so a long entry is taken
+                     against the prevailing direction — the hardest version of this trade, and the
+                     one that most needs its stop respected.`}</p></div>
           <div class="b-rgb"><h4>Volatility</h4>
             <div class="b-rgv">${esc(reg.volLabel)}</div>
             <div class="b-rgt"><i style="left:${Math.max(0, Math.min(100, reg.vol / 60 * 100)).toFixed(1)}%"></i></div>
@@ -4015,7 +4115,28 @@
             <p class="b-rgn">Realised volatility is
               <b style="color:var(--b-ink)">${reg.vol.toFixed(1)}%</b> annualised — the standard deviation
               of daily returns across this window, scaled by the square root of 252.
-              ${Number.isFinite(N(row.atr_pct)) ? `The screen's own daily ATR for this name is ${N(row.atr_pct).toFixed(2)}%.` : ''}</p></div>
+              ${Number.isFinite(N(row.atr_pct)) ? `The screen's own daily ATR for this name is ${N(row.atr_pct).toFixed(2)}%.` : ''}</p>
+            ${/* THE STOP, IN DAYS OF NORMAL MOVEMENT. "57.8% annualised" is a
+                * statistic; "the stop is 1.8 average days away" is a decision.
+                * Anything inside about two days of typical range is a stop
+                * ordinary noise can reach without the thesis being wrong. */''}
+            ${Number.isFinite(N(row.atr_pct)) && N(row.atr_pct) > 0 && Number.isFinite(entry) && Number.isFinite(stop)
+              ? (() => {
+                  const away = Math.abs(entry - stop) / entry * 100;
+                  const days = away / N(row.atr_pct);
+                  return `<p class="b-rgw"><b>What that means here.</b> This name moves about
+                    <b style="color:var(--b-ink)">${N(row.atr_pct).toFixed(2)}%</b> on an average day and
+                    the stop sits <b style="color:var(--b-ink)">${away.toFixed(2)}%</b> from entry —
+                    about <b style="color:var(--b-ink)">${days.toFixed(1)}</b> average days of movement.
+                    ${days < 2
+                      ? `That is inside ordinary noise: this stop can be reached without the thesis
+                         being wrong at all.`
+                      : days < 4
+                        ? `That is a normal working distance — far enough to survive a quiet day,
+                           close enough to matter.`
+                        : `That is a wide stop. It will not be hit by noise, but it is also the
+                           amount you are risking to find out.`}</p>`;
+                })() : ''}</div>
         </div>`
         : `<p class="b-p">Regime is not measured for this name — it needs at least 30 daily closes and the
             series did not load. It is left blank rather than guessed from the levels.</p>`}

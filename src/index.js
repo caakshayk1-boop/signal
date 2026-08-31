@@ -27,6 +27,7 @@ import stats from "./api/stats.js";
 import markets from "./api/markets.js";
 import flows from "./api/flows.js";
 import calendar from "./api/calendar.js";
+import ipolive from "./api/ipolive.js";
 import { runWatchdog } from "./watchdog.js";
 import subscribe from "./api/subscribe.js";
 
@@ -37,6 +38,7 @@ const ROUTES = {
   "/api/markets": markets,
   "/api/flows": flows,
   "/api/calendar": calendar,
+  "/api/ipo-live": ipolive,
   "/api/subscribe": subscribe,
 };
 
