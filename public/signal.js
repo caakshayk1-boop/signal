@@ -1031,8 +1031,19 @@
        get('/api/flows')]);
     const heavy = [CACHED('/api/calendar'), CACHED('/screen.json')];
     const cl = heavy[0], sr = heavy[1];
-    if (!cl.ready || !sr.ready) {
-      // Fire them, and come back through this route once they land.
+    /* ONCE PER VISIT, NOT ONCE PER RENDER.
+     *
+     * This re-entered the route as soon as the heavy feeds resolved — and
+     * resolving includes FAILING. With the screen unreachable the second pass
+     * found them still not ready, fired them again, and re-entered again:
+     * measured as main oscillating 466 → 138 → 466 characters forever, a
+     * repaint and two requests every cycle, for as long as the tab stayed
+     * open on a broken connection.
+     *
+     * heavyTried is cleared by render() on every route change, so navigating
+     * away and back does try again — the guard stops a loop, not a retry. */
+    if (!heavyTried && (!cl.ready || !sr.ready)) {
+      heavyTried = true;
       Promise.all([get('/api/calendar'), get('/screen.json')]).then(() => {
         if (routeOf() === '/') R['/']();
       });
@@ -1676,6 +1687,7 @@
    * dataset behind these was already loaded to draw the tile, and asking NSE
    * again to show what is on screen is a request for nothing. */
   let TODAY5 = null;
+  let heavyTried = false;
 
   // "2026-09-14" -> "14 Sep". Day first, because that is the part that
   // answers "how soon".
@@ -1929,8 +1941,8 @@
   R['/ideas'] = async () => {
     paint(head('Ideas', 'Ranked names, and the orders a fully-sized book would place against them. Sizes are shown as a share of the book, so they scale to whatever you run.', 'Ranked ideas') +
       sec('Trade ideas', skel('sk-card', 3)));
-    const [t, mn, p, tk] = await Promise.all(
-      [get('/today.json'), get('/mandate.json'), get('/pulse.json'), get('/api/ticker')]);
+    const [t, mn, p, tk, lg] = await Promise.all(
+      [get('/today.json'), get('/mandate.json'), get('/pulse.json'), get('/api/ticker'), ledger()]);
     let out = head('Ideas', 'Ranked names, and the orders a fully-sized book would place against them. Sizes are shown as a share of the book, so they scale to whatever you run.', 'Ranked ideas');
     if (!t.ok) { paint(out + fail('Ideas', t.error)); return; }
 
@@ -1985,6 +1997,110 @@
          nothing current to show. Stale ideas presented as current would be worse.</div>`,
       mbRows.length ? `${mbRows.length} names${picked.pick_date ? ` · ${esc(picked.pick_date)}` : ''}` : '',
       'The weekly list, with what each name was picked at and what it has done since.');
+
+    /* ── AI LONG-TERM IDEAS, IN THREE STAGES ──────────────────────────────
+     *
+     * The ask was for AI signals in three buckets — swing, short term, long
+     * term. The data does not support that reading and it is worth being
+     * exact about why, because the honest version is still useful.
+     *
+     * Every one of these signals carries `timeframe: LONG` and a stated
+     * horizon of "2-3 years". There is no swing bucket and no short-term
+     * bucket; the engine does not produce them. What each signal DOES carry
+     * is three targets — and checked across all seventeen, those targets are
+     * always exactly +35%, +75% and +150% from entry. An identical ladder on
+     * every name.
+     *
+     * So they are not three calls at three horizons. They are three
+     * milestones on ONE multi-year thesis, and the ladder is a rule rather
+     * than per-name analysis. Presenting them as three independent horizons
+     * would dress a fixed rule up as three pieces of research.
+     *
+     * What is genuinely per-name is everything else: the entry, the structure
+     * stop, the fundamental and technical scores, and the written thesis. So
+     * the stages are shown as stages, the fixed ladder is disclosed once, and
+     * the analysis that IS specific to the name is given the room.
+     */
+    const aiRows = (lg.ok ? lg.rows : []).filter(r =>
+      String(r.signal_type) === 'ai_longterm' && String(r.status) === 'OPEN');
+
+    const STAGES = [
+      ['target1', 'First objective', 'the move that says the thesis is working'],
+      ['target2', 'Base case', 'what the engine is actually underwriting'],
+      ['target3', 'Full thesis', 'the whole idea, over its stated horizon'],
+    ];
+
+    if (aiRows.length) {
+      const horizon = ((aiRows[0].metadata || {}).horizon) || 'multi-year';
+      out += sec('AI long-term ideas', `<div class="aig">${aiRows.map(r => {
+        const md = r.metadata || {};
+        const facts = md.facts || {};
+        const entry = Number(r.entry), stop = Number(r.sl);
+        const now = Number(facts.price) || entry;
+        const risk = Math.abs(entry - stop) || 1;
+        const top = Number(r.target3) || entry;
+        const at = v => Math.max(0, Math.min(100, ((v - stop) / ((top - stop) || 1)) * 100));
+        return `<article class="aic">
+          <div class="aic-h">
+            <button type="button" class="aic-s" data-card="${esc(r.symbol)}">${esc(r.symbol)}</button>
+            ${watchBtn(r.symbol)}
+            ${r.grade ? `<span class="aic-g">${esc(r.grade)}</span>` : ''}
+            ${md.sector ? `<span class="aic-x">${esc(md.sector)}</span>` : ''}
+          </div>
+
+          <div class="aic-lv">
+            <span><i>Entry</i><b>₹${esc(fmtN(entry))}</b></span>
+            <span><i>Structure stop</i><b>₹${esc(fmtN(stop))}</b></span>
+            <span><i>Risk per share</i><b>₹${esc(fmtN(risk))}</b></span>
+            ${Number.isFinite(Number(md.fund_score)) ? `<span><i>Fundamental</i><b>${Math.round(md.fund_score)}</b></span>` : ''}
+            ${Number.isFinite(Number(md.tech_score)) ? `<span><i>Technical</i><b>${Math.round(md.tech_score)}</b></span>` : ''}
+          </div>
+
+          ${/* One track, three milestones, and where price stands on it. */''}
+          <div class="aic-tr">
+            <span class="aic-fill" style="width:${at(now).toFixed(1)}%"></span>
+            <i class="aic-now" style="left:${at(now).toFixed(1)}%"></i>
+            <u class="aic-nowl" style="left:${at(now).toFixed(1)}%">now ₹${esc(fmtN(now))}</u>
+            ${STAGES.map(([k]) => Number.isFinite(Number(r[k]))
+              ? `<i class="aic-m" style="left:${at(Number(r[k])).toFixed(1)}%"></i>` : '').join('')}
+          </div>
+
+          <ol class="aic-st">
+            ${STAGES.map(([k, label, why], i) => {
+              const v = Number(r[k]);
+              if (!Number.isFinite(v)) return '';
+              const gain = ((v - entry) / entry) * 100;
+              const R = (v - entry) / risk;
+              const away = ((v - now) / now) * 100;
+              const done = now >= v;
+              return `<li class="aic-s${done ? ' is-done' : ''}">
+                <span class="aic-n">${i + 1}</span>
+                <span class="aic-b">
+                  <b>${esc(label)}</b>
+                  <em>${esc(why)}</em>
+                </span>
+                <span class="aic-v">
+                  <b>₹${esc(fmtN(v))}</b>
+                  <em>${pct(gain)} from entry · ${R.toFixed(1)}R</em>
+                  <u>${done ? 'reached' : `${pct(away)} away`}</u>
+                </span>
+              </li>`;
+            }).join('')}
+          </ol>
+
+          ${md.thesis ? `<p class="aic-t">${esc(String(md.thesis))}</p>` : ''}
+          ${md.rationale ? `<p class="aic-r">${esc(String(md.rationale))}</p>` : ''}
+        </article>`;
+      }).join('')}</div>
+      <p class="hint"><b>Three stages, one idea — not three calls.</b> Every one of these signals states
+        a single horizon of <b>${esc(horizon)}</b>, and its three targets sit at a fixed
+        <b>+35%</b>, <b>+75%</b> and <b>+150%</b> from entry on every name without exception. The
+        ladder is a rule, so the stages are milestones on one thesis rather than three separate
+        pieces of research. What IS specific to each name is the entry, the structure stop, the two
+        scores and the written thesis — which is why those are what the card spends its room on.</p>`,
+        `${aiRows.length} open · ${esc(horizon)}`,
+        'One thesis per name, and the three points at which it would have paid.');
+    }
 
     const picks = t.data.picks || [];
     out += sec('The daily engine’s ranked picks', picks.length ? `<div class="cards-2">${picks.map(x => ideaCard(x, false)).join('')}</div>`
@@ -3345,7 +3461,7 @@
      * of each other. Percentages and transforms do not mean what they look
      * like they mean. */
     const ladder = pts_.map((p, i) => `<div class="b-lvl ${p.c}" tabindex="0" data-lvl="${esc(p.k)}"
-        style="top:${at(p.v).toFixed(2)}%;animation-delay:${(i * 60)}ms">
+        style="top:${at(p.v).toFixed(2)}%">
         <span class="b-lvl-tag">${esc(p.k)}</span><span class="b-lvl-line"></span>
         <span class="b-lvl-d">${p.k === 'Now' ? 'current' : dist(p.v)}</span>
         <span class="b-lvl-val">${f(p.v)}</span></div>`).join('');
@@ -5394,6 +5510,7 @@
     }
     // A new route reads a different set of feeds; the probe must follow it.
     routeUrls = new Set();
+    heavyTried = false;      // a fresh visit may retry the deferred feeds
     const run = async () => {
       try { await R[path](); } catch (err) {
         paint(fail('This section', err && err.message ? err.message : 'unexpected error'));

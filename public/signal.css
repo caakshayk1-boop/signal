@@ -2885,3 +2885,76 @@ html:has(dialog[open]){overflow:hidden}
   /* No sticky tab strip at the top on a phone — it is fixed to the bottom. */
   #b-chart, .b-sec, [id^="b-"]{scroll-margin-top:calc(var(--barh) + 56px)}
 }
+
+/* ── AI LONG-TERM IDEAS ───────────────────────────────────────────────────
+   Three stages on one thesis. The track shows where price stands between the
+   stop and the full thesis; the list below names each milestone, what it
+   would mean, and how far away it is. Reached stages are marked as reached
+   rather than removed — a milestone already passed is the most useful thing
+   on the card. */
+.aig{display:flex;flex-direction:column;gap:14px}
+.aic{border:1px solid var(--line);border-radius:var(--r-4);padding:18px 19px;background:var(--surface)}
+.aic-h{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:14px}
+.aic-s{border:0;background:none;padding:0;cursor:pointer;text-align:left;
+  font:600 var(--t-7)/1.15 var(--mono);letter-spacing:var(--ls-tight);color:var(--text)}
+.aic-s:hover{color:var(--accent)}
+/* Green on a 14% green tint measures 4.33:1 in light — under AA. Darkened
+   toward the ink rather than swapping the hue, the same fix as .b-zst.active. */
+.aic-g{font:600 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-wide);padding:5px 8px;
+  border-radius:var(--r-1);background:color-mix(in srgb,var(--up) 14%,transparent);
+  color:color-mix(in srgb,var(--up) 76%,var(--text))}
+.aic-x{font:400 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-wide);text-transform:uppercase;
+  color:var(--dim)}
+
+.aic-lv{display:flex;flex-wrap:wrap;gap:10px 24px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.aic-lv span{display:flex;flex-direction:column;gap:3px}
+.aic-lv i{font:400 var(--t-1)/1 var(--mono);font-style:normal;letter-spacing:var(--ls-wider);
+  text-transform:uppercase;color:var(--dim)}
+.aic-lv b{font:600 var(--t-5)/1.2 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+
+.aic-tr{position:relative;height:8px;border-radius:var(--r-2);background:var(--line);
+  margin:34px 0 26px}
+.aic-fill{position:absolute;left:0;top:0;bottom:0;border-radius:var(--r-2);
+  background:color-mix(in srgb,var(--accent) 34%,transparent)}
+.aic-m{position:absolute;top:-4px;width:2px;height:16px;margin-left:-1px;
+  background:var(--line2);border-radius:var(--r-hair)}
+.aic-now{position:absolute;top:-6px;width:3px;height:20px;margin-left:-1.5px;
+  background:var(--accent);border-radius:var(--r-hair)}
+.aic-nowl{position:absolute;top:-19px;transform:translateX(-50%);text-decoration:none;
+  font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);text-transform:uppercase;
+  color:var(--accent);white-space:nowrap}
+
+.aic-st{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.aic-s{}
+.aic-st > li{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:0 13px;
+  align-items:start;padding:13px 0;border-top:1px solid var(--line)}
+.aic-st > li:first-child{border-top:0}
+.aic-st > li.is-done{opacity:.62}
+.aic-n{font:600 var(--t-2)/1 var(--mono);color:var(--dim);
+  border:1px solid var(--line2);border-radius:var(--r-1);text-align:center;padding:5px 0}
+.aic-b b{display:block;font:600 var(--t-5)/1.3 var(--ui);color:var(--text)}
+.aic-b em{display:block;margin-top:2px;font:400 var(--t-3)/1.45 var(--ui);font-style:normal;color:var(--dim)}
+.aic-v{text-align:right}
+.aic-v b{display:block;font:600 var(--t-6)/1.2 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.aic-v em{display:block;margin-top:3px;font:400 var(--t-3)/1.35 var(--mono);font-style:normal;color:var(--dim)}
+.aic-v u{display:block;margin-top:3px;text-decoration:none;
+  font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--muted)}
+
+.aic-t{margin:16px 0 0;font:400 var(--t-4)/1.65 var(--ui);color:var(--muted);text-wrap:pretty}
+.aic-r{margin:9px 0 0;font:400 var(--t-3)/1.6 var(--mono);color:var(--dim)}
+
+@media(max-width:700px){
+  .aic{padding:15px 15px}
+  .aic-st > li{grid-template-columns:24px minmax(0,1fr);gap:4px 11px}
+  .aic-v{grid-column:2;text-align:left;margin-top:6px}
+  .aic-v em,.aic-v u{display:inline;margin-right:9px}
+  .aic-lv{gap:10px 18px}
+}
+
+/* The ladder's rows arrive together, not in sequence. A 60ms stagger meant
+   that for a few hundred milliseconds after every repaint the rules sat in a
+   different order from the prices they mark — on the one component whose
+   argument is that the distance between two levels is the real distance. The
+   regression suite caught it as "the rules still sit in true price order"
+   failing intermittently, which is exactly what a transient looks like. */
+.b-lvl{animation-delay:0s !important}
