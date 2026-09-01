@@ -28,17 +28,23 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "22", cache: npm }
 
-      - name: Is a Cloudflare token configured?
-        id: gate
+      # The gate was added so the repo would not be permanently red before the
+      # token existed. It outlived that purpose: the token still does not
+      # exist, and the gate meant every push since 29 Aug reported a
+      # successful "deploy" that deployed nothing. A skipped deploy that looks
+      # identical to a completed one is not a safety feature.
+      - name: Require a Cloudflare token
         run: |
-          if [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then echo "go=yes" >> "$GITHUB_OUTPUT"
-          else echo "::warning::CLOUDFLARE_API_TOKEN not set — skipping deploy"; echo "go=no" >> "$GITHUB_OUTPUT"; fi
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN not set — this push has NOT been deployed."
+            echo "  gh secret set CLOUDFLARE_API_TOKEN  --repo caakshayk1-boop/signal"
+            echo "  gh secret set CLOUDFLARE_ACCOUNT_ID --repo caakshayk1-boop/signal"
+            exit 1
+          fi
 
-      - if: steps.gate.outputs.go == 'yes'
-        run: npm ci
+      - run: npm ci
 
-      - if: steps.gate.outputs.go == 'yes'
-        name: Deploy the Worker
+      - name: Deploy the Worker
         run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -46,7 +52,7 @@ jobs:
 
       # SIGNAL_URL is a repo variable, not a secret — it is a public URL, and
       # putting it in vars means the log can print which site was checked.
-      - if: steps.gate.outputs.go == 'yes' && vars.SIGNAL_URL != ''
+      - if: vars.SIGNAL_URL != ''
         name: Check the rendered page
         run: |
           npx playwright install chromium --with-deps

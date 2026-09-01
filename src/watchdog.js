@@ -39,7 +39,25 @@ const API = "https://api.github.com";
  * late when they land at all, and dispatching a duplicate of a run that was
  * merely slow is worse than waiting: the scan writes to a ledger and sends
  * Telegram messages, so a double-run is a double alert. */
-const GRACE_MIN = 75;
+/* WHY THIS IS NOW 12 MINUTES AND NOT 75.
+ *
+ * 75 was the right number while a dispatch could duplicate real work: the scan
+ * writes to a ledger and both jobs send Telegram messages, so firing a second
+ * copy of a run that was merely slow is worse than waiting for it.
+ *
+ * That is no longer the trade. Every slot below now dispatches a form of the
+ * job that STANDS DOWN when the work is already done for the day —
+ * `brief_*_catchup` consults job_runs for a delivery stamped today in MYT, and
+ * daily_scan keeps its `--once` guard on a dispatched slot (it did not; see
+ * the `force` input added to that workflow). A duplicate dispatch is therefore
+ * a no-op that costs one database read.
+ *
+ * Once duplicates are free, waiting is pure cost, and the cost is the entire
+ * complaint: the brief is supposed to land at 08:00 MYT and has been arriving
+ * at 14:14. Twelve minutes is one Cloudflare tick past the slot — close enough
+ * that GitHub's own scheduler still wins on a healthy morning, late enough
+ * that it is not racing it for no reason. */
+const GRACE_MIN = 12;
 
 const WATCH = [
   {
@@ -47,9 +65,36 @@ const WATCH = [
     file: "daily_scan.yml",
     why: "signals and Telegram alerts",
     slots: [
-      { dow: [1, 2, 3, 4, 5], h: 5, m: 0 },   // 10:30 IST — midday, the only in-hours actionable scan
-      { dow: [1, 2, 3, 4, 5], h: 11, m: 0 },  // 16:30 IST — EOD, measurement and ledger settlement
-      { dow: [6], h: 4, m: 0 },               // 09:30 IST Saturday — full scan + multibaggers
+      // 13:00 MYT — the operator's "signals opening" slot. 05:00 UTC is
+      // 10:30 IST, an hour and a quarter into the NSE session, so the day has
+      // a real range to score and there are still four hours to act in.
+      { dow: [1, 2, 3, 4, 5], h: 5, m: 0, inputs: { slot: "midday" } },
+      // 21:00 MYT — "closing, with all updates". 13:00 UTC is 18:30 IST, three
+      // hours after the bell: every close is final and the ledger settles.
+      { dow: [1, 2, 3, 4, 5], h: 13, m: 0, inputs: { slot: "eod" } },
+      { dow: [6], h: 4, m: 0, inputs: { slot: "weekend" } },
+    ],
+  },
+  {
+    /* THE BRIEF WAS THE ONE JOB NOTHING WATCHED.
+     *
+     * It is also the one the operator sees every morning, and on 1 Sep its
+     * 22:43 UTC cron produced no run at all — the brief went out at 14:14 MYT
+     * off a catch-up, six hours past its 08:00 slot. The watchdog knew nothing
+     * about it because this entry did not exist.
+     *
+     * The dispatched task is the CATCH-UP variant on purpose. Its only
+     * difference from the primary is that it asks job_runs whether this slot
+     * already went out today in MYT and stands down if it did — which is
+     * exactly the behaviour a second trigger must have. */
+    repo: "caakshayk1-boop/trading-dashboard",
+    file: "scheduled_tasks.yml",
+    why: "the morning and evening Telegram briefs",
+    slots: [
+      // 08:00 MYT.
+      { dow: [1, 2, 3, 4, 5], h: 0, m: 0, inputs: { task: "brief_morning_catchup" } },
+      // 21:00 MYT.
+      { dow: [1, 2, 3, 4, 5], h: 13, m: 0, inputs: { task: "brief_evening_catchup" } },
     ],
   },
   {
@@ -71,7 +116,15 @@ const hdrs = (token) => ({
   "User-Agent": "signal-watchdog",
 });
 
-/** The most recent slot that has already passed its grace period. */
+/** The most recent slot that has already passed its grace period, WITH the
+ *  dispatch inputs that slot needs.
+ *
+ *  It used to return a bare timestamp. That was enough while every dispatch
+ *  was "run this workflow" with no arguments — and that was the bug: a
+ *  workflow_dispatch carries no `github.event.schedule`, so scheduled_tasks.yml
+ *  matched no arm of its own cron table and resolved to TASK=none. The
+ *  watchdog would have fired it, GitHub would have reported success, and
+ *  nothing whatsoever would have been sent. The slot has to say what to run. */
 function dueSlot(now, slots) {
   let best = null;
   // Look back two days: a Friday-evening slot can still be the newest one on
@@ -82,7 +135,7 @@ function dueSlot(now, slots) {
       if (!s.dow.includes(d.getUTCDay())) continue;
       const at = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), s.h, s.m, 0);
       if (at + GRACE_MIN * 60000 > now.getTime()) continue;   // not due yet
-      if (!best || at > best) best = at;
+      if (!best || at > best.at) best = { at, inputs: s.inputs || null };
     }
   }
   return best;
@@ -97,11 +150,13 @@ async function lastRunAt(repo, file, token) {
   return run ? Date.parse(run.created_at) : 0;
 }
 
-async function dispatch(repo, file, token) {
+async function dispatch(repo, file, token, inputs) {
   const r = await fetch(`${API}/repos/${repo}/actions/workflows/${file}/dispatches`, {
     method: "POST",
     headers: { ...hdrs(token), "Content-Type": "application/json" },
-    body: JSON.stringify({ ref: "main" }),
+    // `inputs` must be omitted entirely rather than sent as null — GitHub
+    // rejects a null body field with a 422 rather than treating it as absent.
+    body: JSON.stringify(inputs ? { ref: "main", inputs } : { ref: "main" }),
     signal: AbortSignal.timeout(10000),
   });
   // 204 is the documented success for this endpoint.
@@ -126,14 +181,15 @@ export async function runWatchdog(env, { act = true } = {}) {
   for (const w of WATCH) {
     const due = dueSlot(now, w.slots);
     const row = { repo: w.repo, workflow: w.file, why: w.why,
-                  due_slot: due ? new Date(due).toISOString() : null };
+                  due_slot: due ? new Date(due.at).toISOString() : null,
+                  dispatch_inputs: due && due.inputs ? due.inputs : null };
     try {
       const last = await lastRunAt(w.repo, w.file, token);
       row.last_run = last ? new Date(last).toISOString() : null;
       row.hours_since = last ? +((now - last) / 36e5).toFixed(1) : null;
-      row.missed = !!(due && last < due);
+      row.missed = !!(due && last < due.at);
       if (row.missed && act) {
-        await dispatch(w.repo, w.file, token);
+        await dispatch(w.repo, w.file, token, due.inputs);
         row.dispatched = true;
       }
     } catch (e) {

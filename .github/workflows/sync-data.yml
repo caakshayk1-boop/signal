@@ -183,13 +183,40 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
+          # THIS USED TO BE A WARNING AND `exit 0`.
+          #
+          # That is how the site went stale without anyone being told. The
+          # token was never set, so from the day this repo was created every
+          # single run took this branch: fetched the feeds correctly, committed
+          # them correctly, skipped the upload, and reported SUCCESS. Thirteen
+          # green runs in a row, a green history, and a live site whose data
+          # had not moved since the last deploy from a laptop. On 1 Sep the
+          # front page was still offering LUMINO, a book that closed on 31 Aug.
+          #
+          # A publishing step that cannot publish has failed. Saying so in a
+          # warning nobody reads, and then claiming success, is worse than not
+          # having the step: it converts a visible outage into a silent one.
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
-            echo "::warning::CLOUDFLARE_API_TOKEN is not set, so the feeds committed above are NOT live."
-            echo "Set it once with:  gh secret set CLOUDFLARE_API_TOKEN --repo caakshayk1-boop/signal"
-            exit 0
+            echo "::error::CLOUDFLARE_API_TOKEN is not set. The feeds committed above are NOT live,"
+            echo "::error::and this site will keep serving whatever was last uploaded by hand."
+            echo "Set it once with:"
+            echo "  gh secret set CLOUDFLARE_API_TOKEN  --repo caakshayk1-boop/signal"
+            echo "  gh secret set CLOUDFLARE_ACCOUNT_ID --repo caakshayk1-boop/signal"
+            exit 1
           fi
-          npm ci --omit=dev
-          # Stamp AFTER the feeds are in place so the build hash describes what
-          # is actually being uploaded.
+          # NOT --omit=dev. wrangler IS a devDependency, so omitting dev left
+          # nothing to run and `npx` silently fetched whatever version of
+          # wrangler was newest that morning — an unpinned deploy tool on the
+          # one job that publishes the site.
+          npm ci
+          # RE-RENDER BEFORE STAMPING. index.html carries a server-rendered
+          # snapshot of today.json baked in at deploy time, and this step used
+          # to upload fresh feeds under a snapshot built from the previous
+          # ones: the JSON said Monday, the HTML a crawler saw still said
+          # Sunday. Prerender reads public/*.json, which the copy above has
+          # just replaced, so it has to run here and not before.
+          node scripts/prerender.mjs
+          # Stamp AFTER the feeds and the snapshot are in place, so the build
+          # hash describes what is actually being uploaded.
           node scripts/stamp-build.mjs
           npx wrangler deploy

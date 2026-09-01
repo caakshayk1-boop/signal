@@ -1331,10 +1331,16 @@
     }
 
     const io = (await get('/ipo.json'));
-    if (io.ok && (io.data.open || []).length) {
-      out += sec('Open right now', io.data.open.slice(0, 2).map(ipoCard).join(''),
-        `${io.data.open.length} book${io.data.open.length === 1 ? '' : 's'} open`);
+    // Filtered on the calendar, not on the build. A feed that missed a night
+    // used to keep yesterday's shut books under a heading saying "open".
+    const ipoOpen = io.ok ? ipoOpenNow(io.data.open) : [];
+    if (ipoOpen.length) {
+      out += sec('Open right now', ipoOpen.slice(0, 2).map(ipoCard).join(''),
+        `${ipoOpen.length} book${ipoOpen.length === 1 ? '' : 's'} open`);
     }
+    // Nothing in the mirror is still open. NSE may well disagree — that is
+    // exactly the case fillIpoLive() is for, so give it somewhere to render.
+    if (!ipoOpen.length) out += '<div id="ipoExtraHome"></div>';
     paint(out);
     // The front page renders the same IPO card as the IPO route, so it needs
     // the same upgrade to the live book. Wiring it to one route and not the
@@ -1489,7 +1495,16 @@
    * its vintage. */
   async function fillIpoLive() {
     const hosts = [...document.querySelectorAll('.subs[data-ipo]')];
-    if (!hosts.length) return;
+    /* IT USED TO RETURN HERE WHEN THERE WERE NO CARDS TO PATCH.
+     *
+     * That is precisely backwards. No cards means the morning build carried no
+     * open book — either because it never ran, or because every book it knew
+     * about has since closed. That is the one moment the live NSE list is the
+     * only thing standing between the reader and an empty section, and it was
+     * the one moment this function refused to fetch it. Carry on as long as
+     * there is anywhere at all to render. */
+    const extras = [...document.querySelectorAll('#ipoExtra, #ipoExtraHome')];
+    if (!hosts.length && !extras.length) return;
     const r = await get('/api/ipo-live');
     if (!r.ok || !r.data || !r.data.ok) return;
     IPO_LIVE = r.data;
@@ -1514,15 +1529,17 @@
      * about book size and is still true. A sentence that does not match the
      * pattern is left exactly as the build wrote it rather than guessed at. */
     /* Anything NSE calls active that the page has not already shown. */
-    const extra = document.getElementById('ipoExtra');
+    const extra = document.getElementById('ipoExtra') || document.getElementById('ipoExtraHome');
     if (extra) {
       const shown = new Set([...document.querySelectorAll('.subs[data-ipo]')]
         .map(x => x.getAttribute('data-ipo')));
       const missing = (r.data.issues || []).filter(x => !shown.has(String(x.symbol).toUpperCase()));
       extra.innerHTML = missing.length ? `<section class="sec">
-        <div class="sec-h"><h2>Also open on NSE</h2>
+        <div class="sec-h"><h2>${hosts.length ? 'Also open on NSE' : 'Open on NSE'}</h2>
           <span class="sec-n">${missing.length} not in the screen</span></div>
-        <p class="sec-lead">Books NSE lists as active that this morning's build did not carry.</p>
+        <p class="sec-lead">${hosts.length
+          ? "Books NSE lists as active that this morning's build did not carry."
+          : "Read live from NSE. The build that carries bands, lots and verdicts has not run since these opened."}</p>
         <div class="rank">${missing.map(x => `<div class="rank-r xtra">
           <span class="s"><b>${esc(x.symbol)}</b><span>${esc(x.company || '')}</span></span>
           ${/* Number(null) is 0, not NaN, so an unpublished book rendered as
@@ -1547,6 +1564,38 @@
       if (now !== was) el.textContent = now;
     }
   }
+  /* A BOOK'S LAST DAY IS A FACT ABOUT THE CALENDAR, NOT ABOUT THE BUILD.
+   *
+   * days_left is computed by the daily build and then frozen into the feed.
+   * On 1 Sep the live site still showed LUMINO — a book that closed on 31 Aug
+   * — carrying the pill "closes today", because days_left had been 0 since the
+   * morning of the 31st and nothing ever recomputed it. A stale feed is a
+   * recoverable state the page already labels; a stale feed ASSERTING that a
+   * shut book closes today is a reader placing an application that cannot be
+   * filled. That is the difference between old and wrong.
+   *
+   * close_date sits in the feed and was never read by this file. These derive
+   * the number from it against the Indian trading day, so the claim decays to
+   * the truth as the feed ages instead of repeating the morning it was built. */
+  const istToday = () => {
+    // en-CA renders YYYY-MM-DD, which compares correctly as a plain string.
+    try { return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); }
+    catch { return new Date().toISOString().slice(0, 10); }
+  };
+  const daysLeftFor = r => {
+    const cd = String(r.close_date || '').slice(0, 10);
+    // No usable close date: keep whatever the build said rather than invent one.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(cd)) return r.days_left != null ? r.days_left : null;
+    return Math.round(
+      (Date.parse(cd + 'T00:00:00Z') - Date.parse(istToday() + 'T00:00:00Z')) / 86400000);
+  };
+  /* Books the calendar still says are taking bids. A negative days_left is a
+   * closed book, and it must not appear under a heading that says "open". */
+  const ipoOpenNow = list => (list || []).filter(r => {
+    const dl = daysLeftFor(r);
+    return dl == null || dl >= 0;
+  });
+
   // NSE keys on the symbol; the mirror sometimes carries a name and no symbol.
   const ipoLiveFor = r => {
     if (!IPO_LIVE) return null;
@@ -1567,7 +1616,9 @@
         <span class="sym">${esc(r.symbol || r.sym || '')}</span>
         ${r.verdict ? `<span class="pill ${cls}">${esc(r.verdict)}</span>` : ''}
         <span class="spacer"></span>
-        ${r.days_left != null ? `<span class="pill">${r.days_left === 0 ? 'closes today' : esc(r.days_left) + 'd left'}</span>` : ''}
+        ${(() => { const dl = daysLeftFor(r); return dl == null ? ''
+          : `<span class="pill${dl < 0 ? ' v-avoid' : ''}">${
+              dl < 0 ? 'book closed' : dl === 0 ? 'closes today' : esc(dl) + 'd left'}</span>`; })()}
         <span class="co">${esc(r.company || '')}</span>
       </div>
       ${r.verdict_why ? `<div class="ipo-why" data-why="${esc(String(r.symbol || r.sym || '').toUpperCase())}">${
@@ -2336,14 +2387,15 @@
     if (!io.ok) { paint(out + fail('The IPO radar', io.error)); return; }
     const d = io.data, c = d.counts || {};
 
+    const dOpen = ipoOpenNow(d.open);
     out += sec('Where it stands', `<div class="grid">
-        ${tile((d.open || []).length, 'Books open', 'bidding today', (d.open || []).length ? 'ac' : '')}
+        ${tile(dOpen.length, 'Books open', 'bidding today', dOpen.length ? 'ac' : '')}
         ${tile((d.upcoming || []).length, 'Upcoming', 'announced, not open')}
         ${tile((d.awaiting_listing || []).length, 'Awaiting listing', 'closed, not yet traded')}
         ${tile(c.apply ?? '—', 'Rated apply', 'on public demand only', c.apply ? 'up' : '')}
       </div>`);
 
-    out += sec('Open now', (d.open || []).length ? `<div class="cards-2">${d.open.map(ipoCard).join('')}</div>`
+    out += sec('Open now', dOpen.length ? `<div class="cards-2">${dOpen.map(ipoCard).join('')}</div>`
       : `<div class="empty">No mainboard book is open today.</div>`);
 
     /* NSE'S LIST IS LONGER THAN THE MIRROR'S.
