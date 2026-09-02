@@ -1377,8 +1377,11 @@
           const rows = [...fam.values()].sort((a, b) => b.trades - a.trades);
           const anyClosed = rows.some(r => r.trades > 0);
           return `
-        <h3 class="sub-h">The five engines this site publishes</h3>
-        <p class="sec-note">Counted over every trade these engines have generated, including before
+        <h3 class="sub-h">The engines this site publishes</h3>
+        <p class="sec-note">Five engines, shown as ${rows.length} rows: <b>magic</b> and
+          <b>magicmagic</b> are counted as one family until enough of each has closed to tell them
+          apart — four closed trades against one is not two win rates worth comparing.
+          Counted over every trade these engines have generated, including before
           this site started publishing — a longer sample for judging an engine than the
           ${LR.trades} closed above, and still not a record of what this site called.
           The ledger carries eleven engines; the other six (<b>ohl</b>, <b>breakout</b>,
