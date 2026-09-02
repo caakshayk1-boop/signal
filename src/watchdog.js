@@ -30,6 +30,8 @@
  * The watchdog is therefore idle on a healthy day and invisible in the logs.
  */
 
+import { db } from "./api/_db.js";
+
 const API = "https://api.github.com";
 
 /* Slots are UTC, because that is the clock both GitHub Actions and Cloudflare
@@ -93,11 +95,11 @@ const WATCH = [
       // 13:00 MYT — the operator's "signals opening" slot. 05:00 UTC is
       // 10:30 IST, an hour and a quarter into the NSE session, so the day has
       // a real range to score and there are still four hours to act in.
-      { dow: [1, 2, 3, 4, 5], h: 5, m: 0, inputs: { slot: "midday" } },
+      { dow: [1, 2, 3, 4, 5], h: 5, m: 0, inputs: { slot: "midday" }, job: "scan_midday" },
       // 21:00 MYT — "closing, with all updates". 13:00 UTC is 18:30 IST, three
       // hours after the bell: every close is final and the ledger settles.
-      { dow: [1, 2, 3, 4, 5], h: 13, m: 0, inputs: { slot: "eod" } },
-      { dow: [6], h: 4, m: 0, inputs: { slot: "weekend" } },
+      { dow: [1, 2, 3, 4, 5], h: 13, m: 0, inputs: { slot: "eod" }, job: "scan_eod" },
+      { dow: [6], h: 4, m: 0, inputs: { slot: "weekend" }, job: "scan_weekend" },
     ],
   },
   {
@@ -117,9 +119,9 @@ const WATCH = [
     why: "the morning and evening Telegram briefs",
     slots: [
       // 08:00 MYT.
-      { dow: [1, 2, 3, 4, 5], h: 0, m: 0, inputs: { task: "brief_morning_catchup" } },
+      { dow: [1, 2, 3, 4, 5], h: 0, m: 0, inputs: { task: "brief_morning_catchup" }, job: "brief_morning" },
       // 21:00 MYT.
-      { dow: [1, 2, 3, 4, 5], h: 13, m: 0, inputs: { task: "brief_evening_catchup" } },
+      { dow: [1, 2, 3, 4, 5], h: 13, m: 0, inputs: { task: "brief_evening_catchup" }, job: "brief_evening" },
     ],
   },
   {
@@ -164,19 +166,69 @@ function dueSlot(now, slots, graceMin = GRACE_MIN) {
       if (!s.dow.includes(d.getUTCDay())) continue;
       const at = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), s.h, s.m, 0);
       if (at + graceMin * 60000 > now.getTime()) continue;   // not due yet
-      if (!best || at > best.at) best = { at, inputs: s.inputs || null };
+      if (!best || at > best.at) best = { at, inputs: s.inputs || null, job: s.job || null };
     }
   }
   return best;
 }
 
+/** When did a run that could plausibly have done the work last START?
+ *
+ *  A FAILED RUN USED TO SATISFY A SLOT. This asked for per_page=1 and took
+ *  that run's created_at whatever became of it, so a run that errored in
+ *  `Install dependencies` counted as the slot being covered and the watchdog
+ *  stood down on a workflow that had done nothing at all.
+ *
+ *  A run still in flight DOES count — dispatching a second copy of a job that
+ *  is running right now is the double-fire this whole file is built to avoid.
+ *  Only a run that finished badly is discounted. */
 async function lastRunAt(repo, file, token) {
-  const r = await fetch(`${API}/repos/${repo}/actions/workflows/${file}/runs?per_page=1`,
+  const r = await fetch(`${API}/repos/${repo}/actions/workflows/${file}/runs?per_page=10`,
     { headers: hdrs(token), signal: AbortSignal.timeout(10000) });
   if (!r.ok) throw new Error(`runs ${r.status}`);
   const j = await r.json();
-  const run = (j.workflow_runs || [])[0];
-  return run ? Date.parse(run.created_at) : 0;
+  for (const run of j.workflow_runs || []) {          // newest first
+    const finished = run.status === "completed";
+    if (!finished || run.conclusion === "success") return Date.parse(run.created_at);
+  }
+  return 0;
+}
+
+/** Did the WORK for this slot actually land in the ledger?
+ *
+ *  THE GAP THIS CLOSES. Everything above reasons about GitHub runs, and a run
+ *  is not a scan. On 31 Aug all three midday crons for daily_scan.yml arrived
+ *  hours late, were each told the clock had moved to `eod`, kept `midday`
+ *  anyway, found midday already done and stood down under --once. Three runs
+ *  started, all three went green, no scan happened, no alerts went out — and
+ *  the watchdog saw three runs newer than the slot and reported health.
+ *
+ *  job_runs is the durable record of work COMPLETED: standalone_scan stamps
+ *  `scan_<slot>` only after the engines have run, and daily_brief stamps
+ *  `brief_<slot>` only after Telegram has accepted the message. `run_at` is
+ *  UTC ISO, so comparing it against the slot needs no timezone reasoning —
+ *  and it is strictly stronger than the date-string matching the Python
+ *  readers do, because a scan stamped this morning cannot satisfy tonight's
+ *  EOD slot.
+ *
+ *  Throws rather than returning false when the database will not answer. The
+ *  caller falls back to the run-based check, so a Turso outage degrades this
+ *  to the old behaviour instead of dispatching every job on every tick. */
+async function workDoneSince(job, sinceMs) {
+  const rs = await db().execute({
+    sql: "SELECT run_at, status FROM job_runs WHERE job = ?",
+    args: [job],
+  });
+  const row = (rs.rows || [])[0];
+  if (!row) return { done: false, run_at: null, status: null };
+  const status = row.status === null || row.status === undefined ? "" : String(row.status);
+  const raw = row.run_at === null || row.run_at === undefined ? "" : String(row.run_at);
+  const at = Date.parse(raw.includes("T") ? raw : raw.replace(" ", "T"));
+  return {
+    done: status === "ok" && Number.isFinite(at) && at >= sinceMs,
+    run_at: raw || null,
+    status,
+  };
 }
 
 async function dispatch(repo, file, token, inputs) {
@@ -217,7 +269,28 @@ export async function runWatchdog(env, { act = true } = {}) {
       const last = await lastRunAt(w.repo, w.file, token);
       row.last_run = last ? new Date(last).toISOString() : null;
       row.hours_since = last ? +((now - last) / 36e5).toFixed(1) : null;
-      row.missed = !!(due && last < due.at);
+
+      // A run newer than the slot is the WEAKEST evidence available, so it is
+      // only the answer when nothing better exists.
+      let missed = !!(due && last < due.at);
+      row.checked_by = "run_started";
+
+      if (due && due.job) {
+        try {
+          const work = await workDoneSince(due.job, due.at);
+          row.job = due.job;
+          row.job_run_at = work.run_at;
+          row.job_status = work.status;
+          missed = !work.done;
+          row.checked_by = "job_runs";
+        } catch (e) {
+          // Degrade to the run-based answer rather than dispatching blind on
+          // every tick for as long as the database is unreachable.
+          row.verify_error = String((e && e.message) || e);
+        }
+      }
+
+      row.missed = missed;
       if (row.missed && act) {
         await dispatch(w.repo, w.file, token, due.inputs);
         row.dispatched = true;
