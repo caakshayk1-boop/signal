@@ -492,13 +492,23 @@
    */
   /* ── WHICH ENGINES THIS SITE PUBLISHES ────────────────────────────────────
    *
-   * The ledger carries eleven engines. This site surfaces five of them, and
+   * The ledger carries eleven engines. This site surfaces six of them, and
    * the filter is applied once here so every surface agrees — the ledger page,
    * the brief's choice of setup, the record, the open count.
    *
-   * OHL and commodities are excluded on instruction. So are breakout, cf_1h,
-   * top5_pick and sip_bucket, which are simply not on the list of what this
-   * site is for.
+   * OHL and commodities are excluded on instruction. So are cf_1h, top5_pick
+   * and sip_bucket, which are simply not on the list of what this site is for.
+   *
+   * BREAKOUT WAS ADDED 2026-09-02, on instruction, and it changes what the
+   * record says rather than merely adding a row. Four of the five engines here
+   * had never closed a trade and the fifth was 0-for-6, so the published
+   * record stood at two closed trades and could not move quickly. Breakout
+   * brings the largest closed sample of any engine on the ledger — and the
+   * sample it brings is a losing one, 22 closed at a 9.1% win rate.
+   *
+   * That is the honest trade: the record becomes able to say something, and
+   * the first thing it says is worse. It is added anyway because a whitelist
+   * chosen to keep the number small is a track record chosen to stay quiet.
    *
    * BOTH magic AND magicmagic are kept, and the reason is worth stating: the
    * instruction was to keep whichever is better, and the ledger cannot answer
@@ -508,10 +518,11 @@
    * rest of this site refuses. They are shown as one family until enough have
    * closed to separate them; the Signals page is where that will show up.
    */
-  const ENGINES = new Set(['magic', 'magicmagic', 'equity_measured', 'multibagger', 'ai_longterm']);
+  const ENGINES = new Set(['magic', 'magicmagic', 'equity_measured', 'multibagger',
+                           'ai_longterm', 'breakout']);
   const ENGINE_LABEL = {
     magic: 'Magic', magicmagic: 'Magic', equity_measured: 'Equity, measured',
-    multibagger: 'Multibagger', ai_longterm: 'AI',
+    multibagger: 'Multibagger', ai_longterm: 'AI', breakout: 'Breakout',
   };
   const engineOk = r => ENGINES.has(String(r.signal_type || ''));
 
@@ -1378,15 +1389,15 @@
           const anyClosed = rows.some(r => r.trades > 0);
           return `
         <h3 class="sub-h">The engines this site publishes</h3>
-        <p class="sec-note">Five engines, shown as ${rows.length} rows: <b>magic</b> and
+        <p class="sec-note">Six engines, shown as ${rows.length} rows: <b>magic</b> and
           <b>magicmagic</b> are counted as one family until enough of each has closed to tell them
           apart — four closed trades against one is not two win rates worth comparing.
           Counted over every trade these engines have generated, including before
           this site started publishing — a longer sample for judging an engine than the
           ${LR.trades} closed above, and still not a record of what this site called.
-          The ledger carries eleven engines; the other six (<b>ohl</b>, <b>breakout</b>,
-          <b>commodity</b>, <b>cf_1h</b>, <b>top5_pick</b>, <b>sip_bucket</b>) are not published
-          here and are not counted anywhere on this page.</p>
+          The ledger carries eleven engines; the other five (<b>ohl</b>, <b>commodity</b>,
+          <b>cf_1h</b>, <b>top5_pick</b>, <b>sip_bucket</b>) are not published here and are not
+          counted anywhere on this page.</p>
         <div class="rank">
           <div class="rank-r eng eng-h">
             <span class="s">Engine</span><span class="x">Closed</span>
@@ -1396,10 +1407,16 @@
             <span class="s"><b>${esc(r.label)}</b></span>
             <span class="x">${r.trades || '—'}</span>
             <span class="x">${r.trades ? (Math.round(r.wins / r.trades * 1000) / 10) + '%' : '—'}</span>
+            ${/* "6 of 30" SAT NEXT TO A COLUMN READING "0%" AND WAS READ AS SIX WINS.
+                * It meant six closed trades against the thirty the bar needs, but
+                * the closed count is already its own column, so the pill was
+                * repeating a number the row had and inviting the wrong reading of
+                * it. It now states what is MISSING, which the row does not say
+                * anywhere else and which is the actual answer to "cleared?". */''}
             <span class="x">${r.trades >= 30
               ? `<i class="pill v-apply">cleared</i>`
               : r.trades
-                ? `<i class="pill v-avoid">${r.trades} of 30</i>`
+                ? `<i class="pill v-avoid">${30 - r.trades} more needed</i>`
                 : `<i class="pill">none closed yet</i>`}</span>
           </div>`).join('')}
         </div>
