@@ -574,18 +574,41 @@
   };
   const engineOk = r => ENGINES.has(String(r.signal_type || ''));
 
+  /* ── AND NOTHING SHORT ────────────────────────────────────────────────────
+   *
+   * The book is long-only, and the rule is not a preference. standalone_scan's
+   * longs_only() states it: "nothing short is put in front of a reader as an
+   * action", and swing_rulebook refuses to size one (SHORT_NOT_TAKEN).
+   *
+   * That filter is applied to the TELEGRAM list and to nothing else, on
+   * purpose — every engine keeps filing shorts and the ledger keeps every one,
+   * because deleting them would destroy the evidence for whether refusing them
+   * costs anything. This site was reading the ledger, so it published them
+   * anyway: on 2 Sep the first entry in the restarted record was WIPRO SELL,
+   * an alert that was never sent to anyone.
+   *
+   * Two things were wrong with that at once. It put a short in front of a
+   * reader as an action, which is the one thing the rule forbids. And the page
+   * describes itself as "every alert this site has sent" while showing one it
+   * had not sent — the record claiming credit for a call nobody received.
+   *
+   * Shorts remain in the ledger and remain published in full on
+   * news.askakshay.com, which is the site that reports everything the engines
+   * do rather than everything this book acts on. */
+  const longOnly = r => String(r.action || 'BUY').toUpperCase() !== 'SELL';
+
   async function ledger() {
     const live = await get('/api/signals?limit=400');
     if (live.ok) {
       const all = live.data.signals || live.data.rows || [];
-      const rows = all.filter(engineOk);
+      const rows = all.filter(engineOk).filter(longOnly);
       if (all.length) return { ok: true, rows, live: true, at: live.data.generated_at,
                                dropped: all.length - rows.length };
     }
     const snap = await get('/alerts.json');
     if (!snap.ok) return { ok: false, error: live.error || snap.error };
     const all = Array.isArray(snap.data) ? snap.data : (snap.data.rows || []);
-    const rows = all.filter(engineOk);
+    const rows = all.filter(engineOk).filter(longOnly);
     return { ok: true, rows, live: false, error: live.error, dropped: all.length - rows.length };
   }
 
