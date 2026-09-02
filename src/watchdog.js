@@ -61,6 +61,31 @@ const GRACE_MIN = 12;
 
 const WATCH = [
   {
+    /* THE TOP OF THE CHAIN, AND IT WAS THE ONE THING UNWATCHED.
+     *
+     * Every feed the other three entries move around is produced here. If this
+     * build drops, the sync faithfully mirrors yesterday, the site goes stale,
+     * and nothing repairs it — the original outage with a different cause.
+     *
+     * ITS GRACE IS THREE HOURS, NOT TWELVE MINUTES, AND THAT IS DELIBERATE.
+     * The rule that makes a short grace safe elsewhere is that a duplicate
+     * dispatch is a no-op: the briefs consult job_runs, the scan keeps
+     * --once. This build has no such guard. It runs for nine minutes, commits
+     * docs/index.html and publishes, so two overlapping copies race on the
+     * commit. Twelve minutes here would fire a second build almost every day,
+     * because this cron genuinely does land late — 23:44Z on 1 Sep, 00:57Z on
+     * 31 Aug, against a 22:00Z slot.
+     *
+     * Three hours is past the worst observed drift and still finishes before
+     * the 01:30 sync collects it, so a dropped build is repaired inside the
+     * same morning rather than waiting a day. */
+    repo: "caakshayk1-boop/trading-dashboard",
+    file: "newspaper.yml",
+    why: "the daily build every feed comes from",
+    graceMin: 180,
+    slots: [{ dow: [0, 1, 2, 3, 4, 5, 6], h: 22, m: 0 }],
+  },
+  {
     repo: "caakshayk1-boop/trading-dashboard",
     file: "daily_scan.yml",
     why: "signals and Telegram alerts",
@@ -129,7 +154,7 @@ const hdrs = (token) => ({
  *  matched no arm of its own cron table and resolved to TASK=none. The
  *  watchdog would have fired it, GitHub would have reported success, and
  *  nothing whatsoever would have been sent. The slot has to say what to run. */
-function dueSlot(now, slots) {
+function dueSlot(now, slots, graceMin = GRACE_MIN) {
   let best = null;
   // Look back two days: a Friday-evening slot can still be the newest one on
   // a Sunday, and reporting "nothing due" then would hide a real outage.
@@ -138,7 +163,7 @@ function dueSlot(now, slots) {
     for (const s of slots) {
       if (!s.dow.includes(d.getUTCDay())) continue;
       const at = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), s.h, s.m, 0);
-      if (at + GRACE_MIN * 60000 > now.getTime()) continue;   // not due yet
+      if (at + graceMin * 60000 > now.getTime()) continue;   // not due yet
       if (!best || at > best.at) best = { at, inputs: s.inputs || null };
     }
   }
@@ -183,8 +208,9 @@ export async function runWatchdog(env, { act = true } = {}) {
 
   const checked = [];
   for (const w of WATCH) {
-    const due = dueSlot(now, w.slots);
-    const row = { repo: w.repo, workflow: w.file, why: w.why,
+    const grace = w.graceMin || GRACE_MIN;
+    const due = dueSlot(now, w.slots, grace);
+    const row = { repo: w.repo, workflow: w.file, why: w.why, grace_minutes: grace,
                   due_slot: due ? new Date(due.at).toISOString() : null,
                   dispatch_inputs: due && due.inputs ? due.inputs : null };
     try {
@@ -201,5 +227,7 @@ export async function runWatchdog(env, { act = true } = {}) {
     }
     checked.push(row);
   }
-  return { ok: true, at: now.toISOString(), grace_minutes: GRACE_MIN, checked };
+  // Per-workflow now — reporting one number here would misdescribe every row
+  // that overrides it.
+  return { ok: true, at: now.toISOString(), default_grace_minutes: GRACE_MIN, checked };
 }
