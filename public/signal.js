@@ -1338,39 +1338,77 @@
             : `Over ${LR.trades} closed trades the average trade returned
                <b class="${neg ? 'dn' : 'up'}">${LR.expectancy_r > 0 ? '+' : ''}${LR.expectancy_r}R</b>.`}
         </p>
-        ${floors.length ? `
-        ${/* THE ENGINES ARE A DIFFERENT POPULATION AND MUST SAY SO.
-            * These counts are all-time from /api/stats — they include trades
-            * generated before this site published anything. That makes them
-            * useful for judging an ENGINE and invalid as a claim about this
-            * site's record, so they sit under their own heading with their own
-            * sentence saying exactly that. Merging the two is the mistake the
-            * LAUNCH cutoff exists to prevent. */''}
-        <h3 class="sub-h">Before that: the engines' own history</h3>
-        <p class="sec-note">Every trade these engines have generated, including the ones from before
-          this site published anything — a longer sample for judging an engine, and
-          <b>not</b> a record of what this site called.</p>
+        ${(() => {
+          /* THE TABLE USED TO LIST THE ENGINES THIS SITE DOES NOT PUBLISH.
+           *
+           * It was built from engine_floors, which is every engine in the
+           * ledger ranked by sample size: ohl, breakout, commodity, cf_1h,
+           * equity_measured. Exactly ONE of those five is on this site's
+           * whitelist. So the record section named four engines whose signals
+           * this site deliberately never shows, and omitted four it does —
+           * directly under a paragraph explaining what this site publishes.
+           *
+           * It is now driven by ENGINES, the same set ledger() filters on.
+           * magic and magicmagic stay merged into one family, for the reason
+           * given at that constant: four closed trades and one closed trade
+           * are not two win rates worth comparing.
+           *
+           * An engine with nothing closed says so. That is the honest state of
+           * four of the five, and hiding those rows would leave a table that
+           * implies this site has a track record it does not have. */
+          const bt = st && st.by_signal_type ? st.by_signal_type : null;
+          const statOf = k => {
+            if (!bt) return null;
+            if (Array.isArray(bt)) return bt.find(x => (x.key || x.signal_type) === k) || null;
+            return bt[k] || null;
+          };
+          const fam = new Map();
+          for (const k of ENGINES) {
+            const label = ENGINE_LABEL[k] || k;
+            const cur = fam.get(label) || { label, trades: 0, wins: 0 };
+            const r = statOf(k);
+            if (r) {
+              const n = Number(r.trades || r.closed || 0) || 0;
+              cur.trades += n;
+              cur.wins += Math.round((Number(r.win_rate) || 0) / 100 * n);
+            }
+            fam.set(label, cur);
+          }
+          const rows = [...fam.values()].sort((a, b) => b.trades - a.trades);
+          const anyClosed = rows.some(r => r.trades > 0);
+          return `
+        <h3 class="sub-h">The five engines this site publishes</h3>
+        <p class="sec-note">Counted over every trade these engines have generated, including before
+          this site started publishing — a longer sample for judging an engine than the
+          ${LR.trades} closed above, and still not a record of what this site called.
+          The ledger carries eleven engines; the other six (<b>ohl</b>, <b>breakout</b>,
+          <b>commodity</b>, <b>cf_1h</b>, <b>top5_pick</b>, <b>sip_bucket</b>) are not published
+          here and are not counted anywhere on this page.</p>
         <div class="rank">
           <div class="rank-r eng eng-h">
             <span class="s">Engine</span><span class="x">Closed</span>
             <span class="x">Win rate</span><span class="x">Cleared for capital</span>
           </div>
-          ${floors.map(f => `<div class="rank-r eng">
-            <span class="s"><b>${esc(f.key)}</b></span>
-            <span class="x">${f.trades}</span>
-            <span class="x">${f.win_rate}%</span>
-            <span class="x">${f.status === 'insufficient-sample'
-              ? `<i class="pill v-avoid">${f.trades} of 30</i>`
-              : `<i class="pill v-apply">cleared</i>`}</span>
+          ${rows.map(r => `<div class="rank-r eng">
+            <span class="s"><b>${esc(r.label)}</b></span>
+            <span class="x">${r.trades || '—'}</span>
+            <span class="x">${r.trades ? (Math.round(r.wins / r.trades * 1000) / 10) + '%' : '—'}</span>
+            <span class="x">${r.trades >= 30
+              ? `<i class="pill v-apply">cleared</i>`
+              : r.trades
+                ? `<i class="pill v-avoid">${r.trades} of 30</i>`
+                : `<i class="pill">none closed yet</i>`}</span>
           </div>`).join('')}
         </div>
-        <p class="sec-note">${cleared === 0
-          ? `<b>No engine has cleared the bar.</b> This site's rule is 30 or more closed trades at a
-             t-statistic of 2 or better before an engine is trusted with capital, and not one of
-             ${floors.length} qualifies today. That is why nothing below is a recommendation.`
-          : `${cleared} of ${floors.length} engines clear the 30-trade, t≥2 bar this site sets before
-             an engine is trusted with capital.`}
-        </p>` : ''}
+        <p class="sec-note"><b>No engine has cleared the bar.</b> The rule is 30 or more closed
+          trades at a t-statistic of 2 or better before an engine is trusted with capital.
+          ${anyClosed
+            ? `${rows.filter(r => !r.trades).length} of the ${rows.length} have never closed a
+               trade, and the ${rows.filter(r => r.trades).length === 1 ? 'one that has is' :
+               'ones that have are'} well short of the sample.`
+            : `None of them has closed a trade yet.`}
+          That is why nothing below is a recommendation.</p>`;
+        })()}
         <p class="hint">Win rate and expectancy count closed signals only; open positions are
           excluded until they settle.
           <a href="#/methodology">How this is measured</a> ·
