@@ -101,8 +101,26 @@ try {
   ok("no change prints a signed zero", !signs.some(s => /^[+\-−]0\.00%$/.test(s)),
      signs.filter(s => /^[+\-−]0\.00%$/.test(s)));
 
+  /* `=== 0` ASSERTED SOMETHING STRICTER THAN THE NAME CLAIMS.
+   *
+   * A page scrolls sideways when scrollWidth EXCEEDS clientWidth. A negative
+   * delta means the content is narrower than the viewport, which is the
+   * opposite condition and cannot produce a horizontal scrollbar — yet it
+   * failed this assertion just as loudly as real overflow would.
+   *
+   * That is not academic. The first CI run of this suite (2 Sep, once
+   * SIGNAL_URL was set and it started running at all) failed every one of
+   * these checks at exactly -15 on both 320px and 1440px, while every content
+   * assertion on the same pages passed. It could not be reproduced on macOS
+   * under either overlay or classic scrollbars — both measure 0 — so the -15
+   * is something about the Linux runner's viewport accounting that has not
+   * been explained. It is emphatically not the page scrolling sideways.
+   *
+   * `<= 0` still fails on any real overflow, which is the entire point of the
+   * check; it stops failing on the one arithmetic sign that proves the bug is
+   * absent. */
   const oxM = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  ok("no horizontal overflow at 1440", oxM === 0, oxM);
+  ok("no horizontal overflow at 1440", oxM <= 0, oxM);
 
   /* ── BRIEF ───────────────────────────────────────────────────────────── */
   console.log("\n  /brief");
@@ -436,7 +454,8 @@ try {
     await mp.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await mp.waitForTimeout(SETTLE);
     const ox = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    ok(`${route} does not scroll sideways`, ox === 0, ox);
+    // <= 0, not === 0 — see the note on the 1440 check above.
+    ok(`${route} does not scroll sideways`, ox <= 0, ox);
   }
   // Seven tabs in a six-column grid pushed the bar 64px past a 390px phone.
   const tabFit = await mp.evaluate(() => {
