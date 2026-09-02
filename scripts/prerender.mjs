@@ -61,7 +61,7 @@ const wire = Array.isArray(news) ? news : [];
  *
  * It must never fail the build. A snapshot without the numbers is a smaller
  * page; a build that dies because a fetch timed out is an outage. */
-const LAUNCH = "2026-08-29";   // must match LAUNCH in public/signal.js
+const LAUNCH = "2026-09-02";   // must match LAUNCH in public/signal.js
 async function liveRecord() {
   try {
     // /api/signals, NOT /api/stats. stats is all-time and cannot be filtered,
@@ -78,7 +78,10 @@ async function liveRecord() {
       (x) => String(x.alert_date || x.date || "").slice(0, 10) >= LAUNCH);
     const closed = rows.filter(
       (x) => Number.isFinite(Number(x.r_multiple)) && (x.badge || "") !== "open");
-    if (!rows.length) return null;
+    // NOT `if (!rows.length) return null`. Zero rows on or after LAUNCH is a
+    // real, correct answer — it is what a record that restarted today looks
+    // like — and returning null for it routed the snapshot into the "ledger
+    // unreachable" branch on the one day that sentence was false.
     const wins = closed.filter((x) => Number(x.r_multiple) > 0).length;
     const sum = closed.reduce((a, x) => a + Number(x.r_multiple), 0);
     return { published: rows.length, trades: closed.length, wins,
@@ -108,9 +111,13 @@ const block = `${OPEN}
          ? `Too small a sample to prove an edge either way — shown anyway, because waiting until the
             number flatters is how track records get manufactured. The screen below is research.`
          : `Published first, because a record shown only after a good month is not a record.`}`
-    : rec
+    : rec && rec.published
       ? `<b>${rec.published}</b> published since ${LAUNCH}, none closed yet. The screen below is
          research until they settle.`
+      : rec
+      ? `The record restarts on ${LAUNCH}, the day the stop rules changed — breakout and OHL were
+         both running stops inside their own daily range. Earlier signals stay published on
+         news.askakshay.com; they are not counted here.`
       : `Every call is logged when it is made and graded against the bars that follow, win or lose.
          The full ledger is on the live page.`}</p>
   ${universe ? `<p class="pre-m">Every session, <b>${universe} names</b> re-screened and the wire read

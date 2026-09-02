@@ -209,7 +209,27 @@
    * so. It was a local inside the signals route, which is why the brief's own
    * record section was still quoting the all-time ledger — two populations
    * under one product. */
-  const LAUNCH = '2026-08-29';
+  /* THE RECORD RESTARTS ON THE DAY THE STOP RULES CHANGED.
+   *
+   * 2026-09-02 is not an arbitrary line. Measured over 113 closed trades,
+   * breakout's stop sat at 0.29x the name's own ATR and ohl's at 0.78x — both
+   * inside the range those instruments cover in a normal session, so they were
+   * taken out by noise rather than by the trade being wrong (90.9% and 91.7%
+   * stop-out). Both were corrected today, along with breakout sizing a
+   * weeks-long trade off daily bars.
+   *
+   * Every signal before this line was generated under stops this site now says
+   * were wrong. Showing them under a heading that reads "the record" would be
+   * grading the new rules with the old rules' results.
+   *
+   * THIS IS A FILTER, NOT A DELETION, AND THAT IS DELIBERATE. Both sites read
+   * one Turso table; deleting those rows would erase news.askakshay.com's
+   * history too, which is where they are still published in full. Nothing is
+   * lost — signal.askakshay.com simply stops claiming them as its own record.
+   *
+   * The cutoff was 2026-08-29, the publish date. Moving it costs the site
+   * 22 published and 5 closed trades, all five of them losses. */
+  const LAUNCH = '2026-09-02';
 
   /* ONE CUTOFF, ON THE PUBLISH DATE, EVERYWHERE.
    *
@@ -1152,10 +1172,24 @@
             * the same mechanism and with no edit. */''}
         ${(() => {
           if (!LR.published) {
-            return `<h1>Every signal, graded.<br>The record is public.</h1>
-              <p class="hero-sub">Each call is logged when it is made and graded against the bars
-                that follow, win or lose. The ledger is not reachable this minute —
-                <a href="#/signals">open the record</a> rather than take this page's word.</p>`;
+            /* EMPTY BECAUSE IT RESTARTED IS NOT EMPTY BECAUSE IT BROKE.
+             * This branch said "the ledger is not reachable this minute",
+             * which was true only of a failed fetch. On the day the cutoff
+             * moves it is reached by a page whose ledger answered perfectly
+             * and had nothing on or after LAUNCH yet — and telling a reader
+             * the site is broken when it is working is its own kind of lie. */
+            const reachable = sgx.ok;
+            return `<h1>Every signal, graded.<br>The record starts ${esc(LAUNCH)}.</h1>
+              <p class="hero-sub">${reachable
+                ? `Nothing published yet under the stop rules corrected today — breakout and OHL
+                   were both running stops inside their own daily range, and every signal before
+                   this line was generated under them. They stay published on
+                   <a href="https://news.askakshay.com">news.askakshay.com</a>; they are simply
+                   not counted here. The first entries land with tonight's scan.`
+                : `Each call is logged when it is made and graded against the bars that follow,
+                   win or lose. The ledger is not answering this minute —
+                   <a href="#/signals">open the record</a> rather than take this page's word.`}
+              </p>`;
           }
           /* BELOW FIVE, THE HEADLINE STATES THE COUNT AND NOT A VERDICT.
            *
@@ -1324,7 +1358,14 @@
      * bad week, and reports an edge that turns positive with the same
      * prominence it reports one that has not. */
     const st = stx.ok && stx.data && stx.data.ok ? stx.data : null;
-    if (LR.published) {
+    /* RENDER WHENEVER THE LEDGER ANSWERED, INCLUDING WITH NOTHING IN IT.
+     *
+     * The gate was `if (LR.published)`, so on the day the cutoff moved the
+     * whole section vanished and the front page led with picks again —
+     * silently undoing the reframe at exactly the moment the reader most needs
+     * to be told the record restarted and why. An empty record is a state to
+     * show, not a section to hide. */
+    if (sgx.ok) {
       const floors = st ? (st.engine_floors || []).slice().sort((a, b) => (b.trades || 0) - (a.trades || 0)) : [];
       const cleared = floors.filter(f => f.status !== 'insufficient-sample').length;
       const neg = LR.expectancy_r != null && LR.expectancy_r < 0;
@@ -1338,7 +1379,14 @@
           ${tile(LR.trades ? (LR.expectancy_r > 0 ? '+' : '') + LR.expectancy_r + 'R' : '—', 'Per trade',
                  'expectancy, closed only', LR.trades ? dir(LR.expectancy_r) : '')}
         </div>
-        <p class="sec-note">${!LR.trades
+        <p class="sec-note">${!LR.published
+          ? `The record restarts on ${esc(LAUNCH)}, the day the stop rules changed. Breakout was
+             running a stop at 0.29x its own ATR and OHL at 0.78x — inside the range those names
+             cover in a normal session, which is why 91% of them stopped out. Grading the
+             corrected rules with the old rules' results would tell you nothing, so the count
+             starts again here. The earlier signals are not deleted: they remain published in
+             full on <a href="https://news.askakshay.com">news.askakshay.com</a>.`
+          : !LR.trades
           ? `Nothing published since ${esc(LAUNCH)} has closed. That is the truthful state of a
              record that starts here, and it fills itself as positions settle.`
           : LR.trades < 30
