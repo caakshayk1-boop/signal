@@ -99,6 +99,34 @@
     return s + '₹' + Math.round(a).toLocaleString('en-IN');
   };
   const trim = x => String(x.toFixed(2)).replace(/\.?0+$/, '');
+
+  /* ── ONE PRICE FORMAT, EVERYWHERE ────────────────────────────────────────
+   *
+   * Three formats were live on a single screen. The brief's ladder printed
+   * ₹12,540, ₹12,427.44 and ₹8,778.6 one under the other — no decimals, two
+   * decimals, and one decimal — because two different local `f` helpers and a
+   * `maximumFractionDigits: 2` were formatting the same column. The last of
+   * those drops a trailing zero, which is where the single decimal came from.
+   *
+   * Paise on a ₹12,000 stock are not precision, they are noise: the levels are
+   * derived from an ATR measured to the nearest rupee, so printing them to
+   * 1/100th claims an accuracy the inputs never had. Below ₹1,000 the second
+   * decimal starts carrying real information, and under ₹100 it always does.
+   *
+   * The rule was already in this file as fmtN(), used by the screen table and
+   * nowhere else. It is lifted here so there is one answer rather than four.
+   *
+   *     >= 1000   no decimals      ₹12,540
+   *      < 1000   two decimals     ₹847.25
+   */
+  const price = (v, cur = '₹') => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    return cur + Math.abs(n).toLocaleString('en-IN', Math.abs(n) >= 1000
+      ? { maximumFractionDigits: 0 }
+      : { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      .replace(/^/, n < 0 ? '-' : '');
+  };
   /* A SIGNED ZERO IS A LIE ABOUT DIRECTION.
    *
    * This printed the sign from the raw value and the digits from toFixed(2),
@@ -1586,7 +1614,7 @@
     ${(p.reasons || []).length ? `<div class="reads">${p.reasons.map(x =>
         `<div class="read read-for">${esc(x)}</div>`).join('')}</div>` : ''}
     <div class="kv">
-      <div><span class="kk">${p._live ? 'Live' : 'Price'}</span><span class="vv${p._live ? ' lv' : ''}">₹${p._live ? p._live.price.toFixed(2) : esc(p.price)}</span></div>
+      <div><span class="kk">${p._live ? 'Live' : 'Price'}</span><span class="vv${p._live ? ' lv' : ''}">${p._live ? price(p._live.price) : price(p.price)}</span></div>
       <div><span class="kk">Today</span><span class="vv ${p._live ? dir(p._live.change_pct) : ''}">${p._live && p._live.change_pct != null ? pct(p._live.change_pct) : '—'}</span></div>
       <div><span class="kk">1M</span><span class="vv ${dir(p.r1m)}">${pct(p.r1m)}</span></div>
       <div><span class="kk">3M</span><span class="vv ${dir(p.r3m)}">${pct(p.r3m)}</span></div>
@@ -1595,10 +1623,10 @@
       <div><span class="kk">RSI 14D</span><span class="vv">${p.rsi != null ? Math.round(p.rsi) : '—'}</span></div>
     </div>
     ${p.entry ? `<div class="kv lv-plan">
-      <div><span class="kk">Entry</span><span class="vv">₹${esc(p.entry)}</span></div>
+      <div><span class="kk">Entry</span><span class="vv">${price(p.entry)}</span></div>
       <div><span class="kk">Stop</span><span class="vv dn">₹${esc(p.stop)} <i>${esc(p.stop_pct)}%</i></span></div>
-      <div><span class="kk">Target 1</span><span class="vv up">₹${esc(p.t1)} <i>+${esc(p.t1_pct)}%</i></span></div>
-      <div><span class="kk">Target 2</span><span class="vv up">₹${esc(p.t2)} <i>+${esc(p.t2_pct)}%</i></span></div>
+      <div><span class="kk">Target 1</span><span class="vv up">${price(p.t1)} <i>+${esc(p.t1_pct)}%</i></span></div>
+      <div><span class="kk">Target 2</span><span class="vv up">${price(p.t2)} <i>+${esc(p.t2_pct)}%</i></span></div>
     </div>
     ${trailPlan(p.entry, p.stop, p.t1, p.t2, 'BUY')}` : ''}
     <div class="card-foot">
@@ -2551,7 +2579,7 @@
               ${o.rr ? `<span class="pill pill-up">${esc(o.rr)}:1</span>` : ''}</div>
             <div class="kv">
               <div><span class="kk">Entry</span><span class="vv">₹${esc(o.entry ?? '—')}</span></div>
-              <div><span class="kk">Last</span><span class="vv">${live ? '₹' + live.price.toFixed(2) : '—'}</span></div>
+              <div><span class="kk">Last</span><span class="vv">${live ? price(live.price) : '—'}</span></div>
               <div><span class="kk">Stop</span><span class="vv dn">₹${esc(o.stop ?? '—')}</span></div>
               <div><span class="kk">Size</span><span class="vv">${sh != null ? sh.toFixed(1) + '% of book' : '—'}</span></div>
               <div><span class="kk">Risk</span><span class="vv">${o.risk_pct != null ? o.risk_pct + '%' : (d.capital ? (Number(o.risk_amount) / d.capital * 100).toFixed(2) + '%' : '—')}</span></div>
@@ -2866,7 +2894,7 @@
           if (!live) continue;
           const cell = main.querySelector(`[data-sym="${CSS.escape(sym)}"] [data-px]`);
           if (!cell) continue;
-          cell.textContent = '₹' + live.price.toFixed(2);
+          cell.textContent = price(live.price);
           cell.classList.add('lv');
           const day = main.querySelector(`[data-sym="${CSS.escape(sym)}"] [data-day]`);
           if (day && live.change_pct != null) {
@@ -2935,9 +2963,9 @@
     </span>`;
   };
   // Compact Indian-format number for the labels and titles above.
-  const fmtN = v => Number(v) >= 1000
-    ? Math.round(Number(v)).toLocaleString('en-IN')
-    : String(Math.round(Number(v) * 100) / 100);
+  // The rule this defined now lives in price(); kept as a name the screen
+  // table already uses, delegating rather than holding a second copy.
+  const fmtN = v => price(v, '');
 
   const screenTable = (rows, offset) => `<div class="rank">
     <div class="rank-r rank-head scr-r">
@@ -3285,7 +3313,7 @@
       const mv = r.price ? (live.price - r.price) / r.price * 100 : null;
       host.insertAdjacentHTML('afterend',
         `<div class="livebox"><span class="lv-k">Live</span>
-          <b class="lv-p">₹${live.price.toFixed(2)}</b>
+          <b class="lv-p">${price(live.price)}</b>
           ${live.change_pct != null ? `<span class="lv-c ${dir(live.change_pct)}">${pct(live.change_pct)} today</span>` : ''}
           ${mv != null ? `<span class="lv-s">${pct(mv)} vs the ${esc(String(r.last_date || 'screen'))} close</span>` : ''}
         </div>`);
@@ -3373,13 +3401,13 @@
           <span class="spacer"></span>${pill}
         </div>
         <div class="kv">
-          <div><span class="kk">Entry</span><span class="vv">${cur}${esc(r.entry ?? '—')}</span></div>
+          <div><span class="kk">Entry</span><span class="vv">${price(r.entry, cur)}</span></div>
           <div><span class="kk">${open ? 'Last' : 'Exit'}</span><span class="vv">${
-            open ? (live ? cur + live.price.toFixed(2) : '<span style="color:var(--dim)">no mark</span>')
+            open ? (live ? price(live.price, cur) : '<span style="color:var(--dim)">no mark</span>')
                  : cur + esc(r.exit_price ?? '—')}</span></div>
-          <div><span class="kk">Stop</span><span class="vv dn">${cur}${esc(r.sl ?? '—')}</span></div>
-          <div><span class="kk">Target 1</span><span class="vv up">${cur}${esc(r.target1 ?? '—')}</span></div>
-          <div><span class="kk">Target 2</span><span class="vv up">${cur}${esc(r.target2 ?? '—')}</span></div>
+          <div><span class="kk">Stop</span><span class="vv dn">${price(r.sl, cur)}</span></div>
+          <div><span class="kk">Target 1</span><span class="vv up">${price(r.target1, cur)}</span></div>
+          <div><span class="kk">Target 2</span><span class="vv up">${price(r.target2, cur)}</span></div>
           <div><span class="kk">R:R</span><span class="vv">${esc(r.rr ?? '—')}</span></div>
         </div>
         ${open && live && isFinite(Number(r.sl)) && isFinite(Number(r.target1))
@@ -3492,7 +3520,7 @@
     const e = Number(entry), s0 = Number(sl), a = Number(t1), b = Number(t2);
     if (![e, s0, a].every(Number.isFinite)) return '';
     const short = /SELL|SHORT/i.test(String(action || ''));
-    const f = v => '₹' + Number(v).toFixed(2);
+    const f = v => price(v);
     const steps = [
       [`Stop stays at ${f(s0)}`, 'until the first target prints'],
       [`After T1, trail to ${f(e)}`, 'break-even — never back below it'],
@@ -3882,7 +3910,7 @@
     // than the gap between a T1 and a T2 reading on any real setup.
     const rrDisagrees = Number.isFinite(rrLedger)
       && Math.abs(rrLedger - rrT1) > 0.15 && Math.abs(rrLedger - rrT2) > 0.15;
-    const f = v => Number.isFinite(v) ? cur + v.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '—';
+    const f = v => price(v, cur);
     const dist = v => Number.isFinite(v) && Number.isFinite(last) && last
       ? `${v >= last ? '+' : '−'}${f(Math.abs(v - last)).replace(cur, cur)} · ${pct((v - last) / last * 100)}` : '—';
 
@@ -4714,8 +4742,8 @@
             <td>${esc(String(r.alert_date || r.date || '').slice(0, 10))}</td>
             <td style="color:var(--b-ink)">${esc(r.symbol)}</td>
             <td>${esc(r.action || '')}</td>
-            <td class="num">${esc(r.entry ?? '—')}</td>
-            <td class="num">${esc(r.exit_price ?? '—')}</td>
+            <td class="num">${price(r.entry, r.currency || '₹')}</td>
+            <td class="num">${price(r.exit_price, r.currency || '₹')}</td>
             <td style="color:${(r.badge === 'win') ? 'var(--b-bull)' : 'var(--b-bear)'}">${esc(r.status || r.badge || '')}</td>
             <td class="num" style="color:${Number(r.pnl_pct) > 0 ? 'var(--b-bull)' : 'var(--b-bear)'}">${pct(r.pnl_pct)}</td>
           </tr>`).join('')}</tbody></table></div>` : ''}
