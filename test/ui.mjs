@@ -286,8 +286,22 @@ try {
   await p.waitForTimeout(SETTLE);
 
   ok("the hero renders", await p.locator(".hero h1").count() === 1);
+  /* BOUND TO THE BRIEF LINK, NOT TO WHICHEVER BUTTON IS PRIMARY.
+   *
+   * This read `.btn-hero`, which encoded an assumption the check never meant
+   * to make: that the brief is the hero's first call to action. When the front
+   * page moved to leading with the measured record, the brief became the
+   * secondary button and this failed — while the thing it actually cares
+   * about, that a reader is told the brief costs a minute before they commit
+   * to it, was still true and still on screen.
+   *
+   * Addressing the link by its href asserts the real contract and survives the
+   * next reordering. It is also strictly stronger: it can no longer pass
+   * because some other button happens to carry the words. */
   ok("the CTA states how long the brief takes",
-     (await p.locator(".btn-hero").innerText()).includes("60 seconds"));
+     (await p.locator('.hero-cta a[href="#/brief"]').innerText()).includes("60 seconds"));
+  ok("the hero leads with the measured record",
+     (await p.locator(".hero-cta a").first().getAttribute("href")) === "#/signals");
   ok("the header CTA names the product action",
      (await p.locator(".btn-cta").innerText()).toLowerCase().includes("brief"));
   /* THE CHIP REPORTS A MEASUREMENT, NOT A LABEL.
