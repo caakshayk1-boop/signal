@@ -3469,7 +3469,8 @@
         main.innerHTML = base + `<div class="note">
           <b>No signals yet — the record starts today.</b> This page counts only what the
           engine sends from <b>${esc(LAUNCH)}</b> onward, so its win rate is earned here
-          rather than inherited. The scanner publishes at 10:30 and 16:30 IST on weekdays;
+          rather than inherited. The scanner publishes at 10:30 and 18:30 IST on weekdays
+          (13:00 and 21:00 MYT);
           the first entries will appear after those runs.
           <br><br>The full history of ${every.length} earlier signals is unchanged and still
           in the ledger — it is simply older than this page's counting window.

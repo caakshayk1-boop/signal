@@ -231,8 +231,22 @@ try {
    * while someone was reading it. */
   await p.goto(SITE + "#/signals", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE);
+  /* THERE MAY BE NO CARDS, AND THAT IS A REAL STATE.
+   *
+   * This asserted `nLinks > 0` unconditionally, so it failed the moment the
+   * launch cutoff moved and the page correctly had nothing to list. The thing
+   * it protects is that a card, WHERE ONE EXISTS, offers the brief link — not
+   * that the ledger is non-empty, which is not this check's business and is
+   * covered by the empty-state assertion further down. */
+  const nCards = await p.locator("article.sig, .sig-card, .alert-row").count();
   const nLinks = await p.locator("a.brief-link").count();
-  ok("signal cards offer a Full brief link", nLinks > 0, nLinks);
+  if (nCards === 0) {
+    console.log("  NOTE  no signals since launch — nothing to carry a brief link");
+    ok("the empty ledger explains itself rather than showing nothing",
+       /record starts today|No signals yet/i.test(await p.locator("main").innerText()));
+  } else {
+    ok("signal cards offer a Full brief link", nLinks > 0, nLinks);
+  }
   if (nLinks > 1) {
     const link = p.locator("a.brief-link").nth(1);   // deliberately not the default pick
     const wanted = await link.evaluate(a => a.dataset.brief);
@@ -373,7 +387,8 @@ try {
   } else {
     const t = await p.locator("main").innerText();
     console.log("  NOTE  no closed trades since launch — checking the explanation instead");
-    ok("the empty curve says the record starts here", /The record starts here/.test(t));
+    ok("the empty curve says the record starts here",
+       /The record starts here|record starts today|No signals yet/i.test(t));
     /* The pre-launch summary was REMOVED on request. It was extra context, not
      * a disclosure the site depended on: this site never counted those trades
      * as its own, the launch record is empty and says so, and Methodology
