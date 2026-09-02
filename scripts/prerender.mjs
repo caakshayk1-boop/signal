@@ -61,13 +61,30 @@ const wire = Array.isArray(news) ? news : [];
  *
  * It must never fail the build. A snapshot without the numbers is a smaller
  * page; a build that dies because a fetch timed out is an outage. */
+const LAUNCH = "2026-08-29";   // must match LAUNCH in public/signal.js
 async function liveRecord() {
   try {
-    const r = await fetch("https://signal.askakshay.com/api/stats",
+    // /api/signals, NOT /api/stats. stats is all-time and cannot be filtered,
+    // and this snapshot has to describe the same population the page does:
+    // what this site PUBLISHED, from launch, graded. Quoting the all-time
+    // figure here would put one record in the crawler's index and a different
+    // one on the page it links to.
+    const r = await fetch("https://signal.askakshay.com/api/signals?limit=400",
       { signal: AbortSignal.timeout(10000) });
     if (!r.ok) return null;
     const j = await r.json();
-    return j && j.ok && j.headline && j.headline.trades ? j : null;
+    if (!j || !j.ok || !Array.isArray(j.signals)) return null;
+    const rows = j.signals.filter(
+      (x) => String(x.alert_date || x.date || "").slice(0, 10) >= LAUNCH);
+    const closed = rows.filter(
+      (x) => Number.isFinite(Number(x.r_multiple)) && (x.badge || "") !== "open");
+    if (!rows.length) return null;
+    const wins = closed.filter((x) => Number(x.r_multiple) > 0).length;
+    const sum = closed.reduce((a, x) => a + Number(x.r_multiple), 0);
+    return { published: rows.length, trades: closed.length, wins,
+             losses: closed.length - wins,
+             win_rate: closed.length ? Math.round(wins / closed.length * 1000) / 10 : null,
+             expectancy_r: closed.length ? Math.round(sum / closed.length * 1000) / 1000 : null };
   } catch { return null; }
 }
 const rec = await liveRecord();
@@ -79,18 +96,23 @@ const state = up != null && counted
 const block = `${OPEN}
 <section class="pre">
   <p class="pre-k">Signal · ${date}</p>
-  <h1 class="pre-h">${rec
-    ? `Every signal, graded. Including the ${rec.headline.losses} that lost.`
+  <h1 class="pre-h">${rec && rec.trades
+    ? (rec.wins === 0
+        ? `Every signal, graded. All ${rec.trades} that closed, lost.`
+        : `Every signal, graded. Including the ${rec.losses} that lost.`)
     : `Every signal, graded. The record is public.`}</h1>
-  <p class="pre-s">${rec
-    ? `<b>${rec.totals.closed}</b> closed trades, <b>${rec.headline.win_rate}%</b> of them winners,
-       averaging <b>${rec.headline.expectancy_r > 0 ? "+" : ""}${rec.headline.expectancy_r}R</b> a trade.
-       ${rec.headline.expectancy_r < 0
-         ? `That is a losing record and it is published first, because a record shown only after a
-            good month is not a record. The screen below is research on that basis.`
-         : `The screen below is the working behind it.`}`
-    : `Every call is logged when it is made and graded against the bars that follow, win or lose.
-       The full ledger is on the live page.`}</p>
+  <p class="pre-s">${rec && rec.trades
+    ? `<b>${rec.published}</b> published since ${LAUNCH}, <b>${rec.trades}</b> closed, averaging
+       <b>${rec.expectancy_r > 0 ? "+" : ""}${rec.expectancy_r}R</b>.
+       ${rec.trades < 30
+         ? `Too small a sample to prove an edge either way — shown anyway, because waiting until the
+            number flatters is how track records get manufactured. The screen below is research.`
+         : `Published first, because a record shown only after a good month is not a record.`}`
+    : rec
+      ? `<b>${rec.published}</b> published since ${LAUNCH}, none closed yet. The screen below is
+         research until they settle.`
+      : `Every call is logged when it is made and graded against the bars that follow, win or lose.
+         The full ledger is on the live page.`}</p>
   ${universe ? `<p class="pre-m">Every session, <b>${universe} names</b> re-screened and the wire read
     for what touches them.</p>` : ""}
   ${up != null && down != null && counted ? `<p class="pre-m"><b>${up}</b> of <b>${counted}</b>

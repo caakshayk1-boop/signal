@@ -1030,9 +1030,30 @@
      * front page's lead claim, and a lead claim that arrives in a second pass
      * is one the reader has already scrolled past. It is a Turso aggregate of
      * ~100 rows and returns in about a second, alongside the rest. */
-    const [t, p, n, m, fl, ed, lw, stx] = await Promise.all(
+    /* THE RECORD IS THE LAUNCH WINDOW, AND IT HAS TO BE FETCHED THE SAME WAY
+     * #/signals FETCHES IT.
+     *
+     * The first version of the front-page record read /api/stats, which is
+     * all-time and cannot be filtered — the exact thing recordOf() was written
+     * to replace, and the exact failure the LAUNCH comment above describes.
+     * It put "71 closed, 12.7%" at the top of the page while #/signals, two
+     * clicks away, reported the launch window. Two populations under one
+     * heading, which is what makes a reader distrust both numbers.
+     *
+     * ?limit=400 matches the signals route, so get()'s window usually serves
+     * one of the two calls from cache. /api/stats is still fetched, but only
+     * for engine_floors — a property of the engines, not of this site's
+     * record, and labelled as such where it is shown. */
+    const [t, p, n, m, fl, ed, lw, stx, sgx] = await Promise.all(
       [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets'),
-       get('/api/flows'), get('/edition.json'), get('/api/wire'), get('/api/stats')]);
+       get('/api/flows'), get('/edition.json'), get('/api/wire'), get('/api/stats'),
+       get('/api/signals?limit=400')]);
+    /* The site's own record: what it PUBLISHED, from LAUNCH, graded. */
+    const lrRows = sgx.ok && sgx.data && Array.isArray(sgx.data.signals)
+      ? sgx.data.signals.filter(sinceLaunch) : [];
+    const LR = recordOf(lrRows);
+    LR.published = lrRows.length;
+    LR.open = lrRows.filter(r => (r.badge || '').toLowerCase() === 'open').length;
     const heavy = [CACHED('/api/calendar'), CACHED('/screen.json')];
     const cl = heavy[0], sr = heavy[1];
     /* ONCE PER VISIT, NOT ONCE PER RENDER.
@@ -1107,26 +1128,34 @@
             * the edge turns positive this headline reports that instead, by
             * the same mechanism and with no edit. */''}
         ${(() => {
-          const hh = stx.ok && stx.data && stx.data.ok ? stx.data.headline : null;
-          const ht = stx.ok && stx.data && stx.data.ok ? stx.data.totals : null;
-          if (!hh || !ht || !hh.trades) {
+          if (!LR.published) {
             return `<h1>Every signal, graded.<br>The record is public.</h1>
-              <p class="hero-sub">Each call is logged when it is made and graded against the
-                bars that follow, win or lose. The ledger is not reachable this minute —
+              <p class="hero-sub">Each call is logged when it is made and graded against the bars
+                that follow, win or lose. The ledger is not reachable this minute —
                 <a href="#/signals">open the record</a> rather than take this page's word.</p>`;
           }
-          const neg = hh.expectancy_r < 0;
-          return `<h1>Every signal, graded.<br>Including the <b class="dn">${hh.losses}</b> that lost.</h1>
+          if (!LR.trades) {
+            return `<h1>Every signal, graded.<br>The record starts here.</h1>
+              <p class="hero-sub"><b>${LR.published}</b> signals published since
+                ${esc(LAUNCH)}, none closed yet. Nothing to report is reported as nothing,
+                not as a clean slate. Everything below is research until it settles.</p>`;
+          }
+          const neg = LR.expectancy_r < 0;
+          const allLost = LR.wins === 0;
+          const thin = LR.trades < 30;
+          return `<h1>Every signal, graded.<br>${allLost
+              ? `All <b class="dn">${LR.trades}</b> that closed, lost.`
+              : `Including the <b class="dn">${LR.losses}</b> that lost.`}</h1>
             <p class="hero-sub">
-              <b>${ht.closed}</b> closed trades since ${esc(String(ht.first_date || '').slice(0, 7))}.
-              <b>${hh.win_rate}%</b> of them won, and the average trade returned
-              <b class="${neg ? 'dn' : 'up'}">${hh.expectancy_r > 0 ? '+' : ''}${hh.expectancy_r}R</b>.
-              ${neg
-                ? `That is a losing record, and it is stated here first because a page that
-                   only leads with its record on good months is not a record, it is marketing.
-                   Everything below is research on that basis — candidates to examine, not
-                   calls to take.`
-                : `Everything below is the working that produced it.`}
+              <b>${LR.published}</b> published since ${esc(LAUNCH)}.
+              <b>${LR.trades}</b> have closed, averaging
+              <b class="${neg ? 'dn' : 'up'}">${LR.expectancy_r > 0 ? '+' : ''}${LR.expectancy_r}R</b>${
+                allLost ? '' : ` at a <b>${LR.win_rate}%</b> win rate`}.
+              ${thin
+                ? `${LR.trades} trades is too small a sample to prove an edge in either direction —
+                   but it is the record, and a page that waits for a better one before showing it is
+                   not publishing a record. Everything below is research, not a recommendation.`
+                : `Stated first, because a record shown only after a good month is not a record.`}
             </p>`;
         })()}
         <div class="hero-cta">
@@ -1253,33 +1282,43 @@
      * bad week, and reports an edge that turns positive with the same
      * prominence it reports one that has not. */
     const st = stx.ok && stx.data && stx.data.ok ? stx.data : null;
-    if (st && st.headline && st.headline.trades) {
-      const H = st.headline, T = st.totals;
-      const floors = (st.engine_floors || []).slice().sort((a, b) => (b.trades || 0) - (a.trades || 0));
-      /* THE BAR IS THE SITE'S OWN, NOT ONE INVENTED FOR THIS SECTION.
-       * engine_floors already carries `status`, and every engine currently
-       * reads "insufficient-sample" against a 30-trade minimum. Restating
-       * that here in a second place would be a second thing to keep true. */
+    if (LR.published) {
+      const floors = st ? (st.engine_floors || []).slice().sort((a, b) => (b.trades || 0) - (a.trades || 0)) : [];
       const cleared = floors.filter(f => f.status !== 'insufficient-sample').length;
-      const neg = H.expectancy_r < 0;
+      const neg = LR.expectancy_r != null && LR.expectancy_r < 0;
       out += sec('The record', `
         <div class="grid">
-          ${tile(T.closed, 'Closed trades', `since ${esc(String(T.first_date || '').slice(0, 10))}`)}
-          ${tile(H.win_rate + '%', 'Win rate', `${H.wins} of ${H.trades}`, H.win_rate >= 50 ? 'up' : 'dn')}
-          ${tile((H.expectancy_r > 0 ? '+' : '') + H.expectancy_r + 'R', 'Per trade',
-                 'expectancy, closed only', dir(H.expectancy_r))}
-          ${tile(H.profit_factor, 'Profit factor', H.profit_factor >= 1 ? 'above break-even' : 'below break-even',
-                 H.profit_factor >= 1 ? 'up' : 'dn')}
+          ${tile(LR.published, 'Published', `since ${esc(LAUNCH)}`, 'ac')}
+          ${tile(LR.trades, 'Closed and scored', LR.open + ' still open')}
+          ${tile(LR.trades ? LR.win_rate + '%' : '—', 'Win rate',
+                 LR.trades ? `${LR.wins}W / ${LR.losses}L` : 'nothing closed yet',
+                 LR.trades ? (LR.win_rate >= 50 ? 'up' : 'dn') : '')}
+          ${tile(LR.trades ? (LR.expectancy_r > 0 ? '+' : '') + LR.expectancy_r + 'R' : '—', 'Per trade',
+                 'expectancy, closed only', LR.trades ? dir(LR.expectancy_r) : '')}
         </div>
-        <p class="sec-note">${neg
-          ? `Following every signal on this site would have lost <b>${Math.abs(Math.round(H.expectancy_r * H.trades * 10) / 10)}R</b>
-             over ${H.trades} closed trades. The average winner returns <b>+${H.avg_win_r}R</b> against
-             <b>${H.avg_loss_r}R</b> on a loser, so the arithmetic is not the exit — it is that
-             ${(100 - H.win_rate).toFixed(1)}% of entries do not work. Deepest drawdown to date:
-             <b class="dn">${H.max_drawdown_r}R</b>.`
-          : `Across ${H.trades} closed trades the average trade returned <b>+${H.expectancy_r}R</b>,
-             on an average winner of +${H.avg_win_r}R against ${H.avg_loss_r}R on a loser.`}
+        <p class="sec-note">${!LR.trades
+          ? `Nothing published since ${esc(LAUNCH)} has closed. That is the truthful state of a
+             record that starts here, and it fills itself as positions settle.`
+          : LR.trades < 30
+            ? `<b>${LR.trades} closed trades is not a verdict.</b> It is too thin to establish an
+               edge or rule one out, and it is shown anyway because the alternative — waiting until
+               the number flatters — is how track records get manufactured.
+               ${neg ? `As it stands the average trade has cost <b class="dn">${LR.expectancy_r}R</b>.` : ''}`
+            : `Over ${LR.trades} closed trades the average trade returned
+               <b class="${neg ? 'dn' : 'up'}">${LR.expectancy_r > 0 ? '+' : ''}${LR.expectancy_r}R</b>.`}
         </p>
+        ${floors.length ? `
+        ${/* THE ENGINES ARE A DIFFERENT POPULATION AND MUST SAY SO.
+            * These counts are all-time from /api/stats — they include trades
+            * generated before this site published anything. That makes them
+            * useful for judging an ENGINE and invalid as a claim about this
+            * site's record, so they sit under their own heading with their own
+            * sentence saying exactly that. Merging the two is the mistake the
+            * LAUNCH cutoff exists to prevent. */''}
+        <h3 class="sub-h">Before that: the engines' own history</h3>
+        <p class="sec-note">Every trade these engines have generated, including the ones from before
+          this site published anything — a longer sample for judging an engine, and
+          <b>not</b> a record of what this site called.</p>
         <div class="rank">
           <div class="rank-r eng eng-h">
             <span class="s">Engine</span><span class="x">Closed</span>
@@ -1295,19 +1334,17 @@
           </div>`).join('')}
         </div>
         <p class="sec-note">${cleared === 0
-          ? `<b>No engine has cleared the bar.</b> This site's own rule is 30 or more closed trades
-             at a t-statistic of 2 or better before an engine is trusted with capital, and on
-             today's ledger not one of ${floors.length} qualifies. The picks below are published
-             because the record is published with them — they are candidates for your own work,
-             not positions to take.`
-          : `${cleared} of ${floors.length} engines clear the 30-trade, t≥2 bar this site sets
-             before an engine is trusted with capital.`}
-        </p>
-        <p class="hint">Win rate, average R and expectancy are computed over closed signals only;
-          the ${T.open} still open are excluded until they settle.
+          ? `<b>No engine has cleared the bar.</b> This site's rule is 30 or more closed trades at a
+             t-statistic of 2 or better before an engine is trusted with capital, and not one of
+             ${floors.length} qualifies today. That is why nothing below is a recommendation.`
+          : `${cleared} of ${floors.length} engines clear the 30-trade, t≥2 bar this site sets before
+             an engine is trusted with capital.`}
+        </p>` : ''}
+        <p class="hint">Win rate and expectancy count closed signals only; open positions are
+          excluded until they settle.
           <a href="#/methodology">How this is measured</a> ·
           <a href="#/signals">Every trade, one by one</a></p>`,
-        `${T.closed} closed · ${T.open} open`);
+        `${LR.published} published · ${LR.trades} closed`);
     }
 
     out += sec('Today', `<div class="grid grid-5">
@@ -5134,7 +5171,21 @@
     ['Market pulse',   '/pulse.json',      30],
     ['Trade ideas',    '/today.json',      30],
     ['Signal ledger',  '/alerts.json',     30],
-    ['IPO tracker',    '/ipo.json',         8],   // a book moves through the day
+    /* WAS 8, BECAUSE THE SUBSCRIPTION FIGURE IN THIS FILE WENT STALE INSIDE A
+     * SESSION — it showed green at 19 hours while the book it described had
+     * moved from 27x to 104x.
+     *
+     * That is no longer what this file supplies. /api/ipo-live reads the book
+     * straight from NSE on every render, the card carries its own "read HH:MM
+     * UTC", and the volatile number is never the mirrored one any more. What
+     * is left here — band, lot, issue size, the verdict and its reasoning — is
+     * a once-daily build like every other artefact above it.
+     *
+     * Holding it to 8 hours meant the chip went amber every single morning by
+     * about nine and stayed there all day, describing a file whose only
+     * fast-moving field had already been replaced. A warning that is always on
+     * is not a warning. */
+    ['IPO tracker',    '/ipo.json',        30],
     ['Wire',           '/api/wire',         1],   // live, refreshed every 15 min
     ['Conviction',     '/conviction.json', 30],
     ['Edition',        '/edition.json',    30],
@@ -5164,10 +5215,29 @@
    * the most favourable one inside it — the end of that day — with the display
    * saying it is a date rather than a time. */
   const isDateOnly = ts => /^\d{4}-\d{2}-\d{2}$/.test(String(ts || '').trim());
+  /* A NAIVE TIMESTAMP IS UTC, AND THE BROWSER ASSUMES IT IS LOCAL.
+   *
+   * new Date("2026-09-01T23:49:16") — no Z, no offset — is parsed as LOCAL
+   * time per the spec. The Python that writes these feeds works in UTC and
+   * emits some of them without an offset, so every such stamp was read as
+   * being the reader's own UTC offset older than it was.
+   *
+   * That is not a rounding error, it is the reader's longitude: this site is
+   * operated from Malaysia at UTC+8, so a feed built eight hours ago reported
+   * as sixteen. The freshness chip read "15h old" about an IPO file that was
+   * genuinely 8h old, on a page whose entire claim is that it tells you when
+   * to stop trusting it. A staleness indicator that overstates staleness
+   * trains the reader to ignore it, which costs exactly as much as one that
+   * understates it.
+   *
+   * Stamps that DO carry an offset (+05:30 on the screen, Z on the wire) are
+   * untouched — this only supplies the zone the producer omitted. */
   const ageHours = ts => {
     if (!ts) return null;
     const dateOnly = isDateOnly(ts);
-    const dt = new Date(dateOnly ? ts + 'T23:59:59' : ts);
+    let v = String(ts);
+    if (!dateOnly && !/[Zz]$|[+-]\d{2}:?\d{2}$/.test(v)) v += 'Z';
+    const dt = new Date(dateOnly ? ts + 'T23:59:59' : v);
     if (isNaN(dt)) return null;
     return Math.max(0, (Date.now() - dt.getTime()) / 36e5);
   };
