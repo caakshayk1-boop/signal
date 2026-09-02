@@ -3032,6 +3032,33 @@ html:has(dialog[open]){overflow:hidden}
  * claim, the engine history is context under it, and the type has to say which
  * is which before the prose does. */
 .sub-h{font:600 var(--t-4)/1.3 var(--ui);margin:26px 0 6px;color:var(--text)}
+
+/* ── TICKER ───────────────────────────────────────────────────────────────
+ * Deliberately motionless. See the note on the element in index.html: a
+ * marquee moves the number away from the eye reading it, is motion nobody
+ * asked for, freezes in a background tab when driven by rAF, and — worst on
+ * this site — makes a stale price look live.
+ *
+ * scroll-snap so a swipe lands on a whole instrument rather than halfway
+ * through one, and the row is focusable so arrow keys scroll it too. */
+.tkr{border-bottom:1px solid var(--line);background:var(--surface);overflow:hidden}
+.tkr-row{display:flex;gap:0;overflow-x:auto;scroll-snap-type:x proximity;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tkr-row::-webkit-scrollbar{display:none}
+.tkr-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.tkr-i{display:flex;align-items:baseline;gap:7px;padding:7px 14px;white-space:nowrap;
+  scroll-snap-align:start;border-right:1px solid var(--line)}
+.tkr-n{font:500 var(--t-1)/1 var(--mono);color:var(--dim);letter-spacing:.06em;
+  text-transform:uppercase}
+.tkr-p{font:500 var(--t-3)/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.tkr-c{font:500 var(--t-2)/1 var(--mono);font-variant-numeric:tabular-nums}
+.tkr-c.up{color:var(--up)} .tkr-c.dn{color:var(--down)}
+/* A SHUT MARKET SAYS SO. The dimming is the secondary cue; the word is the
+ * one that survives greyscale, a colourblind reader and a bad screen. */
+.tkr-i.is-shut .tkr-p,.tkr-i.is-shut .tkr-c{opacity:.55}
+.tkr-s{font:400 var(--t-1)/1 var(--mono);color:var(--dim);font-style:normal;
+  border:1px solid var(--line);border-radius:3px;padding:2px 4px}
+@media (max-width:600px){ .tkr-i{padding:6px 11px;gap:6px} }
 .rank-r.eng.eng-h .s,.rank-r.eng.eng-h .x{font:500 var(--t-1)/1 var(--mono);color:var(--dim);
   letter-spacing:.08em;text-transform:uppercase}
 @media (max-width:560px){

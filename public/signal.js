@@ -540,7 +540,7 @@
    */
   /* ── WHICH ENGINES THIS SITE PUBLISHES ────────────────────────────────────
    *
-   * The ledger carries eleven engines. This site surfaces six of them, and
+   * The ledger carries twelve engines. This site surfaces seven of them, and
    * the filter is applied once here so every surface agrees — the ledger page,
    * the brief's choice of setup, the record, the open count.
    *
@@ -567,10 +567,11 @@
    * closed to separate them; the Signals page is where that will show up.
    */
   const ENGINES = new Set(['magic', 'magicmagic', 'equity_measured', 'multibagger',
-                           'ai_longterm', 'breakout']);
+                           'ai_longterm', 'breakout', 'momentum_quant']);
   const ENGINE_LABEL = {
     magic: 'Magic', magicmagic: 'Magic', equity_measured: 'Equity, measured',
     multibagger: 'Multibagger', ai_longterm: 'AI', breakout: 'Breakout',
+    momentum_quant: 'Quant momentum',
   };
   const engineOk = r => ENGINES.has(String(r.signal_type || ''));
 
@@ -6331,6 +6332,7 @@
   let lastRefresh = Date.now();
   async function refresh(force) {
     if (!force && document.visibilityState === 'hidden') return;
+    paintTicker();
     if (document.getElementById('sheet')?.open) return;   // never yank an open card
     if (document.querySelector('dialog.cmd[open]')) return;      // nor an open search
     /* NEVER REPAINT UNDER SOMEONE'S HANDS. Typing in the screen search or the
@@ -6452,6 +6454,58 @@
     });
   }
 
+  /* ── THE TICKER ──────────────────────────────────────────────────────────
+   *
+   * Twelve instruments across the top of every page, chosen rather than
+   * dumped: the three Indian indices a reader here actually checks, the two
+   * rupee crosses, gold and crude, then the two US indices that set tomorrow's
+   * open. /api/ticker carries 71 across eleven segments; putting all of them
+   * up here would be the same as putting none.
+   *
+   * WHAT IT DOES THAT A MARQUEE CANNOT:
+   *
+   *  - It says when a market is SHUT. Every Indian row above was "closed" at
+   *    the moment this was written, and a scrolling strip would have shown
+   *    those prices moving past exactly as it shows a live one. A closed row
+   *    is dimmed and carries the word.
+   *  - It holds still, so a number can be read and compared to the one beside
+   *    it. Scrolling is the reader's, on a swipe or an arrow key.
+   *  - The sign is on the number, not only in the colour. Same rule as every
+   *    other figure on this site.
+   *  - It updates on the existing 60-second refresh rather than owning a
+   *    timer, so it cannot drift out of step with the page under it.
+   */
+  const TKR_PICK = [
+    ['Nifty 50', 'NIFTY'], ['Sensex', 'SENSEX'], ['Bank Nifty', 'BANKNIFTY'],
+    ['USD/INR', 'USDINR'], ['MYR/INR', 'MYRINR'],
+    ['Gold', 'GOLD'], ['Crude WTI', 'CRUDE'],
+    ['S&P 500', 'S&P'], ['Nasdaq', 'NASDAQ'],
+  ];
+  async function paintTicker() {
+    const host = document.getElementById('tkr');
+    const row = document.getElementById('tkrRow');
+    if (!host || !row) return;
+    const r = await get('/api/ticker');
+    if (!r.ok || !r.data || !Array.isArray(r.data.segments)) return;
+    const all = r.data.segments.flatMap(sg => sg.items || []);
+    const byName = new Map(all.map(i => [String(i.name || '').toLowerCase(), i]));
+    const items = TKR_PICK.map(([nm]) => byName.get(nm.toLowerCase())).filter(Boolean);
+    if (!items.length) return;
+
+    row.innerHTML = items.map(i => {
+      const closed = String(i.session || '').toLowerCase() === 'closed';
+      const d = dir(i.change_pct);
+      return `<span class="tkr-i${closed ? ' is-shut' : ''}">
+        <b class="tkr-n">${esc(i.name)}</b>
+        <span class="tkr-p">${esc(i.price ?? '—')}</span>
+        <span class="tkr-c ${d}">${pct(i.change_pct)}</span>
+        ${closed ? '<i class="tkr-s">closed</i>' : ''}
+      </span>`;
+    }).join('');
+    host.hidden = false;
+  }
+
+  paintTicker();
   setInterval(() => refresh(false), 60000);
   document.addEventListener('visibilitychange', () => {
     // Back on screen after more than a minute away: refresh at once.

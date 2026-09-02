@@ -105,6 +105,19 @@
  </div>
 </header>
 
+<!-- THE TICKER, AND WHY IT DOES NOT SCROLL BY ITSELF.
+     A marquee is the obvious build and the wrong one here. It moves the number
+     away from the eye that is reading it; it is motion nobody asked for; and
+     driven by requestAnimationFrame it FREEZES in a background tab — a trap
+     this repo has already hit once (see the note in signal.js). Worst of all
+     it flatters: a price gliding past looks live whether or not it is, on a
+     site whose entire argument is that it tells you when to stop trusting it.
+     So this strip holds still, scrolls when you push it, and says which
+     markets are shut. -->
+<div class="tkr" id="tkr" role="region" aria-label="Market ticker" hidden>
+  <div class="tkr-row" id="tkrRow" tabindex="0"></div>
+</div>
+
 
 <!-- FOUR DECISIONS, NOT NINE.
      Nine tabs is not a navigation, it is a list of every page — and it read as
