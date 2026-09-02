@@ -102,6 +102,10 @@ const WATCH = [
     file: "sync-data.yml",
     why: "the mirrored feeds this site renders",
     slots: [
+      // 09:30 MYT — the first collection after the newspaper finishes. This is
+      // the slot that matters: without it the site served yesterday's edition
+      // through the entire Malaysian morning.
+      { dow: [0, 1, 2, 3, 4, 5, 6], h: 1, m: 30 },
       { dow: [0, 1, 2, 3, 4, 5, 6], h: 6, m: 40 },
       { dow: [0, 1, 2, 3, 4, 5, 6], h: 12, m: 40 },
     ],
