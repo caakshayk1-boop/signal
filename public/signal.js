@@ -1075,9 +1075,9 @@
      * one of the two calls from cache. /api/stats is still fetched, but only
      * for engine_floors — a property of the engines, not of this site's
      * record, and labelled as such where it is shown. */
-    const [t, p, n, m, fl, ed, lw, stx, sgx] = await Promise.all(
+    const [t, p, n, m, fl, ed, lw, sgx] = await Promise.all(
       [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets'),
-       get('/api/flows'), get('/edition.json'), get('/api/wire'), get('/api/stats'),
+       get('/api/flows'), get('/edition.json'), get('/api/wire'),
        ledger()]);
     /* THE SITE'S OWN RECORD — THROUGH ledger(), NOT A SECOND COPY OF ITS RULES.
      *
@@ -1181,13 +1181,10 @@
             const reachable = sgx.ok;
             return `<h1>Every signal, graded.<br>The record starts ${esc(LAUNCH)}.</h1>
               <p class="hero-sub">${reachable
-                ? `Nothing published yet under the stop rules corrected today — breakout and OHL
-                   were both running stops inside their own daily range, and every signal before
-                   this line was generated under them. They stay published on
-                   <a href="https://news.askakshay.com">news.askakshay.com</a>; they are simply
-                   not counted here. The first entries land with tonight's scan.`
-                : `Each call is logged when it is made and graded against the bars that follow,
-                   win or lose. The ledger is not answering this minute —
+                ? `Nothing published yet. The stop rules changed today, so the count starts here.
+                   Earlier signals stay on
+                   <a href="https://news.askakshay.com">news.askakshay.com</a>.`
+                : `The ledger is not answering this minute —
                    <a href="#/signals">open the record</a> rather than take this page's word.`}
               </p>`;
           }
@@ -1227,11 +1224,8 @@
               <b>${LR.trades}</b> have closed, averaging
               <b class="${neg ? 'dn' : 'up'}">${LR.expectancy_r > 0 ? '+' : ''}${LR.expectancy_r}R</b>${
                 allLost ? '' : ` at a <b>${LR.win_rate}%</b> win rate`}.
-              ${thin
-                ? `${LR.trades} trades is too small a sample to prove an edge in either direction —
-                   but it is the record, and a page that waits for a better one before showing it is
-                   not publishing a record. Everything below is research, not a recommendation.`
-                : `Stated first, because a record shown only after a good month is not a record.`}
+              ${thin ? `Too few to settle anything. Shown anyway.` : ''}
+              Everything below is research, not a recommendation.
             </p>`;
         })()}
         <div class="hero-cta">
@@ -1357,21 +1351,43 @@
      * so this section cannot drift from the ledger, cannot be forgotten on a
      * bad week, and reports an edge that turns positive with the same
      * prominence it reports one that has not. */
-    const st = stx.ok && stx.data && stx.data.ok ? stx.data : null;
-    /* RENDER WHENEVER THE LEDGER ANSWERED, INCLUDING WITH NOTHING IN IT.
+    /* ── THE RECORD ───────────────────────────────────────────────────────
+     * Counted ONLY from LAUNCH, engines included. The first version of this
+     * section printed "0 published · 0 closed" and then a table of 22 closed
+     * breakout trades from before the cutoff — the pre-launch history this
+     * site had just stopped claiming, restated immediately underneath the zero
+     * that says it does not count it. Two answers to one question, and the
+     * louder one was the one the page had just disowned.
      *
-     * The gate was `if (LR.published)`, so on the day the cutoff moved the
-     * whole section vanished and the front page led with picks again —
-     * silently undoing the reframe at exactly the moment the reader most needs
-     * to be told the record restarted and why. An empty record is a state to
-     * show, not a section to hide. */
+     * So /api/stats is gone from this section. Every figure below comes from
+     * the same rows the tiles do, which makes the section incapable of
+     * disagreeing with itself.
+     *
+     * The prose is short for the same reason. The earlier draft explained the
+     * magic/magicmagic merge, named all eleven engines and justified the
+     * counting window in a paragraph — argument in place of numbers, on a
+     * page whose case is that the numbers speak. */
     if (sgx.ok) {
-      const floors = st ? (st.engine_floors || []).slice().sort((a, b) => (b.trades || 0) - (a.trades || 0)) : [];
-      const cleared = floors.filter(f => f.status !== 'insufficient-sample').length;
+      const fam = new Map();
+      for (const k of ENGINES) {
+        const label = ENGINE_LABEL[k] || k;
+        if (!fam.has(label)) fam.set(label, { label, pub: 0, closed: 0, wins: 0 });
+      }
+      for (const r of lrRows) {
+        const label = ENGINE_LABEL[r.signal_type] || r.signal_type;
+        const f = fam.get(label);
+        if (!f) continue;
+        f.pub += 1;
+        if ((r.badge || '') !== 'open' && Number.isFinite(Number(r.r_multiple))) {
+          f.closed += 1;
+          if (Number(r.r_multiple) > 0) f.wins += 1;
+        }
+      }
+      const rows = [...fam.values()].sort((a, b) => b.closed - a.closed || b.pub - a.pub);
       const neg = LR.expectancy_r != null && LR.expectancy_r < 0;
       out += sec('The record', `
         <div class="grid">
-          ${tile(LR.published, 'Published', `since ${esc(LAUNCH)}`, 'ac')}
+          ${tile(LR.published, 'Published', `since ${esc(LAUNCH)}`, LR.published ? 'ac' : '')}
           ${tile(LR.trades, 'Closed and scored', LR.open + ' still open')}
           ${tile(LR.trades ? LR.win_rate + '%' : '—', 'Win rate',
                  LR.trades ? `${LR.wins}W / ${LR.losses}L` : 'nothing closed yet',
@@ -1380,106 +1396,29 @@
                  'expectancy, closed only', LR.trades ? dir(LR.expectancy_r) : '')}
         </div>
         <p class="sec-note">${!LR.published
-          ? `The record restarts on ${esc(LAUNCH)}, the day the stop rules changed. Breakout was
-             running a stop at 0.29x its own ATR and OHL at 0.78x — inside the range those names
-             cover in a normal session, which is why 91% of them stopped out. Grading the
-             corrected rules with the old rules' results would tell you nothing, so the count
-             starts again here. The earlier signals are not deleted: they remain published in
-             full on <a href="https://news.askakshay.com">news.askakshay.com</a>.`
+          ? `Restarted ${esc(LAUNCH)}, the day the stop rules changed. Earlier signals stay on
+             <a href="https://news.askakshay.com">news.askakshay.com</a>.`
           : !LR.trades
-          ? `Nothing published since ${esc(LAUNCH)} has closed. That is the truthful state of a
-             record that starts here, and it fills itself as positions settle.`
-          : LR.trades < 30
-            ? `<b>${LR.trades} closed trades is not a verdict.</b> It is too thin to establish an
-               edge or rule one out, and it is shown anyway because the alternative — waiting until
-               the number flatters — is how track records get manufactured.
-               ${neg ? `As it stands the average trade has cost <b class="dn">${LR.expectancy_r}R</b>.` : ''}`
-            : `Over ${LR.trades} closed trades the average trade returned
-               <b class="${neg ? 'dn' : 'up'}">${LR.expectancy_r > 0 ? '+' : ''}${LR.expectancy_r}R</b>.`}
+          ? `Nothing has closed yet.`
+          : `${LR.trades} closed, averaging
+             <b class="${neg ? 'dn' : 'up'}">${LR.expectancy_r > 0 ? '+' : ''}${LR.expectancy_r}R</b>.
+             ${LR.trades < 30 ? 'Too few to settle anything, and shown anyway.' : ''}`}
         </p>
-        ${(() => {
-          /* THE TABLE USED TO LIST THE ENGINES THIS SITE DOES NOT PUBLISH.
-           *
-           * It was built from engine_floors, which is every engine in the
-           * ledger ranked by sample size: ohl, breakout, commodity, cf_1h,
-           * equity_measured. Exactly ONE of those five is on this site's
-           * whitelist. So the record section named four engines whose signals
-           * this site deliberately never shows, and omitted four it does —
-           * directly under a paragraph explaining what this site publishes.
-           *
-           * It is now driven by ENGINES, the same set ledger() filters on.
-           * magic and magicmagic stay merged into one family, for the reason
-           * given at that constant: four closed trades and one closed trade
-           * are not two win rates worth comparing.
-           *
-           * An engine with nothing closed says so. That is the honest state of
-           * four of the five, and hiding those rows would leave a table that
-           * implies this site has a track record it does not have. */
-          const bt = st && st.by_signal_type ? st.by_signal_type : null;
-          const statOf = k => {
-            if (!bt) return null;
-            if (Array.isArray(bt)) return bt.find(x => (x.key || x.signal_type) === k) || null;
-            return bt[k] || null;
-          };
-          const fam = new Map();
-          for (const k of ENGINES) {
-            const label = ENGINE_LABEL[k] || k;
-            const cur = fam.get(label) || { label, trades: 0, wins: 0 };
-            const r = statOf(k);
-            if (r) {
-              const n = Number(r.trades || r.closed || 0) || 0;
-              cur.trades += n;
-              cur.wins += Math.round((Number(r.win_rate) || 0) / 100 * n);
-            }
-            fam.set(label, cur);
-          }
-          const rows = [...fam.values()].sort((a, b) => b.trades - a.trades);
-          const anyClosed = rows.some(r => r.trades > 0);
-          return `
-        <h3 class="sub-h">The engines this site publishes</h3>
-        <p class="sec-note">Six engines, shown as ${rows.length} rows: <b>magic</b> and
-          <b>magicmagic</b> are counted as one family until enough of each has closed to tell them
-          apart — four closed trades against one is not two win rates worth comparing.
-          Counted over every trade these engines have generated, including before
-          this site started publishing — a longer sample for judging an engine than the
-          ${LR.trades} closed above, and still not a record of what this site called.
-          The ledger carries eleven engines; the other five (<b>ohl</b>, <b>commodity</b>,
-          <b>cf_1h</b>, <b>top5_pick</b>, <b>sip_bucket</b>) are not published here and are not
-          counted anywhere on this page.</p>
         <div class="rank">
           <div class="rank-r eng eng-h">
-            <span class="s">Engine</span><span class="x">Closed</span>
-            <span class="x">Win rate</span><span class="x">Cleared for capital</span>
+            <span class="s">Engine</span><span class="x">Published</span>
+            <span class="x">Closed</span><span class="x">Win rate</span>
           </div>
           ${rows.map(r => `<div class="rank-r eng">
             <span class="s"><b>${esc(r.label)}</b></span>
-            <span class="x">${r.trades || '—'}</span>
-            <span class="x">${r.trades ? (Math.round(r.wins / r.trades * 1000) / 10) + '%' : '—'}</span>
-            ${/* "6 of 30" SAT NEXT TO A COLUMN READING "0%" AND WAS READ AS SIX WINS.
-                * It meant six closed trades against the thirty the bar needs, but
-                * the closed count is already its own column, so the pill was
-                * repeating a number the row had and inviting the wrong reading of
-                * it. It now states what is MISSING, which the row does not say
-                * anywhere else and which is the actual answer to "cleared?". */''}
-            <span class="x">${r.trades >= 30
-              ? `<i class="pill v-apply">cleared</i>`
-              : r.trades
-                ? `<i class="pill v-avoid">${30 - r.trades} more needed</i>`
-                : `<i class="pill">none closed yet</i>`}</span>
+            <span class="x">${r.pub || '—'}</span>
+            <span class="x">${r.closed || '—'}</span>
+            <span class="x">${r.closed
+              ? (Math.round(r.wins / r.closed * 1000) / 10) + '%' : '—'}</span>
           </div>`).join('')}
         </div>
-        <p class="sec-note"><b>No engine has cleared the bar.</b> The rule is 30 or more closed
-          trades at a t-statistic of 2 or better before an engine is trusted with capital.
-          ${anyClosed
-            ? `${rows.filter(r => !r.trades).length} of the ${rows.length} have never closed a
-               trade, and the ${rows.filter(r => r.trades).length === 1 ? 'one that has is' :
-               'ones that have are'} well short of the sample.`
-            : `None of them has closed a trade yet.`}
-          That is why nothing below is a recommendation.</p>`;
-        })()}
-        <p class="hint">Win rate and expectancy count closed signals only; open positions are
-          excluded until they settle.
-          <a href="#/methodology">How this is measured</a> ·
+        <p class="hint">An engine is trusted with capital at 30 closed trades and t&nbsp;≥&nbsp;2.
+          None is there. <a href="#/methodology">How this is measured</a> ·
           <a href="#/signals">Every trade, one by one</a></p>`,
         `${LR.published} published · ${LR.trades} closed`);
     }
@@ -1603,14 +1542,11 @@
          * ledger reading −0.556R a recommendation is not what this can
          * honestly be. Renaming the section would have hidden the history;
          * saying plainly what it is, directly under the name, does not. */
-        'Ranked candidates for your own work, not positions to take. The engines behind '
-          + 'them have not cleared this site\'s 30-trade bar — the record above is the '
-          + 'reason to treat every name here as a starting point.');
+        'Ranked candidates, not positions to take. No engine has cleared the 30-trade bar.');
     } else {
       const pk = (d.picks || [])[0];
       if (pk) out += sec('This week’s top idea', ideaCard(pk, true), null,
-        'The highest-scoring setup the screen found this week. Scored, not endorsed — '
-        + 'see the record above for how setups of this kind have actually resolved.');
+        'The week\'s highest-scoring setup. Scored, not endorsed.');
     }
 
     const io = (await get('/ipo.json'));

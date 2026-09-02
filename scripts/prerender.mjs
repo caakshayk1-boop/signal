@@ -107,17 +107,14 @@ const block = `${OPEN}
   <p class="pre-s">${rec && rec.trades
     ? `<b>${rec.published}</b> published since ${LAUNCH}, <b>${rec.trades}</b> closed, averaging
        <b>${rec.expectancy_r > 0 ? "+" : ""}${rec.expectancy_r}R</b>.
-       ${rec.trades < 30
-         ? `Too small a sample to prove an edge either way — shown anyway, because waiting until the
-            number flatters is how track records get manufactured. The screen below is research.`
-         : `Published first, because a record shown only after a good month is not a record.`}`
+       ${rec.trades < 30 ? `Too few to settle anything. Shown anyway.` : ``}
+       The screen below is research.`
     : rec && rec.published
       ? `<b>${rec.published}</b> published since ${LAUNCH}, none closed yet. The screen below is
          research until they settle.`
       : rec
-      ? `The record restarts on ${LAUNCH}, the day the stop rules changed — breakout and OHL were
-         both running stops inside their own daily range. Earlier signals stay published on
-         news.askakshay.com; they are not counted here.`
+      ? `Nothing published yet. The stop rules changed on ${LAUNCH}, so the count starts there.
+         Earlier signals stay on news.askakshay.com.`
       : `Every call is logged when it is made and graded against the bars that follow, win or lose.
          The full ledger is on the live page.`}</p>
   ${universe ? `<p class="pre-m">Every session, <b>${universe} names</b> re-screened and the wire read
