@@ -46,6 +46,32 @@ const universe = num(pulse.universe) || num(br.counted) || num(scr.universe_size
 const picks = Array.isArray(today.picks) ? today.picks : [];
 const wire = Array.isArray(news) ? news : [];
 
+/* THE RECORD, READ RATHER THAN RECOMPUTED.
+ *
+ * The snapshot's old headline sold the signals — "decoded in 60 seconds",
+ * "one setup written up in full". That is the sentence a crawler indexes and
+ * a link preview shows, and it is the one the ledger contradicts.
+ *
+ * The figures are not in any static feed, and the two ways to get them here
+ * were: compute them from alerts.json, or ask the API that already computes
+ * them. Computing them would put a second implementation of this site's
+ * headline number in a build script — the failure this repo has hit more than
+ * once. So it asks the live Worker, which is the same source the page itself
+ * reads a second later.
+ *
+ * It must never fail the build. A snapshot without the numbers is a smaller
+ * page; a build that dies because a fetch timed out is an outage. */
+async function liveRecord() {
+  try {
+    const r = await fetch("https://signal.askakshay.com/api/stats",
+      { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.ok && j.headline && j.headline.trades ? j : null;
+  } catch { return null; }
+}
+const rec = await liveRecord();
+
 const state = up != null && counted
   ? (up / counted >= 0.6 ? "Broad advance" : up / counted <= 0.4 ? "Broad decline" : "Split")
   : null;
@@ -53,16 +79,25 @@ const state = up != null && counted
 const block = `${OPEN}
 <section class="pre">
   <p class="pre-k">Signal · ${date}</p>
-  <h1 class="pre-h">Indian markets, decoded in 60 seconds.</h1>
-  <p class="pre-s">${universe ? `Every session, <b>${universe} names</b> re-screened, the wire read for
-    what touches them, and one setup written up in full — with the stop, the target and the reason it
-    would be wrong.` : `Every session: the full screen re-run, the wire read for what touches it, and
-    one setup written up in full.`}</p>
+  <h1 class="pre-h">${rec
+    ? `Every signal, graded. Including the ${rec.headline.losses} that lost.`
+    : `Every signal, graded. The record is public.`}</h1>
+  <p class="pre-s">${rec
+    ? `<b>${rec.totals.closed}</b> closed trades, <b>${rec.headline.win_rate}%</b> of them winners,
+       averaging <b>${rec.headline.expectancy_r > 0 ? "+" : ""}${rec.headline.expectancy_r}R</b> a trade.
+       ${rec.headline.expectancy_r < 0
+         ? `That is a losing record and it is published first, because a record shown only after a
+            good month is not a record. The screen below is research on that basis.`
+         : `The screen below is the working behind it.`}`
+    : `Every call is logged when it is made and graded against the bars that follow, win or lose.
+       The full ledger is on the live page.`}</p>
+  ${universe ? `<p class="pre-m">Every session, <b>${universe} names</b> re-screened and the wire read
+    for what touches them.</p>` : ""}
   ${up != null && down != null && counted ? `<p class="pre-m"><b>${up}</b> of <b>${counted}</b>
     screened names advanced and <b>${down}</b> declined${state ? ` — ${esc(state.toLowerCase())}` : ""}.
     ${num(br.at_52w_high) != null ? `<b>${br.at_52w_high}</b> sit at a 52-week high.` : ""}</p>` : ""}
-  ${picks.length ? `<p class="pre-m"><b>${picks.length}</b> ideas cleared the screen this week${
-    picks[0] && picks[0].sym ? `, led by <b>${esc(picks[0].sym)}</b>` : ""}.</p>` : ""}
+  ${picks.length ? `<p class="pre-m"><b>${picks.length}</b> candidates cleared the screen this week${
+    picks[0] && picks[0].sym ? `, led by <b>${esc(picks[0].sym)}</b>` : ""} — ranked, not recommended.</p>` : ""}
   ${wire.length ? `<ul class="pre-l">${wire.slice(0, 4).map((x) =>
     `<li><b>${esc(x.source || "wire")}</b> — ${esc(x.title || "")}</li>`).join("")}</ul>` : ""}
   <p class="pre-n">This is the snapshot published with the build${date ? ` on ${date}` : ""}.

@@ -1026,9 +1026,13 @@
      * to the wire. Anything that changes between the passes is flagged by the
      * usual change-flash rather than swapping silently. */
     const n2 = { ok: false, data: null };   // filled below; the hero reads its length
-    const [t, p, n, m, fl, ed, lw] = await Promise.all(
+    /* /api/stats joins the first wave deliberately. The record is now the
+     * front page's lead claim, and a lead claim that arrives in a second pass
+     * is one the reader has already scrolled past. It is a Turso aggregate of
+     * ~100 rows and returns in about a second, alongside the rest. */
+    const [t, p, n, m, fl, ed, lw, stx] = await Promise.all(
       [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets'),
-       get('/api/flows'), get('/edition.json'), get('/api/wire')]);
+       get('/api/flows'), get('/edition.json'), get('/api/wire'), get('/api/stats')]);
     const heavy = [CACHED('/api/calendar'), CACHED('/screen.json')];
     const cl = heavy[0], sr = heavy[1];
     /* ONCE PER VISIT, NOT ONCE PER RENDER.
@@ -1084,24 +1088,51 @@
             * under it is the only honest proof — today's actual counts, from
             * the feeds this page has already loaded. If the screen is empty
             * the sentence says so rather than making the claim anyway. */''}
-        <h1>Indian markets,<br>decoded in 60 seconds.</h1>
-        <p class="hero-sub">${(() => {
-          const pu0 = p.ok ? p.data : {};
-          const n = Number(pu0.universe || (pu0.breadth || {}).counted) || null;
-          const up = Number((pu0.breadth || {}).up);
-          const wireN = (n_ok => n_ok ? n_ok.length : 0)(n2.ok ? n2.data : null);
-          return n
-            ? `Every session, <b>${n} names</b> re-screened, the wire read for what touches them,
-               and one setup written up in full — with the stop, the target and the reason it
-               would be wrong. ${Number.isFinite(up) ? `<b>${up}</b> of them are up today.` : ''}`
-            : `Every session: the full screen re-run, the wire read for what touches it, and one
-               setup written up in full — with the stop, the target and the reason it would be
-               wrong. Today's build has not landed yet.`;
-        })()}</p>
+        ${/* THE HEADLINE USED TO SELL THE SIGNALS. THE LEDGER REFUTES THEM.
+            *
+            * It read "Indian markets, decoded in 60 seconds", under which the
+            * subhead promised "one setup written up in full — with the stop,
+            * the target and the reason it would be wrong". Every word of that
+            * was true about the process and silent about the outcome, while
+            * this site's own published record showed 62 losses in 71 closed
+            * trades at an expectancy of −0.556R.
+            *
+            * A page cannot lead with a claim its own measurement contradicts
+            * and still call itself measured. So the lead is now the record —
+            * including, and especially, when the record is bad. That is the
+            * only version of this page that is honest on a losing month, and
+            * a page that is only honest on good months is not honest.
+            *
+            * The numbers are read live from /api/stats, never typed here. If
+            * the edge turns positive this headline reports that instead, by
+            * the same mechanism and with no edit. */''}
+        ${(() => {
+          const hh = stx.ok && stx.data && stx.data.ok ? stx.data.headline : null;
+          const ht = stx.ok && stx.data && stx.data.ok ? stx.data.totals : null;
+          if (!hh || !ht || !hh.trades) {
+            return `<h1>Every signal, graded.<br>The record is public.</h1>
+              <p class="hero-sub">Each call is logged when it is made and graded against the
+                bars that follow, win or lose. The ledger is not reachable this minute —
+                <a href="#/signals">open the record</a> rather than take this page's word.</p>`;
+          }
+          const neg = hh.expectancy_r < 0;
+          return `<h1>Every signal, graded.<br>Including the <b class="dn">${hh.losses}</b> that lost.</h1>
+            <p class="hero-sub">
+              <b>${ht.closed}</b> closed trades since ${esc(String(ht.first_date || '').slice(0, 7))}.
+              <b>${hh.win_rate}%</b> of them won, and the average trade returned
+              <b class="${neg ? 'dn' : 'up'}">${hh.expectancy_r > 0 ? '+' : ''}${hh.expectancy_r}R</b>.
+              ${neg
+                ? `That is a losing record, and it is stated here first because a page that
+                   only leads with its record on good months is not a record, it is marketing.
+                   Everything below is research on that basis — candidates to examine, not
+                   calls to take.`
+                : `Everything below is the working that produced it.`}
+            </p>`;
+        })()}
         <div class="hero-cta">
-          <a class="btn-hero" href="#/brief">Today’s brief
-            <em>${CURVE_MIN} · what is set up and where it is wrong</em></a>
-          <a class="btn-ghost" href="#/signals">See the record →</a>
+          <a class="btn-hero" href="#/signals">The record
+            <em>every trade, graded, with the losses</em></a>
+          <a class="btn-ghost" href="#/brief">Today’s brief · ${CURVE_MIN} →</a>
         </div>
       </div>
       <div class="hero-r">
@@ -1210,6 +1241,74 @@
     const t5 = (id, v, k, sub, cls) => `<button type="button" class="tile tile-go" data-t5="${id}">
       <div class="v ${cls || ''}">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}
       <div class="k">${esc(k)}</div></button>`;
+
+    /* ── THE RECORD, FIRST ────────────────────────────────────────────────
+     * Placed above every pick on the page, and that placement is the whole
+     * change. The measurement already existed and was honest; it lived on
+     * #/signals, two clicks from anybody who never went looking. A record
+     * that only the sceptical reader finds is not disclosure.
+     *
+     * Nothing here is written by hand. Every figure is read from /api/stats,
+     * so this section cannot drift from the ledger, cannot be forgotten on a
+     * bad week, and reports an edge that turns positive with the same
+     * prominence it reports one that has not. */
+    const st = stx.ok && stx.data && stx.data.ok ? stx.data : null;
+    if (st && st.headline && st.headline.trades) {
+      const H = st.headline, T = st.totals;
+      const floors = (st.engine_floors || []).slice().sort((a, b) => (b.trades || 0) - (a.trades || 0));
+      /* THE BAR IS THE SITE'S OWN, NOT ONE INVENTED FOR THIS SECTION.
+       * engine_floors already carries `status`, and every engine currently
+       * reads "insufficient-sample" against a 30-trade minimum. Restating
+       * that here in a second place would be a second thing to keep true. */
+      const cleared = floors.filter(f => f.status !== 'insufficient-sample').length;
+      const neg = H.expectancy_r < 0;
+      out += sec('The record', `
+        <div class="grid">
+          ${tile(T.closed, 'Closed trades', `since ${esc(String(T.first_date || '').slice(0, 10))}`)}
+          ${tile(H.win_rate + '%', 'Win rate', `${H.wins} of ${H.trades}`, H.win_rate >= 50 ? 'up' : 'dn')}
+          ${tile((H.expectancy_r > 0 ? '+' : '') + H.expectancy_r + 'R', 'Per trade',
+                 'expectancy, closed only', dir(H.expectancy_r))}
+          ${tile(H.profit_factor, 'Profit factor', H.profit_factor >= 1 ? 'above break-even' : 'below break-even',
+                 H.profit_factor >= 1 ? 'up' : 'dn')}
+        </div>
+        <p class="sec-note">${neg
+          ? `Following every signal on this site would have lost <b>${Math.abs(Math.round(H.expectancy_r * H.trades * 10) / 10)}R</b>
+             over ${H.trades} closed trades. The average winner returns <b>+${H.avg_win_r}R</b> against
+             <b>${H.avg_loss_r}R</b> on a loser, so the arithmetic is not the exit — it is that
+             ${(100 - H.win_rate).toFixed(1)}% of entries do not work. Deepest drawdown to date:
+             <b class="dn">${H.max_drawdown_r}R</b>.`
+          : `Across ${H.trades} closed trades the average trade returned <b>+${H.expectancy_r}R</b>,
+             on an average winner of +${H.avg_win_r}R against ${H.avg_loss_r}R on a loser.`}
+        </p>
+        <div class="rank">
+          <div class="rank-r eng eng-h">
+            <span class="s">Engine</span><span class="x">Closed</span>
+            <span class="x">Win rate</span><span class="x">Cleared for capital</span>
+          </div>
+          ${floors.map(f => `<div class="rank-r eng">
+            <span class="s"><b>${esc(f.key)}</b></span>
+            <span class="x">${f.trades}</span>
+            <span class="x">${f.win_rate}%</span>
+            <span class="x">${f.status === 'insufficient-sample'
+              ? `<i class="pill v-avoid">${f.trades} of 30</i>`
+              : `<i class="pill v-apply">cleared</i>`}</span>
+          </div>`).join('')}
+        </div>
+        <p class="sec-note">${cleared === 0
+          ? `<b>No engine has cleared the bar.</b> This site's own rule is 30 or more closed trades
+             at a t-statistic of 2 or better before an engine is trusted with capital, and on
+             today's ledger not one of ${floors.length} qualifies. The picks below are published
+             because the record is published with them — they are candidates for your own work,
+             not positions to take.`
+          : `${cleared} of ${floors.length} engines clear the 30-trade, t≥2 bar this site sets
+             before an engine is trusted with capital.`}
+        </p>
+        <p class="hint">Win rate, average R and expectancy are computed over closed signals only;
+          the ${T.open} still open are excluded until they settle.
+          <a href="#/methodology">How this is measured</a> ·
+          <a href="#/signals">Every trade, one by one</a></p>`,
+        `${T.closed} closed · ${T.open} open`);
+    }
 
     out += sec('Today', `<div class="grid grid-5">
         ${t5('news', wireTop && wireTop.n ? wireTop.n : (wire.length ? '—' : '0'),
@@ -1324,10 +1423,20 @@
            <p class="hint">Ranked ${esc(c.date)} over ${esc(c.universe)} screened names. The slate is
            logged every day, so it can be graded later rather than quietly rewritten.</p>
          </details>`,
-        `${c.picks.length} names · ${esc(c.date)}`);
+        `${c.picks.length} names · ${esc(c.date)}`,
+        /* THE LEAD SAYS WHAT THESE ARE, BECAUSE THE HEADING DOES NOT.
+         * "Today's conviction" is the language of a recommendation, and on a
+         * ledger reading −0.556R a recommendation is not what this can
+         * honestly be. Renaming the section would have hidden the history;
+         * saying plainly what it is, directly under the name, does not. */
+        'Ranked candidates for your own work, not positions to take. The engines behind '
+          + 'them have not cleared this site\'s 30-trade bar — the record above is the '
+          + 'reason to treat every name here as a starting point.');
     } else {
       const pk = (d.picks || [])[0];
-      if (pk) out += sec('This week’s top idea', ideaCard(pk, true));
+      if (pk) out += sec('This week’s top idea', ideaCard(pk, true), null,
+        'The highest-scoring setup the screen found this week. Scored, not endorsed — '
+        + 'see the record above for how setups of this kind have actually resolved.');
     }
 
     const io = (await get('/ipo.json'));

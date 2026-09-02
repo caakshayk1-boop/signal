@@ -3013,6 +3013,27 @@ html:has(dialog[open]){overflow:hidden}
 .rank-r.xtra{display:grid;grid-template-columns:minmax(0,1fr) 96px 116px;gap:0 12px;
   align-items:baseline;padding:13px 16px;border-top:1px solid var(--line)}
 .rank-r.xtra:first-child{border-top:0}
+
+/* ── ENGINE CLEARANCE ROW ─────────────────────────────────────────────────
+ * A fourth column the .xtra variant does not have. Every engine on the
+ * ledger, its sample, and whether it clears the 30-trade bar this site sets
+ * before an engine is trusted with capital — so the answer is a row in the
+ * record rather than a claim in prose.
+ * On a phone the verdict wraps to its own full-width line: at 320px four
+ * columns cannot hold a name, two figures and a pill without one of them
+ * being unreadable, and the verdict is the column worth keeping whole. */
+.rank-r.eng{grid-template-columns:minmax(0,1fr) 72px 84px 120px;gap:0 12px;align-items:center}
+.rank-r.eng .s b{font:600 var(--t-4)/1.2 var(--mono);color:var(--text)}
+.rank-r.eng .x{font:500 var(--t-4)/1.3 var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.rank-r.eng .x .pill{font-style:normal;white-space:nowrap}
+.rank-r.eng.eng-h{background:var(--surface2,var(--surface))}
+.rank-r.eng.eng-h .s,.rank-r.eng.eng-h .x{font:500 var(--t-1)/1 var(--mono);color:var(--dim);
+  letter-spacing:.08em;text-transform:uppercase}
+@media (max-width:560px){
+  .rank-r.eng{grid-template-columns:minmax(0,1fr) 64px 72px;gap:6px 10px}
+  .rank-r.eng .x:last-child{grid-column:1/-1;text-align:left}
+  .rank-r.eng.eng-h .x:last-child{display:none}
+}
 .rank-r.xtra .s b{display:block;font:600 var(--t-4)/1.2 var(--mono);color:var(--text)}
 .rank-r.xtra .s span{display:block;margin-top:2px;font:400 var(--t-3)/1.4 var(--ui);color:var(--dim)}
 .rank-r.xtra .x{font:500 var(--t-4)/1.3 var(--mono);font-variant-numeric:tabular-nums;
