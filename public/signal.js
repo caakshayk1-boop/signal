@@ -1396,8 +1396,7 @@
                  'expectancy, closed only', LR.trades ? dir(LR.expectancy_r) : '')}
         </div>
         <p class="sec-note">${!LR.published
-          ? `Restarted ${esc(LAUNCH)}, the day the stop rules changed. Earlier signals stay on
-             <a href="https://news.askakshay.com">news.askakshay.com</a>.`
+          ? ``
           : !LR.trades
           ? `Nothing has closed yet.`
           : `${LR.trades} closed, averaging
