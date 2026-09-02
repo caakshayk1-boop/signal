@@ -1047,10 +1047,22 @@
     const [t, p, n, m, fl, ed, lw, stx, sgx] = await Promise.all(
       [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets'),
        get('/api/flows'), get('/edition.json'), get('/api/wire'), get('/api/stats'),
-       get('/api/signals?limit=400')]);
-    /* The site's own record: what it PUBLISHED, from LAUNCH, graded. */
-    const lrRows = sgx.ok && sgx.data && Array.isArray(sgx.data.signals)
-      ? sgx.data.signals.filter(sinceLaunch) : [];
+       ledger()]);
+    /* THE SITE'S OWN RECORD — THROUGH ledger(), NOT A SECOND COPY OF ITS RULES.
+     *
+     * The first attempt fetched /api/signals here and filtered it by hand. It
+     * matched on the launch cutoff and still disagreed with #/signals: 38
+     * published against 19, 8 closed against 2. The missing rule was the
+     * engine whitelist — ledger() drops rows whose signal_type is not in
+     * ENGINES, and re-deriving the population by hand simply did not know
+     * that.
+     *
+     * Which is the whole lesson twice over. Consistency between two pages
+     * cannot come from carefully writing the same filter in both places; it
+     * has to come from calling the same function. ledger() also carries the
+     * alerts.json fallback, so the front page now degrades the way the signals
+     * page does instead of showing nothing. */
+    const lrRows = sgx.ok ? (sgx.rows || []).filter(sinceLaunch) : [];
     const LR = recordOf(lrRows);
     LR.published = lrRows.length;
     LR.open = lrRows.filter(r => (r.badge || '').toLowerCase() === 'open').length;
@@ -1133,6 +1145,25 @@
               <p class="hero-sub">Each call is logged when it is made and graded against the bars
                 that follow, win or lose. The ledger is not reachable this minute —
                 <a href="#/signals">open the record</a> rather than take this page's word.</p>`;
+          }
+          /* BELOW FIVE, THE HEADLINE STATES THE COUNT AND NOT A VERDICT.
+           *
+           * This page already holds that line elsewhere: rCurve() returns null
+           * under five closed trades, and #/signals says in as many words that
+           * "a curve needs five before its shape means anything". A headline
+           * reading "All 2 that closed, lost" would break that rule in the
+           * loudest type on the site — technically true, and a verdict drawn
+           * from two data points, which is the same error as claiming an edge
+           * from two winners. Being wrong in the pessimistic direction is
+           * still being wrong. */
+          if (LR.trades && LR.trades < 5) {
+            return `<h1>Every signal, graded.<br>The record starts here.</h1>
+              <p class="hero-sub"><b>${LR.published}</b> published since ${esc(LAUNCH)},
+                <b>${LR.trades}</b> closed so far${LR.wins === 0 && LR.trades
+                  ? ` — <b class="dn">${LR.trades === 1 ? 'a loss' : 'both losses'}</b>` : ''}.
+                That is too few to mean anything in either direction, and it is shown rather
+                than withheld until it flatters. Everything below is research, not a
+                recommendation.</p>`;
           }
           if (!LR.trades) {
             return `<h1>Every signal, graded.<br>The record starts here.</h1>
