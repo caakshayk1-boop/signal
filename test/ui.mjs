@@ -238,7 +238,7 @@ try {
    * it protects is that a card, WHERE ONE EXISTS, offers the brief link — not
    * that the ledger is non-empty, which is not this check's business and is
    * covered by the empty-state assertion further down. */
-  const nCards = await p.locator("article.sig, .sig-card, .alert-row").count();
+  const nCards = await p.locator("main article.card").count();
   const nLinks = await p.locator("a.brief-link").count();
   if (nCards === 0) {
     console.log("  NOTE  no signals since launch — nothing to carry a brief link");
