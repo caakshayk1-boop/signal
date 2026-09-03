@@ -1357,7 +1357,9 @@
      * so a dead RSS host degrades to yesterday's wire rather than to nothing —
      * and the label says which of the two is on screen. */
     const liveWire = lw.ok && lw.data && lw.data.ok ? lw.data : null;
-    const wire = liveWire ? liveWire.stories : (n.ok ? n.data : []);
+    // Merged before anything counts or slices it, so the section count and the
+    // "N of M" line describe stories rather than filings.
+    const wire = dedupeWire(liveWire ? liveWire.stories : (n.ok ? n.data : []));
     const wireIsLive = !!liveWire;
     const wireAge = (() => {
       /* SHORT, BECAUSE EVERY STORY ALREADY CARRIES ITS OWN AGE.
@@ -1548,6 +1550,12 @@
     out += sec('The wire', wire.length ? `<div class="wire">${wireView.map(x => `
         <a href="${esc(x.link || '#')}" ${x.link ? 'target="_blank" rel="noopener"' : ''}>
           <span class="ws">${esc(x.source || 'wire')}${
+            // HOW MANY WIRES CARRIED IT. The closest thing this feed has to a
+            // measure of size: no timestamp, no clustering upstream, but the
+            // fact that four desks filed the same story today is real and
+            // measured. Named rather than counted, so it can be checked.
+            x._also && x._also.length
+              ? `<i class="w-also" title="${esc(x._also.join(', '))}">+${x._also.length} more</i>` : ''}${
             x.at ? `<i class="w-at">${esc(storyAge(x.at))}</i>` : ''}</span>
           <span class="wt">${esc(x.title || '')}</span>
           ${x.summary ? `<span class="wd">${esc(String(x.summary).slice(0, 150))}</span>` : ''}
@@ -5369,6 +5377,79 @@
   /* How old a single story is. RSS gives every item a pubDate, which is the
    * thing the daily wire never had: "12m ago" is what tells a reader the wire
    * is moving, and no amount of restating the file's age does that. */
+  /* ── ONE STORY, ONCE ──────────────────────────────────────────────────────
+   *
+   * Ten wires covering one market print the same event five times. Measured on
+   * a live pull of 60 stories: six clusters — oil and US-Iran (6 headlines),
+   * the $127bn NRI deposit number (4), tomorrow's Nifty open (7), the
+   * HDFC/ICICI Nifty crown (2), the Lumino listing (2), Swiggy's MSCI removal
+   * (2). Two of them were the SAME outlet contradicting itself on the same
+   * open — "Gift Nifty hints cautious start" beside "Gift Nifty hints a
+   * positive start".
+   *
+   * Exact-title matching finds none of this: every wire writes its own
+   * headline. Plain word overlap does not find it either — "Oil prices edge
+   * lower on US-Iran war uncertainty" and "Oil prices edge lower as markets
+   * weigh renewed US-Iran supply risks" share four words in ten and score 0.4
+   * on a Jaccard, under any threshold loose enough to be safe.
+   *
+   * So the comparison is IDF-WEIGHTED: a word is worth what it is rare. In a
+   * batch about the Indian market, "market" and "stocks" carry nothing and
+   * "NRI", "Lumino" and "127" carry the story. Document frequency is computed
+   * over the batch in hand, so the weighting adapts to what the day is about
+   * instead of relying on a stop-list somebody has to maintain.
+   *
+   * DUPLICATES ARE MERGED, NOT DROPPED. That a story ran on four wires is
+   * information — it is the closest thing this feed has to a measure of how
+   * big the story is — so the first one keeps its place and the others become
+   * a byline. Nothing is hidden; it is counted.
+   *
+   * The threshold is 0.34, the middle of a plateau: 0.28, 0.32 and 0.36 all
+   * merge the same eight pairs, and every one of those eight is a genuine
+   * duplicate on inspection. Above 0.42 it starts missing them. It errs toward
+   * under-merging, because two stories wrongly merged loses one, and two
+   * stories wrongly kept costs a line.
+   */
+  const WIRE_STOP = new Set(['this', 'that', 'with', 'from', 'their', 'they', 'will',
+    'have', 'been', 'after', 'more', 'than', 'over', 'into', 'amid', 'says', 'said',
+    'ahead', 'check', 'live', 'updates', 'today', 'stock', 'stocks', 'share', 'shares',
+    'market', 'markets', 'price', 'prices', 'news']);
+  const wireToks = t => [...new Set(String(t || '').toLowerCase()
+    .replace(/[^a-z0-9₹$ ]/g, ' ').split(/\s+/)
+    .filter(w => w.length > 3 && !WIRE_STOP.has(w)))];
+
+  function dedupeWire(stories, threshold = 0.34) {
+    const list = Array.isArray(stories) ? stories : [];
+    if (list.length < 2) return list;
+    const toks = list.map(x => wireToks(x.title));
+    const df = new Map();
+    for (const t of toks) for (const w of t) df.set(w, (df.get(w) || 0) + 1);
+    const idf = w => Math.log(list.length / (1 + (df.get(w) || 0)));
+    const sim = (a, b) => {
+      const B = new Set(b);
+      let inter = 0, ua = 0, ub = 0;
+      for (const w of a) { ua += idf(w); if (B.has(w)) inter += idf(w); }
+      for (const w of b) ub += idf(w);
+      const d = Math.sqrt(ua * ub);
+      return d > 0 ? inter / d : 0;
+    };
+    const kept = [];
+    for (let i = 0; i < list.length; i++) {
+      let host = null;
+      for (const k of kept) { if (sim(toks[i], toks[k.i]) >= threshold) { host = k; break; } }
+      if (host) {
+        // The byline, not a deletion. Same source twice is not worth printing.
+        const src = list[i].source;
+        if (src && src !== list[host.i].source && !host.also.includes(src)) host.also.push(src);
+      } else {
+        kept.push({ i, also: [] });
+      }
+    }
+    return kept.map(k => (k.also.length
+      ? { ...list[k.i], _also: k.also, _wires: k.also.length + 1 }
+      : list[k.i]));
+  }
+
   const storyAge = iso => {
     if (!iso) return '';
     const m = (Date.now() - Date.parse(iso)) / 60000;
@@ -5568,7 +5649,7 @@
     const wireStamp = ed.ok ? feedStamp(ed.data) : null;
     const wireH = ageHours(wireStamp);
     if (!n.ok) { paint(head('The wire', '', 'Every story') + fail('The wire', n.error)); return; }
-    const all = live ? live.stories : (Array.isArray(n.data) ? n.data : []);
+    const all = dedupeWire(live ? live.stories : (Array.isArray(n.data) ? n.data : []));
     const universe = sc.ok ? (sc.data.rows || sc.data.data || []) : [];
     // Median sector move today, so a matched story can say what its sector did
     // rather than only which company it named.
@@ -6475,37 +6556,73 @@
    *  - It updates on the existing 60-second refresh rather than owning a
    *    timer, so it cannot drift out of step with the page under it.
    */
-  const TKR_PICK = [
-    ['Nifty 50', 'NIFTY'], ['Sensex', 'SENSEX'], ['Bank Nifty', 'BANKNIFTY'],
-    ['USD/INR', 'USDINR'], ['MYR/INR', 'MYRINR'],
-    ['Gold', 'GOLD'], ['Crude WTI', 'CRUDE'],
-    ['S&P 500', 'S&P'], ['Nasdaq', 'NASDAQ'],
-  ];
+  /* ── THE TICKER ──────────────────────────────────────────────────────────
+   *
+   * Every instrument the markets page carries — all ten segments through to
+   * crypto, ~66 rows — moving slowly enough to read.
+   *
+   * IT MOVES ON A CSS ANIMATION, NOT requestAnimationFrame. The distinction is
+   * the whole reason the first version of this refused to move at all: rAF
+   * does not run in a background tab, so an rAF marquee freezes the moment you
+   * switch away and resumes mid-stride when you come back. A CSS transform
+   * animation is driven by the compositor, costs no main-thread work, and
+   * keeps its own time whether or not the tab is looked at.
+   *
+   * SPEED IS SET FROM THE CONTENT, NOT GUESSED. A fixed duration makes a long
+   * strip fast and a short one crawl; the duration is computed so the strip
+   * always travels at the same ~45 pixels per second, which is slow enough to
+   * read a five-character price without tracking it.
+   *
+   * It pauses on hover and on keyboard focus, so a number can be held still to
+   * be read, and it does not move at all under prefers-reduced-motion — where
+   * the strip becomes an ordinary scrollable row.
+   *
+   * The list is duplicated once and translated by exactly -50%, which is what
+   * makes the loop seamless: the second copy is under the cursor at the moment
+   * the first runs out. aria-hidden on the copy so a screen reader is not read
+   * the market twice.
+   */
+  const TKR_PX_PER_SEC = 45;
   async function paintTicker() {
     const host = document.getElementById('tkr');
     const row = document.getElementById('tkrRow');
     if (!host || !row) return;
     const r = await get('/api/ticker');
     if (!r.ok || !r.data || !Array.isArray(r.data.segments)) return;
-    const all = r.data.segments.flatMap(sg => sg.items || []);
-    const byName = new Map(all.map(i => [String(i.name || '').toLowerCase(), i]));
-    const items = TKR_PICK.map(([nm]) => byName.get(nm.toLowerCase())).filter(Boolean);
-    if (!items.length) return;
 
-    row.innerHTML = items.map(i => {
+    const segs = (r.data.segments || []).filter(sg => (sg.items || []).length);
+    if (!segs.length) return;
+    const cell = i => {
       const closed = String(i.session || '').toLowerCase() === 'closed';
       const d = dir(i.change_pct);
       return `<span class="tkr-i${closed ? ' is-shut' : ''}">
         <b class="tkr-n">${esc(i.name)}</b>
         <span class="tkr-p">${esc(i.price ?? '—')}</span>
         <span class="tkr-c ${d}">${pct(i.change_pct)}</span>
-        ${closed ? '<i class="tkr-s">closed</i>' : ''}
       </span>`;
-    }).join('');
+    };
+    // Segment labels travel with the strip. Without them 66 instruments are an
+    // undifferentiated stream and "Copper" arrives with no clue it is a metal
+    // rather than a mid-cap.
+    const strip = segs.map(sg =>
+      `<span class="tkr-seg">${esc(sg.icon || '')} ${esc(sg.label)}</span>` +
+      sg.items.map(cell).join('')).join('');
+
+    row.innerHTML = `<div class="tkr-t" id="tkrT"><div class="tkr-h">${strip}</div>` +
+                    `<div class="tkr-h" aria-hidden="true">${strip}</div></div>`;
     host.hidden = false;
+
+    /* Duration from measured width, so the speed is the same on a phone and a
+     * wide desktop. Measured after paint — before it, scrollWidth is 0 and the
+     * animation would be instant. */
+    const t = document.getElementById('tkrT');
+    const one = t && t.firstElementChild;
+    if (one) {
+      const w = one.scrollWidth || 0;
+      if (w > 0) t.style.setProperty('--tkr-dur', (w / TKR_PX_PER_SEC).toFixed(1) + 's');
+    }
   }
 
-  paintTicker();
   setInterval(() => refresh(false), 60000);
   document.addEventListener('visibilitychange', () => {
     // Back on screen after more than a minute away: refresh at once.
