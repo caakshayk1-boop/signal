@@ -314,6 +314,14 @@ try {
    * because some other button happens to carry the words. */
   ok("the CTA states how long the brief takes",
      (await p.locator('.hero-cta a[href="#/brief"]').innerText()).includes("60 seconds"));
+  const tkr = await p.evaluate(() => {
+    const h = document.getElementById("tkr");
+    return h ? { hidden: h.hidden, items: h.querySelectorAll(".tkr-i").length,
+                 segs: h.querySelectorAll(".tkr-seg").length } : null;
+  });
+  ok("the ticker is populated on arrival", !!tkr && !tkr.hidden && tkr.items > 20,
+     tkr && `${tkr.items} items / ${tkr.segs} segments`);
+
   ok("the hero leads with the measured record",
      (await p.locator(".hero-cta a").first().getAttribute("href")) === "#/signals");
   ok("the header CTA names the product action",

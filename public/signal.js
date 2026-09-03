@@ -6623,6 +6623,7 @@
     }
   }
 
+  paintTicker();
   setInterval(() => refresh(false), 60000);
   document.addEventListener('visibilitychange', () => {
     // Back on screen after more than a minute away: refresh at once.
