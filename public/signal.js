@@ -4271,6 +4271,35 @@
           the same 750-name screen the rest of this site runs on, and ${pts ? `${pts.length} real daily closes` : 'the published levels'}.</p>
       </header>
 
+      ${/* ── THE WHOLE TRADE, BEFORE THE ARGUMENT FOR IT ──────────────────────
+          *
+          * The brief runs to roughly 1,400 words across twelve sections and
+          * the first hard number arrived several screens in. A reader who
+          * only wants to know what the trade IS — direction, levels, what it
+          * risks, what the engine behind it has actually done — had to read
+          * the case for it first.
+          *
+          * This is that, in one line, immediately under the headline. It
+          * adds no new figures: every one already appears below with its
+          * working shown. What it changes is the order — the answer first,
+          * then the argument, which is the order the rest of this site uses
+          * and the one place it was not being used.
+          *
+          * The engine's own record is on the strip on purpose. It is the
+          * single most relevant fact about a setup and it lived in section
+          * eleven of twelve. */''}
+      ${snap([
+        ['Direction', isShort ? 'Short' : 'Long', esc(sig.timeframe || ''), isShort ? 'dn' : 'up'],
+        ['Entry', price(entry, cur), last ? `now ${price(last, cur)}` : ''],
+        ['Stop', price(stop, cur), `${(Math.abs(entry - stop) / entry * 100).toFixed(2)}% away`, 'dn'],
+        ['Target 1', price(t1, cur), `${rrT1.toFixed(1)}× the risk`, 'up'],
+        ['Engine', esc(ENGINE_LABEL[sig.signal_type] || sig.signal_type || '—'),
+         H ? `${H.trades} closed · ${H.win_rate}% won` : 'nothing closed yet'],
+        H ? ['Its expectancy', (H.expectancy_r > 0 ? '+' : '') + H.expectancy_r + 'R',
+             'per closed trade', dir(H.expectancy_r)] : null,
+      ], 'No engine on this site has cleared 30 closed trades at t&nbsp;≥&nbsp;2, so this is a '
+       + 'setup to examine rather than a call to take.')}
+
       ${missed ? `<div class="b-miss"><b>${esc(missed)} has no brief to show.</b>
         A brief needs an open signal carrying an entry, a stop and a first target — that name
         has none right now, so this is the best open setup instead, not a substitute for it.</div>` : ''}
