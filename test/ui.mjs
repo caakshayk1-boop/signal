@@ -520,6 +520,71 @@ try {
   ok("at least one score bar is non-zero", widths.some(w => w && w !== "0%"), widths);
   await rmCtx.close();
 
+  /* ── FUNDS ───────────────────────────────────────────────────────────
+   * This route had NO assertions at all, and it is the one that has now cost
+   * three round trips to guessed field names — r5y/cagr5 in the summary strip
+   * (which therefore rendered blank every single day and nobody saw it),
+   * age_years, and a whole `portfolio` block computed weekly and dropped by
+   * the emitter. Every one of those is invisible in a build log and invisible
+   * on the page: a missing figure just looks like a fund that has no figure.
+   * So the assertions below check that a value the FEED CARRIES actually
+   * reaches the DOM, which is the only failure mode this route has. */
+  console.log("\n  /funds — the screen, and one fund's sheet");
+  await page.goto(SITE + "#/funds", { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(SETTLE);
+
+  const feed = await page.evaluate(async () => {
+    const r = await fetch("/funds.json"); return r.ok ? r.json() : null;
+  });
+  ok("the fund feed loads", !!(feed && feed.ok));
+
+  const rowN = await page.locator(".rank-r.fnd[data-fund]").count();
+  ok("the screen renders fund rows", rowN > 0, rowN);
+
+  // The summary strip read f.r5y ?? f.cagr5. Neither name exists on this feed
+  // — the field is r5 — so "Best 5-year" was a dash on every load.
+  const best = (await page.locator(".snap").innerText()).match(/Best 5-year\s*\n?\s*([^\n]+)/i);
+  ok("the Best 5-year figure is a number, not a dash",
+     !!(best && /\d/.test(best[1])), best && best[1]);
+
+  await page.locator(".rank-r.fnd[data-fund]").first().click();
+  await page.waitForTimeout(900);
+  const sheetTxt = await page.locator("#sheet .sheet-b").innerText();
+  ok("clicking a fund opens its sheet", sheetTxt.length > 200, sheetTxt.length);
+
+  // Age comes from history_years. It was read as age_years and rendered "—".
+  ok("the sheet gives the fund an age", /Age\s*\n?\s*[\d.]+\s*yrs/i.test(sheetTxt),
+     sheetTxt.slice(0, 160));
+
+  // Data-conditional from here: assert what THIS feed carries, so the suite
+  // fails on a rendering bug and not on a screen that has not rerun yet.
+  const clicked = await page.locator(".rank-r.fnd[data-fund]").first()
+    .getAttribute("data-fund");
+  const first = feed && feed.categories.flatMap(c => c.funds)
+    .find(f => String(f.code) === clicked);
+  ok("the sheet is the fund that was clicked", !!first, first && first.name);
+
+  if (first && Array.isArray(first.calendar) && first.calendar.length) {
+    ok("year-by-year returns render", (await page.locator(".fd-cy").count()) > 0);
+  } else {
+    console.log("  SKIP  year-by-year — this fund carries no calendar");
+  }
+
+  if (first && first.portfolio && (first.portfolio.top_stocks || []).length) {
+    const stocks = await page.locator(".fd-own > div:last-child .fd-or").count();
+    ok("the holdings the feed carries all render", stocks === first.portfolio.top_stocks.length,
+       [stocks, first.portfolio.top_stocks.length]);
+    ok("the sector weights render", (await page.locator(".fd-own > div:first-child .fd-or").count())
+       === first.portfolio.top_sectors.length);
+    // The gap list must not claim a gap the sheet just filled two sections up.
+    ok("holdings are not also listed as unavailable",
+       !/Top holdings and sectors/i.test(sheetTxt));
+  } else {
+    ok("a fund with no portfolio says so plainly",
+       /Top holdings and sectors/i.test(sheetTxt));
+  }
+  await page.evaluate(() => document.getElementById("sheet")?.close());
+
   /* ── NARROW ──────────────────────────────────────────────────────────── */
   console.log("\n  320 x 568 — the narrowest phone in use");
   const mCtx = await browser.newContext({ viewport: { width: 320, height: 568 } });

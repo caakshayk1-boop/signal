@@ -6012,6 +6012,46 @@
             got there in ways nobody would have sat through equally.</p>`);
       })()}
 
+      ${(() => {
+        const p = f.portfolio;
+        if (!p || !(p.top_stocks || []).length) return '';
+        /* WHAT IT OWNS, NOT HOW IT DID.
+         * Two flexi-caps with the same 3Y CAGR can be a banks-and-IT book and a
+         * smallcap-industrials one. The return columns cannot tell them apart;
+         * this can, and it is the only part of the sheet that answers "does
+         * adding this diversify anything I already hold". */
+        const mxS = Math.max(...p.top_sectors.map(x => x.pct), 1);
+        const mxH = Math.max(...p.top_stocks.map(x => x.pct), 1);
+        const wt = (v, mx) => `<span class="fd-b"><i class="up" style="width:${(v / mx * 100).toFixed(0)}%"></i></span>`;
+        return sec('What it owns', `
+          <div class="fd-own">
+            <div>
+              <h4 class="fd-oh">Top 3 sectors</h4>
+              ${p.top_sectors.map(x => `<div class="fd-or">
+                <span class="fd-on">${esc(x.name)}</span>${wt(x.pct, mxS)}
+                <span class="fd-op">${x.pct.toFixed(2)}%</span></div>`).join('')}
+              <p class="hint" style="margin-top:9px">Summed from the individual holdings, not read
+                off the fund house's sector chart — a weight that cannot be reconciled against the
+                rows beside it will eventually disagree with them.</p>
+            </div>
+            <div>
+              <h4 class="fd-oh">Top 10 holdings</h4>
+              ${p.top_stocks.map((x, i) => `<div class="fd-or">
+                <span class="fd-oi">${i + 1}</span>
+                <span class="fd-on">${esc(x.name)}</span>${wt(x.pct, mxH)}
+                <span class="fd-op">${x.pct.toFixed(2)}%</span></div>`).join('')}
+            </div>
+          </div>
+          <div class="fd-ometa">
+            ${p.holdings_count != null ? `<span><b>${p.holdings_count}</b> holdings in all</span>` : ''}
+            ${p.equity_pct != null ? `<span><b>${p.equity_pct.toFixed(1)}%</b> of the fund is in
+              these shares${p.equity_pct < 90 ? ' — the rest is cash, debt or overseas units' : ''}</span>` : ''}
+            ${p.as_on ? `<span>Portfolio as on <b>${esc(p.as_on)}</b></span>` : ''}
+          </div>
+          <p class="hint">Holdings are disclosed monthly, so this is the latest published portfolio
+            and not today's. The percentages are of the whole fund, not of the equity sleeve.</p>`);
+      })()}
+
       ${sec('What this screen cannot tell you', `
         ${row('Expense ratio', '<b class="fd-u">Not published here</b>',
               'each AMC releases per-scheme TER as a monthly PDF; it is not in the AMFI feed')}
@@ -6019,10 +6059,11 @@
               'AMFI publishes it monthly in a separate file this screen does not read')}
         ${row('Exit load', '<b class="fd-u">Not published here</b>',
               'in the scheme document — typically 1% inside a year on equity funds')}
-        ${row('Top holdings and sectors', '<b class="fd-u">Not published here</b>',
-              'monthly portfolio disclosures, per AMC, not in any NAV feed')}
+        ${f.portfolio && (f.portfolio.top_stocks || []).length ? '' :
+          row('Top holdings and sectors', '<b class="fd-u">Not published here</b>',
+              'no published portfolio table resolved for this scheme')}
         ${f.url ? row('Factsheet', `<a href="${esc(f.url)}" target="_blank" rel="noopener">AMFI page →</a>`,
-              'where the missing four are published') : ''}
+              'where the missing figures are published') : ''}
         <p class="hint">These are listed rather than omitted because a gap you can see is worth
           more than one you cannot. This screen reads AMFI's daily NAV file and nothing else, so
           everything above is a real limit of the source — not a shortcut. Where a number is
@@ -6053,7 +6094,7 @@
       ['Categories', cats.length, 'ranked separately'],
       ['Funds screened', allN, 'Direct + Growth only', 'ac'],
       ['Best 5-year', (() => {
-        const b = cats.flatMap(c => c.funds).map(f => Number(f.r5y ?? f.cagr5))
+        const b = cats.flatMap(c => c.funds).map(f => Number(f.r5))
           .filter(Number.isFinite).sort((a, b2) => b2 - a);
         return b.length ? b[0].toFixed(1) + '%' : null;
       })(), 'annualised', 'up'],
