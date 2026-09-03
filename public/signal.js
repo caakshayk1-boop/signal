@@ -5909,8 +5909,8 @@
       <span class="i">${i + 1}</span>
       <span class="s"><b>${esc(f.name || '—')}</b>
         <span>${esc(f.category || '')}${f.nav != null ? ` · NAV ${price(f.nav)}` : ''}</span></span>
+      <span class="x ${dir(r3)} ${heatCell(r3, 25)}"><b>${Number.isFinite(r3) ? r3.toFixed(2) + '%' : '—'}</b></span>
       <span class="x ${dir(r5)} ${heatCell(r5, 25)}">${Number.isFinite(r5) ? r5.toFixed(2) + '%' : '—'}</span>
-      <span class="x ${dir(r3)} ${heatCell(r3, 25)}">${Number.isFinite(r3) ? r3.toFixed(2) + '%' : '—'}</span>
       <span class="x ${dir(r1)} ${heatCell(r1, 40)}">${Number.isFinite(r1) ? r1.toFixed(1) + '%' : '—'}</span>
       <span class="x" title="Worst peak-to-trough fall over three years">${
         Number.isFinite(dd) ? dd.toFixed(1) + '%' : '—'}</span>
@@ -6016,14 +6016,16 @@
         return b.length ? b[0].toFixed(1) + '%' : null;
       })(), 'annualised', 'up'],
       ['Screen run', d.generated_at ? String(d.generated_at).slice(0, 10) : null, 'weekly'],
-    ], 'Returns are computed here from the NAV series AMFI publishes, not taken from a fund '
-     + 'house page — so every figure can be reproduced from the raw data.');
+    ], 'Ranked on the 3-year return — the arrow marks the column. Three years is the longest '
+     + 'window most of this shelf actually has, and a 5-year sort would silently drop every '
+     + 'fund younger than that rather than rank it. Every figure is computed from the NAV '
+     + 'series AMFI publishes, not taken from a fund house page.');
 
     for (const c of cats) {
       out += sec(c.label || c.key, `<div class="rank">
         <div class="rank-r rank-head fnd" aria-hidden="false">
           <span class="i">#</span><span class="s">Scheme</span>
-          <span class="x">5-year</span><span class="x">3-year</span><span class="x">1-year</span>
+          <span class="x">3-year ↓</span><span class="x">5-year</span><span class="x">1-year</span>
           <span class="x">Worst fall</span><span class="x">Volatility</span>
         </div>
         ${c.funds.map(fundRow).join('')}
