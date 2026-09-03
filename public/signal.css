@@ -158,9 +158,28 @@ a{color:inherit;text-decoration:none}
 /* ── HEADER ──────────────────────────────────────────────────────────────── */
 .bar-in{max-width:1280px;margin:0 auto;width:100%;display:flex;align-items:center;
   justify-content:space-between;gap:12px}
+/* ── OPAQUE, BECAUSE THE BLUR CANNOT BE RELIED ON ────────────────────────
+ * These were 88% / 94% opaque with a backdrop blur behind them. Chromium
+ * applies the blur and the frosted effect works; WEBKIT DOES NOT APPLY
+ * backdrop-filter ON A STICKY ELEMENT, so in Safari the bar was simply 8%
+ * transparent with nothing blurring what was underneath — and the page could
+ * be read straight through the header. Reproduced in Playwright's webkit:
+ * "Open 5", "Winners 0", "5 shown" and a card's stop/entry/target row all
+ * legible through the bar, which is exactly the "overlapping" that kept being
+ * reported and that Chromium never showed.
+ *
+ * @supports cannot fix it: WebKit REPORTS support for backdrop-filter and
+ * returns blur(12px) from getComputedStyle while rendering nothing, so the
+ * query passes and the bug stays.
+ *
+ * So the surface is opaque. The blur stays for engines that honour it — over
+ * an opaque background it simply has no effect — and the header is a solid
+ * surface everywhere, which is what a sticky header has to be. Losing a
+ * frosted edge is a smaller cost than a header you can read the page through.
+ */
 .bar{position:sticky;top:0;z-index:40;height:var(--barh);display:flex;align-items:center;
   justify-content:space-between;gap:12px;padding:0 var(--gut);
-  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  background:var(--bg);
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
   border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:8px}
@@ -180,7 +199,7 @@ a{color:inherit;text-decoration:none}
      grid and pushed the bar to 454px inside a 390px phone — the whole page
      scrolled sideways. Auto-flow takes however many tabs the markup has. */
   display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
-  background:color-mix(in srgb,var(--bg) 94%,transparent);
+  background:var(--bg);
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-top:1px solid var(--line)}
 .tabs a{display:grid;place-items:center;font:500 var(--t-2)/1 var(--ui);letter-spacing:var(--ls-0);
@@ -1259,8 +1278,9 @@ body::before{display:none}
 /* ── QUICK NAV — where you are in the argument ───────────────────────────── */
 .b-qnav{position:sticky;top:calc(var(--barh) + 46px);z-index:30;margin:0 0 -1px;
   display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;
-  background:color-mix(in srgb,var(--b-bg) 92%,transparent);
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  /* Opaque for the same reason as .bar — WebKit does not apply
+     backdrop-filter on a sticky element, and this is sticky. */
+  background:var(--b-bg);
   border-bottom:1px solid var(--b-line);padding:8px 0}
 .b-qnav::-webkit-scrollbar{display:none}
 .b-qnav a{flex:none;padding:8px 13px;border-radius:var(--r-2);white-space:nowrap;
