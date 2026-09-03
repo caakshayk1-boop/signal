@@ -5879,6 +5879,89 @@
   }
 
   let newsQ = '', newsSrc = '';
+  /* ── FUNDS ────────────────────────────────────────────────────────────────
+   *
+   * The SIP screen that has run weekly for months and only ever appeared in
+   * the newspaper's HTML. It reads docs/funds.json, the build artefact added
+   * for this route, so both sites rank the same NAVs from the same run.
+   *
+   * WHAT THIS PAGE REFUSES TO DO. It does not rank funds against each other
+   * across categories. A small-cap fund returning 22% and a large-cap
+   * returning 14% are not first and second in one list — they are two
+   * different risks, and a single leaderboard implies a comparison the data
+   * does not support. So categories are the unit, and every table says which
+   * one it is.
+   *
+   * It also does not claim to know cost. Per-scheme TER is not in the free
+   * AMFI feed; Direct-vs-Regular is the one cost lever the data shows, the
+   * screen is Direct-only by construction, and the page says so rather than
+   * implying it screened on expense.
+   */
+  const fundRow = (f, i) => {
+    const r5 = Number(f.r5y ?? f.cagr5), r3 = Number(f.r3y ?? f.cagr3);
+    const sip = Number(f.sip10y);
+    return `<div class="rank-r fnd" data-fund="${esc(f.code || f.name || '')}" role="button" tabindex="0">
+      <span class="i">${i + 1}</span>
+      <span class="s"><b>${esc(f.name || '—')}</b>
+        <span>${esc(f.category || '')}${f.nav != null ? ` · NAV ${price(f.nav)}` : ''}</span></span>
+      <span class="x ${dir(r5)} ${heatCell(r5, 25)}">${Number.isFinite(r5) ? r5.toFixed(2) + '%' : '—'}</span>
+      <span class="x ${dir(r3)} ${heatCell(r3, 25)}">${Number.isFinite(r3) ? r3.toFixed(2) + '%' : '—'}</span>
+      <span class="x">${Number.isFinite(sip) ? money(sip) : '—'}</span>
+    </div>`;
+  };
+
+  R['/funds'] = async () => {
+    const head0 = head('Funds',
+      'A SIP screen over AMFI\'s official NAV file. Direct plans only, ranked inside each category.',
+      'Fund screen');
+    paint(head0 + sec('Loading', `<div class="sk" style="height:280px"></div>`));
+    const fr = await get('/funds.json');
+    if (!fr.ok || !fr.data || !fr.data.ok) {
+      paint(head0 + fail('The fund screen', (fr.data && fr.data.error) || fr.error
+        || 'the weekly screen has not published yet'));
+      return;
+    }
+    const d = fr.data;
+    const cats = (d.categories || []).filter(c => (c.funds || []).length);
+    const allN = cats.reduce((n, c) => n + c.funds.length, 0);
+    let out = head0 + snap([
+      ['Categories', cats.length, 'ranked separately'],
+      ['Funds screened', allN, 'Direct + Growth only', 'ac'],
+      ['Best 5-year', (() => {
+        const b = cats.flatMap(c => c.funds).map(f => Number(f.r5y ?? f.cagr5))
+          .filter(Number.isFinite).sort((a, b2) => b2 - a);
+        return b.length ? b[0].toFixed(1) + '%' : null;
+      })(), 'annualised', 'up'],
+      ['Screen run', d.generated_at ? String(d.generated_at).slice(0, 10) : null, 'weekly'],
+    ], 'Returns are computed here from the NAV series AMFI publishes, not taken from a fund '
+     + 'house page — so every figure can be reproduced from the raw data.');
+
+    for (const c of cats) {
+      out += sec(c.label || c.key, `<div class="rank">
+        <div class="rank-r rank-head fnd">
+          <span class="i">#</span><span class="s">Scheme</span>
+          <span class="x">5-year</span><span class="x">3-year</span><span class="x">₹10k SIP · 10y</span>
+        </div>
+        ${c.funds.map(fundRow).join('')}
+      </div>`, `${c.funds.length} funds`, c.blurb || '');
+    }
+
+    out += sec('What this screen knows, and what it does not', `
+      <p class="sec-note"><b>Direct plans only, and that is the cost lever.</b> Per-scheme expense
+        ratio is not published in the free AMFI feed — each AMC releases it as a monthly PDF — so
+        this screen does not claim to know it. What the data does show is Direct against Regular,
+        where the same scheme, same portfolio and same manager costs typically 0.5–1.2% a year more
+        in the Regular plan because the distributor commission sits inside its TER. Screening
+        Direct-only takes the low-cost half of the universe by construction.</p>
+      <p class="sec-note"><b>Growth, not IDCW.</b> IDCW payouts are taxed at slab rate, which makes
+        a like-for-like return comparison impossible.</p>
+      <p class="sec-note"><b>Past returns, ranked.</b> Nothing here is a recommendation and none of
+        it forecasts anything. A category leader over five years is a fact about five years that
+        have already happened.</p>
+      <p class="hint">${esc(d.basis || '')}</p>`);
+    paint(out);
+  };
+
   R['/news'] = async () => {
     const [n, sc, pu, ed, lw] = await Promise.all(
       [get('/news.json'), get('/screen.json'), get('/pulse.json'), get('/edition.json'),

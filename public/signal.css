@@ -3072,6 +3072,18 @@ html:has(dialog[open]){overflow:hidden}
  * is which before the prose does. */
 .sub-h{font:600 var(--t-4)/1.3 var(--ui);margin:26px 0 6px;color:var(--text)}
 
+/* Fund rows: scheme name gets the room, three figures line up on the right. */
+.rank-r.fnd{grid-template-columns:30px minmax(0,1fr) 92px 92px 116px;gap:0 12px;align-items:center}
+.rank-r.fnd .s b{font:600 var(--t-4)/1.25 var(--ui);display:block;color:var(--text)}
+.rank-r.fnd .s span{display:block;margin-top:2px;font:400 var(--t-2)/1.35 var(--ui);color:var(--dim)}
+.rank-r.fnd .x{font:500 var(--t-4)/1.2 var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+@media(max-width:720px){
+  /* The 3-year column is the first to go: on a phone the scheme name and the
+     two figures a reader actually compares are what fit. */
+  .rank-r.fnd{grid-template-columns:24px minmax(0,1fr) 78px 96px}
+  .rank-r.fnd .x:nth-of-type(2){display:none}
+}
+
 /* ── SCALE-OUT LADDER ────────────────────────────────────────────────────
  * Sits inside the trailing-rule block because the two are one plan: the trail
  * says where the stop goes, this says how much to sell. Publishing one without
