@@ -3088,6 +3088,14 @@ html:has(dialog[open]){overflow:hidden}
 .fd-s{grid-column:1/-1;font:400 var(--t-2)/1.4 var(--ui);color:var(--dim)}
 /* A gap you can see is worth more than one you cannot: dimmed, not hidden. */
 .fd-u{font:500 var(--t-3)/1.2 var(--ui)!important;color:var(--dim)!important}
+/* Year-by-year bars. A CAGR hides the shape; these are the shape. */
+.fd-cal{display:grid;gap:5px}
+.fd-cy{display:grid;grid-template-columns:46px 1fr 62px;gap:9px;align-items:center}
+.fd-cl{font:500 var(--t-2)/1 var(--mono);color:var(--dim)}
+.fd-cb{height:9px;border-radius:3px;background:var(--raised);overflow:hidden}
+.fd-cb i{display:block;height:100%;border-radius:3px}
+.fd-cb i.up{background:var(--up)} .fd-cb i.dn{background:var(--down)}
+.fd-cv{font:600 var(--t-3)/1 var(--mono);font-variant-numeric:tabular-nums;text-align:right}
 .fd-sip{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
   border-radius:var(--r);overflow:hidden;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
 .fd-sip > div{background:var(--surface);padding:13px 15px;display:flex;flex-direction:column;gap:3px}

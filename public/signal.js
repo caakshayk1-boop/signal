@@ -5972,19 +5972,45 @@
           <b>when</b> each instalment bought.</p>`) : ''}
 
       ${sec('The fund itself', `
-        ${row('Age', f.age_years != null ? `<b>${Number(f.age_years).toFixed(1)} yrs</b>` : '—',
+        ${row('Age', f.history_years != null ? `<b>${Number(f.history_years).toFixed(1)} yrs</b>` : '—',
               f.inception ? `first NAV ${esc(String(f.inception).slice(0, 10))}` : '')}
+        ${row('Since inception', f.since_inception != null
+              ? `<b class="${dir(f.since_inception)}">${Number(f.since_inception).toFixed(2)}%</b>` : '—',
+              'annualised over its whole life')}
         ${row('Fund house', f.house ? `<b>${esc(f.house)}</b>` : '—', '')}
         ${row('AMFI category', f.category ? `<b>${esc(f.category)}</b>` : '—',
               'ranked only against this')}
         ${row('Plan', '<b>Direct · Growth</b>',
               'the screen holds no Regular or IDCW plan')}
-        <p class="hint">${f.age_years != null && Number(f.age_years) < 5
-          ? `<b>This fund is ${Number(f.age_years).toFixed(1)} years old.</b> A three-year number on it
+        <p class="hint">${f.history_years != null && Number(f.history_years) < 5
+          ? `<b>This fund is ${Number(f.history_years).toFixed(1)} years old.</b> A three-year number on it
              covers a period this fund has only just lived through, and any window longer than its
              age is blank above rather than shortened.`
           : `Age matters because it bounds every return beside it — a fund cannot show you a
              drawdown it was not alive for.`}</p>`)}
+
+      ${(() => {
+        const cal = Array.isArray(f.calendar) ? f.calendar.filter(x => x && x.ret != null) : [];
+        if (!cal.length) return '';
+        const mx = Math.max(...cal.map(x => Math.abs(Number(x.ret) || 0)), 1);
+        /* YEAR BY YEAR, NOT ANOTHER AVERAGE.
+         * A CAGR is one number standing in for a decade, and it hides the
+         * shape completely: 18% a year and 45%/−20%/30%/−15% can be the same
+         * figure. The bars are the answer to "would I have held this", which
+         * the annualised number cannot give. Already computed by the screen
+         * and never published until now. */
+        return sec('Year by year', `<div class="fd-cal">${cal.map(x => {
+          const v = Number(x.ret);
+          return `<div class="fd-cy">
+            <span class="fd-cl">${esc(x.year)}</span>
+            <span class="fd-cb"><i class="${v < 0 ? 'dn' : 'up'}"
+              style="width:${(Math.abs(v) / mx * 100).toFixed(0)}%"></i></span>
+            <span class="fd-cv ${dir(v)}">${v > 0 ? '+' : ''}${v.toFixed(1)}%</span>
+          </div>`; }).join('')}</div>
+          <p class="hint">Calendar years, computed from the NAV series. An annualised return is
+            one number standing in for all of these, and two funds with the same CAGR can have
+            got there in ways nobody would have sat through equally.</p>`);
+      })()}
 
       ${sec('What this screen cannot tell you', `
         ${row('Expense ratio', '<b class="fd-u">Not published here</b>',
@@ -5995,6 +6021,8 @@
               'in the scheme document — typically 1% inside a year on equity funds')}
         ${row('Top holdings and sectors', '<b class="fd-u">Not published here</b>',
               'monthly portfolio disclosures, per AMC, not in any NAV feed')}
+        ${f.url ? row('Factsheet', `<a href="${esc(f.url)}" target="_blank" rel="noopener">AMFI page →</a>`,
+              'where the missing four are published') : ''}
         <p class="hint">These are listed rather than omitted because a gap you can see is worth
           more than one you cannot. This screen reads AMFI's daily NAV file and nothing else, so
           everything above is a real limit of the source — not a shortcut. Where a number is
