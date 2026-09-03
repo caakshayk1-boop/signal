@@ -296,6 +296,39 @@
   // IS, the lead says what it MEANS. Blocks with nothing to add omit it.
   const sec = (label, body, n, lead) =>
     `<section class="sec"><div class="sec-h"><h2>${esc(label)}</h2>${n ? `<span class="sec-n">${esc(n)}</span>` : ''}</div>${lead ? `<p class="sec-lead">${esc(lead)}</p>` : ''}${body}</section>`;
+  /* ── SNAPSHOT ─────────────────────────────────────────────────────────────
+   *
+   * One line at the top of a route that answers "what is the state of this
+   * page" before any scrolling. Four routes had no such line: markets opened
+   * on a sector heatmap, screen on a 750-row table, news on a filter box, and
+   * ideas on a card — each of them making the reader assemble the summary
+   * themselves from the detail below.
+   *
+   * It is a STRIP, not a grid of tiles. The tiles this site already uses are
+   * for a section's own numbers and take a lot of vertical space; a route
+   * summary has to cost almost nothing above the content it summarises, or it
+   * pushes the content it describes off the screen.
+   *
+   * Every item is label + value, with an optional third element for the one
+   * word of context that stops a bare number being a riddle. Values are
+   * tabular so a repaint cannot make the row jitter, and the strip scrolls
+   * sideways on a narrow phone rather than wrapping into three lines.
+   *
+   * A null value renders an em dash. Nothing here invents a figure: a route
+   * that cannot compute an item omits it rather than showing a zero. */
+  const snap = (items, note) => {
+    const live = (items || []).filter(x => x && x[0]);
+    if (!live.length) return '';
+    return `<div class="snap" role="group" aria-label="Summary">
+      <div class="snap-r">${live.map(([k, v, sub, cls]) => `<div class="snap-i">
+        <span class="snap-k">${esc(k)}</span>
+        <span class="snap-v ${cls || ''}">${v == null || v === '' ? '—' : v}</span>
+        ${sub ? `<span class="snap-s">${esc(sub)}</span>` : ''}
+      </div>`).join('')}</div>
+      ${note ? `<p class="snap-n">${note}</p>` : ''}
+    </div>`;
+  };
+
   const tile = (v, k, sub, cls) =>
     `<div class="tile"><div class="v ${cls || ''}">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}<div class="k">${esc(k)}</div></div>`;
 
@@ -2353,6 +2386,21 @@
     const [m, p] = await Promise.all([get('/api/markets'), get('/pulse.json')]);
     let out = head('Markets', 'The board live, and what the 750-name screen underneath it did.', 'The board');
     const pu = p.ok ? p.data : {};
+    /* The page opened on a sector heatmap and left the reader to work out the
+     * state of the market from it. These are the four numbers that heatmap is
+     * an elaboration of. */
+    {
+      const br = pu.breadth || {}, up = Number(br.up), cnt = Number(br.counted);
+      const nifty = (m.ok ? (m.data.markets || []) : []).find(x => /nifty 50/i.test(x.name || ''));
+      out += snap([
+        nifty && ['Nifty 50', esc(nifty.price ?? '—'), pct(nifty.change_pct) + ' today', dir(nifty.change_pct)],
+        Number.isFinite(up) && Number.isFinite(cnt) && cnt
+          ? ['Advancing', `${up}<span style="color:var(--dim)">/${cnt}</span>`,
+             Math.round(up / cnt * 100) + '% of the screen', up / cnt >= 0.5 ? 'up' : 'dn'] : null,
+        Number.isFinite(Number(br.at_52w_high)) ? ['At 52-week high', br.at_52w_high, 'names', 'ac'] : null,
+        ['Screened', pu.universe || 750, 'names re-run daily'],
+      ]);
+    }
 
     /* The world strip goes FIRST, above breadth. Whether the exchange behind a
      * number is currently trading qualifies every number below it, the same
@@ -2418,6 +2466,22 @@
       [get('/today.json'), get('/mandate.json'), get('/pulse.json'), get('/api/ticker'), ledger()]);
     let out = head('Ideas', 'Ranked names, and the orders a fully-sized book would place against them. Sizes are shown as a share of the book, so they scale to whatever you run.', 'Ranked ideas');
     if (!t.ok) { paint(out + fail('Ideas', t.error)); return; }
+    /* What is on this page, before the cards. A reader arriving here cannot
+     * otherwise tell whether "ideas" means five names or fifty, nor which of
+     * them the site has any record on. */
+    {
+      const td = t.data || {};
+      const mb = (td.multibaggers || td.multibagger || []).length || null;
+      const pk = (td.picks || []).length || null;
+      const wk = (td.picks_week || []).length || null;
+      out += snap([
+        pk ? ['Ranked today', pk, 'daily engine'] : null,
+        mb ? ['Multibaggers', mb, 'weekly scan', 'ac'] : null,
+        wk ? ['This week', wk, 'top picks'] : null,
+        ['Cleared for capital', '0', 'of 7 engines', 'dn'],
+      ], 'No engine has 30 closed trades at t&nbsp;≥&nbsp;2, so nothing here is a '
+       + 'recommendation. <a href="#/signals">The record</a> is the reason.');
+    }
 
     /* ── MULTIBAGGERS LEAD ────────────────────────────────────────────────
      *
@@ -2741,6 +2805,16 @@
                   tech: 'Technical', r1m: '1M return', roce: 'ROCE', mcap_cr: 'Size' };
 
   R['/screen'] = async () => {
+    const screenSnap = rows => snap([
+      ['Universe', rows.length, 'names screened'],
+      ['Above 200-day', rows.filter(r => n(r.price) && n(r.sma200) && n(r.price) > n(r.sma200)).length,
+       'in an uptrend', 'up'],
+      ['At 52-week high', rows.filter(r => r.brk52w).length, 'breaking out', 'ac'],
+      ['Median ATR', (() => {
+        const a = rows.map(r => n(r.atr_pct)).filter(x => x != null).sort((x, y) => x - y);
+        return a.length ? a[Math.floor(a.length / 2)].toFixed(2) + '%' : null;
+      })(), 'daily range'],
+    ]);
     const shell = body => head('Screen',
       'Every one of the 750 names, searchable. Tap any row for the full card.',
       'The full universe') + body;
@@ -2763,6 +2837,7 @@
         .sort((a, b) => (b[scrSort] ?? -1e9) - (a[scrSort] ?? -1e9));
 
       main.innerHTML = shell(
+        screenSnap(SCREEN) +
         `<div class="tools">
           <input type="search" id="scrq" class="scr-in" placeholder="Symbol, company or sector"
                  value="${esc(scrQ)}" aria-label="Search the screen">
@@ -5712,6 +5787,18 @@
         : `<div class="empty">No story matches that.</div>`;
 
       paint(head('The wire', 'Every story on the tape today, and the screened names each one mentions.', 'The full file') +
+        /* The page opened on a filter box. How many stories there are, how
+         * many wires filed them, how many were merged as the same story and
+         * how many touch a screened name are the four things worth knowing
+         * before deciding whether to read any of them. */
+        snap([
+          ['Stories', all.length, rows.length !== all.length ? `${rows.length} shown` : 'after merging'],
+          ['Wires', sources.length, 'filed today'],
+          [
+            'Merged', all.filter(x => x._also && x._also.length).length || '0',
+            'same story, two desks', 'ac'],
+          ['Touch the screen', linked, `of ${all.length} name a screened company`, linked ? 'up' : ''],
+        ]) +
         sec('Filter', `<div class="tools">
             <input type="search" id="nwq" class="scr-in" value="${esc(newsQ)}"
                    placeholder="Search headlines, summaries or sources" aria-label="Search the wire">
