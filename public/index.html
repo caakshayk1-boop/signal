@@ -68,6 +68,15 @@
 <body>
 <a class="skip" href="#main">Skip to content</a>
 
+<!-- HOW MUCH OF THIS PAGE IS LEFT.
+     A two-pixel rule across the top that fills as you scroll. These routes run
+     long — the brief is twelve sections, the screen is 750 rows — and a
+     scrollbar on a phone is either hidden or a hairline nobody reads. It
+     measures the DOCUMENT, so it answers "how much further" rather than "where
+     in this section", which is the question a long page actually raises. -->
+<div class="prog" id="prog" role="progressbar" aria-label="Page scrolled"
+     aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+
 <header class="bar" role="banner">
  <div class="bar-in">
   <a class="brand" href="#/">

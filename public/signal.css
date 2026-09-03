@@ -3036,6 +3036,21 @@ html:has(dialog[open]){overflow:hidden}
  * is which before the prose does. */
 .sub-h{font:600 var(--t-4)/1.3 var(--ui);margin:26px 0 6px;color:var(--text)}
 
+/* ── SCROLL PROGRESS ─────────────────────────────────────────────────────
+ * Two pixels across the very top, above the sticky header, filling as the
+ * page scrolls. Ported from news.askakshay.com.
+ *
+ * The accent, not a signal colour. Green or red on this site mean up and down
+ * on an instrument, and a bar that fills green as you read would be reading as
+ * a market state it has nothing to do with.
+ *
+ * z-index sits above the header's own stacking context — the header is sticky
+ * and would otherwise slide over it. The transition is short enough to smooth
+ * the rAF steps and short enough not to lag the thumb. */
+.prog{position:fixed;top:0;left:0;height:2px;width:0;background:var(--accent);
+  z-index:2000;transition:width .1s linear;pointer-events:none}
+@media (prefers-reduced-motion:reduce){ .prog{transition:none} }
+
 /* ── ROUTE SNAPSHOT ───────────────────────────────────────────────────────
  * A strip, not a grid: it sits above the content it summarises and has to
  * cost almost nothing vertically, or it pushes that content off the screen.

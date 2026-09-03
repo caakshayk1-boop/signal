@@ -6700,7 +6700,7 @@
    * the first runs out. aria-hidden on the copy so a screen reader is not read
    * the market twice.
    */
-  const TKR_PX_PER_SEC = 45;
+  const TKR_PX_PER_SEC = 60;
   async function paintTicker() {
     const host = document.getElementById('tkr');
     const row = document.getElementById('tkrRow');
@@ -6740,6 +6740,48 @@
       if (w > 0) t.style.setProperty('--tkr-dur', (w / TKR_PX_PER_SEC).toFixed(1) + 's');
     }
   }
+
+  /* ── SCROLL PROGRESS ─────────────────────────────────────────────────────
+   *
+   * Ported from news.askakshay.com, which has had it for months. These routes
+   * run long — the brief is twelve sections, the screen is 750 rows — and on a
+   * phone the native scrollbar is either hidden entirely or a hairline that
+   * tells you nothing.
+   *
+   * rAF IS CORRECT HERE, AND WRONG FOR THE TICKER TWO FUNCTIONS UP. The
+   * difference is the event: a scroll handler only has work to do while
+   * somebody is scrolling, which cannot happen in a background tab, so rAF
+   * not running there costs nothing. A marquee has to keep time whether or
+   * not it is watched, which is exactly what rAF refuses to do.
+   *
+   * The rAF is a coalescer, not an animation loop — scroll fires far faster
+   * than the screen refreshes, and without it this recomputes layout dozens of
+   * times per frame.
+   */
+  (() => {
+    const bar = document.getElementById('prog');
+    if (!bar) return;
+    let queued = false;
+    const draw = () => {
+      const d = document.documentElement;
+      const h = d.scrollHeight - window.innerHeight;
+      const pc = h > 0 ? Math.min(100, Math.max(0, window.scrollY / h * 100)) : 0;
+      bar.style.width = pc + '%';
+      // Announced as well as drawn: the element is a progressbar to the
+      // assistive tree, and a bar with no value is furniture.
+      bar.setAttribute('aria-valuenow', Math.round(pc));
+      queued = false;
+    };
+    addEventListener('scroll', () => {
+      if (!queued) { queued = true; requestAnimationFrame(draw); }
+    }, { passive: true });
+    // Route changes replace <main> wholesale, so the height it was measured
+    // against is gone; recompute rather than leave the bar describing the
+    // previous page.
+    addEventListener('hashchange', () => setTimeout(draw, 60));
+    addEventListener('resize', draw, { passive: true });
+    draw();
+  })();
 
   paintTicker();
   setInterval(() => refresh(false), 60000);

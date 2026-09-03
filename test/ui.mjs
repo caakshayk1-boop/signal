@@ -319,6 +319,18 @@ try {
     return h ? { hidden: h.hidden, items: h.querySelectorAll(".tkr-i").length,
                  segs: h.querySelectorAll(".tkr-seg").length } : null;
   });
+  /* The bar is 0% at the top of a page by definition, so asserting it exists
+   * proves nothing. Scroll, then read it. */
+  await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight * 0.5));
+  await p.waitForTimeout(400);
+  const prog = await p.evaluate(() => {
+    const b = document.getElementById("prog");
+    return b ? parseFloat(b.style.width) || 0 : -1;
+  });
+  ok("the scroll progress bar tracks the page", prog > 5, prog + "%");
+  await p.evaluate(() => window.scrollTo(0, 0));
+  await p.waitForTimeout(300);
+
   ok("the ticker is populated on arrival", !!tkr && !tkr.hidden && tkr.items > 20,
      tkr && `${tkr.items} items / ${tkr.segs} segments`);
 
