@@ -5898,15 +5898,19 @@
    * implying it screened on expense.
    */
   const fundRow = (f, i) => {
-    const r5 = Number(f.r5y ?? f.cagr5), r3 = Number(f.r3y ?? f.cagr3);
-    const sip = Number(f.sip10y);
+    const r5 = Number(f.r5), r3 = Number(f.r3), r1 = Number(f.r1);
+    const vol = Number(f.volatility), dd = Number(f.dd3);
     return `<div class="rank-r fnd" data-fund="${esc(f.code || f.name || '')}" role="button" tabindex="0">
       <span class="i">${i + 1}</span>
       <span class="s"><b>${esc(f.name || '—')}</b>
         <span>${esc(f.category || '')}${f.nav != null ? ` · NAV ${price(f.nav)}` : ''}</span></span>
       <span class="x ${dir(r5)} ${heatCell(r5, 25)}">${Number.isFinite(r5) ? r5.toFixed(2) + '%' : '—'}</span>
       <span class="x ${dir(r3)} ${heatCell(r3, 25)}">${Number.isFinite(r3) ? r3.toFixed(2) + '%' : '—'}</span>
-      <span class="x">${Number.isFinite(sip) ? money(sip) : '—'}</span>
+      <span class="x ${dir(r1)} ${heatCell(r1, 40)}">${Number.isFinite(r1) ? r1.toFixed(1) + '%' : '—'}</span>
+      <span class="x" title="Worst peak-to-trough fall over three years">${
+        Number.isFinite(dd) ? dd.toFixed(1) + '%' : '—'}</span>
+      <span class="x" title="Annualised volatility, three years">${
+        Number.isFinite(vol) ? vol.toFixed(1) : '—'}</span>
     </div>`;
   };
 
@@ -5940,7 +5944,8 @@
       out += sec(c.label || c.key, `<div class="rank">
         <div class="rank-r rank-head fnd">
           <span class="i">#</span><span class="s">Scheme</span>
-          <span class="x">5-year</span><span class="x">3-year</span><span class="x">₹10k SIP · 10y</span>
+          <span class="x">5-year</span><span class="x">3-year</span><span class="x">1-year</span>
+          <span class="x">Worst fall</span><span class="x">Volatility</span>
         </div>
         ${c.funds.map(fundRow).join('')}
       </div>`, `${c.funds.length} funds`, c.blurb || '');
