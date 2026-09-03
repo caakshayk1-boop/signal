@@ -4351,6 +4351,55 @@
         </div>`;
       })()}
 
+      ${/* ── AT A GLANCE ──────────────────────────────────────────────────────
+          * The whole trade as one picture, above twelve sections of prose.
+          *
+          * THE BAR IS DRAWN TO SCALE, WHICH IS THE POINT. Reward-to-risk
+          * printed as "1.6x" is a number a reader has to trust; the same fact
+          * drawn as a red block beside a green one three-fifths longer is a
+          * fact they can see. A brief whose central claim is a ratio should
+          * show the ratio.
+          *
+          * The outcomes are in PER CENT OF THE POSITION, not R. R is the
+          * site's unit and the right one for a ledger, but "what happens to my
+          * money if the stop hits" is the question a reader actually has, and
+          * -2.7% answers it without them converting anything.
+          *
+          * The widths animate from zero on first paint. It is one transition
+          * on a transform-free property over 700ms — enough to show the
+          * proportion arriving, not enough to make anyone wait — and it is
+          * skipped entirely under prefers-reduced-motion. */''}
+      ${(() => {
+        const dStop = Math.abs(entry - stop) / entry * 100;
+        const d1 = Math.abs(t1 - entry) / entry * 100;
+        const d2 = Math.abs(t2 - entry) / entry * 100;
+        const span = dStop + d2 || 1;
+        const seg = (v, cls, lab, sub) => `<div class="bg-seg ${cls}" style="--w:${(v / span * 100).toFixed(1)}%">
+          <span class="bg-l">${esc(lab)}</span><span class="bg-v">${sub}</span></div>`;
+        const band = score == null ? '' : `<div class="bg-score">
+          <div class="bg-dial" style="--p:${Math.max(0, Math.min(100, score))}">
+            <b>${score}</b><i>/100</i></div>
+          <span class="bg-sl">${esc(conviction)}</span></div>`;
+        return `<div class="b-glance">
+          <div class="bg-h">At a glance</div>
+          <div class="bg-bar" role="img"
+               aria-label="Risk ${dStop.toFixed(1)}% against reward ${d1.toFixed(1)}% to the first target and ${d2.toFixed(1)}% to the second">
+            ${seg(dStop, 'is-risk', 'Risk', '−' + dStop.toFixed(1) + '%')}
+            ${seg(d1, 'is-r1', 'Target 1', '+' + d1.toFixed(1) + '%')}
+            ${seg(d2 - d1, 'is-r2', 'Target 2', '+' + d2.toFixed(1) + '%')}
+          </div>
+          <div class="bg-row">
+            <div class="bg-i"><span class="bg-k">If the stop hits</span>
+              <span class="bg-n dn">−${dStop.toFixed(1)}%</span><span class="bg-s">−1.0R</span></div>
+            <div class="bg-i"><span class="bg-k">If target 1 prints</span>
+              <span class="bg-n up">+${d1.toFixed(1)}%</span><span class="bg-s">+${rrT1.toFixed(1)}R</span></div>
+            <div class="bg-i"><span class="bg-k">If target 2 prints</span>
+              <span class="bg-n up">+${d2.toFixed(1)}%</span><span class="bg-s">+${rrT2.toFixed(1)}R</span></div>
+            ${band}
+          </div>
+        </div>`;
+      })()}
+
       ${missed ? `<div class="b-miss"><b>${esc(missed)} has no brief to show.</b>
         A brief needs an open signal carrying an entry, a stop and a first target — that name
         has none right now, so this is the best open setup instead, not a substitute for it.</div>` : ''}
