@@ -291,7 +291,39 @@ export async function runWatchdog(env, { act = true } = {}) {
       }
 
       row.missed = missed;
-      if (row.missed && act) {
+
+      /* ── A SLOT IS DISPATCHED ONCE, NOT UNTIL IT GIVES IN ─────────────────
+       *
+       * Observed live on 3 Sep: daily_scan dispatched at 03:00, 03:20 and
+       * 03:40 UTC — one per tick, indefinitely, and every run went green
+       * without scanning.
+       *
+       * The cause is a seam between two idempotence rules that are each
+       * correct alone. `--once` in standalone_scan asks "has scan_eod been
+       * stamped for today's IST date"; this watchdog asks "has scan_eod been
+       * stamped at or after this slot's UTC instant". Sep 2 13:00Z is 18:30
+       * IST, so a scan_eod stamped earlier that IST day satisfies the runner
+       * and not the watchdog. The runner then declines every dispatch, the
+       * watchdog sees the work still undone, and the two sit there passing the
+       * job back and forth every twenty minutes.
+       *
+       * Hammering it harder cannot win that argument. If a run has ALREADY
+       * completed after the slot and the work is still not recorded, the
+       * runner has considered this slot and decided against it — a further
+       * copy will decide the same thing. That is not a missing run, it is a
+       * disagreement, and it wants surfacing rather than retrying.
+       *
+       * So: dispatch when nothing has run since the slot. When something has
+       * run since the slot and the work is still absent, mark it `stalled` and
+       * leave it alone. Both states are reported; only one of them fires. */
+      const ranSinceSlot = !!(due && last && last >= due.at);
+      row.stalled = !!(row.missed && ranSinceSlot);
+      if (row.stalled) {
+        row.note = "a run completed after this slot and the work is still not "
+                 + "recorded — the runner is declining it, so dispatching again "
+                 + "would only repeat the refusal";
+      }
+      if (row.missed && !row.stalled && act) {
         await dispatch(w.repo, w.file, token, due.inputs);
         row.dispatched = true;
       }
