@@ -3086,6 +3086,8 @@ html:has(dialog[open]){overflow:hidden}
 .fd-b i{display:block;height:100%;border-radius:3px;background:var(--dim)}
 .fd-b i.up{background:var(--up)} .fd-b i.dn{background:var(--down)}
 .fd-s{grid-column:1/-1;font:400 var(--t-2)/1.4 var(--ui);color:var(--dim)}
+/* A gap you can see is worth more than one you cannot: dimmed, not hidden. */
+.fd-u{font:500 var(--t-3)/1.2 var(--ui)!important;color:var(--dim)!important}
 .fd-sip{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
   border-radius:var(--r);overflow:hidden;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
 .fd-sip > div{background:var(--surface);padding:13px 15px;display:flex;flex-direction:column;gap:3px}

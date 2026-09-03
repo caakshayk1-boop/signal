@@ -5971,22 +5971,36 @@
           be the return restated, and would hide the fact that a SIP's result depends on
           <b>when</b> each instalment bought.</p>`) : ''}
 
-      ${sec('Returns, annualised', `
-        ${row('5 year', r5 != null ? `<b class="${dir(r5)}">${r5.toFixed(2)}%</b>` : '—', '', bar(r5, 35))}
-        ${row('3 year', r3 != null ? `<b class="${dir(r3)}">${r3.toFixed(2)}%</b>` : '—', '', bar(r3, 35))}
-        ${row('1 year', r1 != null ? `<b class="${dir(r1)}">${r1.toFixed(2)}%</b>` : '—', '', bar(r1, 50))}
-        <p class="hint">Computed from the NAV series AMFI publishes, not taken from a fund
-          house page. A blank means the fund is younger than the window — shown as unknown
-          rather than shortened and compared against real ones.</p>`)}
+      ${sec('The fund itself', `
+        ${row('Age', f.age_years != null ? `<b>${Number(f.age_years).toFixed(1)} yrs</b>` : '—',
+              f.inception ? `first NAV ${esc(String(f.inception).slice(0, 10))}` : '')}
+        ${row('Fund house', f.house ? `<b>${esc(f.house)}</b>` : '—', '')}
+        ${row('AMFI category', f.category ? `<b>${esc(f.category)}</b>` : '—',
+              'ranked only against this')}
+        ${row('Plan', '<b>Direct · Growth</b>',
+              'the screen holds no Regular or IDCW plan')}
+        <p class="hint">${f.age_years != null && Number(f.age_years) < 5
+          ? `<b>This fund is ${Number(f.age_years).toFixed(1)} years old.</b> A three-year number on it
+             covers a period this fund has only just lived through, and any window longer than its
+             age is blank above rather than shortened.`
+          : `Age matters because it bounds every return beside it — a fund cannot show you a
+             drawdown it was not alive for.`}</p>`)}
 
-      ${sec('What the ride was like', `
-        ${row('Worst fall, 3 years', dd != null ? `<b class="dn">${dd.toFixed(1)}%</b>` : '—',
-              'peak to trough — the number that decides whether you hold on')}
-        ${row('Volatility, 3 years', vol != null ? `<b>${vol.toFixed(1)}</b>` : '—',
-              'annualised standard deviation of monthly returns')}
-        <p class="hint">Two funds can post the same return and compound completely
-          differently. A fund that made 18% through a 40% fall is not the same proposition
-          as one that made 16% through a 20% fall.</p>`)}
+      ${sec('What this screen cannot tell you', `
+        ${row('Expense ratio', '<b class="fd-u">Not published here</b>',
+              'each AMC releases per-scheme TER as a monthly PDF; it is not in the AMFI feed')}
+        ${row('AUM', '<b class="fd-u">Not published here</b>',
+              'AMFI publishes it monthly in a separate file this screen does not read')}
+        ${row('Exit load', '<b class="fd-u">Not published here</b>',
+              'in the scheme document — typically 1% inside a year on equity funds')}
+        ${row('Top holdings and sectors', '<b class="fd-u">Not published here</b>',
+              'monthly portfolio disclosures, per AMC, not in any NAV feed')}
+        <p class="hint">These are listed rather than omitted because a gap you can see is worth
+          more than one you cannot. This screen reads AMFI's daily NAV file and nothing else, so
+          everything above is a real limit of the source — not a shortcut. Where a number is
+          missing, the scheme document and the AMC's monthly factsheet carry it.
+          <b>Direct-vs-Regular is the one cost lever the NAV data does show</b>, and the screen is
+          Direct-only by construction, which is the low-cost half of the universe.</p>`)}
 
       <p class="hint"><b>Direct plan, Growth option.</b> Per-scheme expense ratio is not in
         the free AMFI feed, so this screen does not claim to know it. Ranked only against
