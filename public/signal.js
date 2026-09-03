@@ -5682,6 +5682,8 @@
         return `<article class="nwc">
           <div class="nwc-h">
             <span class="nwc-s">${esc(x.source || 'wire')}${
+              x._also && x._also.length
+                ? ` <i class="w-also" title="${esc(x._also.join(', '))}">+${x._also.length} more</i>` : ''}${
               x.at ? ` · ${esc(storyAge(x.at))}` : ''}</span>
             ${/* A story that names no screened company gets no badge at all.
                 * "No screened company named" was a label announcing an absence
