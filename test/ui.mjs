@@ -324,7 +324,7 @@ try {
   await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight * 0.5));
   await p.waitForTimeout(400);
   const prog = await p.evaluate(() => {
-    const b = document.getElementById("prog");
+    const b = document.getElementById("scrollprog");
     return b ? parseFloat(b.style.width) || 0 : -1;
   });
   ok("the scroll progress bar tracks the page", prog > 5, prog + "%");
