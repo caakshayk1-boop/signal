@@ -292,57 +292,43 @@ export async function runWatchdog(env, { act = true } = {}) {
 
       row.missed = missed;
 
-      /* ── A SLOT IS DISPATCHED ONCE, NOT UNTIL IT GIVES IN ─────────────────
+      /* ── THE RUNNER DECIDES WHETHER TO ACT, NOT THIS FILE ─────────────────
        *
-       * Observed live on 3 Sep: daily_scan dispatched at 03:00, 03:20 and
-       * 03:40 UTC — one per tick, indefinitely, and every run went green
-       * without scanning.
+       * There was a suppression here. It inferred from "a run completed after
+       * the slot and the work is still unrecorded" that the runner had
+       * considered the slot and refused, so dispatching again would repeat the
+       * refusal. The inference is sound and the guard was still wrong.
        *
-       * The cause is a seam between two idempotence rules that are each
-       * correct alone. `--once` in standalone_scan asks "has scan_eod been
-       * stamped for today's IST date"; this watchdog asks "has scan_eod been
-       * stamped at or after this slot's UTC instant". Sep 2 13:00Z is 18:30
-       * IST, so a scan_eod stamped earlier that IST day satisfies the runner
-       * and not the watchdog. The runner then declines every dispatch, the
-       * watchdog sees the work still undone, and the two sit there passing the
-       * job back and forth every twenty minutes.
+       * It cannot tell one run from another. A hand-dispatched momentum scan,
+       * a drifted cron that ran a different slot, any run at all after the slot
+       * — each looked like a refusal. Measured live on 3 Sep it was suppressing
+       * BOTH daily_scan's end-of-day slot and scheduled_tasks' evening brief at
+       * the same time: two pieces of real work, neither dispatched, on the day
+       * the operator reported no signals firing.
        *
-       * Hammering it harder cannot win that argument. If a run has ALREADY
-       * completed after the slot and the work is still not recorded, the
-       * runner has considered this slot and decided against it — a further
-       * copy will decide the same thing. That is not a missing run, it is a
-       * disagreement, and it wants surfacing rather than retrying.
+       * The thing it was protecting against — a dispatch every twenty minutes
+       * into a job that keeps declining — is noise. The thing it caused is
+       * missing work. Those are not the same size of mistake.
        *
-       * So: dispatch when nothing has run since the slot. When something has
-       * run since the slot and the work is still absent, mark it `stalled` and
-       * leave it alone. Both states are reported; only one of them fires. */
-      /* THE SUPPRESSION IS TIME-BOUNDED, AND TODAY SHOWED WHY.
+       * AND THE PROTECTION WAS ALREADY THERE, one layer down. standalone_scan
+       * keeps --once, which allows one completed scan per slot per IST day;
+       * daily_brief's catch-up consults job_runs for a delivery stamped today
+       * in MYT. Both are idempotent and both are authoritative. A dispatch into
+       * either is a no-op when the work is done. Idempotence belongs in the
+       * thing that does the work, not in a guess made from outside it.
        *
-       * On 3 Sep the midday slot was never scanned. The watchdog saw it
-       * correctly — scan_midday last recorded the previous day, missed: true —
-       * and then stood down, because runs HAD completed after the slot and the
-       * guard read that as "the runner is declining it".
-       *
-       * Some of those runs were hand-dispatched momentum scans that had
-       * nothing to do with the midday slot. The guard cannot tell one run from
-       * another: it sees a completion after the slot and infers a refusal.
-       *
-       * So the inference now expires. Within two hours of the slot, a
-       * completed run is good evidence that something tried and declined, and
-       * re-dispatching would repeat the refusal. Beyond two hours it is far
-       * more likely to be an unrelated run, and standing down on it means the
-       * slot is never served at all — which is the worse failure of the two,
-       * and the one that actually happened. */
+       * `stalled` is still computed and still reported, because a slot the
+       * runner genuinely keeps refusing is worth seeing on /api/pipeline. It
+       * no longer decides anything. */
       const STALL_WINDOW_MIN = 120;
-      const ranSinceSlot = !!(due && last && last >= due.at
-                              && last <= due.at + STALL_WINDOW_MIN * 60000);
-      row.stalled = !!(row.missed && ranSinceSlot);
+      row.stalled = !!(row.missed && due && last && last >= due.at
+                       && last <= due.at + STALL_WINDOW_MIN * 60000);
       if (row.stalled) {
-        row.note = "a run completed after this slot and the work is still not "
-                 + "recorded — the runner is declining it, so dispatching again "
-                 + "would only repeat the refusal";
+        row.note = "a run completed shortly after this slot without recording the "
+                 + "work — dispatching anyway, because --once and the brief's own "
+                 + "guard make a duplicate a no-op";
       }
-      if (row.missed && !row.stalled && act) {
+      if (row.missed && act) {
         await dispatch(w.repo, w.file, token, due.inputs);
         row.dispatched = true;
       }
