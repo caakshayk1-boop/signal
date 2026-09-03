@@ -530,6 +530,8 @@ try {
    * So the assertions below check that a value the FEED CARRIES actually
    * reaches the DOM, which is the only failure mode this route has. */
   console.log("\n  /funds — the screen, and one fund's sheet");
+  const fCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await fCtx.newPage();
   await page.goto(SITE + "#/funds", { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(SETTLE);
 
@@ -584,6 +586,7 @@ try {
        /Top holdings and sectors/i.test(sheetTxt));
   }
   await page.evaluate(() => document.getElementById("sheet")?.close());
+  await fCtx.close();
 
   /* ── NARROW ──────────────────────────────────────────────────────────── */
   console.log("\n  320 x 568 — the narrowest phone in use");

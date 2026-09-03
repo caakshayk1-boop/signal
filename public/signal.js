@@ -6873,10 +6873,27 @@
       }
     };
     if (useVT) {
-      // The transition resolves when the callback does; nothing downstream
-      // depends on the animation having finished, so `finished` is not awaited.
-      try { await document.startViewTransition(run).updateCallbackDone; }
-      catch (e) { await run(); }                 // a rejected transition still renders
+      /* THE ABORT IS ABOUT THE ANIMATION, NOT THE RENDER.
+       *
+       * A route that fetches for more than about four seconds blows the View
+       * Transition API's update-callback deadline. The spec's response is to
+       * SKIP THE ANIMATION and reject `ready` — the callback keeps running and
+       * the page paints normally. Two bugs came out of not knowing that:
+       *
+       *  · `ready` was never touched, so its rejection was unhandled and
+       *    surfaced as a page error — "Transition was aborted because of
+       *    timeout in DOM update" — on any slow route;
+       *  · the catch below re-ran `run()`, which re-fetched and re-painted a
+       *    route that had already rendered. On a slow connection, the exact
+       *    condition that triggered it, the remedy was a second full load.
+       *
+       * `run` swallows its own errors, so updateCallbackDone can only settle
+       * fulfilled; there is nothing left for a fallback render to fix. Both
+       * animation promises are explicitly ignored instead. */
+      const vt = document.startViewTransition(run);
+      vt.ready.catch(() => {});                  // skipped animation, not a failure
+      vt.finished.catch(() => {});
+      await vt.updateCallbackDone.catch(() => {});
     } else {
       await run();
     }
