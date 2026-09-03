@@ -824,6 +824,8 @@
     if (!ev.target.closest) return;
     const t = ev.target.closest('.heat-t');
     if (t && t.dataset.sector) { openSector(t.dataset.sector); return; }
+    const fd = ev.target.closest('.rank-r.fnd[data-fund]');
+    if (fd && fd.dataset.fund) { openFund(fd.dataset.fund); return; }
     const bl = ev.target.closest('[data-brief]');
     if (bl) { briefSym = bl.dataset.brief; return; }   // the href does the routing
     if (ev.target.closest('a')) return;          // never hijack a real link
@@ -5898,9 +5900,12 @@
    * implying it screened on expense.
    */
   const fundRow = (f, i) => {
+    // Registered on render, keyed by code, so the delegated click below can
+    // find the whole record without re-fetching or re-searching the feed.
+    if (f && f.code != null) window.__FUNDS[String(f.code)] = f;
     const r5 = Number(f.r5), r3 = Number(f.r3), r1 = Number(f.r1);
     const vol = Number(f.volatility), dd = Number(f.dd3);
-    return `<div class="rank-r fnd" data-fund="${esc(f.code || f.name || '')}" role="button" tabindex="0">
+    return `<div class="rank-r fnd" data-fund="${esc(String(f.code ?? ''))}" role="button" tabindex="0">
       <span class="i">${i + 1}</span>
       <span class="s"><b>${esc(f.name || '—')}</b>
         <span>${esc(f.category || '')}${f.nav != null ? ` · NAV ${price(f.nav)}` : ''}</span></span>
@@ -5913,6 +5918,80 @@
         Number.isFinite(vol) ? vol.toFixed(1) : '—'}</span>
     </div>`;
   };
+
+  /* ── ONE FUND, IN FULL ────────────────────────────────────────────────────
+   *
+   * The table ranks; this answers "what am I actually looking at". Opened by
+   * clicking a row, which is the same gesture every other table on this site
+   * already uses for detail.
+   *
+   * The SIP block is the headline because it is the number people came for,
+   * and it is shown as invested-against-value rather than a single figure: a
+   * ₹22 lakh corpus means nothing until you can see the ₹12 lakh that went in.
+   * It is computed from the fund's own NAV series, buying units on each
+   * monthly anniversary at the NAV that actually printed — not from a CAGR
+   * projection, which is the same number twice and hides when the money went
+   * in.
+   *
+   * Drawdown sits beside the returns rather than under them. A fund that
+   * returned 18% through a 40% fall is a different proposition from one that
+   * returned 16% through a 20% fall, and only one of those is a number people
+   * survive holding.
+   */
+  window.__FUNDS = {};
+  function openFund(code) {
+    const f = window.__FUNDS[String(code)];
+    if (!f) return;
+    const n = v => (Number.isFinite(Number(v)) ? Number(v) : null);
+    const r1 = n(f.r1), r3 = n(f.r3), r5 = n(f.r5), dd = n(f.dd3), vol = n(f.volatility);
+    const sip = f.sip10 && n(f.sip10.value) ? f.sip10 : null;
+    const bar = (v, scale) => {
+      const x = n(v);
+      if (x == null) return '<span class="fd-b"><i style="width:0"></i></span>';
+      const w = Math.max(2, Math.min(100, Math.abs(x) / scale * 100));
+      return `<span class="fd-b"><i class="${x < 0 ? 'dn' : 'up'}" style="width:${w.toFixed(0)}%"></i></span>`;
+    };
+    const row = (k, v, sub, b) => `<div class="fd-r"><span class="fd-k">${esc(k)}</span>
+      <span class="fd-v">${v}</span>${b || ''}${sub ? `<span class="fd-s">${sub}</span>` : ''}</div>`;
+
+    sheet(f.name || 'Fund', `
+      <p class="hint" style="margin:0 0 14px">${esc(f.category || '')}${
+        f.house ? ` · ${esc(f.house)}` : ''}${
+        f.nav != null ? ` · NAV ${price(f.nav)}${f.nav_date ? ` on ${esc(String(f.nav_date).slice(0, 10))}` : ''}` : ''}</p>
+
+      ${sip ? sec('A ₹10,000 monthly SIP, ten years', `
+        <div class="fd-sip">
+          <div><span class="fd-k">You would have put in</span><b>${money(sip.invested)}</b>
+            <span class="fd-s">${sip.months} instalments</span></div>
+          <div><span class="fd-k">It would be worth</span><b class="up">${money(sip.value)}</b>
+            <span class="fd-s">${(sip.value / sip.invested).toFixed(2)}× the money in</span></div>
+        </div>
+        <p class="hint">Units bought at the NAV that actually printed on each monthly
+          anniversary, valued at the latest NAV. Not a projection from a CAGR — that would
+          be the return restated, and would hide the fact that a SIP's result depends on
+          <b>when</b> each instalment bought.</p>`) : ''}
+
+      ${sec('Returns, annualised', `
+        ${row('5 year', r5 != null ? `<b class="${dir(r5)}">${r5.toFixed(2)}%</b>` : '—', '', bar(r5, 35))}
+        ${row('3 year', r3 != null ? `<b class="${dir(r3)}">${r3.toFixed(2)}%</b>` : '—', '', bar(r3, 35))}
+        ${row('1 year', r1 != null ? `<b class="${dir(r1)}">${r1.toFixed(2)}%</b>` : '—', '', bar(r1, 50))}
+        <p class="hint">Computed from the NAV series AMFI publishes, not taken from a fund
+          house page. A blank means the fund is younger than the window — shown as unknown
+          rather than shortened and compared against real ones.</p>`)}
+
+      ${sec('What the ride was like', `
+        ${row('Worst fall, 3 years', dd != null ? `<b class="dn">${dd.toFixed(1)}%</b>` : '—',
+              'peak to trough — the number that decides whether you hold on')}
+        ${row('Volatility, 3 years', vol != null ? `<b>${vol.toFixed(1)}</b>` : '—',
+              'annualised standard deviation of monthly returns')}
+        <p class="hint">Two funds can post the same return and compound completely
+          differently. A fund that made 18% through a 40% fall is not the same proposition
+          as one that made 16% through a 20% fall.</p>`)}
+
+      <p class="hint"><b>Direct plan, Growth option.</b> Per-scheme expense ratio is not in
+        the free AMFI feed, so this screen does not claim to know it. Ranked only against
+        its own category. Past returns, not a recommendation and not a forecast.</p>`);
+  }
 
   R['/funds'] = async () => {
     const head0 = head('Funds',
@@ -5942,7 +6021,7 @@
 
     for (const c of cats) {
       out += sec(c.label || c.key, `<div class="rank">
-        <div class="rank-r rank-head fnd">
+        <div class="rank-r rank-head fnd" aria-hidden="false">
           <span class="i">#</span><span class="s">Scheme</span>
           <span class="x">5-year</span><span class="x">3-year</span><span class="x">1-year</span>
           <span class="x">Worst fall</span><span class="x">Volatility</span>
