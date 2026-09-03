@@ -316,7 +316,26 @@ export async function runWatchdog(env, { act = true } = {}) {
        * So: dispatch when nothing has run since the slot. When something has
        * run since the slot and the work is still absent, mark it `stalled` and
        * leave it alone. Both states are reported; only one of them fires. */
-      const ranSinceSlot = !!(due && last && last >= due.at);
+      /* THE SUPPRESSION IS TIME-BOUNDED, AND TODAY SHOWED WHY.
+       *
+       * On 3 Sep the midday slot was never scanned. The watchdog saw it
+       * correctly — scan_midday last recorded the previous day, missed: true —
+       * and then stood down, because runs HAD completed after the slot and the
+       * guard read that as "the runner is declining it".
+       *
+       * Some of those runs were hand-dispatched momentum scans that had
+       * nothing to do with the midday slot. The guard cannot tell one run from
+       * another: it sees a completion after the slot and infers a refusal.
+       *
+       * So the inference now expires. Within two hours of the slot, a
+       * completed run is good evidence that something tried and declined, and
+       * re-dispatching would repeat the refusal. Beyond two hours it is far
+       * more likely to be an unrelated run, and standing down on it means the
+       * slot is never served at all — which is the worse failure of the two,
+       * and the one that actually happened. */
+      const STALL_WINDOW_MIN = 120;
+      const ranSinceSlot = !!(due && last && last >= due.at
+                              && last <= due.at + STALL_WINDOW_MIN * 60000);
       row.stalled = !!(row.missed && ranSinceSlot);
       if (row.stalled) {
         row.note = "a run completed after this slot and the work is still not "

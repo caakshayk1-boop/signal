@@ -3647,8 +3647,44 @@
       [`After T1, trail to ${f(e)}`, 'break-even — never back below it'],
     ];
     if (Number.isFinite(b)) steps.push([`After T2, trail to ${f(a)}`, 'locking the first target in']);
+    /* ── THE SCALE-OUT, BESIDE THE TRAIL ──────────────────────────────────
+     * 20% at the first target, 50% at the second, the balance at the third.
+     *
+     * The trail above says where the stop goes; it never said how much to
+     * sell, so a reader following it held the whole position to a single exit.
+     * These are two halves of one plan and were only ever half published.
+     *
+     * The fractions are the operator's, and the arithmetic beside each rung is
+     * what they actually bank — 20% of a position at 1.6R is 0.32R of the
+     * whole, which is the figure worth seeing rather than the percentage on
+     * its own. Weighted across all three rungs the plan returns 0.20x1.6 +
+     * 0.50x2.5 + 0.30x3.3 = 2.56R if every target prints, against 3.3R for
+     * holding it all to the last one. That is the cost of taking money off the
+     * table, and it is stated rather than left for the reader to discover.
+     *
+     * Same standing as the trail: a management rule, not a re-grade. The
+     * ledger is still scored to the single stop the signal was sent with. */
+    const t3 = Number.isFinite(b) ? e + (short ? -1 : 1) * Math.abs(b - e) * (3.3 / 2.5) : null;
+    const rOf = lv => Math.abs(lv - e) / Math.abs(e - s0);
+    const rungs = [
+      ['20%', a, 'first target'],
+      Number.isFinite(b) ? ['50%', b, 'second target'] : null,
+      t3 ? ['30%', t3, 'the balance, at the third'] : null,
+    ].filter(Boolean);
+    const banked = rungs.reduce((x, [pcStr, lv]) => x + parseFloat(pcStr) / 100 * rOf(lv), 0);
     return `<div class="trail"><span>Trailing rule</span>
       ${steps.map(([t, k]) => `<div class="tr-s"><b>${esc(t)}</b><i>${esc(k)}</i></div>`).join('')}
+      <div class="tr-sc">
+        <span class="tr-sch">Scale-out</span>
+        ${rungs.map(([pcStr, lv, lab]) => `<div class="tr-r">
+          <b>${esc(pcStr)}</b><span>at ${f(lv)}</span><i>${esc(lab)} · ${rOf(lv).toFixed(1)}R</i>
+        </div>`).join('')}
+        <div class="tr-n">Sold this way the whole position returns
+          <b>${banked.toFixed(2)}R</b> if every target prints, against
+          <b>${rOf(rungs[rungs.length - 1][1]).toFixed(1)}R</b> for holding all of it to the
+          last one. Taking money off the table costs that difference; it buys the certainty
+          of having taken it.</div>
+      </div>
       <div class="tr-n">Published as a management rule. The ledger is still scored on the
         stop the signal was sent with — a break-even trail measured
         <b>worse</b> than the fixed stop over 470 closed trades.</div>
