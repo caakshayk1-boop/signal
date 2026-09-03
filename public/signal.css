@@ -799,7 +799,10 @@ body{font-family:var(--ui);font-size:var(--t-6);line-height:1.5;letter-spacing:v
 
 /* Header and tabs: taller, quieter, sentence case. */
 .bar{height:var(--barh);border-bottom:1px solid var(--line);
-  background:color-mix(in srgb,var(--bg) 92%,transparent)}
+  /* Opaque, like the rule above. This one is later in the file and was
+     re-adding the transparency that made the page readable through the
+     header in Safari — see the note at the first .bar rule. */
+  background:var(--bg)}
 .tabs a{font:500 var(--t-5)/1 var(--ui);letter-spacing:var(--ls-0);color:var(--dim)}
 .tabs a[aria-current="page"]{color:var(--text)}
 .tabs a[aria-current="page"]::before{background:var(--text)}
