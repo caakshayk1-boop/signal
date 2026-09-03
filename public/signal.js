@@ -780,6 +780,20 @@
 
   // Five steps each way, on the sector's own median. A continuous ramp reads
   // as decoration; steps read as a scale you can compare two tiles against.
+  /* heatClass is calibrated for SECTOR medians, where 1.5% is a big day. The
+   * same thresholds on a 1-month return or a distance from the 200-day put
+   * every row at maximum tint and say nothing. This takes the scale the column
+   * lives on and maps onto the same seven steps, so the tint means "large for
+   * this column" rather than "large for a sector's daily median".
+   *
+   * A tint, not a replacement for the sign: the number keeps its + or - and
+   * its text colour, so the column still reads correctly in greyscale and to
+   * anyone who cannot separate the two hues. */
+  const heatCell = (v, scale) => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || !scale) return '';
+    return heatClass(n / scale * 1.5);
+  };
   const heatClass = v => v >= 1.5 ? 'h-p3' : v >= .6 ? 'h-p2' : v > .1 ? 'h-p1'
                        : v <= -1.5 ? 'h-n3' : v <= -.6 ? 'h-n2' : v < -.1 ? 'h-n1' : 'h-z';
 
@@ -3091,10 +3105,10 @@
              cell that never fills should read as "not measured" like every
              other unmeasured cell on this site, not as a decorative dot. -->
         <span class="x" data-l="Today" data-day style="color:var(--dim)">—</span>
-        <span class="x ${dir(v50)}" data-l="vs 50D">${v50 == null ? '—' : pct(v50)}</span>
-        <span class="x ${dir(v200)}" data-l="vs 200D">${v200 == null ? '—' : pct(v200)}</span>
+        <span class="x ${dir(v50)} ${heatCell(v50, 8)}" data-l="vs 50D">${v50 == null ? '—' : pct(v50)}</span>
+        <span class="x ${dir(v200)} ${heatCell(v200, 20)}" data-l="vs 200D">${v200 == null ? '—' : pct(v200)}</span>
         <span class="x" data-l="RSI" style="color:${(r.rsi ?? 50) > 70 ? 'var(--warn)' : (r.rsi ?? 50) < 35 ? 'var(--accent)' : 'var(--dim)'}">${r.rsi != null ? Math.round(r.rsi) : '—'}</span>
-        <span class="m ${dir(r.r1m)}" data-l="1 month">${pct(r.r1m)}</span>
+        <span class="m ${dir(r.r1m)} ${heatCell(r.r1m, 12)}" data-l="1 month">${pct(r.r1m)}</span>
         <span class="pl-w">${priceLine(r)}</span>
       </div>`; }).join('')}</div>`;
 
@@ -4299,6 +4313,43 @@
              'per closed trade', dir(H.expectancy_r)] : null,
       ], 'No engine on this site has cleared 30 closed trades at t&nbsp;≥&nbsp;2, so this is a '
        + 'setup to examine rather than a call to take.')}
+
+      ${/* ── THE VERDICT ──────────────────────────────────────────────────────
+          * Twelve sections of evidence and the page never said what it added
+          * up to. Every number was there and the reader had to do the
+          * arithmetic that the site's own clearance rule already answers.
+          *
+          * It is derived, not written: the engine's closed record against the
+          * 30-trade, t>=2 bar this site sets before an engine is trusted with
+          * capital. There is no path through this that prints "take it" —
+          * because on today's ledger no engine clears, and a verdict that
+          * cannot say no is not a verdict. If one ever clears, this reports
+          * that, by the same rule and with no edit. */''}
+      ${(() => {
+        const n = H ? H.trades : 0;
+        const cleared = n >= 30 && H && H.expectancy_r > 0;
+        const cls = cleared ? 'ok' : n >= 8 && H && H.expectancy_r < 0 ? 'no' : 'thin';
+        const head = cleared ? 'Cleared for capital'
+          : (n >= 8 && H && H.expectancy_r < 0) ? 'Research only — this engine is losing'
+          : 'Research only — not enough evidence';
+        const body = cleared
+          ? `${esc(ENGINE_LABEL[sig.signal_type] || sig.signal_type)} has ${n} closed trades at
+             ${H.expectancy_r > 0 ? '+' : ''}${H.expectancy_r}R. It clears the bar this site sets.`
+          : (n >= 8 && H && H.expectancy_r < 0)
+          ? `${esc(ENGINE_LABEL[sig.signal_type] || sig.signal_type)} has closed <b>${n}</b> trades
+             since ${esc(LAUNCH)} at <b>${H.expectancy_r}R</b> each. The setup below may still be
+             sound; the engine that found it has not paid so far.`
+          : `${esc(ENGINE_LABEL[sig.signal_type] || sig.signal_type)} has closed
+             <b>${n || 'no'}</b> trade${n === 1 ? '' : 's'} since ${esc(LAUNCH)} — ${30 - n} short of
+             the 30 this site requires before an engine is trusted with capital. Nothing below
+             changes that.`;
+        return `<div class="b-verdict is-${cls}">
+          <div class="b-vk">The verdict</div>
+          <h2>${head}</h2><p>${body}</p>
+          <p class="b-vs">The bar is 30 closed trades at a t-statistic of 2 or better.
+            <a href="#/signals">See the record</a>.</p>
+        </div>`;
+      })()}
 
       ${missed ? `<div class="b-miss"><b>${esc(missed)} has no brief to show.</b>
         A brief needs an open signal carrying an entry, a stop and a first target — that name
