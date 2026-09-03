@@ -328,6 +328,31 @@ try {
     return b ? parseFloat(b.style.width) || 0 : -1;
   });
   ok("the scroll progress bar tracks the page", prog > 5, prog + "%");
+
+  /* THE COLLISION CHECK, AND WHY IT IS THIS SHAPE.
+   *
+   * The scroll bar was first shipped as `.prog`, a name signal.css already
+   * used for the signal card's progress-to-target widget. Every one of those
+   * inherited `position:fixed; top:0; left:0; width:0` and collapsed into the
+   * viewport's top-left corner, stacked on each other and over the page — the
+   * "overlapping" that was reported three times and that no geometry check
+   * caught, because the elements really were where the CSS put them.
+   *
+   * Asserting the specific class would only guard the name that already broke.
+   * This asserts the SYMPTOM: nothing inside <main> should be pinned to the
+   * top-left corner with no width. Any future generic class name that leaks a
+   * fixed-position rule into content fails here. */
+  const pinned = await p.evaluate(() => [...document.querySelectorAll("main *")]
+    .filter((e) => {
+      const cs = getComputedStyle(e);
+      if (cs.position !== "fixed") return false;
+      const r = e.getBoundingClientRect();
+      return r.top < 8 && r.left < 8 && r.width < 4;
+    })
+    .slice(0, 4)
+    .map((e) => e.tagName + "." + (e.className || "").toString().split(" ")[0]));
+  ok("no content is pinned to the top-left corner with no width",
+     pinned.length === 0, pinned.join(", "));
   await p.evaluate(() => window.scrollTo(0, 0));
   await p.waitForTimeout(300);
 

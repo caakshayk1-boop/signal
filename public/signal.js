@@ -6859,7 +6859,7 @@
    * times per frame.
    */
   (() => {
-    const bar = document.getElementById('prog');
+    const bar = document.getElementById('scrollprog');
     if (!bar) return;
     let queued = false;
     const draw = () => {

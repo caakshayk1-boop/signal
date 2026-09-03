@@ -3150,9 +3150,18 @@ html:has(dialog[open]){overflow:hidden}
  * z-index sits above the header's own stacking context — the header is sticky
  * and would otherwise slide over it. The transition is short enough to smooth
  * the rAF steps and short enough not to lag the thumb. */
-.prog{position:fixed;top:0;left:0;height:2px;width:0;background:var(--accent);
+/* NAMED .scrollprog, NOT .prog. `.prog` was already the signal card's
+ * progress-to-target widget (see the rule far above), and taking the name
+ * applied `position:fixed; top:0; left:0; height:2px; width:0` to every one of
+ * them — collapsing each card's stop/entry/target bar into the viewport's
+ * top-left corner, stacked on each other and over the page. That is the
+ * "overlapping" that appeared the moment this bar shipped.
+ *
+ * A generic class name in a 200KB single stylesheet is a collision waiting for
+ * a second author, and I was the second author. */
+.scrollprog{position:fixed;top:0;left:0;height:2px;width:0;background:var(--accent);
   z-index:2000;transition:width .1s linear;pointer-events:none}
-@media (prefers-reduced-motion:reduce){ .prog{transition:none} }
+@media (prefers-reduced-motion:reduce){ .scrollprog{transition:none} }
 
 /* ── ROUTE SNAPSHOT ───────────────────────────────────────────────────────
  * A strip, not a grid: it sits above the content it summarises and has to
