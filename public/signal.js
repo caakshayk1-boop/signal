@@ -2805,16 +2805,16 @@
                   tech: 'Technical', r1m: '1M return', roce: 'ROCE', mcap_cr: 'Size' };
 
   R['/screen'] = async () => {
-    const screenSnap = rows => snap([
+    const screenSnap = rows => ((num) => snap([
       ['Universe', rows.length, 'names screened'],
-      ['Above 200-day', rows.filter(r => n(r.price) && n(r.sma200) && n(r.price) > n(r.sma200)).length,
+      ['Above 200-day', rows.filter(r => num(r.price) && num(r.sma200) && num(r.price) > num(r.sma200)).length,
        'in an uptrend', 'up'],
       ['At 52-week high', rows.filter(r => r.brk52w).length, 'breaking out', 'ac'],
       ['Median ATR', (() => {
-        const a = rows.map(r => n(r.atr_pct)).filter(x => x != null).sort((x, y) => x - y);
+        const a = rows.map(r => num(r.atr_pct)).filter(x => x != null).sort((x, y) => x - y);
         return a.length ? a[Math.floor(a.length / 2)].toFixed(2) + '%' : null;
       })(), 'daily range'],
-    ]);
+    ]))(v => { const x = Number(v); return Number.isFinite(x) ? x : null; });
     const shell = body => head('Screen',
       'Every one of the 750 names, searchable. Tap any row for the full card.',
       'The full universe') + body;
