@@ -6152,6 +6152,56 @@
              drawdown it was not alive for.`}</p>`)}
 
       ${(() => {
+        /* THE MOST USEFUL NUMBER ON THE SHEET, COMPUTED SINCE LAUNCH AND NEVER
+         * PUBLISHED. rolling3y and percentile_r3 are in every funds.json build
+         * and appeared nowhere in this file.
+         *
+         * A trailing 3-year CAGR is ONE window — the one ending today — and it
+         * silently rewards whoever got lucky with an end date. The rolling
+         * figures answer the question people actually have: if I had started
+         * at any month, what would three years have paid? Worst, median and
+         * best across every window is the honest form, and the SPREAD between
+         * them is the risk that a single CAGR hides completely.
+         *
+         * A range with a central marker, not a chart: the data's job is one
+         * magnitude and its dispersion. `above_7pct` is a proportion and gets
+         * a sentence, not a plot. */
+        const R = f.rolling3y;
+        if (!R || R.windows == null) return '';
+        const w = n(R.worst), m = n(R.median), b = n(R.best);
+        if (w == null || b == null) return '';
+        const lo = Math.min(0, w), hi = Math.max(b, 0);
+        const span = (hi - lo) || 1;
+        const pos = v => ((v - lo) / span * 100);
+        const zero = lo < 0 ? pos(0) : null;
+        const pct = n(R.above_7pct), rank = n(f.percentile_r3);
+        return sec('Whenever you had started', `
+          <div class="fd-band" role="img"
+               aria-label="Rolling three-year returns: worst ${w}%, median ${m ?? '-'}%, best ${b}%, across ${R.windows} windows">
+            <div class="fd-band-tr">
+              ${zero != null ? `<i class="fd-band-zero" style="left:${zero.toFixed(1)}%"></i>` : ''}
+              <i class="fd-band-fill ${w < 0 ? 'neg' : ''}"
+                 style="left:${pos(w).toFixed(1)}%;width:${(pos(b) - pos(w)).toFixed(1)}%"
+                 title="Every 3-year window landed between ${w}% and ${b}%"></i>
+              ${m != null ? `<i class="fd-band-med" style="left:${pos(m).toFixed(1)}%"
+                 title="Median 3-year window: ${m}%"></i>` : ''}
+            </div>
+            <div class="fd-band-lb">
+              <span class="${w < 0 ? 'dn' : ''}"><b>${w.toFixed(1)}%</b><i>worst</i></span>
+              ${m != null ? `<span class="mid"><b>${m.toFixed(1)}%</b><i>median</i></span>` : ''}
+              <span><b>${b.toFixed(1)}%</b><i>best</i></span>
+            </div>
+          </div>
+          <p class="hint">Annualised, across ${R.windows} overlapping three-year windows since
+            launch${pct != null ? `. <b>${pct}%</b> of them beat 7% a year — roughly what a fixed
+            deposit pays, and the bar a fund has to clear to be worth the volatility` : ''}${
+            rank != null ? `. Its trailing 3-year return ranks <b>${rank}</b> of 100 in this
+            category` : ''}.
+            The headline 3-year figure is just the window ending today; the spread above is what a
+            single CAGR hides.</p>`);
+      })()}
+
+      ${(() => {
         const cal = Array.isArray(f.calendar) ? f.calendar.filter(x => x && x.ret != null) : [];
         if (!cal.length) return '';
         const mx = Math.max(...cal.map(x => Math.abs(Number(x.ret) || 0)), 1);

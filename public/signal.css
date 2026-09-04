@@ -3424,3 +3424,26 @@ html:has(dialog[open]){overflow:hidden}
 .lad-foot{margin:8px 0 0;padding-top:7px;border-top:1px solid var(--line);
           font-size:11px;line-height:1.5;color:var(--dim)}
 @media (max-width:520px){ .lad-risk{margin-left:0;flex-basis:100%} }
+
+/* ── ROLLING 3-YEAR BAND ─────────────────────────────────────────────────────
+ * A range with a central marker, not a chart. The job of the data is one
+ * magnitude and its dispersion, and dispersion is exactly what a single
+ * trailing CAGR hides — so the SPREAD is the mark and the median is a tick on
+ * it. Text wears text tokens throughout; the band alone carries the encoding. */
+.fd-band{margin:2px 0 4px}
+.fd-band-tr{position:relative;height:12px;border-radius:6px;background:var(--line);overflow:hidden}
+.fd-band-fill{position:absolute;top:0;bottom:0;border-radius:6px;background:var(--up);opacity:.55}
+.fd-band-fill.neg{background:linear-gradient(90deg,var(--down),var(--up))}
+/* 2px surface gap so the marker reads as ON the band, not part of it */
+.fd-band-med{position:absolute;top:-2px;bottom:-2px;width:3px;margin-left:-1.5px;
+             border-radius:2px;background:var(--text);
+             box-shadow:0 0 0 2px var(--bg)}
+.fd-band-zero{position:absolute;top:0;bottom:0;width:1px;background:var(--dim);opacity:.5}
+.fd-band-lb{display:flex;justify-content:space-between;margin-top:7px;gap:8px}
+.fd-band-lb span{display:flex;flex-direction:column;gap:1px;min-width:0}
+.fd-band-lb span.mid{align-items:center;flex:1}
+.fd-band-lb span:last-child{align-items:flex-end;text-align:right}
+.fd-band-lb b{font:600 13.5px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.fd-band-lb span.dn b{color:var(--down)}
+.fd-band-lb i{font:400 10px/1 var(--mono);font-style:normal;text-transform:uppercase;
+              letter-spacing:.09em;color:var(--dim)}
