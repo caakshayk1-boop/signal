@@ -80,7 +80,7 @@ jobs:
       # twelve hours. That is a worse failure than drift — drift is visible in
       # a diff, this would look like the edits never happened.
       #
-      # The DATA still mirrors, below, because the nine JSON feeds are genuinely
+      # The DATA still mirrors, below, because the twelve JSON feeds are genuinely
       # build artefacts of generate.py upstream and are not authored here.
 
       - name: Fetch the data feeds
@@ -90,7 +90,7 @@ jobs:
           set -euo pipefail
           mkdir -p .incoming
           fail=0
-          for j in alerts conviction data-health edition funds ipo mandate news pulse screen today; do
+          for j in alerts conviction data-health edition engines funds ipo mandate news pulse screen today; do
             if gh api "repos/$UPSTREAM/contents/docs/$j.json" \
                  -H "Accept: application/vnd.github.raw" > ".incoming/$j.json" 2>/dev/null \
                && [ -s ".incoming/$j.json" ]; then

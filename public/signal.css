@@ -3115,6 +3115,27 @@ html:has(dialog[open]){overflow:hidden}
 .fd-ometa{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:14px;
   font:500 var(--t-2)/1.4 var(--ui);color:var(--dim)}
 .fd-ometa b{color:var(--ink);font-variant-numeric:tabular-nums}
+/* Engine status. Six facts a row, tabular so the floors line up down the
+   column — that vertical read IS the point: one engine's number is meaningless,
+   the spread between them is the story. */
+.eg{display:grid;gap:2px}
+.eg-r{display:grid;gap:6px 12px;align-items:center;padding:9px 0;
+  border-bottom:1px solid var(--hair);
+  grid-template-columns:1fr auto;grid-template-areas:"n s" "t w" "f c"}
+@media(min-width:720px){.eg-r{grid-template-columns:1.4fr 118px 84px 84px 96px 88px;
+  grid-template-areas:"n s t w f c"}}
+.eg-r:last-child{border-bottom:0}
+.eg-n{grid-area:n;font:600 var(--t-3)/1.2 var(--mono)}
+.eg-s{grid-area:s;justify-self:start;font:600 var(--t-1)/1 var(--ui);
+  letter-spacing:.07em;text-transform:uppercase;padding:4px 8px;border-radius:4px;white-space:nowrap}
+.eg-s.on{background:color-mix(in srgb,var(--up) 16%,transparent);color:var(--up)}
+.eg-s.off{background:color-mix(in srgb,var(--down) 18%,transparent);color:var(--down)}
+.eg-s.new{background:var(--raised);color:var(--dim)}
+.eg-t{grid-area:t} .eg-w{grid-area:w} .eg-f{grid-area:f} .eg-c{grid-area:c}
+.eg-t,.eg-w,.eg-f,.eg-c{font:500 var(--t-2)/1 var(--mono);
+  font-variant-numeric:tabular-nums;color:var(--dim)}
+.eg-w.up{color:var(--up)} .eg-w.dn{color:var(--down)}
+.eg-c{color:var(--ink);font-weight:600}
 .fd-sip{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
   border-radius:var(--r);overflow:hidden;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
 .fd-sip > div{background:var(--surface);padding:13px 15px;display:flex;flex-direction:column;gap:3px}

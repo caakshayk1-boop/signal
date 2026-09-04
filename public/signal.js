@@ -3447,10 +3447,51 @@
   }
 
   let sigFilter = 'all';
+
+  /* ── WHICH ENGINES ARE ALLOWED TO PUBLISH ────────────────────────────────
+   *
+   * The single most-asked question about this page is "why is nothing firing",
+   * and the answer was unreadable from outside. Each engine must clear an R:R
+   * floor derived from its OWN measured win rate — break-even is (1-p)/p — and
+   * an engine whose required floor hits the cap stops publishing entirely.
+   * That table lived in a cache file on a CI runner that is destroyed after
+   * every job, so an engine the system had switched off and an engine having a
+   * quiet day looked identical from here: silence.
+   *
+   * It is on the page now, with the arithmetic, because an engine disabled by
+   * its own record is the most interesting thing this site can say about it. */
+  function engineStatusHtml(d) {
+    const rows = Object.entries(d.engines || {})
+      .filter(([, v]) => (v.trades || 0) > 0)
+      .sort((a, b) => (b[1].trades || 0) - (a[1].trades || 0));
+    if (!rows.length) return '';
+    const chip = v => v.status === 'disabled'
+      ? '<span class="eg-s off">Not publishing</span>'
+      : v.status === 'insufficient-sample'
+        ? '<span class="eg-s new">Default floor</span>'
+        : '<span class="eg-s on">Publishing</span>';
+    return sec('Which engines are publishing', `<div class="eg">
+      ${rows.map(([k, v]) => `<div class="eg-r">
+        <span class="eg-n">${esc(k)}</span>
+        ${chip(v)}
+        <span class="eg-t">${v.trades} closed</span>
+        <span class="eg-w ${v.win_rate >= 40 ? 'up' : 'dn'}">${v.win_rate}% win</span>
+        <span class="eg-f">needs ${v.breakeven_rr ? v.breakeven_rr + 'R' : '—'}</span>
+        <span class="eg-c">floor ${v.floor}R</span>
+      </div>`).join('')}
+    </div>
+    <p class="hint">${esc(d.basis)}${d.computed_at
+      ? ` Measured ${esc(String(d.computed_at).slice(0, 10))}.` : ''}</p>`,
+      `${rows.filter(([, v]) => v.status === 'disabled').length} switched off`,
+      'Break-even R:R is fixed by win rate alone: an engine winning 15% of the time needs 5.7R to '
+      + 'break even, and no amount of target-stretching produces that honestly.');
+  }
+
   R['/signals'] = async () => {
     const intro = 'Every alert this site has sent since it launched, with the levels it was sent at. Scored when it closes — losers included, which is the point of publishing it.';
     paint(head('Signals', intro, 'The public ledger') + skel('sk-card', 4));
-    const a = await ledger();
+    const [a, engRes] = await Promise.all([ledger(), get('/engines.json')]);
+    const ENG_TABLE = (engRes && engRes.ok && engRes.data && engRes.data.ok) ? engRes.data : null;
     const base = head('Signals', intro, 'The public ledger')
       + (a.live ? '' : `<div class="note"><b>Showing this morning's snapshot, not the live ledger.</b>
           The live signal feed did not answer${a.error ? ` — ${esc(a.error)}` : ''}, so this page is
@@ -3560,7 +3601,7 @@
           the first entries will appear after those runs.
           <br><br>The full history of ${every.length} earlier signals is unchanged and still
           in the ledger — it is simply older than this page's counting window.
-        </div>`;
+        </div>` + (ENG_TABLE ? engineStatusHtml(ENG_TABLE) : '');
         return;
       }
       main.innerHTML = base +
@@ -3593,6 +3634,7 @@
                    it. The tiles below carry the record as it stands, and the line appears at five.`}
 
           </div>`, '', 'Every closed signal, in the order it closed.')) +
+        (ENG_TABLE ? engineStatusHtml(ENG_TABLE) : '') +
         sec('The record', `<div class="grid">
           ${tile(all.length, 'Signals published', 'since ' + esc(LAUNCH), 'ac')}
           ${tile(opens.length, 'Still open', 'marked to live prices')}
