@@ -2808,6 +2808,17 @@
   let scrQ = '', scrPresets = new Set(), scrSort = 'comp', scrPage = 0, SCRDIV = null;
   const PRESETS = {
     all:        ['Everything',     () => true],
+    /* Verdict filters come first because they answer the question a reader
+     * actually arrives with. The 750-name screen was 89 correct columns and no
+     * answer: on the 2026-09-04 build 203 rows carried no tags and no horizon
+     * at all, and nothing anywhere said "don't touch this" or "right business,
+     * wrong entry". verdict.py supplies one call per row — see its header for
+     * every threshold. It is a reading of the evidence, not a forecast. */
+    buy_lt:     ['Buy · long term', r => r.vd?.c === 'BUY' && r.vd?.h === 'long term'],
+    buy_pos:    ['Buy · positional', r => r.vd?.c === 'BUY' && r.vd?.h === 'positional'],
+    buy_swing:  ['Buy · swing',    r => r.vd?.c === 'BUY' && r.vd?.h === 'swing'],
+    waiting:    ['Wait for entry', r => r.vd?.c === 'WAIT'],
+    avoid:      ['Red flags',      r => r.vd?.c === 'AVOID' || (r.vd?.f || []).length > 0],
     breakout:   ['Breaking out',   r => (r.setup?.tags || []).some(t => /BREAKOUT/.test(t))],
     rsleader:   ['RS leaders',     r => (r.setup?.tags || []).includes('RS LEADER')],
     volume:     ['Volume spike',   r => (r.vol_spike ?? 0) >= 2],
@@ -3090,6 +3101,43 @@
   // table already uses, delegating rather than holding a second copy.
   const fmtN = v => price(v, '');
 
+  /* THE VERDICT.
+   * One call per name, computed in verdict.py at build time and published on
+   * the row as `vd`. Rendered here rather than derived in the browser so the
+   * page, the Telegram bot and the tests cannot disagree about what a stock
+   * was called on a given day.
+   *
+   * The reasons are deliberately NOT in the payload: the two panes below this
+   * block already render why_now and risk.flags off the same row, and
+   * carrying both would have put 251 KB onto a file the front page fetches on
+   * first paint. What the reader cannot get elsewhere is the call, the
+   * horizon, and — for a WAIT — the level that would change it. */
+  const VD_CLASS = { BUY: 'pill-up', WAIT: 'pill-wn', AVOID: 'pill-dn',
+                     WATCH: 'pill-ac', UNRATED: 'pill-ac' };
+  const VD_WORD  = { BUY: 'Act', WAIT: 'Wait', AVOID: 'Ignore',
+                     WATCH: 'Watch', UNRATED: 'Not rated' };
+
+  const verdictBlock = r => {
+    const v = r.vd;
+    if (!v) return '';
+    const flags = (v.f || []).map(f =>
+      `<div class="vd-flag"><b>${esc(f.w)}</b><span>${esc(f.e)}</span></div>`).join('');
+    return `<div class="vd vd-${esc((v.c || '').toLowerCase())}">
+      <div class="vd-head">
+        <span class="pill ${VD_CLASS[v.c] || 'pill-ac'}">${esc(VD_WORD[v.c] || v.c)}</span>
+        <b>${esc(v.l || '')}</b>
+        ${v.k ? `<span class="vd-conf" title="How well the underlying data supports this reading — not how likely it is to work.">${esc(v.k)} confidence</span>` : ''}
+      </div>
+      <p class="vd-line">${esc(v.o || '')}</p>
+      ${v.t ? `<p class="vd-trig"><i>What would change it</i> ${esc(v.t)}</p>` : ''}
+      ${v.a?.length ? `<p class="vd-also">Also reads as a ${v.a.map(esc).join(' and a ')} case.</p>` : ''}
+      ${flags}
+      <p class="vd-foot">A rules-based reading of the published accounts and price data — every
+        threshold is fixed in advance and visible in <code>verdict.py</code>. It is not a forecast,
+        carries no expectancy, and is not advice.</p>
+    </div>`;
+  };
+
   const screenTable = (rows, offset) => `<div class="rank">
     <div class="rank-r rank-head scr-r">
       <span class="i">#</span><span class="s">Name</span>
@@ -3325,6 +3373,7 @@
           * built from (the live mark is in the box below and will differ); the
           * second is market capitalisation. Neither says so, and a reader
           * asking "what is 1363?" is asking a fair question. */''}
+      ${verdictBlock(r)}
       <div class="cardmeta">
         <span><i>Screen close</i><b>₹${esc(r.price)}</b></span>
         <span><i>Market cap</i><b>₹${r.mcap_cr != null
