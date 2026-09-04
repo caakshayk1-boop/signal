@@ -329,8 +329,15 @@ try {
    * Addressing the link by its href asserts the real contract and survives the
    * next reordering. It is also strictly stronger: it can no longer pass
    * because some other button happens to carry the words. */
+  /* READ, DO NOT THROW. A locator that never appears rejects after 30s and
+   * takes the whole process down — which is what happened when the Today route
+   * broke: this line crashed the run, and every assertion after it, including
+   * the route sweep that exists to catch exactly that, never executed. A
+   * missing element is a FAILED CHECK, not a dead suite. */
+  const ctaText = await p.locator('.hero-cta a[href="#/brief"]')
+    .innerText({ timeout: 8000 }).catch(() => null);
   ok("the CTA states how long the brief takes",
-     (await p.locator('.hero-cta a[href="#/brief"]').innerText()).includes("60 seconds"));
+     !!ctaText && ctaText.includes("60 seconds"), ctaText);
   /* The ticker is painted from the same quote feed as the board, so it fails
    * the same way on a cold Worker cache seconds after a deploy: fewer
    * instruments, fewer items. Same remedy, same reasoning — read it once, and
@@ -615,6 +622,45 @@ try {
   }
   await page.evaluate(() => document.getElementById("sheet")?.close());
   await fCtx.close();
+
+  /* ── EVERY ROUTE, EVERY ERROR ────────────────────────────────────────
+   *
+   * THE HOME PAGE SHIPPED BROKEN AND THIS SUITE SAID ALL CHECKS PASSED.
+   *
+   * `CACHED('/screen.json').then(noteLadder)` — CACHED is synchronous and
+   * returns the wrapper, not a promise, so .then was undefined and the Today
+   * route threw on every single load and rendered its error panel instead of
+   * the page. Eighty assertions were green while the front page was a red box.
+   *
+   * Two holes made that possible. The pageerror listener was attached to a
+   * context that only ever visited /markets and /brief, so `#/` was checked
+   * for horizontal overflow and nothing else. And an error the app CATCHES
+   * and renders as `.note.err` produces no console error at all — the page
+   * reports the failure politely and a listener sees a clean run.
+   *
+   * So this sweeps every route and asserts both: no thrown error, and no
+   * rendered failure panel. The second is the one that would have caught it. */
+  console.log("\n  every route — thrown errors and rendered failures");
+  const ROUTES = ["#/", "#/markets", "#/signals", "#/brief", "#/screen", "#/ideas",
+                  "#/news", "#/ipo", "#/funds", "#/watch", "#/join",
+                  "#/methodology", "#/sources", "#/terms", "#/privacy"];
+  const swCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const sw = await swCtx.newPage();
+  const thrown = [];
+  let routeNow = "";
+  sw.on("pageerror", e => thrown.push(`${routeNow} :: ${e.message.slice(0, 120)}`));
+  for (const route of ROUTES) {
+    routeNow = route;
+    await sw.goto(SITE + route, { waitUntil: "domcontentloaded" });
+    await sw.waitForTimeout(SETTLE);
+    // The panel names what failed, so report its text rather than a boolean —
+    // a red run should say which section and why without opening the browser.
+    const panels = await sw.locator("main .note.err").allInnerTexts();
+    ok(`${route} renders no failure panel`, panels.length === 0,
+       panels.map(t => t.replace(/\s+/g, " ").slice(0, 150)));
+  }
+  ok("no route threw", thrown.length === 0, thrown.slice(0, 3));
+  await swCtx.close();
 
   /* ── NARROW ──────────────────────────────────────────────────────────── */
   console.log("\n  320 x 568 — the narrowest phone in use");

@@ -1198,7 +1198,16 @@
     const LR = recordOf(lrRows);
     LR.published = lrRows.length;
     LR.open = lrRows.filter(r => (r.badge || '').toLowerCase() === 'open').length;
-    const heavy = [CACHED('/api/calendar'), CACHED('/screen.json').then(noteLadder)];
+    /* CACHED IS SYNCHRONOUS. It reads the in-memory micro-cache and returns
+     * the wrapper itself — {ok, ready, data, error} — not a promise. This line
+     * called .then on it, which is undefined, so the Today route threw on
+     * every load and rendered its error panel instead of the page.
+     *
+     * The line below it chains .then onto get(), which IS async and correct.
+     * Two calls that look identical, one awaited and one not, is exactly how
+     * this got written. noteLadder returns its argument either way, so it
+     * composes both ways — the only difference is whether you await it. */
+    const heavy = [CACHED('/api/calendar'), noteLadder(CACHED('/screen.json'))];
     const cl = heavy[0], sr = heavy[1];
     /* ONCE PER VISIT, NOT ONCE PER RENDER.
      *
