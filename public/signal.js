@@ -659,7 +659,7 @@
   async function screenIndex() {
     if (window.__SCRIDX) return window.__SCRIDX;
     if (!SCREEN) {
-      const r = await get('/screen.json');
+      const r = noteLadder(await get('/screen.json'));
       if (!r.ok) return null;
       SCREEN = (r.data.rows || []).filter(x => x && x.sym);
     }
@@ -1198,7 +1198,7 @@
     const LR = recordOf(lrRows);
     LR.published = lrRows.length;
     LR.open = lrRows.filter(r => (r.badge || '').toLowerCase() === 'open').length;
-    const heavy = [CACHED('/api/calendar'), CACHED('/screen.json')];
+    const heavy = [CACHED('/api/calendar'), CACHED('/screen.json').then(noteLadder)];
     const cl = heavy[0], sr = heavy[1];
     /* ONCE PER VISIT, NOT ONCE PER RENDER.
      *
@@ -1213,7 +1213,7 @@
      * away and back does try again — the guard stops a loop, not a retry. */
     if (!heavyTried && (!cl.ready || !sr.ready)) {
       heavyTried = true;
-      Promise.all([get('/api/calendar'), get('/screen.json')]).then(() => {
+      Promise.all([get('/api/calendar'), get('/screen.json').then(noteLadder)]).then(() => {
         if (routeOf() === '/') R['/']();
       });
     }
@@ -2849,7 +2849,7 @@
       `<div class="sk" style="height:320px"></div>`));
 
     if (!SCREEN) {
-      const r = await get('/screen.json');
+      const r = noteLadder(await get('/screen.json'));
       if (!r.ok) { paint(shell(fail('The screen', r.error))); return; }
       SCREEN = (r.data.rows || []).filter(x => x && x.sym);
     }
@@ -3138,6 +3138,76 @@
     </div>`;
   };
 
+  /* THE TARGET LADDER.
+   * Three targets that sit on levels price actually turned at, each carrying
+   * the MEASURED share of closed trades that ran that far — see targets.py.
+   *
+   * The reach percentages are deliberately unflattering. Stripping cf_1h,
+   * whose record is FX pairs with 0.08% stops against claimed 21% moves, the
+   * ledger says T1 is reached 19% of the time and T3 3%. Publishing a target
+   * without that number is what made the old 4.0R level look like a plan; it
+   * had never once been hit.
+   *
+   * `basis` is an index into screen.json's ladder.basis legend — the same few
+   * dozen strings repeat across 750 rows, so they ship once. */
+  /* The legend is captured wherever the feed is read, not at one call site:
+   * /screen.json is fetched from six places (the screen route, the front
+   * page's second pass, the command bar, the record). Hooking one of them left
+   * the "Because" column blank whenever the card was reached by another. */
+  /* Kept on `window` deliberately. The legend arrives with whichever
+   * /screen.json read happens first, and the company card can be opened from
+   * routes that resolved theirs earlier — a module-local `let` read empty on
+   * whichever path lost that race, and the "Because" column shipped blank. On
+   * window it is also inspectable from the console when it does go wrong. */
+  const noteLadder = feed => {
+    // get() resolves to a WRAPPER — {ok, data, error} — while CACHED() and a
+    // plain fetch resolve to the feed itself. Reading only `feed.ladder`
+    // silently missed every get() call, which is all of them, and the
+    // "Because" column shipped blank while the data was perfectly correct.
+    const f = feed && feed.data ? feed.data : feed;
+    if (f && f.ladder && !window.__ladderMeta) window.__ladderMeta = f.ladder;
+    return feed;
+  };
+  const ladderMeta = () => window.__ladderMeta || null;
+  const basisText = i => (typeof i === 'number'
+    ? (ladderMeta()?.basis?.[i] ?? '') : (i || ''));
+
+  const reachClass = n => n >= 15 ? 'pill-up' : n >= 7 ? 'pill-wn' : 'pill-dn';
+
+  const ladderBlock = r => {
+    const L = r.lad;
+    if (!L || !Array.isArray(L.t)) return '';
+    const rows = L.t.map(([px, rr, reach, b], i) => `
+      <tr>
+        <td class="lad-t">T${i + 1}</td>
+        <td class="lad-px">₹${fmtN(px)}</td>
+        <td class="lad-r">${rr.toFixed(2)}R</td>
+        <td><span class="pill ${reachClass(reach)}">${reach}%</span></td>
+        <td class="lad-why">${esc(basisText(b))}</td>
+      </tr>`).join('');
+    const wall = L.w ? `<p class="lad-wall"><i>In the way</i> ₹${fmtN(L.w[0])}
+      (${L.w[1]}R) — ${esc(basisText(L.w[2]))}. The trade has to clear it to reach T1.</p>` : '';
+    return `<div class="lad">
+      <div class="lad-head">
+        <b>If you traded it</b>
+        <span class="lad-risk">Entry ₹${fmtN(L.e)} · Stop ₹${fmtN(L.s)} · risking ${L.rk}%</span>
+      </div>
+      <div class="scroll-x"><table class="lad-tbl">
+        <thead><tr><th></th><th>Target</th><th>R</th>
+          <th title="Share of closed trades whose best move reached at least this far. Measured, not forecast.">Reached</th>
+          <th>Because</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      ${wall}
+      <p class="lad-trail">${L.tr
+        ? 'Fundamentals are strong enough to <b>trail</b> after T2 — ratchet a stop under each higher low rather than capping the exit. A fixed target cannot capture an extended move, and this ledger\'s 90th-percentile run is 2.28R.'
+        : 'No trail. The fundamental case is not strong enough to justify holding past the last target.'}</p>
+      <p class="lad-foot">Stop is ${ladderMeta()?.stop_atr_mult ?? 1.41}× ATR below entry. "Reached" is measured over
+        ${ladderMeta()?.reach_sample ?? 120} closed trades${L.ao ? '. Today\'s levels are anchors only — 52-week high and moving averages; swing-high levels arrive with the next weekly screen' : ''}.
+        Not advice, and not a forecast.</p>
+    </div>`;
+  };
+
   const screenTable = (rows, offset) => `<div class="rank">
     <div class="rank-r rank-head scr-r">
       <span class="i">#</span><span class="s">Name</span>
@@ -3294,7 +3364,7 @@
     if (!SCREEN) {
       sheet(esc(sym), `<div class="sk" style="height:210px"></div>
         <p class="hint">Loading the screen — about 260 KB, once per session.</p>`);
-      const r0 = await get('/screen.json');
+      const r0 = noteLadder(await get('/screen.json'));
       if (!r0.ok) { sheet(esc(sym), fail('The company card', r0.error)); return; }
       SCREEN = (r0.data.rows || []).filter(x => x && x.sym);
     }
@@ -3374,6 +3444,7 @@
           * second is market capitalisation. Neither says so, and a reader
           * asking "what is 1363?" is asking a fair question. */''}
       ${verdictBlock(r)}
+      ${ladderBlock(r)}
       <div class="cardmeta">
         <span><i>Screen close</i><b>₹${esc(r.price)}</b></span>
         <span><i>Market cap</i><b>₹${r.mcap_cr != null
@@ -4029,7 +4100,7 @@
       <div class="b-sk" style="height:300px;margin-top:26px"></div></div></div>`);
 
     const [a, sc, st] = await Promise.all(
-      [ledger(), get('/screen.json'), get('/api/stats')]);
+      [ledger(), get('/screen.json').then(noteLadder), get('/api/stats')]);
     if (!a.ok) { paint(fail('The signal brief', a.error)); return; }
     const rows = a.rows;
     const open = rows.filter(r => (r.badge || '').toLowerCase() === 'open'

@@ -3397,3 +3397,30 @@ html:has(dialog[open]){overflow:hidden}
 @media (max-width:520px){
   .vd-conf{margin-left:0;flex-basis:100%}
 }
+
+/* ── TARGET LADDER ───────────────────────────────────────────────────────────
+ * Three targets, each on a level, each carrying its measured reach. The reach
+ * pill is the point of the whole block: a target that has been hit 3% of the
+ * time is allowed to exist, it is not allowed to look like one hit 19% of the
+ * time. Colour encodes that, so it reads before the number does. */
+.lad{border:1px solid var(--line);border-radius:4px;padding:10px 12px;margin:0 0 14px}
+.lad-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.lad-head b{font-size:13.5px;letter-spacing:-.01em}
+.lad-risk{font:400 11.5px/1 var(--mono);color:var(--dim);margin-left:auto}
+.scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.lad-tbl{border-collapse:collapse;width:100%;font-size:12.5px;min-width:400px}
+.lad-tbl th{font:500 10px/1 var(--mono);text-transform:uppercase;letter-spacing:.09em;
+            color:var(--dim);text-align:left;padding:0 8px 5px 0;white-space:nowrap}
+.lad-tbl td{padding:5px 8px 5px 0;border-top:1px solid var(--line)}
+.lad-t{font:600 11px/1 var(--mono);color:var(--dim)}
+.lad-px,.lad-r{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.lad-px{font-weight:600}
+.lad-r{color:var(--dim)}
+.lad-why{color:var(--dim);font-size:11.5px;line-height:1.4}
+.lad-wall{margin:8px 0 0;font-size:12px;line-height:1.5;color:var(--dim)}
+.lad-wall i{font-style:normal;font:600 10px/1 var(--mono);text-transform:uppercase;
+            letter-spacing:.08em;color:var(--down);margin-right:6px}
+.lad-trail{margin:8px 0 0;font-size:12.5px;line-height:1.5}
+.lad-foot{margin:8px 0 0;padding-top:7px;border-top:1px solid var(--line);
+          font-size:11px;line-height:1.5;color:var(--dim)}
+@media (max-width:520px){ .lad-risk{margin-left:0;flex-basis:100%} }
