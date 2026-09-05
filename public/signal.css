@@ -226,7 +226,7 @@ a{color:inherit;text-decoration:none}
    300px of empty gutter each side; at 1440 it was worse. A data page that
    makes the reader scroll while a third of the screen sits empty is wasting
    the one thing a desktop has over a phone. */
-main{max-width:1280px;margin:0 auto;padding:20px var(--gut) 40px;min-height:60vh}
+main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh}
 /* THE PAGE HEAD, rebuilt to the brief's rhythm: a mono eyebrow, a serif
    headline set light and large, one line of standfirst, then a rule. The old
    head was an 800-weight sans headline with a 14.5px grey line under it and
@@ -243,13 +243,20 @@ main{max-width:1280px;margin:0 auto;padding:20px var(--gut) 40px;min-height:60vh
 /* Sections breathe like the brief's do, and carry an optional serif headline
    under the mono label — the label says what the block IS, the headline says
    what it MEANS. A block with nothing to mean simply omits it. */
-.sec{margin-top:clamp(32px,4.4vw,56px)}
+/* The vw term tied every gap to WINDOW WIDTH, so the widest screens — the ones
+   with the most room already — got the largest gaps and the longest scroll.
+   Section spacing should follow the type scale, not the viewport. */
+.sec{margin-top:clamp(26px,2.4vw,40px)}
 .sec-h{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
 .sec-h h2{font:600 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-widest);text-transform:uppercase;color:var(--dim)}
 .sec-h .sec-n{margin-left:auto;font:400 var(--t-2)/1 var(--mono);color:var(--dim);
   font-variant-numeric:tabular-nums;flex:none}
-.sec-lead{font:400 clamp(var(--t-7),2.3vw,var(--t-9))/1.2 var(--serif);letter-spacing:var(--ls-snug);
-  color:var(--text);margin:-4px 0 16px;max-width:32ch;text-wrap:balance}
+/* A thesis line, not a paragraph. It is set at display size, so anything long
+   enough to wrap three times stops reading as a headline and starts reading as
+   body copy that someone made too big — which is what a 20-word engine note
+   looked like. The width cap is the guard; keep the text inside it. */
+.sec-lead{font:400 clamp(var(--t-6),1.9vw,var(--t-8))/1.22 var(--serif);letter-spacing:var(--ls-snug);
+  color:var(--text);margin:-2px 0 13px;max-width:34ch;text-wrap:balance}
 .sec-note{font-size:var(--t-5);line-height:1.6;color:var(--muted);margin-top:12px;max-width:70ch}
 .sec-note b{color:var(--text);font-weight:600}
 
@@ -947,7 +954,20 @@ body::before{display:none}
 .b-m .v.up{color:var(--b-bull)} .b-m .v.dn{color:var(--b-bear)} .b-m .v.gold{color:var(--b-gold)}
 
 /* ── SECTION RHYTHM ──────────────────────────────────────────────────────── */
-.b-sec{padding:clamp(38px,6vw,72px) 0;border-bottom:1px solid var(--b-line)}
+/* ── SECTION RHYTHM ──────────────────────────────────────────────────────
+ * 72px top AND 72px bottom put 144px between every pair of sections. Across
+ * the brief's twelve that is roughly 1,700px of the page's 11,200 — an eighth
+ * of the document is the gap between things, and on a phone it means scrolling
+ * past a screen and a half of nothing between one heading and the next.
+ *
+ * A rule already separates the sections; the space only has to let it breathe.
+ * Asymmetric, because a heading needs more air above it than its last line
+ * needs below, and the 6vw term is dropped: it tied the gap to the WIDTH of
+ * the window, so a wide desktop got the largest gaps and the shortest scroll
+ * to fill them. */
+.b-sec{padding:clamp(26px,3.4vw,46px) 0 clamp(20px,2.6vw,34px);
+  border-bottom:1px solid var(--b-line)}
+@media(max-width:640px){.b-sec{padding:22px 0 18px}}
 .b-lab{font:500 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-widest);text-transform:uppercase;color:var(--b-dim)}
 .b-h2{font:400 clamp(var(--t-9),3.2vw,36px)/1.16 var(--b-serif);letter-spacing:var(--ls-snug);
   margin:14px 0 0;text-wrap:balance;max-width:24ch}
@@ -2059,6 +2079,21 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 
   /* A header for a card layout is meaningless — each card labels itself. */
   .scr-r.rank-head,.rank-r.lvl-r.rank-head{display:none}
+
+  /* ── AND THE CONTAINER HAS TO LET THEM WRAP ────────────────────────────
+   * The rows above became flex and were told to wrap, and they still did not:
+   * measured 520px wide inside a 348px phone, scrolling sideways in their
+   * own container on every load. .rank is a GRID with overflow-x:auto, and an
+   * auto track sizes to max-content — so the track grew to the widest row and
+   * the row, given all the space it asked for, had no reason to wrap. The
+   * stacking rule was written, shipped, and did nothing.
+   *
+   * Bounding the track is what makes wrapping possible. Only for the two row
+   * types that stack; the fund and engine tables keep their scroller, because
+   * they are genuinely tabular and compressing them would just truncate. */
+  .rank:has(> .scr-r),.rank:has(> .rank-r.lvl-r){
+    overflow-x:visible;grid-template-columns:minmax(0,1fr)}
+  .scr-r,.rank-r.lvl-r{min-width:0;max-width:100%}
 }
 
 /* THE TAB BAR AT EIGHT TABS. Eight labels in 390px is 48px each, and
