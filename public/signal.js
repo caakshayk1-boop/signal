@@ -119,7 +119,26 @@
    *     >= 1000   no decimals      ₹12,540
    *      < 1000   two decimals     ₹847.25
    */
+  /* A LEVEL, OR NOTHING. Every guard around the target ladder asked
+   * Number.isFinite, and Number(null) is 0, which is finite — so a blanked
+   * target passed every check and was then divided by, priced, and labelled.
+   * No traded instrument has a level of zero, so zero is absence here. */
+  const lvl = v => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+
   const price = (v, cur = '₹') => {
+    /* NULL IS NOT ZERO, AND Number(null) IS 0.
+     *
+     * The API blanks a target that collapsed into the one before it — TECHM
+     * had T1 and T2 five rupees apart on 24 rupees of risk — and returns null
+     * for it, which is the honest answer. This turned that null into 0 and
+     * printed "TARGET 2  ₹0.00" on the card, a price no engine ever published
+     * and one that reads as a real number. Empty string does the same thing.
+     * Only undefined and NaN were ever caught. */
+    if (v === null || v === undefined || v === '') return '—';
     const n = Number(v);
     if (!Number.isFinite(n)) return '—';
     return cur + Math.abs(n).toLocaleString('en-IN', Math.abs(n) >= 1000
@@ -1718,7 +1737,7 @@
       <div><span class="kk">Target 1</span><span class="vv up">${price(p.t1)} <i>+${esc(p.t1_pct)}%</i></span></div>
       <div><span class="kk">Target 2</span><span class="vv up">${price(p.t2)} <i>+${esc(p.t2_pct)}%</i></span></div>
     </div>
-    ${trailPlan(p.entry, p.stop, p.t1, p.t2, 'BUY')}` : ''}
+    ${trailPlan(p.entry, p.stop, p.t1, p.t2, p.t3, 'BUY')}` : ''}
     <div class="card-foot">
       <span class="mono" style="font-size:var(--t-2);color:var(--dim)">₹${p.turnover_cr != null ? Math.round(p.turnover_cr) : '—'} cr traded · not advice</span>
       ${symLinks(p.sym)}
@@ -2863,6 +2882,7 @@
       SCREEN = (r.data.rows || []).filter(x => x && x.sym);
     }
 
+    let shownRows = [];          // the page the live quote call must ask for
     const draw = () => {
       const q = scrQ.trim().toLowerCase();
       const rows = SCREEN
@@ -2916,6 +2936,7 @@
           if (scrPage >= pages) scrPage = 0;          // a filter change shortens the list
           const from = scrPage * PER;
           const page = rows.slice(from, from + PER);
+          shownRows = page;          // the rows the live quote call must ask for
           const nav = pages < 2 ? '' : `<div class="pager">
             <button type="button" class="pg" data-pg="prev" ${scrPage === 0 ? 'disabled' : ''}>← Previous</button>
             <span class="pg-n">Showing <b>${from + 1}–${Math.min(from + PER, rows.length)}</b>
@@ -3028,21 +3049,48 @@
        * waits for a network call before showing 750 names it already has is
        * slower for no reason. Stamped by symbol, so a re-render mid-flight
        * cannot write a price into the wrong row. */
-      const shown = rows.slice(0, 40).map(r => r.sym);
+      /* THE PAGE ON SCREEN, NOT THE FIRST PAGE OF THE LIST.
+       *
+       * This asked for rows.slice(0, 40) — always page one — and then wrote
+       * the answers into `[data-sym=...]` cells that only exist on page one.
+       * So page 2 and every page after it silently kept the WEEKLY build
+       * price, which is what the screen is for and what it was not doing:
+       * 710 of 750 rows showed a price up to seven days old with no mark that
+       * it was stale. One page is one quote request either way. */
+      const shown = shownRows.map(r => r.sym);
+      const bySym = new Map(shownRows.map(r => [r.sym, r]));
       const token = ++drawToken;
       quotes(shown).then(q => {
         if (token !== drawToken) return;          // a newer draw has replaced this one
         for (const sym of shown) {
           const live = q[sym];
-          if (!live) continue;
-          const cell = main.querySelector(`[data-sym="${CSS.escape(sym)}"] [data-px]`);
-          if (!cell) continue;
-          cell.textContent = price(live.price);
-          cell.classList.add('lv');
-          const day = main.querySelector(`[data-sym="${CSS.escape(sym)}"] [data-day]`);
+          if (!live || !Number.isFinite(Number(live.price))) continue;
+          const row = main.querySelector(`[data-sym="${CSS.escape(sym)}"]`);
+          if (!row) continue;
+          const cell = row.querySelector('[data-px]');
+          if (cell) { cell.textContent = price(live.price); cell.classList.add('lv'); }
+          const day = row.querySelector('[data-day]');
           if (day && live.change_pct != null) {
             day.textContent = pct(live.change_pct);
             day.className = 'x ' + dir(live.change_pct);
+          }
+          /* A LIVE PRICE BESIDE WEEK-OLD PERCENTAGES IS A WORSE ROW THAN A
+           * CONSISTENT STALE ONE. vs50D and vs200D were computed at build time
+           * against the build-time price, so refreshing only the price left
+           * the two columns disagreeing with the number beside them. The
+           * moving averages themselves barely move in a week — a 200-day mean
+           * shifts by a fraction of a percent — so they are re-measured
+           * against the live price and the stored average, which is the small
+           * error rather than the large one. */
+          const r0 = bySym.get(sym), px = Number(live.price);
+          for (const [sel, sma, scale] of [['[data-v50]', r0 && r0.sma50, 8],
+                                           ['[data-v200]', r0 && r0.sma200, 20]]) {
+            const c = row.querySelector(sel);
+            const m = Number(sma);
+            if (!c || !Number.isFinite(m) || m <= 0) continue;
+            const v = (px / m - 1) * 100;
+            c.textContent = pct(v);
+            c.className = 'x ' + dir(v) + ' ' + heatCell(v, scale);
           }
         }
       });
@@ -3234,8 +3282,8 @@
              cell that never fills should read as "not measured" like every
              other unmeasured cell on this site, not as a decorative dot. -->
         <span class="x" data-l="Today" data-day style="color:var(--dim)">—</span>
-        <span class="x ${dir(v50)} ${heatCell(v50, 8)}" data-l="vs 50D">${v50 == null ? '—' : pct(v50)}</span>
-        <span class="x ${dir(v200)} ${heatCell(v200, 20)}" data-l="vs 200D">${v200 == null ? '—' : pct(v200)}</span>
+        <span class="x ${dir(v50)} ${heatCell(v50, 8)}" data-l="vs 50D" data-v50>${v50 == null ? '—' : pct(v50)}</span>
+        <span class="x ${dir(v200)} ${heatCell(v200, 20)}" data-l="vs 200D" data-v200>${v200 == null ? '—' : pct(v200)}</span>
         <span class="x" data-l="RSI" style="color:${(r.rsi ?? 50) > 70 ? 'var(--warn)' : (r.rsi ?? 50) < 35 ? 'var(--accent)' : 'var(--dim)'}">${r.rsi != null ? Math.round(r.rsi) : '—'}</span>
         <span class="m ${dir(r.r1m)} ${heatCell(r.r1m, 12)}" data-l="1 month">${pct(r.r1m)}</span>
         <span class="pl-w">${priceLine(r)}</span>
@@ -3590,21 +3638,39 @@
    * It is on the page now, with the arithmetic, because an engine disabled by
    * its own record is the most interesting thing this site can say about it. */
   function engineStatusHtml(d) {
-    const rows = Object.entries(d.engines || {})
-      .filter(([, v]) => (v.trades || 0) > 0)
+    /* THE ENGINES THIS SITE CARRIES, NOT EVERY ENGINE IN THE LEDGER.
+     *
+     * engines.json is the whole upstream floor table — fourteen engines,
+     * including the FX and intraday ones that have never published here. This
+     * listed all of them, led with cf_1h's 349 FX trades, and omitted
+     * momentum_quant and ai_longterm entirely because the filter dropped
+     * anything with no closed trades. So the table answered "what does the
+     * upstream ledger contain" on a page whose question is "what can appear
+     * below this". Two different questions, and the second is the one asked.
+     *
+     * An engine with nothing closed yet stays IN and says so — "no closed
+     * trades yet" is a fact about this site, and dropping it would hide the
+     * engine most likely to be the one someone is waiting on. */
+    const rows = [...ENGINES]
+      .map(k => [k, (d.engines || {})[k] || { trades: 0, win_rate: null,
+                                              breakeven_rr: null, floor: 2.0,
+                                              status: 'no-record' }])
       .sort((a, b) => (b[1].trades || 0) - (a[1].trades || 0));
     if (!rows.length) return '';
     const chip = v => v.status === 'disabled'
       ? '<span class="eg-s off">Not publishing</span>'
-      : v.status === 'insufficient-sample'
-        ? '<span class="eg-s new">Default floor</span>'
-        : '<span class="eg-s on">Publishing</span>';
+      : v.status === 'no-record'
+        ? '<span class="eg-s new">No record yet</span>'
+        : v.status === 'insufficient-sample'
+          ? '<span class="eg-s new">Default floor</span>'
+          : '<span class="eg-s on">Publishing</span>';
     return sec('Which engines are publishing', `<div class="eg">
       ${rows.map(([k, v]) => `<div class="eg-r">
         <span class="eg-n">${esc(k)}</span>
         ${chip(v)}
-        <span class="eg-t">${v.trades} closed</span>
-        <span class="eg-w ${v.win_rate >= 40 ? 'up' : 'dn'}">${v.win_rate}% win</span>
+        <span class="eg-t">${v.trades ? v.trades + ' closed' : 'none closed'}</span>
+        <span class="eg-w ${v.win_rate == null ? '' : v.win_rate >= 40 ? 'up' : 'dn'}">${
+          v.win_rate == null ? '—' : v.win_rate + '% win'}</span>
         <span class="eg-f">needs ${v.breakeven_rr ? v.breakeven_rr + 'R' : '—'}</span>
         <span class="eg-c">floor ${v.floor}R</span>
       </div>`).join('')}
@@ -3612,8 +3678,7 @@
     <p class="hint">${esc(d.basis)}${d.computed_at
       ? ` Measured ${esc(String(d.computed_at).slice(0, 10))}.` : ''}</p>`,
       `${rows.filter(([, v]) => v.status === 'disabled').length} switched off`,
-      'Break-even R:R is fixed by win rate alone: an engine winning 15% of the time needs 5.7R to '
-      + 'break even, and no amount of target-stretching produces that honestly.');
+      'Win rate alone fixes what an engine must earn per trade to break even.');
   }
 
   R['/signals'] = async () => {
@@ -3705,7 +3770,7 @@
         </div>
         ${open && live && isFinite(Number(r.sl)) && isFinite(Number(r.target1))
           ? progressToTarget(Number(r.entry), Number(r.sl), Number(r.target1), live.price, r.action) : ''}
-        ${open ? trailPlan(r.entry, r.sl, r.target1, r.target2, r.action) : ''}
+        ${open ? trailPlan(r.entry, r.sl, r.target1, r.target2, r.target3, r.action) : ''}
         <div class="card-foot">
           <span class="mono" style="font-size:var(--t-2);color:var(--dim)">${esc(String(r.alert_date || r.date || '').slice(0, 10))}
             ${r.status ? ' · ' + esc(String(r.status).replace(/_/g, ' ').toLowerCase()) : ''}</span>
@@ -3810,16 +3875,28 @@
    * published as what to DO with an open position — not as an edge, and not as
    * a silent rewrite of the record.
    */
-  const trailPlan = (entry, sl, t1, t2, action) => {
-    const e = Number(entry), s0 = Number(sl), a = Number(t1), b = Number(t2);
-    if (![e, s0, a].every(Number.isFinite)) return '';
+  const trailPlan = (entry, sl, t1, t2, t3, action) => {
+    /* EVERY NUMBER HERE IS A PRICE, SO ZERO MEANS ABSENT.
+     *
+     * This read Number(t2). The API returns null for a target that collapsed
+     * into the one before it, Number(null) is 0, and 0 is finite — so a target
+     * that does not exist became a price of zero and then passed every guard
+     * below it. Published on the live card as:
+     *
+     *     50%  at ₹0.00   second target · 6.7R
+     *     30%  at ₹613.41 the balance, at the third · 8.8R
+     *
+     * on a stock trading at ₹264 with a real third target of ₹371.59. The 6.7R
+     * is the distance from ₹264 down to ₹0 measured in risk. */
+    const e = lvl(entry), s0 = lvl(sl), a = lvl(t1), b = lvl(t2), c = lvl(t3);
+    if (e === null || s0 === null || a === null || e === s0) return '';
     const short = /SELL|SHORT/i.test(String(action || ''));
     const f = v => price(v);
     const steps = [
       [`Stop stays at ${f(s0)}`, 'until the first target prints'],
       [`After T1, trail to ${f(e)}`, 'break-even — never back below it'],
     ];
-    if (Number.isFinite(b)) steps.push([`After T2, trail to ${f(a)}`, 'locking the first target in']);
+    if (b !== null) steps.push([`After T2, trail to ${f(a)}`, 'locking the first target in']);
     /* ── THE SCALE-OUT, BESIDE THE TRAIL ──────────────────────────────────
      * 20% at the first target, 50% at the second, the balance at the third.
      *
@@ -3837,13 +3914,26 @@
      *
      * Same standing as the trail: a management rule, not a re-grade. The
      * ledger is still scored to the single stop the signal was sent with. */
-    const t3 = Number.isFinite(b) ? e + (short ? -1 : 1) * Math.abs(b - e) * (3.3 / 2.5) : null;
+    /* THE THIRD TARGET IS THE ONE THE ENGINE PUBLISHED, NOT ONE DERIVED FROM
+     * THE SECOND. This synthesised it as T2 scaled by 3.3/2.5 while the row
+     * carried a real target3 the whole time — so the rung shown was never a
+     * level anyone had underwritten, and when T2 was blank it was arithmetic
+     * on zero. The house ladder ratio is a fallback for rows that genuinely
+     * have no third, and it is derived from T1 there, which always exists. */
+    const third = c !== null ? c
+      : (b !== null ? e + (short ? -1 : 1) * Math.abs(b - e) * (3.3 / 2.5) : null);
     const rOf = lv => Math.abs(lv - e) / Math.abs(e - s0);
     const rungs = [
       ['20%', a, 'first target'],
-      Number.isFinite(b) ? ['50%', b, 'second target'] : null,
-      t3 ? ['30%', t3, 'the balance, at the third'] : null,
+      b !== null ? ['50%', b, 'second target'] : null,
+      third !== null && (b === null || Math.abs(third - b) > 1e-9)
+        ? ['30%', third, 'the balance, at the third'] : null,
     ].filter(Boolean);
+    /* Two rungs, not three, when a target was blanked — and then the split has
+     * to add up. Publishing 20/50 of a position and never saying where the
+     * other 30% goes is worse than not publishing a ladder at all. */
+    if (rungs.length === 2) { rungs[0][0] = '30%'; rungs[1][0] = '70%'; }
+    if (rungs.length === 1) { rungs[0][0] = '100%'; }
     const banked = rungs.reduce((x, [pcStr, lv]) => x + parseFloat(pcStr) / 100 * rOf(lv), 0);
     return `<div class="trail"><span>Trailing rule</span>
       ${steps.map(([t, k]) => `<div class="tr-s"><b>${esc(t)}</b><i>${esc(k)}</i></div>`).join('')}

@@ -655,7 +655,12 @@ try {
     await sw.waitForTimeout(SETTLE);
     // The panel names what failed, so report its text rather than a boolean —
     // a red run should say which section and why without opening the browser.
-    const panels = await sw.locator("main .note.err").allInnerTexts();
+    // The class alone is too broad: #/terms styles its legal disclaimer with
+    // .note.err deliberately, and flagging that would be the test inventing a
+    // defect. The failure panel is the one that says something did not load —
+    // fail() writes "<what> did not load." and nothing else uses that phrasing.
+    const panels = (await sw.locator("main .note.err").allInnerTexts())
+      .filter(t => /did not load/i.test(t));
     ok(`${route} renders no failure panel`, panels.length === 0,
        panels.map(t => t.replace(/\s+/g, " ").slice(0, 150)));
   }
