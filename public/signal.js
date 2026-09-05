@@ -2948,7 +2948,7 @@
           const title = scrPresets.size
             ? [...scrPresets].map(k => PRESETS[k][0]).join(' + ')
             : PRESETS.all[0];
-          return sec(title, rows.length ? screenTable(page, from) + key + nav
+          return sec(title, rows.length ? screenTable(page, from) + heatKey(20, 'Distance from the moving averages') + key + nav
             : `<div class="empty">Nothing matches. Try a different preset or clear the search.</div>`,
             `${rows.length} of ${SCREEN.length}`);
         })());
@@ -3123,6 +3123,22 @@
    * watchlist, and on every one of those a reader met four unexplained ticks
    * on a coloured bar. A chart component that needs a key needs it on every
    * page that draws it, or it is decoration on all but one of them. */
+  /* ── THE HEAT LEGEND ─────────────────────────────────────────────────────
+   * Four surfaces shade cells by value — the screen, the fund table, the movers
+   * and the ideas list — and not one of them said what the shading meant. A
+   * colour that encodes a number and never states its scale is decoration that
+   * looks like information, which is worse than no colour: the reader assumes
+   * a threshold that is not there. `scale` is the same number passed to
+   * heatCell, so the legend cannot drift from the cells it explains. */
+  const heatKey = (scale, what) => `<p class="pl-key heat-key">
+    <span>${esc(what)}, shaded by size:</span>
+    <span><i class="hk h-n3"></i>−${scale}%</span>
+    <span><i class="hk h-n1"></i></span>
+    <span><i class="hk h-z"></i>0</span>
+    <span><i class="hk h-p1"></i></span>
+    <span><i class="hk h-p3"></i>+${scale}%</span>
+    <span>and beyond at the ends.</span></p>`;
+
   const PLKEY = `<p class="pl-key">
     <span>Each row's line runs from its <b>52-week low</b> to its <b>high</b>:</span>
     <span><i class="know"></i>price now</span>
@@ -6173,9 +6189,13 @@
       <span class="x ${dir(r3)} ${heatCell(r3, 25)}"><b>${Number.isFinite(r3) ? r3.toFixed(2) + '%' : '—'}</b></span>
       <span class="x ${dir(r5)} ${heatCell(r5, 25)}">${Number.isFinite(r5) ? r5.toFixed(2) + '%' : '—'}</span>
       <span class="x ${dir(r1)} ${heatCell(r1, 40)}">${Number.isFinite(r1) ? r1.toFixed(1) + '%' : '—'}</span>
-      <span class="x" title="Worst peak-to-trough fall over three years">${
+      <!-- A DEEPER FALL AND A HIGHER VOLATILITY ARE WORSE, so the heat is
+           inverted: these two are the only columns where a bigger number is
+           the bad one, and shading them on the same scale as the returns would
+           have painted the riskiest funds green. -->
+      <span class="x ${heatCell(-Math.abs(dd), 30)}" title="Worst peak-to-trough fall over three years">${
         Number.isFinite(dd) ? dd.toFixed(1) + '%' : '—'}</span>
-      <span class="x" title="Annualised volatility, three years">${
+      <span class="x ${heatCell(-Math.abs(vol - 14), 12)}" title="Annualised volatility, three years — shaded against a 14% typical equity fund">${
         Number.isFinite(vol) ? vol.toFixed(1) : '—'}</span>
     </div>`;
   };
@@ -6212,8 +6232,11 @@
       const w = Math.max(2, Math.min(100, Math.abs(x) / scale * 100));
       return `<span class="fd-b"><i class="${x < 0 ? 'dn' : 'up'}" style="width:${w.toFixed(0)}%"></i></span>`;
     };
-    const row = (k, v, sub, b) => `<div class="fd-r"><span class="fd-k">${esc(k)}</span>
-      <span class="fd-v">${v}</span>${b || ''}${sub ? `<span class="fd-s">${sub}</span>` : ''}</div>`;
+    /* `txt` marks a value that is a NAME, not a measurement — it drops the mono
+     * tabular figures the numbers need and takes the width a name needs. */
+    const row = (k, v, sub, b, txt) => `<div class="fd-r"><span class="fd-k">${esc(k)}</span>
+      <span class="fd-v${txt ? ' txt' : ''}">${v}</span>${b || ''}${
+        sub ? `<span class="fd-s">${sub}</span>` : ''}</div>`;
 
     sheet(f.name || 'Fund', `
       <p class="hint" style="margin:0 0 14px">${esc(f.category || '')}${
@@ -6238,11 +6261,11 @@
         ${row('Since inception', f.since_inception != null
               ? `<b class="${dir(f.since_inception)}">${Number(f.since_inception).toFixed(2)}%</b>` : '—',
               'annualised over its whole life')}
-        ${row('Fund house', f.house ? `<b>${esc(f.house)}</b>` : '—', '')}
+        ${row('Fund house', f.house ? `<b>${esc(f.house)}</b>` : '—', '', '', true)}
         ${row('AMFI category', f.category ? `<b>${esc(f.category)}</b>` : '—',
-              'ranked only against this')}
+              'ranked only against this', '', true)}
         ${row('Plan', '<b>Direct · Growth</b>',
-              'the screen holds no Regular or IDCW plan')}
+              'the screen holds no Regular or IDCW plan', '', true)}
         <p class="hint">${f.history_years != null && Number(f.history_years) < 5
           ? `<b>This fund is ${Number(f.history_years).toFixed(1)} years old.</b> A three-year number on it
              covers a period this fund has only just lived through, and any window longer than its
@@ -6413,7 +6436,8 @@
     ], 'Ranked on the 3-year return — the arrow marks the column. Three years is the longest '
      + 'window most of this shelf actually has, and a 5-year sort would silently drop every '
      + 'fund younger than that rather than rank it. Every figure is computed from the NAV '
-     + 'series AMFI publishes, not taken from a fund house page.');
+     + 'series AMFI publishes, not taken from a fund house page.')
+     + heatKey(25, 'Returns');
 
     for (const c of cats) {
       out += sec(c.label || c.key, `<div class="rank">

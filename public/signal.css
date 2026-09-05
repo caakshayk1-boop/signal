@@ -3111,11 +3111,38 @@ html:has(dialog[open]){overflow:hidden}
  * The bar beside each return is the only place on this page a number is drawn
  * rather than printed: three annualised figures in a column are hard to rank
  * by eye, and the bar does that ranking without adding a claim. */
-.fd-r{display:grid;grid-template-columns:minmax(0,1fr) 84px;gap:4px 12px;
+/* ── A FIXED 84px VALUE COLUMN, HOLDING TEXT ────────────────────────────
+ * The column was sized for "24.62%" and then asked to hold "Bank of India
+ * Mutual Fund", which came out as four right-aligned words stacked down the
+ * page, and "Equity Scheme - Flexi Cap Fund" as four more. Half the sheet's
+ * height was one fund house's name broken across lines.
+ *
+ * The column now sizes to its content up to about half the row, so a figure
+ * still sits in a tight tabular column and a name gets the width it needs.
+ * Text values are set in the UI face and wrap on words; only numbers stay
+ * mono and tabular, which is what the alignment was for in the first place. */
+.fd-r{display:grid;grid-template-columns:minmax(0,1fr) minmax(84px,auto);gap:4px 14px;
   align-items:baseline;padding:9px 0;border-bottom:1px solid var(--line)}
 .fd-r:last-of-type{border-bottom:0}
 .fd-k{font:500 var(--t-3)/1.3 var(--ui);color:var(--dim)}
-.fd-v{font:600 var(--t-5)/1.1 var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.fd-v{font:600 var(--t-5)/1.1 var(--mono);font-variant-numeric:tabular-nums;text-align:right;
+  justify-self:end;overflow-wrap:break-word}
+/* A name is not a measurement: no tabular figures, no mono, and it reads
+   better at body weight than at the weight a headline number carries. */
+/* The heat legend reuses the cell classes themselves, so a swatch is literally
+   the same colour the table paints — a hand-picked swatch would drift the first
+   time the scale changed. */
+.heat-key .hk{display:inline-block;width:20px;height:11px;border-radius:3px;
+  border:1px solid var(--line);vertical-align:-1px}
+.heat-key span{display:inline-flex;align-items:center;gap:5px}
+.fd-v.txt{font:500 var(--t-4)/1.45 var(--ui);font-variant-numeric:normal;
+  letter-spacing:var(--ls-0);text-align:right;max-width:38ch}
+@media(max-width:560px){
+  /* At phone width there is no room for two columns of anything long, so a
+     text value drops under its own label and reads left-to-right like prose. */
+  .fd-r:has(> .fd-v.txt){grid-template-columns:minmax(0,1fr)}
+  .fd-r > .fd-v.txt{text-align:left;justify-self:start;max-width:100%}
+}
 .fd-b{grid-column:1/-1;display:block;height:5px;border-radius:3px;background:var(--raised);
   overflow:hidden}
 .fd-b i{display:block;height:100%;border-radius:3px;background:var(--dim)}
