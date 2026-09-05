@@ -1667,6 +1667,7 @@
       const cvpx = await quotes(c.picks.map(x => x.sym));
       c.picks.forEach(x => { x._live = cvpx[x.sym] || null; });
       out += sec('Today’s conviction', `<div class="cards-2">${c.picks.map(convictionCard).join('')}</div>` +
+        TRAIL_NOTE +
         `<details class="meth"><summary>How these five were chosen</summary>
            <p>${esc(c.method)}</p>
            <p class="hint">Ranked ${esc(c.date)} over ${esc(c.universe)} screened names. The slate is
@@ -3860,7 +3861,8 @@
 
         `<div class="chips" role="group" aria-label="Signal filter">${chips.map(([k, l]) =>
           `<button type="button" class="chip" data-s="${k}" aria-pressed="${sigFilter === k}">${esc(l)}</button>`).join('')}</div>` +
-        sec('Alerts', rows.length ? `<div class="cards-2">${rows.map(card).join('')}</div>`
+        sec('Alerts', rows.length
+          ? `<div class="cards-2">${rows.map(card).join('')}</div>` + TRAIL_NOTE
           : `<div class="empty">No signals with that state.</div>`, `${rows.length} shown`);
       if (CURVE) wireRCurve(CURVE);
       // Same reason as the Screen's: name the chips this handler owns.
@@ -3891,6 +3893,21 @@
    * published as what to DO with an open position — not as an edge, and not as
    * a silent rewrite of the record.
    */
+  /* ── THE NOTE THAT USED TO SIT UNDER EVERY CARD ──────────────────────────
+   * "Published as a management rule… measured worse than the fixed stop over
+   * 470 closed trades" is one fact about how this site grades trades. It was
+   * printed inside trailPlan, so it appeared once per open signal: twenty
+   * identical paragraphs down /signals and five more on the front page, which
+   * is most of what a reader scrolled past between one trade and the next.
+   *
+   * A caveat repeated twenty times is not twenty times as honest. It is said
+   * once, under the list it applies to. */
+  const TRAIL_NOTE = `<p class="hint trail-note"><b>The trail and the scale-out are
+    management rules, not part of the grade.</b> Every signal above is still scored on
+    the single stop it was sent with — a break-even trail measured <b>worse</b> than the
+    fixed stop over 470 closed trades, so publishing it as the graded rule would flatter
+    the record.</p>`;
+
   const trailPlan = (entry, sl, t1, t2, t3, action) => {
     /* EVERY NUMBER HERE IS A PRICE, SO ZERO MEANS ABSENT.
      *
@@ -3958,15 +3975,12 @@
         ${rungs.map(([pcStr, lv, lab]) => `<div class="tr-r">
           <b>${esc(pcStr)}</b><span>at ${f(lv)}</span><i>${esc(lab)} · ${rOf(lv).toFixed(1)}R</i>
         </div>`).join('')}
-        <div class="tr-n">Sold this way the whole position returns
+        ${rungs.length < 2 ? '' : `<div class="tr-n">Sold this way the whole position returns
           <b>${banked.toFixed(2)}R</b> if every target prints, against
-          <b>${rOf(rungs[rungs.length - 1][1]).toFixed(1)}R</b> for holding all of it to the
+          <b>${rOf(rungs[rungs.length - 1][1]).toFixed(2)}R</b> for holding all of it to the
           last one. Taking money off the table costs that difference; it buys the certainty
-          of having taken it.</div>
+          of having taken it.</div>`}
       </div>
-      <div class="tr-n">Published as a management rule. The ledger is still scored on the
-        stop the signal was sent with — a break-even trail measured
-        <b>worse</b> than the fixed stop over 470 closed trades.</div>
     </div>`;
   };
 
