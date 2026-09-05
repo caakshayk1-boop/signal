@@ -3130,7 +3130,7 @@
    * looks like information, which is worse than no colour: the reader assumes
    * a threshold that is not there. `scale` is the same number passed to
    * heatCell, so the legend cannot drift from the cells it explains. */
-  const heatKey = (scale, what) => `<p class="pl-key heat-key">
+  const heatKey = (scale, what) => `<p class="heat-key">
     <span>${esc(what)}, shaded by size:</span>
     <span><i class="hk h-n3"></i>−${scale}%</span>
     <span><i class="hk h-n1"></i></span>
