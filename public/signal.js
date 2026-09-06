@@ -3788,7 +3788,7 @@
         on:    ['live', 'Open · 2R bar'],
         under: ['warn', `Raised bar · ${floor}R`],
         off:   ['off',  'Switched off'],
-        new:   ['new',  'No record yet'],
+        new:   ['new',  'Open · none closed yet'],
       }[state];
       const L = last.get(key);
       // magic and magicmagic are one engine at two depths; the name heads the
