@@ -646,6 +646,20 @@ try {
                   "#/methodology", "#/sources", "#/terms", "#/privacy"];
   const swCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const sw = await swCtx.newPage();
+
+  /* REGISTERED BEFORE THE FIRST NAVIGATION, and that is not a style choice.
+   * A page.route handler added after the page has already been navigated does
+   * not intercept for the loaded document — reproduced twice: identical sweep,
+   * identical canary, interceptor registered late catches nothing and
+   * registered early catches it every time. Two CI runs were spent blaming a
+   * deploy race that was not happening. */
+  let reported = null;
+  await sw.route("**/api/client-error", async route => {
+    try { reported = JSON.parse(route.request().postData() || "{}"); } catch { reported = {}; }
+    await route.fulfill({ status: 200, contentType: "application/json",
+                          body: JSON.stringify({ ok: true, recorded: true }) });
+  });
+
   const thrown = [];
   let routeNow = "";
   sw.on("pageerror", e => thrown.push(`${routeNow} :: ${e.message.slice(0, 120)}`));
@@ -670,24 +684,10 @@ try {
    * cannot announce its own failure. A deliberate throw is injected and the
    * POST it should produce is intercepted — asserting the wiring end to end
    * rather than that a listener was merely attached. */
-  let reported = null;
-  await sw.route("**/api/client-error", async route => {
-    try { reported = JSON.parse(route.request().postData() || "{}"); } catch { reported = {}; }
-    await route.fulfill({ status: 200, contentType: "application/json",
-                          body: JSON.stringify({ ok: true, recorded: true }) });
-  });
-  /* Two attempts, for the same reason the board gets a reload: this runs
-   * seconds after `wrangler deploy`, and the asset the Worker serves can still
-   * be the previous signal.js for a moment. Verified by hand against
-   * production — the reporter fires and the POST lands — so a null here on the
-   * first try is the deploy settling, not the wiring. */
-  for (let attempt = 0; attempt < 2 && !reported; attempt++) {
-    if (attempt) await sw.waitForTimeout(6000);
-    await sw.goto(SITE + "#/methodology?cb=" + Date.now(), { waitUntil: "domcontentloaded" });
-    await sw.waitForTimeout(3500);
-    await sw.evaluate(() => { setTimeout(() => { throw new Error("ui-suite canary"); }, 0); });
-    await sw.waitForTimeout(3000);
-  }
+  await sw.goto(SITE + "#/methodology", { waitUntil: "domcontentloaded" });
+  await sw.waitForTimeout(3000);
+  await sw.evaluate(() => { setTimeout(() => { throw new Error("ui-suite canary"); }, 0); });
+  await sw.waitForTimeout(3000);
   ok("a client error is reported", !!reported && /canary/.test(reported.message || ""),
      reported && reported.message);
   ok("the report names the route it happened on",
