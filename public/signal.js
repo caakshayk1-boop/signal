@@ -1666,7 +1666,7 @@
       `<p class="hint">${dayMap
         ? `Median move <b>today</b> per sector, across the <b>${pu.day_universe || 250} largest</b> by market cap. Tile width is how many names it holds.`
         : 'Median move over the <b>week</b>, across all 750 screened names — today\'s figures arrive with the next screen build.'}
-        Tap a sector for the names behind it.</p>`,
+        Tap a sector for the names behind it.</p>` + heatKey(1.5, 'Sector move'),
       dayMap ? 'today · large caps' : 'this week · all 750');
 
     /* ── TEN OF EIGHTEEN, AND THE BOTTOM SIX ROTATE ───────────────────────
@@ -2543,7 +2543,8 @@
     out += sec('Sector heat — the week, all 750', heatmap(pu.sectors, 'r1w') +
       `<p class="hint">Median move over the <b>past week</b> across the full <b>${pu.universe || 750}-name</b>
         screen — the wider, slower view. The front page shows today over the largest 250.
-        Width is how many names the sector holds; tap one for the names behind it.</p>`,
+        Width is how many names the sector holds; tap one for the names behind it.</p>`
+      + heatKey(1.5, 'Sector move'),
       pu.sectors ? `${pu.sectors.length} sectors · one week` : '');
 
     // /api/ticker, not /api/markets: markets returns a curated NINE, the
@@ -3780,15 +3781,22 @@
        * effectively shut. */
       const FLOOR_MIN = 2.0, FLOOR_CAP = 6.0;
       const strain = Math.max(0, Math.min(1, (floor - FLOOR_MIN) / (FLOOR_CAP - FLOOR_MIN)));
+      /* AN UNPROVEN ENGINE DOES NOT GET THE GREEN. This checked trades === 0
+       * only, so PLUMB — 0% win rate over 7 closed — drew the same "live"
+       * chip in the site's own up-colour as an engine at 41% over 17. The
+       * feed already says which are unproven: below 25 closed trades the win
+       * rate is not evidence, and engines.json marks them
+       * insufficient-sample. Green is a claim, and this one was not earned. */
+      const proven = trades > 0 && v.status !== 'insufficient-sample';
       const state = v.status === 'disabled' || floor >= FLOOR_CAP ? 'off'
-        : trades === 0 ? 'new'
+        : !proven ? 'new'
         : floor > FLOOR_MIN + 0.01 ? 'under'
         : 'on';
       const chip = {
         on:    ['live', 'Open · 2R bar'],
         under: ['warn', `Raised bar · ${floor}R`],
         off:   ['off',  'Switched off'],
-        new:   ['new',  'Open · none closed yet'],
+        new:   ['new',  trades ? `Open · ${trades} closed, not evidence` : 'Open · none closed yet'],
       }[state];
       const L = last.get(key);
       // magic and magicmagic are one engine at two depths; the name heads the

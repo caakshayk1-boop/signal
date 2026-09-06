@@ -2050,15 +2050,26 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
    numbers as a strip that labels each one — because there is no header row up
    there to refer back to. Nothing is hidden; it is re-laid-out. */
 @media(max-width:700px){
-  .scr-r,.rank-r.lvl-r{
+  /* ── AND PLAIN .rank-r, WHICH WAS LEFT BEHIND ──────────────────────────
+   * The fixed-track fix and this flex-stack were both scoped to .scr-r and
+   * .rank-r.lvl-r. Plain .rank-r kept `22px 1fr auto auto` and its sub-line
+   * kept `white-space:nowrap; text-overflow:ellipsis`, so on #/ipo all 24
+   * rows of "How last year's listings did" lost more than half their text
+   * at 390px: an 84px box holding a 193px string rendered as
+   * "listed — · b…". The price band is the only fact that matters about an
+   * unlisted book, and it was the part being cut. */
+  .scr-r,.rank-r.lvl-r,.rank-r{
     display:flex;flex-wrap:wrap;align-items:baseline;gap:0;
     padding:15px 14px}
-  .scr-r > .i,.rank-r.lvl-r > .i{display:none}   /* a rank belongs to a table */
+  .scr-r > .i,.rank-r.lvl-r > .i,.rank-r > .i{display:none}   /* a rank belongs to a table */
 
-  .scr-r > .s,.rank-r.lvl-r > .s{order:1;flex:1 1 55%;display:block;min-width:0}
+  .scr-r > .s,.rank-r.lvl-r > .s,.rank-r > .s{order:1;flex:1 1 55%;display:block;min-width:0}
   .scr-r > .s b,.rank-r.lvl-r > .s b{font-size:var(--t-5);display:inline}
-  .scr-r > .s span,.rank-r.lvl-r > .s span{display:block;font-size:var(--t-3);margin-top:3px;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
+  .scr-r > .s span,.rank-r.lvl-r > .s span,.rank-r > .s span{
+    display:block;font-size:var(--t-3);margin-top:3px;color:var(--dim);
+    /* WRAPS, not truncates. On a stacked card the row is as tall as it needs
+       to be, so an ellipsis here buys nothing and costs the price band. */
+    white-space:normal;overflow:visible;text-overflow:clip}
   .scr-r > .s .wstar,.rank-r.lvl-r > .s .wstar{margin-right:5px}
 
   /* Price is the one number that earns its own position. */
@@ -2069,16 +2080,18 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 
   /* Every other number becomes a chip that names itself. */
   .scr-r > .x:not([data-l="Price"]),.scr-r > .m,
-  .rank-r.lvl-r > .x:not([data-l="Price"]),.rank-r.lvl-r > .m{
+  .rank-r.lvl-r > .x:not([data-l="Price"]),.rank-r.lvl-r > .m,
+  .rank-r > .x:not([data-l="Price"]),.rank-r > .m{
     order:4;flex:0 0 auto;display:inline-flex;align-items:baseline;gap:5px;
     text-align:left;font-size:var(--t-4);margin:11px 16px 0 0;min-width:0}
   .scr-r > .x:not([data-l="Price"])::before,.scr-r > .m::before,
-  .rank-r.lvl-r > .x:not([data-l="Price"])::before,.rank-r.lvl-r > .m::before{
+  .rank-r.lvl-r > .x:not([data-l="Price"])::before,.rank-r.lvl-r > .m::before,
+  .rank-r > .x:not([data-l="Price"])::before,.rank-r > .m::before{
     content:attr(data-l);font:400 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);
     text-transform:uppercase;color:var(--dim);flex:none}
 
   /* A header for a card layout is meaningless — each card labels itself. */
-  .scr-r.rank-head,.rank-r.lvl-r.rank-head{display:none}
+  .scr-r.rank-head,.rank-r.lvl-r.rank-head,.rank-r.rank-head{display:none}
 
   /* ── AND THE CONTAINER HAS TO LET THEM WRAP ────────────────────────────
    * The rows above became flex and were told to wrap, and they still did not:
@@ -2091,9 +2104,9 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
    * Bounding the track is what makes wrapping possible. Only for the two row
    * types that stack; the fund and engine tables keep their scroller, because
    * they are genuinely tabular and compressing them would just truncate. */
-  .rank:has(> .scr-r),.rank:has(> .rank-r.lvl-r){
+  .rank:has(> .scr-r),.rank:has(> .rank-r.lvl-r),.rank:has(> .rank-r){
     overflow-x:visible;grid-template-columns:minmax(0,1fr)}
-  .scr-r,.rank-r.lvl-r{min-width:0;max-width:100%}
+  .scr-r,.rank-r.lvl-r,.rank-r{min-width:0;max-width:100%}
 }
 
 /* THE TAB BAR AT EIGHT TABS. Eight labels in 390px is 48px each, and
@@ -2117,7 +2130,6 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
   .tabs a{padding:0 8px;font-size:var(--t-3);letter-spacing:var(--ls-0)}
   .tabg > summary{padding:0 8px;justify-content:center;width:100%}
   .tabg.is-here > summary::before{left:8px;right:8px}
-}
 }
 
 /* The price line at card size: taller, and labelled, because a card is read on
@@ -3168,7 +3180,7 @@ html:has(dialog[open]){overflow:hidden}
 .fd-oh{font:600 var(--t-2)/1.2 var(--ui);letter-spacing:.06em;text-transform:uppercase;
   color:var(--dim);margin:0 0 9px}
 .fd-or{display:grid;grid-template-columns:auto 1fr 64px 58px;gap:8px;align-items:center;
-  padding:5px 0;border-bottom:1px solid var(--hair)}
+  padding:5px 0;border-bottom:1px solid var(--line)}
 .fd-or:last-of-type{border-bottom:0}
 .fd-oi{font:500 var(--t-2)/1 var(--mono);color:var(--dim);min-width:15px}
 .fd-on{font:500 var(--t-3)/1.3 var(--ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3179,7 +3191,7 @@ html:has(dialog[open]){overflow:hidden}
 .fd-own>div:first-child .fd-or{grid-template-columns:1fr 64px 58px}
 .fd-ometa{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:14px;
   font:500 var(--t-2)/1.4 var(--ui);color:var(--dim)}
-.fd-ometa b{color:var(--ink);font-variant-numeric:tabular-nums}
+.fd-ometa b{color:var(--text);font-variant-numeric:tabular-nums}
 /* ── THE FLOOR ────────────────────────────────────────────────────────────
    Instrument cards, not a table. Dense on purpose: an operator should be able
    to read the whole floor in one look and see which engine is under its bar.
@@ -3205,8 +3217,10 @@ html:has(dialog[open]){overflow:hidden}
 .ag-chip.off {background:color-mix(in srgb,var(--down) 16%,transparent);color:var(--down)}
 .ag-chip.new {background:var(--raised);color:var(--dim)}
 .ag-hunt{font:400 var(--t-3)/1.45 var(--ui);color:var(--muted);margin:0;flex:1 1 auto}
-/* The bar is the whole argument: measured rate as fill, required rate as a
-   tick. Where the tick sits right of the fill, the engine is held back. */
+/* The bar is the floor itself on the 2R-to-6R span. It once drew measured
+   rate against required rate with a tick between them; that comparison was
+   tautological — the floor IS derived from the win rate — and was replaced.
+   See the note in signal.js. There is no tick, and there should not be. */
 .ag-bar{position:relative;height:7px;border-radius:4px;background:var(--raised);overflow:visible}
 .ag-bar i{display:block;height:100%;border-radius:4px;background:var(--dim)}
 .ag-on .ag-bar i{background:var(--up)}
@@ -3218,9 +3232,9 @@ html:has(dialog[open]){overflow:hidden}
 .ag-m span{display:flex;flex-direction:column;font:400 var(--t-1)/1.3 var(--mono);
   letter-spacing:var(--ls-wide);color:var(--dim);text-transform:uppercase}
 .ag-m b{font:600 var(--t-4)/1.1 var(--mono);font-variant-numeric:tabular-nums;
-  color:var(--ink);letter-spacing:var(--ls-0);text-transform:none;margin-bottom:2px}
+  color:var(--text);letter-spacing:var(--ls-0);text-transform:none;margin-bottom:2px}
 .ag-f{display:flex;justify-content:space-between;gap:10px;padding-top:8px;
-  border-top:1px solid var(--hair);font:400 var(--t-1)/1.3 var(--mono);color:var(--dim)}
+  border-top:1px solid var(--line);font:400 var(--t-1)/1.3 var(--mono);color:var(--dim)}
 .ag-f span:last-child{text-align:right;color:var(--muted)}
 .fd-sip{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
   border-radius:var(--r);overflow:hidden;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
