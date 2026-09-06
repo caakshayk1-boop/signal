@@ -3490,13 +3490,7 @@ html:has(dialog[open]){overflow:hidden}
 .tkr-row{overflow:hidden}
 .tkr-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .tkr-t{display:flex;width:max-content;animation:tkr-run var(--tkr-dur,120s) linear infinite}
-/* ── AND IT STOPS WHILE YOU ARE READING ──────────────────────────────────
-   The strip is sticky, so at #/screen scrolled to row 400 it is still on
-   screen and still moving: 218,800ms, infinite, above a 750-row table. It
-   paused only on hover of the strip itself, which is no use to someone
-   scanning rows beneath it. Continuous peripheral motion over dense text is
-   the one place this technique costs more than it gives. */
-body.is-reading .tkr-t{animation-play-state:paused}
+
 .tkr-h{display:flex;align-items:center}
 /* HELD STILL ON DEMAND. A price you cannot stop is a price you cannot read;
  * hover and keyboard focus both pause it. */

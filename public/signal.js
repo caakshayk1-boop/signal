@@ -57,22 +57,6 @@
    *
    * Everything here is wrapped: a reporter that throws while reporting an
    * error is the one bug nobody can debug. */
-  /* The ticker pauses once the reader is past the header and into content.
-   * Scroll, not hover: someone scanning row 400 of the screen is not hovering
-   * the strip, and that is exactly when the motion is worst. Coalesced on a
-   * timeout rather than rAF — rAF does not run in a background tab, and this
-   * has to settle correctly when the tab comes back. */
-  (() => {
-    let t = null, on = false;
-    const sync = () => {
-      const want = window.scrollY > 120;
-      if (want !== on) { on = want; document.body.classList.toggle('is-reading', want); }
-    };
-    addEventListener('scroll', () => { if (t) return; t = setTimeout(() => { t = null; sync(); }, 120); },
-                     { passive: true });
-    sync();
-  })();
-
   const ERR_SEEN = new Set();
   let errSent = 0;
   function reportError(message, stack) {
