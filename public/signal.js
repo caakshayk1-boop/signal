@@ -618,13 +618,51 @@
    * rest of this site refuses. They are shown as one family until enough have
    * closed to separate them; the Signals page is where that will show up.
    */
-  const ENGINES = new Set(['magic', 'magicmagic', 'equity_measured', 'multibagger',
-                           'ai_longterm', 'breakout', 'momentum_quant']);
-  const ENGINE_LABEL = {
-    magic: 'Magic', magicmagic: 'Magic', equity_measured: 'Equity, measured',
-    multibagger: 'Multibagger', ai_longterm: 'AI', breakout: 'Breakout',
-    momentum_quant: 'Quant momentum',
+  /* ── THE ENGINE REGISTRY ─────────────────────────────────────────────────
+   *
+   * NAMES ARE A DISPLAY LAYER AND THAT IS DELIBERATE. `signal_type` is the
+   * primary key for 600+ ledger rows, every per-engine floor, the dedupe
+   * between magic and magicmagic, and the expectancy table. Renaming it in the
+   * database would orphan every one of those and silently reset the 30-day
+   * measurement that is about to start. So the key never moves; only what a
+   * reader sees does.
+   *
+   * `magic` and `magicmagic` are the same screen at two depths off the 52-week
+   * high — >15% and 20-40%. They are presented as one engine with two bands,
+   * because that is what they are, and kept as two keys because that is what
+   * the ledger recorded.
+   *
+   * `hunts` is the one line that has to survive a reader who knows nothing:
+   * what does this thing go looking for. */
+  const ENGINE_REGISTRY = {
+    breakout:        { name: 'BREACH', role: 'Breakouts',        band: null,
+                       hunts: 'Price clearing a level it has been under — 52-week, 20-week and 6-month highs, confirmed on volume.',
+                       tf: 'Daily → weeks' },
+    magic:           { name: 'TIDAL',  role: 'Recovery',         band: '>15% off the high',
+                       hunts: 'Quality names in a dip, with weekly momentum already turning back up.',
+                       tf: 'Weekly → months' },
+    magicmagic:      { name: 'TIDAL',  role: 'Recovery',         band: '20–40% off the high',
+                       hunts: 'The same screen, deeper water — a larger fall, so more room back to the high.',
+                       tf: 'Weekly → months' },
+    equity_measured: { name: 'PLUMB',  role: 'Measured equity',  band: null,
+                       hunts: 'The backtested daily-close engine, sized against the weekly regime. The only one built from a measured edge rather than a pattern.',
+                       tf: 'Daily → days' },
+    multibagger:     { name: 'ASCENT', role: 'Leaders',          band: null,
+                       hunts: 'Names already near their highs with institutional volume behind them — CAN SLIM, held for quarters not weeks.',
+                       tf: 'Weekly → 6–12 months' },
+    momentum_quant:  { name: 'VECTOR', role: 'Momentum',         band: null,
+                       hunts: 'Cross-sectional rank over 750 names: six and twelve month returns over one-year sigma, skipping the last month.',
+                       tf: 'Monthly → months' },
+    ai_longterm:     { name: 'NORTH',  role: 'Long horizon',     band: null,
+                       hunts: 'The long-horizon screen, run weekly against the whole board.',
+                       tf: 'Weekly → months' },
   };
+  const ENGINES = new Set(Object.keys(ENGINE_REGISTRY));
+  const eng = k => ENGINE_REGISTRY[String(k || '')] || null;
+  const engName = k => (eng(k) || {}).name || String(k || '—');
+  /* The old map is kept as the fallback for a row whose engine has since been
+   * retired: an unrecognised key renders as itself rather than as blank. */
+  const ENGINE_LABEL = new Proxy({}, { get: (_, k) => engName(k) });
   const engineOk = r => ENGINES.has(String(r.signal_type || ''));
 
   /* ── AND NOTHING SHORT ────────────────────────────────────────────────────
@@ -3654,48 +3692,101 @@
    *
    * It is on the page now, with the arithmetic, because an engine disabled by
    * its own record is the most interesting thing this site can say about it. */
-  function engineStatusHtml(d) {
-    /* THE ENGINES THIS SITE CARRIES, NOT EVERY ENGINE IN THE LEDGER.
-     *
-     * engines.json is the whole upstream floor table — fourteen engines,
-     * including the FX and intraday ones that have never published here. This
-     * listed all of them, led with cf_1h's 349 FX trades, and omitted
-     * momentum_quant and ai_longterm entirely because the filter dropped
-     * anything with no closed trades. So the table answered "what does the
-     * upstream ledger contain" on a page whose question is "what can appear
-     * below this". Two different questions, and the second is the one asked.
-     *
-     * An engine with nothing closed yet stays IN and says so — "no closed
-     * trades yet" is a fact about this site, and dropping it would hide the
-     * engine most likely to be the one someone is waiting on. */
-    const rows = [...ENGINES]
-      .map(k => [k, (d.engines || {})[k] || { trades: 0, win_rate: null,
-                                              breakeven_rr: null, floor: 2.0,
-                                              status: 'no-record' }])
-      .sort((a, b) => (b[1].trades || 0) - (a[1].trades || 0));
-    if (!rows.length) return '';
-    const chip = v => v.status === 'disabled'
-      ? '<span class="eg-s off">Not publishing</span>'
-      : v.status === 'no-record'
-        ? '<span class="eg-s new">No record yet</span>'
-        : v.status === 'insufficient-sample'
-          ? '<span class="eg-s new">Default floor</span>'
-          : '<span class="eg-s on">Publishing</span>';
-    return sec('Which engines are publishing', `<div class="eg">
-      ${rows.map(([k, v]) => `<div class="eg-r">
-        <span class="eg-n">${esc(k)}</span>
-        ${chip(v)}
-        <span class="eg-t">${v.trades ? v.trades + ' closed' : 'none closed'}</span>
-        <span class="eg-w ${v.win_rate == null ? '' : v.win_rate >= 40 ? 'up' : 'dn'}">${
-          v.win_rate == null ? '—' : v.win_rate + '% win'}</span>
-        <span class="eg-f">needs ${v.breakeven_rr ? v.breakeven_rr + 'R' : '—'}</span>
-        <span class="eg-c">floor ${v.floor}R</span>
-      </div>`).join('')}
-    </div>
-    <p class="hint">${esc(d.basis)}${d.computed_at
-      ? ` Measured ${esc(String(d.computed_at).slice(0, 10))}.` : ''}</p>`,
-      `${rows.filter(([, v]) => v.status === 'disabled').length} switched off`,
-      'Win rate alone fixes what an engine must earn per trade to break even.');
+  /* ── THE FLOOR ───────────────────────────────────────────────────────────
+   *
+   * Every engine on this site, as an operator would see a trading floor: who
+   * is working, what each one hunts, what its own record says it must earn,
+   * and the last thing it actually filed.
+   *
+   * It replaces a six-column table. The table was accurate and unreadable —
+   * "breakout 103 closed 27.2% win needs 2.68R floor 3.08R" is five numbers in
+   * a row with no statement of what any of them means or whether that engine
+   * is currently allowed to trade. The single most-asked question about this
+   * page is "why is nothing firing", and a row of digits does not answer it.
+   *
+   * Each card answers it in order: is it on, what does it look for, what has
+   * it done, and what did it last file. The bar is the engine's win rate
+   * against the win rate its own floor demands — the one comparison that
+   * decides whether it publishes, drawn rather than left to arithmetic. */
+  function floorHtml(d, rows) {
+    const last = new Map();
+    for (const r of (rows || [])) {
+      const k = String(r.signal_type || '');
+      if (!last.has(k)) last.set(k, r);          // rows arrive newest first
+    }
+    const seen = new Set();
+    const cards = Object.entries(ENGINE_REGISTRY).map(([key, meta]) => {
+      const v = (d.engines || {})[key] || {};
+      const trades = v.trades || 0;
+      const win = v.win_rate;
+      const floor = v.floor != null ? Number(v.floor) : 2.0;
+      /* ── WHAT THIS BAR MUST NOT BE ────────────────────────────────────────
+       * The first version drew the measured win rate against the win rate the
+       * floor demands, and that comparison is TAUTOLOGICAL: the floor is
+       * derived from the win rate as breakeven x 1.15, so measured clears
+       * required by exactly the safety margin, every time, for every engine.
+       * A bar that always says the same thing is not information.
+       *
+       * What genuinely varies, and decides whether anything appears below, is
+       * the floor itself — how much a single setup must earn before this
+       * engine is allowed to file it. 2.0R is the default every engine starts
+       * at; 6.0R is the cap, at which point it cannot honestly produce a
+       * qualifying trade and stops. The bar is that span, so a reader can see
+       * at a glance which engines are working under a raised bar and which are
+       * effectively shut. */
+      const FLOOR_MIN = 2.0, FLOOR_CAP = 6.0;
+      const strain = Math.max(0, Math.min(1, (floor - FLOOR_MIN) / (FLOOR_CAP - FLOOR_MIN)));
+      const state = v.status === 'disabled' || floor >= FLOOR_CAP ? 'off'
+        : trades === 0 ? 'new'
+        : floor > FLOOR_MIN + 0.01 ? 'under'
+        : 'on';
+      const chip = {
+        on:    ['live', 'Open · 2R bar'],
+        under: ['warn', `Raised bar · ${floor}R`],
+        off:   ['off',  'Switched off'],
+        new:   ['new',  'No record yet'],
+      }[state];
+      const L = last.get(key);
+      // magic and magicmagic are one engine at two depths; the name heads the
+      // first card and the second is labelled by its band alone.
+      const dupe = seen.has(meta.name); seen.add(meta.name);
+      return `<article class="ag ag-${state}">
+        <header class="ag-h">
+          <span class="ag-n">${esc(meta.name)}${meta.band
+            ? `<i>${esc(meta.band)}</i>` : ''}</span>
+          <span class="ag-r">${esc(meta.role)}</span>
+        </header>
+        <div class="ag-chip ${chip[0]}">${esc(chip[1])}</div>
+        <p class="ag-hunt">${esc(meta.hunts)}</p>
+        <div class="ag-bar" role="img"
+             aria-label="floor ${floor}R on a scale from 2R to 6R">
+          <i style="width:${(strain * 100).toFixed(0)}%"></i>
+        </div>
+        <div class="ag-m">
+          <span><b>${floor}R</b>a setup must earn</span>
+          <span><b>${win == null ? '—' : win + '%'}</b>win rate</span>
+          <span><b>${trades}</b>closed</span>
+        </div>
+        <footer class="ag-f">
+          <span>${esc(meta.tf)}</span>
+          <span>${L ? esc(String(L.symbol || '').replace('.NS', '')) + ' · '
+                      + esc(String(L.date || '').slice(5, 10)) : 'nothing filed yet'}</span>
+        </footer>
+      </article>`;
+    }).join('');
+
+    const on = Object.entries(ENGINE_REGISTRY).filter(([k]) => {
+      const v = (d.engines || {})[k] || {}; return v.status !== 'disabled';
+    }).length;
+    return sec('The floor', `<div class="floor">${cards}</div>
+      <p class="hint">The bar is how far each engine's floor has been raised above the
+        2R default, toward the 6R cap at which it stops publishing altogether. That floor
+        comes from the engine's own win rate — break-even R:R is (1−p)/p — so an engine
+        that wins less often has to earn more per trade before it is allowed to file one.
+        A raised bar is not a fault; it is the system refusing trades that record says
+        lose money.</p>`,
+      `${on} of ${Object.keys(ENGINE_REGISTRY).length} working`,
+      'Who is on the floor, what each one hunts, and what it has to earn to file a trade.');
   }
 
   R['/signals'] = async () => {
@@ -3812,7 +3903,7 @@
           the first entries will appear after those runs.
           <br><br>The full history of ${every.length} earlier signals is unchanged and still
           in the ledger — it is simply older than this page's counting window.
-        </div>` + (ENG_TABLE ? engineStatusHtml(ENG_TABLE) : '');
+        </div>` + (ENG_TABLE ? floorHtml(ENG_TABLE, all) : '');
         return;
       }
       main.innerHTML = base +
@@ -3845,7 +3936,7 @@
                    it. The tiles below carry the record as it stands, and the line appears at five.`}
 
           </div>`, '', 'Every closed signal, in the order it closed.')) +
-        (ENG_TABLE ? engineStatusHtml(ENG_TABLE) : '') +
+        (ENG_TABLE ? floorHtml(ENG_TABLE, all) : '') +
         sec('The record', `<div class="grid">
           ${tile(all.length, 'Signals published', 'since ' + esc(LAUNCH), 'ac')}
           ${tile(opens.length, 'Still open', 'marked to live prices')}

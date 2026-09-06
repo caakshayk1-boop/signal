@@ -3180,27 +3180,48 @@ html:has(dialog[open]){overflow:hidden}
 .fd-ometa{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:14px;
   font:500 var(--t-2)/1.4 var(--ui);color:var(--dim)}
 .fd-ometa b{color:var(--ink);font-variant-numeric:tabular-nums}
-/* Engine status. Six facts a row, tabular so the floors line up down the
-   column — that vertical read IS the point: one engine's number is meaningless,
-   the spread between them is the story. */
-.eg{display:grid;gap:2px}
-.eg-r{display:grid;gap:6px 12px;align-items:center;padding:9px 0;
-  border-bottom:1px solid var(--hair);
-  grid-template-columns:1fr auto;grid-template-areas:"n s" "t w" "f c"}
-@media(min-width:720px){.eg-r{grid-template-columns:1.4fr 118px 84px 84px 96px 88px;
-  grid-template-areas:"n s t w f c"}}
-.eg-r:last-child{border-bottom:0}
-.eg-n{grid-area:n;font:600 var(--t-3)/1.2 var(--mono)}
-.eg-s{grid-area:s;justify-self:start;font:600 var(--t-1)/1 var(--ui);
-  letter-spacing:.07em;text-transform:uppercase;padding:4px 8px;border-radius:4px;white-space:nowrap}
-.eg-s.on{background:color-mix(in srgb,var(--up) 16%,transparent);color:var(--up)}
-.eg-s.off{background:color-mix(in srgb,var(--down) 18%,transparent);color:var(--down)}
-.eg-s.new{background:var(--raised);color:var(--dim)}
-.eg-t{grid-area:t} .eg-w{grid-area:w} .eg-f{grid-area:f} .eg-c{grid-area:c}
-.eg-t,.eg-w,.eg-f,.eg-c{font:500 var(--t-2)/1 var(--mono);
-  font-variant-numeric:tabular-nums;color:var(--dim)}
-.eg-w.up{color:var(--up)} .eg-w.dn{color:var(--down)}
-.eg-c{color:var(--ink);font-weight:600}
+/* ── THE FLOOR ────────────────────────────────────────────────────────────
+   Instrument cards, not a table. Dense on purpose: an operator should be able
+   to read the whole floor in one look and see which engine is under its bar.
+   Auto-fit rather than a fixed column count, so seven cards reflow from four
+   across to one without a single breakpoint naming a number of columns. */
+.floor{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(238px,1fr))}
+.ag{background:var(--surface);border:1px solid var(--line);border-left:2px solid var(--line2);
+  border-radius:var(--r-3);padding:13px 14px 11px;display:flex;flex-direction:column;gap:9px}
+.ag-on{border-left-color:var(--up)}
+.ag-under{border-left-color:var(--warn)}
+.ag-off{border-left-color:var(--down)}
+.ag-new{border-left-color:var(--line2)}
+.ag-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.ag-n{font:600 var(--t-6)/1 var(--mono);letter-spacing:.04em}
+.ag-n i{display:block;font:400 var(--t-1)/1.3 var(--mono);color:var(--dim);
+  letter-spacing:var(--ls-wide);margin-top:4px;font-style:normal}
+.ag-r{font:500 var(--t-1)/1 var(--ui);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--dim);text-align:right;flex:none}
+.ag-chip{align-self:flex-start;font:600 var(--t-1)/1 var(--ui);letter-spacing:.08em;
+  text-transform:uppercase;padding:4px 7px;border-radius:4px}
+.ag-chip.live{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
+.ag-chip.warn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.ag-chip.off {background:color-mix(in srgb,var(--down) 16%,transparent);color:var(--down)}
+.ag-chip.new {background:var(--raised);color:var(--dim)}
+.ag-hunt{font:400 var(--t-3)/1.45 var(--ui);color:var(--muted);margin:0;flex:1 1 auto}
+/* The bar is the whole argument: measured rate as fill, required rate as a
+   tick. Where the tick sits right of the fill, the engine is held back. */
+.ag-bar{position:relative;height:7px;border-radius:4px;background:var(--raised);overflow:visible}
+.ag-bar i{display:block;height:100%;border-radius:4px;background:var(--dim)}
+.ag-on .ag-bar i{background:var(--up)}
+.ag-under .ag-bar i,.ag-off .ag-bar i{background:var(--down)}
+/* The 2R default sits at zero width and the 6R cap fills it, so an empty bar
+   reads correctly as "no extra bar to clear" rather than as missing data. */
+.ag-bar{background:var(--raised)}
+.ag-m{display:flex;flex-wrap:wrap;gap:2px 14px}
+.ag-m span{display:flex;flex-direction:column;font:400 var(--t-1)/1.3 var(--mono);
+  letter-spacing:var(--ls-wide);color:var(--dim);text-transform:uppercase}
+.ag-m b{font:600 var(--t-4)/1.1 var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--ink);letter-spacing:var(--ls-0);text-transform:none;margin-bottom:2px}
+.ag-f{display:flex;justify-content:space-between;gap:10px;padding-top:8px;
+  border-top:1px solid var(--hair);font:400 var(--t-1)/1.3 var(--mono);color:var(--dim)}
+.ag-f span:last-child{text-align:right;color:var(--muted)}
 .fd-sip{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
   border-radius:var(--r);overflow:hidden;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
 .fd-sip > div{background:var(--surface);padding:13px 15px;display:flex;flex-direction:column;gap:3px}
