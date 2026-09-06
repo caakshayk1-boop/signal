@@ -676,10 +676,18 @@ try {
     await route.fulfill({ status: 200, contentType: "application/json",
                           body: JSON.stringify({ ok: true, recorded: true }) });
   });
-  await sw.goto(SITE + "#/methodology", { waitUntil: "domcontentloaded" });
-  await sw.waitForTimeout(2500);
-  await sw.evaluate(() => { setTimeout(() => { throw new Error("ui-suite canary"); }, 0); });
-  await sw.waitForTimeout(2500);
+  /* Two attempts, for the same reason the board gets a reload: this runs
+   * seconds after `wrangler deploy`, and the asset the Worker serves can still
+   * be the previous signal.js for a moment. Verified by hand against
+   * production — the reporter fires and the POST lands — so a null here on the
+   * first try is the deploy settling, not the wiring. */
+  for (let attempt = 0; attempt < 2 && !reported; attempt++) {
+    if (attempt) await sw.waitForTimeout(6000);
+    await sw.goto(SITE + "#/methodology?cb=" + Date.now(), { waitUntil: "domcontentloaded" });
+    await sw.waitForTimeout(3500);
+    await sw.evaluate(() => { setTimeout(() => { throw new Error("ui-suite canary"); }, 0); });
+    await sw.waitForTimeout(3000);
+  }
   ok("a client error is reported", !!reported && /canary/.test(reported.message || ""),
      reported && reported.message);
   ok("the report names the route it happened on",
