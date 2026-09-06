@@ -626,7 +626,14 @@ h4.sh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-tran
   border-radius:var(--r-3);padding:11px 12px;font:400 var(--t-5)/1.2 var(--ui);min-height:42px}
 .scr-in{flex:1 1 190px} .scr-sel{flex:0 1 190px;font-family:var(--mono);font-size:var(--t-3)}
 .scr-in:focus,.scr-sel:focus{outline:none;border-color:var(--live)}
-.scr-r{grid-template-columns:20px minmax(0,1fr) repeat(5,auto) 52px;gap:8px;cursor:pointer}
+/* THE NAME COLUMN TOOK ALL THE SLACK AND THEN STARVED. minmax(0,1fr) gave
+   identity 700px of a 1198px row at 1440 — measured text ink: 180px median,
+   313px max, 424px of it empty — while at 768 the same track fell to 191px and
+   8 of 30 rows truncated, worst by 89px. Same defect .mk was fixed for on line
+   1231, never carried here. A bounded fractional track holds the long names
+   and hands the rest back. */
+.scr-r{grid-template-columns:20px minmax(150px,.55fr) repeat(5,auto) 52px;gap:8px;cursor:pointer}
+@media(min-width:1040px){.scr-r{grid-template-columns:20px minmax(180px,.42fr) repeat(5,auto) 52px}}
 .scr-r:hover{background:var(--raised)}
 .scr-r .x{font:500 var(--t-3)/1 var(--mono);font-variant-numeric:tabular-nums;text-align:right;min-width:44px}
 .segh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-widest);text-transform:uppercase;color:var(--live);
@@ -2993,7 +3000,13 @@ html:has(dialog[open]){overflow:hidden}
 .aic-h{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:14px}
 .aic-s{border:0;background:none;padding:0;cursor:pointer;text-align:left;
   font:600 var(--t-7)/1.15 var(--mono);letter-spacing:var(--ls-tight);color:var(--text)}
-.aic-s:hover{color:var(--accent)}
+
+/* LETTER-SPACING INHERITS AS A LENGTH, NOT A RATIO. --ls-tight is -0.02em,
+   which at 18px resolves to -0.36px absolute and then lands on every child
+   regardless of ITS size: 11px text came out at -0.033em, 64% tighter than the
+   token intends. `font:` shorthand does not reset letter-spacing, so the child
+   rules that set their own font never cleared it. Reset on the children. */
+.aic-s > *{letter-spacing:normal}.aic-s:hover{color:var(--accent)}
 /* Green on a 14% green tint measures 4.33:1 in light — under AA. Darkened
    toward the ink rather than swapping the hue, the same fix as .b-zst.active. */
 .aic-g{font:600 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-wide);padding:5px 8px;
@@ -3021,7 +3034,6 @@ html:has(dialog[open]){overflow:hidden}
   color:var(--accent);white-space:nowrap}
 
 .aic-st{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
-.aic-s{}
 .aic-st > li{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:0 13px;
   align-items:start;padding:13px 0;border-top:1px solid var(--line)}
 .aic-st > li:first-child{border-top:0}
@@ -3407,6 +3419,13 @@ html:has(dialog[open]){overflow:hidden}
 .tkr-row{overflow:hidden}
 .tkr-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .tkr-t{display:flex;width:max-content;animation:tkr-run var(--tkr-dur,120s) linear infinite}
+/* ── AND IT STOPS WHILE YOU ARE READING ──────────────────────────────────
+   The strip is sticky, so at #/screen scrolled to row 400 it is still on
+   screen and still moving: 218,800ms, infinite, above a 750-row table. It
+   paused only on hover of the strip itself, which is no use to someone
+   scanning rows beneath it. Continuous peripheral motion over dense text is
+   the one place this technique costs more than it gives. */
+body.is-reading .tkr-t{animation-play-state:paused}
 .tkr-h{display:flex;align-items:center}
 /* HELD STILL ON DEMAND. A price you cannot stop is a price you cannot read;
  * hover and keyboard focus both pause it. */

@@ -62,6 +62,19 @@ const wire = Array.isArray(news) ? news : [];
  * It must never fail the build. A snapshot without the numbers is a smaller
  * page; a build that dies because a fetch timed out is an outage. */
 const LAUNCH = "2026-09-02";   // must match LAUNCH in public/signal.js
+
+/* The engines this site publishes, lifted from the app's own registry so the
+ * snapshot cannot disagree with the page about which engines count. Throws if
+ * the registry cannot be found, because a silently empty whitelist would make
+ * the shell claim zero published on a day that is false. */
+const ENGINES = (() => {
+  const src = readFileSync(new URL("../public/signal.js", import.meta.url), "utf8");
+  const block = src.match(/const ENGINE_REGISTRY = \{([\s\S]*?)\n  \};/);
+  if (!block) throw new Error("prerender: ENGINE_REGISTRY not found in signal.js");
+  const keys = [...block[1].matchAll(/^\s{4}([a-z0-9_]+)\s*:/gm)].map((m) => m[1]);
+  if (!keys.length) throw new Error("prerender: ENGINE_REGISTRY parsed empty");
+  return new Set(keys);
+})();
 async function liveRecord() {
   try {
     // /api/signals, NOT /api/stats. stats is all-time and cannot be filtered,
@@ -74,8 +87,24 @@ async function liveRecord() {
     if (!r.ok) return null;
     const j = await r.json();
     if (!j || !j.ok || !Array.isArray(j.signals)) return null;
-    const rows = j.signals.filter(
-      (x) => String(x.alert_date || x.date || "").slice(0, 10) >= LAUNCH);
+    /* ── THE SAME POPULATION, OR IT IS NOT A SNAPSHOT OF THIS PAGE ────────
+     *
+     * This filtered on DATE ALONE while the page also applies the engine
+     * whitelist and the long-only rule. The shell said "37 published since
+     * 2026-09-02" and the live page, a second later, said 29 — the reader
+     * watching it load saw two different records for the same claim, and the
+     * crawler indexed the wrong one.
+     *
+     * The whitelist is READ OUT OF signal.js rather than repeated here.
+     * Repeating it is exactly how this drifted: the site's own history already
+     * records the lesson — consistency between two surfaces cannot come from
+     * carefully writing the same filter twice, it has to come from one source.
+     * A second copy would be correct today and wrong the next time an engine
+     * is added. */
+    const rows = j.signals.filter((x) =>
+      String(x.alert_date || x.date || "").slice(0, 10) >= LAUNCH
+      && ENGINES.has(String(x.signal_type || ""))
+      && String(x.action || "BUY").toUpperCase() !== "SELL");
     const closed = rows.filter(
       (x) => Number.isFinite(Number(x.r_multiple)) && (x.badge || "") !== "open");
     // NOT `if (!rows.length) return null`. Zero rows on or after LAUNCH is a

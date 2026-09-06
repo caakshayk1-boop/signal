@@ -57,6 +57,22 @@
    *
    * Everything here is wrapped: a reporter that throws while reporting an
    * error is the one bug nobody can debug. */
+  /* The ticker pauses once the reader is past the header and into content.
+   * Scroll, not hover: someone scanning row 400 of the screen is not hovering
+   * the strip, and that is exactly when the motion is worst. Coalesced on a
+   * timeout rather than rAF — rAF does not run in a background tab, and this
+   * has to settle correctly when the tab comes back. */
+  (() => {
+    let t = null, on = false;
+    const sync = () => {
+      const want = window.scrollY > 120;
+      if (want !== on) { on = want; document.body.classList.toggle('is-reading', want); }
+    };
+    addEventListener('scroll', () => { if (t) return; t = setTimeout(() => { t = null; sync(); }, 120); },
+                     { passive: true });
+    sync();
+  })();
+
   const ERR_SEEN = new Set();
   let errSent = 0;
   function reportError(message, stack) {
@@ -707,6 +723,20 @@
   /* The old map is kept as the fallback for a row whose engine has since been
    * retired: an unrecognised key renders as itself rather than as blank. */
   const ENGINE_LABEL = new Proxy({}, { get: (_, k) => engName(k) });
+  /* ── OLD NAMES IN STORED PROSE ───────────────────────────────────────────
+   * The registry renames what the site RENDERS, but `remarks` is free text
+   * written into the ledger at signal time and it says things like
+   * "Magic-levels screen (v1 engine)". Those rows are history and must not be
+   * rewritten in the database — so the substitution happens on the way out,
+   * the same place the key itself is translated. Longest keys first, or
+   * "magic" would eat the front of "magicmagic". */
+  const ENGINE_WORDS = Object.entries(ENGINE_REGISTRY)
+    .map(([k, v]) => [k, v.name])
+    .concat([['Magic-levels', 'TIDAL levels'], ['MagicMagic', 'TIDAL'], ['Magic', 'TIDAL']])
+    .sort((a, b) => b[0].length - a[0].length);
+  const engineWords = t => ENGINE_WORDS.reduce(
+    (acc, [k, n]) => acc.replace(new RegExp('\\b' + k + '\\b', 'g'), n), String(t || ''));
+
   const engineOk = r => ENGINES.has(String(r.signal_type || ''));
 
   /* ── AND NOTHING SHORT ────────────────────────────────────────────────────
@@ -2796,7 +2826,8 @@
           const sh = shareOf(o.notional);
           return `<article class="card" data-sym="${esc(o.symbol || '')}" role="button" tabindex="0">
             <div class="card-h"><span class="sym">${esc(o.symbol || '')}</span>
-              ${o.engine ? `<span class="pill">${esc(o.engine)}</span>` : ''}
+              ${o.engine ? `<span class="pill" title="${esc(String(o.engine))}">${
+                esc(engName(o.engine))}</span>` : ''}
               <span class="spacer"></span>
               ${live ? `<span class="pill ${move > 0 ? 'pill-up' : 'pill-dn'}">${pct(move)} vs entry</span>`
                      : `<span class="pill">no mark</span>`}
@@ -3914,7 +3945,8 @@
         <div class="card-h">
           <span class="sym">${esc(r.symbol || '')}</span>
           ${r.action ? `<span class="pill ${/SELL|SHORT/i.test(r.action) ? 'pill-dn' : 'pill-up'}">${esc(r.action)}</span>` : ''}
-          ${r.signal_type ? `<span class="pill">${esc(String(r.signal_type).replace(/_/g, ' '))}</span>` : ''}
+          ${r.signal_type ? `<span class="pill" title="${esc(String(r.signal_type))}">${
+            esc(engName(r.signal_type))}</span>` : ''}
           ${r.timeframe ? `<span class="pill">${esc(r.timeframe)}</span>` : ''}
           <span class="spacer"></span>${pill}
         </div>
@@ -3937,7 +3969,7 @@
           ${open ? `<a class="brief-link" href="#/brief" data-brief="${esc(r.symbol)}">Full brief →</a>` : ''}
           ${symLinks(r.symbol, r.tv)}
         </div>
-        ${r.remarks ? `<div class="card-body">${esc(String(r.remarks).slice(0, 180))}</div>` : ''}
+        ${r.remarks ? `<div class="card-body">${esc(engineWords(String(r.remarks).slice(0, 180)))}</div>` : ''}
       </article>`;
     };
 
@@ -5406,7 +5438,7 @@
         <div class="b-tl" id="tl">
           ${[
             [String(sig.alert_date || sig.date || '').slice(0, 10),
-             `<b>Signal published.</b> ${esc(sig.signal_type || 'engine')} engine, ${esc(sig.timeframe || '1D')} timeframe, entry ${f(entry)} with the stop at ${f(stop)}.`],
+             `<b>Signal published.</b> ${esc(engName(sig.signal_type) || 'engine')} engine, ${esc(sig.timeframe || '1D')} timeframe, entry ${f(entry)} with the stop at ${f(stop)}.`],
             sig.sent_at ? [String(sig.sent_at).slice(0, 10) + ' ' + String(sig.sent_at).slice(11, 16),
              `<b>Sent.</b> The alert left the engine at this time and has not been amended since.`] : null,
             [ageDays == null ? '—' : ageDays + ' days',
@@ -6757,11 +6789,24 @@
         from that build; nothing is computed in your browser.</p>
 
       <h3>The signals</h3>
-      <p>Signals come from named engines — <code>magic</code>, <code>magicmagic</code>,
-        <code>equity_measured</code>, <code>ohl</code>, <code>commodity</code> and others. Each
-        publishes an entry, a stop and one or two targets at the moment it fires, and those
-        levels are never edited afterwards. A signal is a thesis with a defined invalidation.
-        It is not a forecast.</p>
+      <p>Signals come from seven named engines. Each publishes an entry, a stop and one or
+        two targets at the moment it fires, and those levels are never edited afterwards. A
+        signal is a thesis with a defined invalidation. It is not a forecast.</p>
+      <div class="rank" style="margin:14px 0">
+        <div class="rank-r lvl-r rank-head"><span class="s">Engine</span>
+          <span class="x">Hunts</span><span class="x">Ledger key</span></div>
+        ${Object.entries(ENGINE_REGISTRY).map(([k, v]) => `<div class="rank-r lvl-r">
+          <span class="s"><b>${esc(v.name)}</b><span>${esc(v.role)}${
+            v.band ? ' · ' + esc(v.band) : ''}</span></span>
+          <span class="x" data-l="Hunts" style="text-align:left;white-space:normal">${esc(v.hunts)}</span>
+          <span class="x" data-l="Ledger key"><code>${esc(k)}</code></span>
+        </div>`).join('')}
+      </div>
+      <p class="hint"><b>The names are what you read; the key is what the ledger stores.</b>
+        Every signal ever filed carries its key, and renaming that column would orphan the
+        record it is the primary key for — so the key never moves. TIDAL appears twice because
+        <code>magic</code> and <code>magicmagic</code> are one screen run at two depths off the
+        52-week high, which is what they have always been.</p>
 
       <h3>The confidence score</h3>
       <p>Five components — structure, momentum, trend, volume and reward-to-risk — each scored
