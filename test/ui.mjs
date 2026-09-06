@@ -665,6 +665,26 @@ try {
        panels.map(t => t.replace(/\s+/g, " ").slice(0, 150)));
   }
   ok("no route threw", thrown.length === 0, thrown.slice(0, 3));
+
+  /* THE REPORTER ITSELF HAS TO WORK, and it is the one piece of code that
+   * cannot announce its own failure. A deliberate throw is injected and the
+   * POST it should produce is intercepted — asserting the wiring end to end
+   * rather than that a listener was merely attached. */
+  let reported = null;
+  await sw.route("**/api/client-error", async route => {
+    try { reported = JSON.parse(route.request().postData() || "{}"); } catch { reported = {}; }
+    await route.fulfill({ status: 200, contentType: "application/json",
+                          body: JSON.stringify({ ok: true, recorded: true }) });
+  });
+  await sw.goto(SITE + "#/methodology", { waitUntil: "domcontentloaded" });
+  await sw.waitForTimeout(2500);
+  await sw.evaluate(() => { setTimeout(() => { throw new Error("ui-suite canary"); }, 0); });
+  await sw.waitForTimeout(2500);
+  ok("a client error is reported", !!reported && /canary/.test(reported.message || ""),
+     reported && reported.message);
+  ok("the report names the route it happened on",
+     !!reported && String(reported.route || "").includes("methodology"), reported && reported.route);
+  await sw.unroute("**/api/client-error");
   await swCtx.close();
 
   /* ── NARROW ──────────────────────────────────────────────────────────── */

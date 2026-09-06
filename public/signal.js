@@ -42,6 +42,50 @@
    * far too short to serve anyone a stale price. */
   const FEEDS = new Map();
   const MICRO = new Map();
+  /* ── TELL SOMEONE WHEN THIS BREAKS ───────────────────────────────────────
+   *
+   * The Today route threw on every load for a day and nothing knew. The deploy
+   * gate's error listener only visited two routes; Cloudflare observability
+   * sees the Worker, not a TypeError in a reader's browser — and this whole
+   * site is client-rendered, so that is where its failures live.
+   *
+   * Deliberately tiny and deliberately quiet: no vendor, no third-party
+   * script, no identifier of any kind. A message, a stack, the route and the
+   * build. It caps itself at five reports per session and dedupes by message,
+   * because the failure mode of an error reporter is a broken page reporting
+   * the same fault a thousand times.
+   *
+   * Everything here is wrapped: a reporter that throws while reporting an
+   * error is the one bug nobody can debug. */
+  const ERR_SEEN = new Set();
+  let errSent = 0;
+  function reportError(message, stack) {
+    try {
+      const msg = String(message || '').slice(0, 500);
+      if (!msg || errSent >= 5) return;
+      const route = (location.hash || '#/').slice(0, 120);
+      const key = route + '|' + msg;
+      if (ERR_SEEN.has(key)) return;
+      ERR_SEEN.add(key);
+      errSent++;
+      // keepalive so a report survives the navigation that often follows.
+      fetch('/api/client-error', {
+        method: 'POST', keepalive: true,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          message: msg, route,
+          stack: String(stack || '').slice(0, 2000),
+          build: (window.__BUILD || ''),
+        }),
+      }).catch(() => {});
+    } catch (e) { /* never let the reporter be the problem */ }
+  }
+  window.addEventListener('error', e => reportError(e && e.message, e && e.error && e.error.stack));
+  window.addEventListener('unhandledrejection', e => {
+    const r = e && e.reason;
+    reportError(r && (r.message || r), r && r.stack);
+  });
+
   const MICRO_MS = 5000;
   let feedRev = 0;
   let routeUrls = new Set();

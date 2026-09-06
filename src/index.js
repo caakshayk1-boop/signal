@@ -31,6 +31,7 @@ import ipolive from "./api/ipolive.js";
 import wire from "./api/wire.js";
 import { runWatchdog } from "./watchdog.js";
 import subscribe from "./api/subscribe.js";
+import clientError from "./api/clienterror.js";
 
 const ROUTES = {
   "/api/ticker": ticker,
@@ -42,6 +43,7 @@ const ROUTES = {
   "/api/ipo-live": ipolive,
   "/api/wire": wire,
   "/api/subscribe": subscribe,
+  "/api/client-error": clientError,
 };
 
 /* The handlers read credentials from process.env, the way they did on Vercel.
