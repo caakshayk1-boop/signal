@@ -440,7 +440,16 @@ main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh
 
 /* ── ENTRANCE — one orchestrated reveal, not scattered effects ───────────── */
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.sec{animation:rise .34s cubic-bezier(.2,.8,.2,1) both}
+/* `backwards`, NOT `both`. With `both` the fill keeps the final keyframe
+   applied after the animation ends — and `transform:none` inside a running
+   fill still computes to matrix(1,0,0,1,0,0), which is a transform. A
+   transformed ancestor creates a containing block, and position:sticky inside
+   one stops sticking: the fund table's pinned header scrolled away while the
+   screen's stayed, for no reason visible in either rule.
+   `backwards` applies the FROM state during the delay — which is all `both`
+   was ever wanted for, to stop the flash before a staggered section starts —
+   and applies nothing at all once it is over. */
+.sec{animation:rise .34s cubic-bezier(.2,.8,.2,1) backwards}
 .sec:nth-child(2){animation-delay:.04s} .sec:nth-child(3){animation-delay:.08s}
 .sec:nth-child(4){animation-delay:.12s} .sec:nth-child(5){animation-delay:.16s}
 @media(prefers-reduced-motion:reduce){.sec{animation:none}
@@ -3277,6 +3286,39 @@ html:has(dialog[open]){overflow:hidden}
   text-transform:uppercase;padding:3px 6px;border-radius:3px}
 .alog-b.is-open{background:var(--raised);color:var(--dim)}
 .alog-b.is-done{background:color-mix(in srgb,var(--up) 14%,transparent);color:var(--up)}
+
+/* ── COLUMN LABELS THAT SURVIVE THE SCROLL ────────────────────────────────
+   A 750-row screen, a 24-row IPO table and a 60-fund list all put their
+   column names in one row at the top and then scroll them away. By row 40 the
+   reader is looking at six columns of numbers with no idea which is "vs 200D"
+   and which is "1 month" — the labels exist exactly once, at the moment you
+   least need them.
+
+   Sticky to the bar, not to zero: the site's header is itself sticky at
+   --barh, so a header pinned to the viewport top would slide underneath it.
+   The tinted background is not decoration — a transparent sticky header
+   renders the rows it is covering straight through itself. */
+.rank-head{position:sticky;top:calc(var(--barh) + 2px);z-index:3;
+  background:var(--raised);backdrop-filter:none}
+/* A sticky child cannot stick inside a clipping ancestor, and `overflow-x:auto`
+   computes overflow-y to auto as well — so the container has to stop being the
+   scroller for the page to be it. NOT applied to every .rank: the fund and
+   engine tables are genuinely tabular and keep their horizontal scroller,
+   which is worth more to them than a pinned header. Only the lists that
+   already fit their width give it up. */
+.rank:has(> .scr-r),.rank:has(> .rank-r.lvl-r),.rank:has(> .rank-r:not(.fnd):not(.eng)){
+  overflow:visible}
+/* The fund table keeps its horizontal scroller where the width is tight, and
+   gives it up where there is room — seven columns fit comfortably past 900px,
+   and a pinned header is worth more there than a scroller nobody needs. */
+@media(min-width:900px){.rank:has(> .rank-r.fnd){overflow:visible}}
+.rank > :first-child{border-top-left-radius:var(--r);border-top-right-radius:var(--r)}
+.rank > :last-child{border-bottom-left-radius:var(--r);border-bottom-right-radius:var(--r)}
+@media(max-width:700px){
+  /* The stacked card layout labels every cell inline, so a pinned header
+     would be a second copy of information already on every row. */
+  .rank-head{position:static}
+}
 .fd-sip{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
   border-radius:var(--r);overflow:hidden;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
 .fd-sip > div{background:var(--surface);padding:13px 15px;display:flex;flex-direction:column;gap:3px}

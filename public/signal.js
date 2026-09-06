@@ -2917,17 +2917,64 @@
     if ((d.awaiting_listing || []).length)
       out += sec('Awaiting listing', `<div class="cards-2">${d.awaiting_listing.map(ipoCard).join('')}</div>`);
 
+    /* ── THE LISTINGS TABLE, WITH ITS LABELS ─────────────────────────────
+     *
+     * It read `r.listed_on` and `r.sym`. NEITHER FIELD EXISTS — the feed
+     * publishes `listing_date` and `symbol` — so every row on this table has
+     * rendered the words "listed —" since it shipped, and the em dash was the
+     * fallback doing its job on a field name that was never there.
+     *
+     * It also had no header row at all: six columns of numbers with nothing
+     * naming any of them. The labels are here now and they are sticky, so
+     * they survive the scroll down twenty-four rows. */
     const rec = (d.recent_listed || []).slice().sort((a, b) =>
       (b.since_listing_pct ?? -1e9) - (a.since_listing_pct ?? -1e9));
-    out += sec('How last year’s listings did', rec.length ? `<div class="rank">${rec.map((r, i) => `
-        <div class="rank-r">
-          <span class="i">${i + 1}</span>
-          <span class="s"><b>${esc(r.sym || r.symbol || '')}</b><span>listed ${esc(r.listed_on || '—')}${r.price_band ? ' · band ' + esc(r.price_band) : ''}</span>${symLinks(r.sym || r.symbol)}</span>
-          <span class="x" style="color:var(--dim)">${r.from_high_pct != null ? pct(r.from_high_pct) + ' off high' : ''}</span>
-          <span class="m ${dir(r.since_listing_pct)}">${pct(r.since_listing_pct)}</span>
-        </div>`).join('')}</div>` : `<div class="empty">No listings in the window.</div>`,
-      `${rec.length} shown`);
+    const ipoRow = (r, i) => `<div class="rank-r lvl-r" data-since="${
+        Number(r.since_listing_pct) >= 0 ? 'up' : 'dn'}">
+      <span class="i">${i + 1}</span>
+      <span class="s"><b>${esc(r.symbol || '')}</b><span>${esc(r.company || '')}</span>${
+        symLinks(r.symbol)}</span>
+      <span class="x" data-l="Listed">${esc(String(r.listing_date || '').slice(0, 10) || '—')}</span>
+      <span class="x" data-l="Price band">${esc(r.price_band || '—')}</span>
+      <span class="x" data-l="Last">${r.last_close != null ? price(r.last_close) : '—'}</span>
+      <span class="x ${dir(r.from_high_pct)}" data-l="Off high">${
+        r.from_high_pct != null ? pct(r.from_high_pct) : '—'}</span>
+      <span class="m ${dir(r.since_listing_pct)}" data-l="Since listing">${
+        pct(r.since_listing_pct)}</span>
+    </div>`;
+    const ipoHead = `<div class="rank-r lvl-r rank-head">
+      <span class="i">#</span><span class="s">Company</span>
+      <span class="x">Listed</span><span class="x">Price band</span><span class="x">Last</span>
+      <span class="x">Off high</span><span class="m">Since listing ↓</span></div>`;
+    const up = rec.filter(r => Number(r.since_listing_pct) >= 0).length;
+    out += sec('How recent listings have done', rec.length
+      ? `<div class="chips" id="ipoflt">
+           <button type="button" class="chip" data-f="all" aria-pressed="true">All ${rec.length}</button>
+           <button type="button" class="chip" data-f="up" aria-pressed="false">Above issue ${up}</button>
+           <button type="button" class="chip" data-f="dn" aria-pressed="false">Below issue ${rec.length - up}</button>
+         </div>
+         <div class="rank" id="ipotbl">${ipoHead}${rec.map(ipoRow).join('')}</div>
+         <p class="hint">Sorted by move since listing. <b>Price band</b> is what the book was
+           offered at; <b>Last</b> is the most recent close. A listing that never traded above
+           its band is the case this table exists to make visible.</p>`
+      : `<div class="empty">No listings in the window.</div>`,
+      `${rec.length} listings`);
     paint(out);
+
+    /* Filtering by attribute rather than re-rendering: the rows are already in
+     * the DOM and re-running the map would drop the live figures fillIpoLive
+     * writes into them a moment later. */
+    const flt = main.querySelector('#ipoflt');
+    if (flt) flt.addEventListener('click', e => {
+      const b = e.target.closest('.chip[data-f]');
+      if (!b) return;
+      const f = b.dataset.f;
+      flt.querySelectorAll('.chip').forEach(c =>
+        c.setAttribute('aria-pressed', String(c === b)));
+      main.querySelectorAll('#ipotbl .rank-r[data-since]').forEach(row => {
+        row.hidden = f !== 'all' && row.dataset.since !== f;
+      });
+    });
     fillIpoLive();   // upgrades the mirrored figures in place, after paint
   };
 
@@ -6246,7 +6293,15 @@
 
     btn.onclick = async () => {
       const hr = await get('/data-health.json');
-      const upstream = hr.ok ? (hr.data.datasets || []) : [];
+      /* SCOPED THE SAME WAY THE HEADER BADGE ALREADY WAS. OUR_DATASETS was
+       * written for the "n of m current" chip and never applied here, so the
+       * panel behind it listed all twelve — Careers, Podcasts, Smart Reads —
+       * feeds that belong to a different product and that nothing on this page
+       * reads. The one row showing DEGRADED was the careers feed, which is not
+       * this site's data at all: the panel was reporting someone else's
+       * outage as this site's health. */
+      const upstream = (hr.ok ? (hr.data.datasets || []) : [])
+        .filter(d => OUR_DATASETS.some(re => re.test(String(d.dataset || ''))));
       const upstreamAge = ageHours(feedStamp(hr.ok ? hr.data : null));
       sheet('Data freshness', `
         <p class="sheet-p">Every feed <b>this page</b> loaded, and how old the copy it loaded is —
