@@ -3784,6 +3784,11 @@
    * it done, and what did it last file. The bar is the engine's win rate
    * against the win rate its own floor demands — the one comparison that
    * decides whether it publishes, drawn rather than left to arithmetic. */
+  /* A heading INSIDE a section — the floor holds two blocks that need naming
+   * without either becoming a section of its own in the page's rhythm. */
+  const sub = (label, body) => `<div class="subsec">
+    <h3 class="subsec-h">${esc(label)}</h3>${body}</div>`;
+
   function floorHtml(d, rows) {
     const last = new Map();
     for (const r of (rows || [])) {
@@ -3861,7 +3866,37 @@
     const on = Object.entries(ENGINE_REGISTRY).filter(([k]) => {
       const v = (d.engines || {})[k] || {}; return v.status !== 'disabled';
     }).length;
+
+    /* ── THE ACTIVITY LOG ────────────────────────────────────────────────
+     * What the floor has actually DONE, newest first. The cards say what each
+     * engine is and what it must earn; none of them says what happened. This
+     * is the one strip on the page built from events rather than state, and
+     * it is the thing a reader checks first: is anything happening.
+     *
+     * Real rows only. Where nothing has been filed the strip says so rather
+     * than padding itself — an empty log is a true statement about a quiet
+     * week, and inventing rows to fill it would make the busiest-looking
+     * version of this page the least honest one. */
+    const feed = (rows || []).filter(r => ENGINES.has(String(r.signal_type || '')))
+      .slice(0, 12);
+    const logHtml = !feed.length
+      ? `<p class="hint">Nothing filed yet since ${esc(LAUNCH)}.</p>`
+      : `<ol class="alog">${feed.map(r => {
+          const m = eng(r.signal_type) || {};
+          const e = lvl(r.entry), sx = lvl(r.sl), t = lvl(r.target1);
+          const rr = (e && sx && t && e !== sx) ? Math.abs(t - e) / Math.abs(e - sx) : null;
+          const b = String(r.badge || '').toLowerCase();
+          return `<li class="alog-r">
+            <span class="alog-d">${esc(String(r.date || '').slice(5, 10))}</span>
+            <span class="alog-e">${esc(m.name || r.signal_type)}</span>
+            <span class="alog-s">${esc(String(r.symbol || '').replace('.NS', ''))}</span>
+            <span class="alog-x">${e ? price(e, r.currency || '₹') : '—'}</span>
+            <span class="alog-r2">${rr ? rr.toFixed(2) + 'R' : '—'}</span>
+            <span class="alog-b ${b === 'open' ? 'is-open' : 'is-done'}">${esc(b || 'filed')}</span>
+          </li>`; }).join('')}</ol>`;
+
     return sec('The floor', `<div class="floor">${cards}</div>
+      ${sub('Latest filings', logHtml)}
       <p class="hint">The bar is how far each engine's floor has been raised above the
         2R default, toward the 6R cap at which it stops publishing altogether. That floor
         comes from the engine's own win rate — break-even R:R is (1−p)/p — so an engine

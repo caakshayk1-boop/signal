@@ -3248,6 +3248,35 @@ html:has(dialog[open]){overflow:hidden}
 .ag-f{display:flex;justify-content:space-between;gap:10px;padding-top:8px;
   border-top:1px solid var(--line);font:400 var(--t-1)/1.3 var(--mono);color:var(--dim)}
 .ag-f span:last-child{text-align:right;color:var(--muted)}
+
+/* ── LATEST FILINGS ───────────────────────────────────────────────────────
+   The floor's cards are state; this is events. Monospace throughout and
+   tabular figures, because the whole value of a log is that the columns line
+   up down the page and a scan finds the outlier without reading. */
+.subsec{margin-top:20px}
+.subsec-h{font:600 var(--t-2)/1 var(--ui);letter-spacing:var(--ls-widest);
+  text-transform:uppercase;color:var(--dim);margin:0 0 9px}
+.alog{list-style:none;margin:0;padding:0;display:grid;gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:var(--r-3);overflow:hidden}
+.alog-r{display:grid;gap:4px 12px;align-items:baseline;padding:9px 12px;background:var(--surface);
+  grid-template-columns:auto auto 1fr auto;
+  grid-template-areas:"d e s b" "d e x r"}
+@media(min-width:640px){
+  .alog-r{grid-template-columns:46px 74px 1fr 92px 62px 66px;
+    grid-template-areas:"d e s x r b"}
+}
+.alog-d{grid-area:d;font:400 var(--t-2)/1.3 var(--mono);color:var(--dim)}
+.alog-e{grid-area:e;font:600 var(--t-2)/1.3 var(--mono);letter-spacing:.04em}
+.alog-s{grid-area:s;font:500 var(--t-3)/1.3 var(--mono);min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alog-x{grid-area:x;font:500 var(--t-3)/1.3 var(--mono);font-variant-numeric:tabular-nums;
+  text-align:right;color:var(--muted)}
+.alog-r2{grid-area:r;font:600 var(--t-3)/1.3 var(--mono);font-variant-numeric:tabular-nums;
+  text-align:right}
+.alog-b{grid-area:b;justify-self:end;font:600 var(--t-1)/1 var(--ui);letter-spacing:.08em;
+  text-transform:uppercase;padding:3px 6px;border-radius:3px}
+.alog-b.is-open{background:var(--raised);color:var(--dim)}
+.alog-b.is-done{background:color-mix(in srgb,var(--up) 14%,transparent);color:var(--up)}
 .fd-sip{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
   border-radius:var(--r);overflow:hidden;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
 .fd-sip > div{background:var(--surface);padding:13px 15px;display:flex;flex-direction:column;gap:3px}
