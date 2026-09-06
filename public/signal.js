@@ -6866,14 +6866,12 @@
       <p>Signals come from seven named engines. Each publishes an entry, a stop and one or
         two targets at the moment it fires, and those levels are never edited afterwards. A
         signal is a thesis with a defined invalidation. It is not a forecast.</p>
-      <div class="rank" style="margin:14px 0">
-        <div class="rank-r lvl-r rank-head"><span class="s">Engine</span>
-          <span class="x">Hunts</span><span class="x">Ledger key</span></div>
-        ${Object.entries(ENGINE_REGISTRY).map(([k, v]) => `<div class="rank-r lvl-r">
-          <span class="s"><b>${esc(v.name)}</b><span>${esc(v.role)}${
-            v.band ? ' · ' + esc(v.band) : ''}</span></span>
-          <span class="x" data-l="Hunts" style="text-align:left;white-space:normal">${esc(v.hunts)}</span>
-          <span class="x" data-l="Ledger key"><code>${esc(k)}</code></span>
+      <div class="roster">
+        ${Object.entries(ENGINE_REGISTRY).map(([k, v]) => `<div class="roster-r">
+          <div class="roster-h"><b>${esc(v.name)}</b><span>${esc(v.role)}</span>
+            <code>${esc(k)}</code></div>
+          ${v.band ? `<em>${esc(v.band)}</em>` : ''}
+          <p>${esc(v.hunts)}</p>
         </div>`).join('')}
       </div>
       <p class="hint"><b>The names are what you read; the key is what the ledger stores.</b>
