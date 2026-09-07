@@ -4033,7 +4033,30 @@
           <div><span class="kk">Stop</span><span class="vv dn">${price(r.sl, cur)}</span></div>
           <div><span class="kk">Target 1</span><span class="vv up">${price(r.target1, cur)}</span></div>
           <div><span class="kk">Target 2</span><span class="vv up">${price(r.target2, cur)}</span></div>
-          <div><span class="kk">R:R</span><span class="vv">${esc(r.rr ?? '—')}</span></div>
+          ${(() => {
+            /* ── R:R MUST REFER TO A TARGET ON THE CARD ────────────────────
+             * The stored `rr` is quoted off T2 by the engines that emit one.
+             * When the read layer blanks T2 — because it collapsed into T1 and
+             * is not a separate exit — the card kept printing that number
+             * beside a target it was no longer showing. FSL: "R:R 1.89" above
+             * a first target worth 1.60R, and a scale-out rung underneath
+             * correctly saying 1.6R. Two numbers for one thing, and the bigger
+             * one pointing at a level that is not there.
+             *
+             * Measured on the live ledger: 13 of 31 rows since launch have no
+             * T2, so this was most of the page.
+             *
+             * The stored value is left in the ledger untouched — it is what the
+             * engine published — and the DISPLAY quotes the furthest target it
+             * is actually showing, naming which one. */
+            const e = lvl(r.entry), sx = lvl(r.sl);
+            const far = lvl(r.target3) || lvl(r.target2) || lvl(r.target1);
+            const which = lvl(r.target3) ? 'T3' : lvl(r.target2) ? 'T2' : 'T1';
+            const shown = (e && sx && far && e !== sx)
+              ? Math.abs(far - e) / Math.abs(e - sx) : null;
+            return `<div><span class="kk">R:R <i class="kk-q">to ${which}</i></span>
+              <span class="vv">${shown != null ? shown.toFixed(2) : esc(r.rr ?? '—')}</span></div>`;
+          })()}
         </div>
         ${open && live && isFinite(Number(r.sl)) && isFinite(Number(r.target1))
           ? progressToTarget(Number(r.entry), Number(r.sl), Number(r.target1), live.price, r.action) : ''}
@@ -4216,7 +4239,10 @@
      * to add up. Publishing 20/50 of a position and never saying where the
      * other 30% goes is worse than not publishing a ladder at all. */
     if (rungs.length === 2) { rungs[0][0] = '30%'; rungs[1][0] = '70%'; }
-    if (rungs.length === 1) { rungs[0][0] = '100%'; }
+    /* ONE TARGET IS NOT A LADDER. "100% at ₹1,569" reads like a scale-out
+     * plan with one rung; it is simply the whole position at the only exit
+     * this signal has, and saying so is shorter and truer. */
+    if (rungs.length === 1) { rungs[0][0] = 'All'; rungs[0][2] = 'the only target'; }
     const banked = rungs.reduce((x, [pcStr, lv]) => x + parseFloat(pcStr) / 100 * rOf(lv), 0);
     return `<div class="trail"><span>Trailing rule</span>
       ${steps.map(([t, k]) => `<div class="tr-s"><b>${esc(t)}</b><i>${esc(k)}</i></div>`).join('')}

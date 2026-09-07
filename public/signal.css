@@ -3539,6 +3539,9 @@ html:has(dialog[open]){overflow:hidden}
 .snap-v.up{color:var(--up)} .snap-v.dn{color:var(--down)} .snap-v.ac{color:var(--accent)}
 .snap-s{font:400 var(--t-2)/1.2 var(--ui);color:var(--dim)}
 .snap-n{margin:7px 2px 0;font:400 var(--t-2)/1.45 var(--ui);color:var(--dim)}
+/* Which target the R:R refers to, inline with the label rather than a
+   separate row — it qualifies the number, it is not a fact of its own. */
+.kk-q{font-style:normal;font-size:var(--t-1);color:var(--dim);letter-spacing:0}
 /* ── FOUR FACTS, ALL FOUR VISIBLE ─────────────────────────────────────────
    The strip is a horizontal scroller, which on a 390px phone means the fourth
    cell is off-screen with nothing saying so: "SCREEN RUN 2026-09-0…" clipped
