@@ -770,7 +770,7 @@ try {
    * rendered failure panel. The second is the one that would have caught it. */
   console.log("\n  every route — thrown errors and rendered failures");
   const ROUTES = ["#/", "#/markets", "#/signals", "#/brief", "#/screen", "#/ideas",
-                  "#/news", "#/ipo", "#/funds", "#/watch", "#/join",
+                  "#/news", "#/ipo", "#/funds", "#/watch", "#/engines", "#/join",
                   "#/methodology", "#/sources", "#/terms", "#/privacy"];
   const swCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const sw = await swCtx.newPage();
@@ -834,7 +834,7 @@ try {
   // the defect this whole block exists to catch, and it was unmeasured exactly
   // where it was most likely.
   for (const route of ["#/", "#/markets", "#/screen", "#/ideas", "#/news", "#/ipo",
-                       "#/funds", "#/watch", "#/signals", "#/brief", "#/methodology"]) {
+                       "#/funds", "#/watch", "#/engines", "#/signals", "#/brief", "#/methodology"]) {
     await mp.goto(SITE + route, { waitUntil: "domcontentloaded" });
     // The screen fetches 1.4 MB before it lays out; the shorter settle used by
     // the other routes measured it mid-skeleton and would have passed anything.

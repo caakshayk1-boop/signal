@@ -700,7 +700,168 @@
     ai_longterm:     { name: 'NORTH',  role: 'Long horizon',     band: null,
                        hunts: 'The long-horizon screen, run weekly against the whole board.',
                        tf: 'Weekly → months' },
+    /* ── THE TWO NEW ONES ─────────────────────────────────────────────────
+     * Every engine above buys strength that is ALREADY VISIBLE — 52-week
+     * highs, names near their highs, twelve-month momentum. None of them looks
+     * for the FIRST move off a base, which is the point where the invalidation
+     * level is closest and therefore where risk is smallest. These two do,
+     * from opposite evidence: LEDGE from price going quiet, KEEL from momentum
+     * refusing to confirm a new low. */
+    ledge:           { name: 'LEDGE',  role: 'Base breakout',    band: '≥12% off the high',
+                       hunts: 'A Darvas box — price gone quiet in a tight range after a fall — '
+                            + 'and then a CLOSE out of the top of it on volume.',
+                       tf: 'Daily → weeks' },
+    keel:            { name: 'KEEL',   role: 'Divergence turn',  band: '≥12% off the high',
+                       hunts: 'A lower low in price against a higher low in RSI, traded only '
+                            + 'when price reclaims the level it lost.',
+                       tf: 'Daily → weeks' },
   };
+  /* ── WHAT EACH ENGINE ACTUALLY FIRES ON ───────────────────────────────────
+   *
+   * This exists because the honest answer to "why did this signal appear?" was
+   * previously nowhere on the site. The roster on /methodology said what each
+   * engine HUNTS in one sentence; it did not say what has to be true for it to
+   * fire, where the stop comes from, or what would prove it wrong.
+   *
+   * `triggers` are the conditions. `stop` and `targets` say how the levels are
+   * built — this matters more than it sounds, because the levels are the whole
+   * trade: the same setup with a stop inside the noise is a different engine.
+   * `wrong` is the invalidation, stated before the fact.
+   *
+   * Wording is taken from what each engine writes into its own ledger rows, not
+   * from a description of them written afterwards. Where an engine has been
+   * corrected the correction is named, because a reader comparing an old signal
+   * to a new one is otherwise looking at two different engines with one name. */
+  const ENGINE_RULES = {
+    breakout: {
+      triggers: ['Close clears a 52-week, 20-week or 6-month high',
+                 'Volume confirms the break',
+                 'Liquidity gate on 20-day turnover'],
+      stop: 'ATR-based, scaled to the HOLDING horizon by the square root of time '
+          + '(2.24x weekly, 4.69x monthly), floored at 1.41x daily ATR, capped 6–20%.',
+      targets: 'Ladder at 1.6 / 2.5 / 3.3 R.',
+      wrong: 'A close back inside the range it broke out of.',
+      fixed: 'Until 2026-09-02 the stop was 0.29x ATR — a day-sized stop on a '
+           + 'weeks-long trade, which produced a 90.9% stop-out rate.',
+    },
+    magic: {
+      triggers: ['Quality name more than 15% off its high',
+                 'Weekly momentum already turning back up',
+                 'Daily close confirms'],
+      stop: 'The WIDER of the structural level and the ATR band.',
+      targets: 'First target floored at 1.6R.',
+      wrong: 'A daily close under the structural level the setup is built on.',
+      fixed: 'Corrected 2026-09-03: it took the TIGHTER of the two stop '
+           + 'candidates, and T1 was floored at 1.0R — one times risk, which '
+           + 'loses money at any win rate this engine has shown.',
+    },
+    magicmagic: {
+      triggers: ['The same screen as TIDAL, 20–40% off the high',
+                 'Weekly momentum turning up', 'Daily close confirms'],
+      stop: 'Same levels function as TIDAL — the wider of structure and ATR.',
+      targets: 'First target floored at 1.6R.',
+      wrong: 'A daily close under the structural level.',
+    },
+    equity_measured: {
+      triggers: ['Daily-close swing setup on the completed bar',
+                 'Sized against the weekly regime'],
+      stop: 'Structural, on the completed daily bar — 1.94x ATR in practice, the '
+          + 'widest of the equity engines and the lowest stop-out rate at 54.5%.',
+      targets: 'House ladder.',
+      wrong: 'A daily close through the structural stop.',
+    },
+    multibagger: {
+      triggers: ['Near its highs with institutional volume behind it',
+                 'CAN SLIM-style leadership screen'],
+      stop: 'Published for reference at 1.57x ATR.',
+      targets: 'Reference levels only.',
+      wrong: 'RESEARCH IDEA, NOT A TRADE. The engine claims no exit rule and '
+           + 'none should be inferred from the levels on the card.',
+    },
+    momentum_quant: {
+      triggers: ['Cross-sectional rank over the 750-name screen',
+                 '12-month and 6-month returns, each skipping the most recent '
+                 + 'month because it reverses',
+                 'Each divided by the name’s own ATR, then z-scored across '
+                 + 'the universe and averaged',
+                 'Tilted toward low scaled turnover'],
+      stop: 'ATR band on a monthly horizon.',
+      targets: 'House ladder.',
+      wrong: 'The rank decays out of the top of the universe, or the stop closes through.',
+      note: 'NSE Indices’ own Nifty500 Momentum 50 construction.',
+    },
+    ai_longterm: {
+      triggers: ['Long-horizon screen, run weekly against the whole board'],
+      stop: '200-day moving average — the thesis breaking, not a volatility band.',
+      targets: 'None. This is an ownership idea measured in years.',
+      wrong: 'The business thesis changes, or price loses the 200-day structure.',
+    },
+    ledge: {
+      triggers: ['A Darvas box: 10–60 bars where neither the high nor the low '
+                 + 'has been taken out, and the range is under 14% deep',
+                 'Today’s CLOSE above the box top — a wick through it does not count',
+                 'Volume at least 1.5x its own 20-day average',
+                 'At least 12% below the 52-week high, so the move is early rather '
+                 + 'than extended',
+                 '20-day average flat or rising, and 20-day turnover above ₹3 cr'],
+      stop: 'Under the box floor — the level at which the base has failed by '
+          + 'definition — but never closer than 1x ATR, so it cannot sit inside '
+          + 'a normal session’s range. Checked on the CLOSE.',
+      targets: 'The box’s own height projected from its top: T1 at 1x, T2 at 2x. '
+             + 'Over 188 backtested signals T1 was reached by 58.5% and T2 by 31.9%. '
+             + 'A third target at 4x was tested and dropped — only 10.1% ever '
+             + 'reached it, which makes it decoration rather than a target.',
+      wrong: 'A daily CLOSE back under the stop. The base failed and the reason '
+           + 'for the trade is gone.',
+    },
+    keel: {
+      triggers: ['Price makes a lower low than a previous swing low',
+                 'RSI(14) makes a HIGHER low at the same time — the selling is '
+                 + 'losing force',
+                 'The two lows are 8–60 bars apart and the divergence is under '
+                 + '40 bars old',
+                 'Price CLOSES back above the level of the earlier low it undercut '
+                 + '— the divergence alone is not the trade, the reclaim is',
+                 'Volume at least 1.3x its 20-day average, and at least 12% below '
+                 + 'the 52-week high'],
+      stop: 'Under the divergence low — if that gives way the momentum argument '
+          + 'is simply wrong — floored at 1x ATR. Checked on the CLOSE.',
+      targets: 'The highest high between the two lows, floored at 1.6R.',
+      wrong: 'A daily CLOSE under the divergence low.',
+    },
+  };
+
+  /* ── WHAT EACH ENGINE IS CLEARED TO DO ────────────────────────────────────
+   *
+   * The bar this book sets before an engine may size capital is 30 or more
+   * CLOSED trades at t >= 2. It is deliberately hard and, as of today, NOTHING
+   * clears it — including the two engines added above, whose numbers come from
+   * a backtest and not from a single live closed trade.
+   *
+   * LIVE      cleared for capital
+   * PAPER     published and tracked, no capital
+   * RESEARCH  an idea, published as an idea, never as a call
+   * BLOCKED   measured and found wanting
+   *
+   * A backtest is never promoted to LIVE here. Backtests are run by the person
+   * who wants the answer, on the universe that exists today, which is why the
+   * survivorship note below travels with every number. */
+  const ENGINE_TIER = {
+    equity_measured: 'PAPER', breakout: 'PAPER', magic: 'PAPER',
+    magicmagic: 'PAPER', momentum_quant: 'PAPER', multibagger: 'RESEARCH',
+    ai_longterm: 'RESEARCH', ledge: 'PAPER', keel: 'RESEARCH',
+  };
+
+  /* Backtested records for the engines that have no live sample yet. Kept
+   * separate from the live record on purpose and NEVER merged with it — a
+   * backtest and a live result are different claims and the card says which. */
+  const ENGINE_BACKTEST = {
+    ledge: { n: 188, exp: 0.224, win: 59.0, t: 3.20, pf: 1.73, maxdd: -7.73,
+             from: '2025-01', to: '2026-08' },
+    keel:  { n: 42,  exp: 0.125, win: 42.9, t: 0.52, pf: 1.19, maxdd: -7.01,
+             from: '2025-01', to: '2026-09' },
+  };
+
   const ENGINES = new Set(Object.keys(ENGINE_REGISTRY));
   const eng = k => ENGINE_REGISTRY[String(k || '')] || null;
   const engName = k => (eng(k) || {}).name || String(k || '—');
@@ -6549,6 +6710,7 @@
     ['/news', 'News', 'The full wire, and the screened names each story touches'],
     ['/signals', 'Signals', 'The public ledger — wins and losses'],
     ['/brief', 'Brief', 'Today’s setup, in full'],
+    ['/engines', 'The floor', 'Every engine — what fires it, and what it has done'],
     ['/methodology', 'Methodology', 'How every number on this site is made'],
     ['/sources', 'Data sources', 'Where the prices come from, and what that means'],
     ['/terms', 'Terms', 'What this is and is not'],
@@ -7468,6 +7630,216 @@
     draw();
   };
 
+  /* ── THE FLOOR ────────────────────────────────────────────────────────────
+   *
+   * One screen that answers the question this site could not previously answer
+   * at all: what is each engine, what makes it fire, and what has it actually
+   * done. It replaces reading a roster paragraph and then hunting the ledger
+   * for that engine's rows.
+   *
+   * The layout is a core surrounded by its engines. On a phone that is a
+   * single column with the core on top, because eight nodes arranged in a ring
+   * on a 375px screen is a diagram nobody can read. On a wider screen the same
+   * cards flow into a grid around the core. No absolute positioning and no
+   * connector geometry to break — the arrangement is a grid, so it cannot
+   * overlap itself at a width nobody tested.
+   *
+   * MOTION IS CSS, NEVER requestAnimationFrame. rAF does not run in a hidden
+   * tab, so an rAF-driven pulse would freeze on whatever frame it stopped on
+   * and the floor would look dead to anyone returning to the tab. A CSS
+   * keyframe animation resumes correctly and honours prefers-reduced-motion
+   * for free.
+   *
+   * NOTHING HERE IS DECORATIVE. A dot pulses only where an engine has open
+   * positions; the bar under each card is its real win rate; a card with too
+   * small a sample says so instead of showing a number. */
+  R['/engines'] = async () => {
+    const shell = body => head('The floor',
+      'Every engine, what makes it fire, and what it has actually done.',
+      'Engines') + body;
+    paint(shell(`<div class="sk" style="height:340px"></div>`));
+
+    const [st, sg] = await Promise.all([get('/api/stats'), get('/api/signals?limit=400')]);
+    const live = {};
+    if (st.ok) for (const r of (st.data.by_signal_type || [])) live[r.key] = r;
+    const openBy = {};
+    if (sg.ok) for (const r of (sg.data.rows || sg.data.signals || [])) {
+      if (String(r.status || '').toUpperCase() === 'OPEN') openBy[r.signal_type] = (openBy[r.signal_type] || 0) + 1;
+    }
+
+    const keys = Object.keys(ENGINE_REGISTRY);
+    const tierOrder = { LIVE: 0, PAPER: 1, RESEARCH: 2, BLOCKED: 3 };
+    keys.sort((a, b) => (tierOrder[ENGINE_TIER[a]] ?? 9) - (tierOrder[ENGINE_TIER[b]] ?? 9)
+                     || ((live[b]?.trades || 0) - (live[a]?.trades || 0)));
+
+    const totalOpen = Object.values(openBy).reduce((s, n) => s + n, 0);
+    const cleared = keys.filter(k => ENGINE_TIER[k] === 'LIVE').length;
+    const closedAll = keys.reduce((s, k) => s + (live[k]?.trades || 0), 0);
+
+    const card = (k) => {
+      const e = ENGINE_REGISTRY[k], tier = ENGINE_TIER[k] || 'RESEARCH';
+      const L = live[k], B = ENGINE_BACKTEST[k];
+      const open = openBy[k] || 0;
+      const n = L?.trades || 0;
+      // THE SAMPLE GATE. Under 20 closed trades a win rate is a coin-flip
+      // reading of a coin flipped a few times, and printing it as a percentage
+      // is the single easiest way for this page to mislead.
+      const measured = n >= 20;
+      const rec = measured
+        ? `<div class="ef-rec">
+             <span class="ef-n"><b class="${dir(L.avg_r)}">${L.avg_r > 0 ? '+' : ''}${Number(L.avg_r).toFixed(3)}</b><em>R per trade</em></span>
+             <span class="ef-n"><b>${Number(L.win_rate).toFixed(0)}%</b><em>win rate</em></span>
+             <span class="ef-n"><b>${n}</b><em>closed</em></span>
+           </div>
+           <div class="ef-bar" role="img" aria-label="${Number(L.win_rate).toFixed(0)}% of ${n} closed trades were wins">
+             <i style="width:${Math.max(2, Math.min(100, L.win_rate)).toFixed(0)}%"></i></div>`
+        : `<p class="ef-thin">${n ? `Only <b>${n}</b> closed trade${n === 1 ? '' : 's'}.` : 'No closed trades yet.'}
+             Not enough to measure — no win rate is shown, because one drawn from
+             ${n || 'nothing'} would read as evidence.</p>`;
+      const bt = B ? `<p class="ef-bt"><span class="ef-btk">BACKTEST</span>
+             ${B.n} signals · <b class="${dir(B.exp)}">${B.exp > 0 ? '+' : ''}${B.exp.toFixed(3)}R</b>
+             · ${B.win.toFixed(0)}% win · t=${B.t.toFixed(2)}
+             <em>Not a live record. ${B.from} → ${B.to}, 149 liquid names.</em></p>` : '';
+      return `<article class="ef-c" data-eng="${esc(k)}" role="button" tabindex="0"
+                aria-label="${esc(e.name)} — ${esc(e.role)}. Open the rules.">
+        <header class="ef-h">
+          <span class="ef-dot ${open ? 'is-on' : ''}" aria-hidden="true"></span>
+          <b class="ef-name">${esc(e.name)}</b>
+          ${/* magic and magicmagic are ONE screen at two depths and share the
+              name TIDAL, so the roster would otherwise show two identical
+              cards. The band is what separates them and it belongs in the
+              heading, not three lines down. */''}
+          <span class="ef-role">${esc(e.band ? `${e.role} · ${e.band}` : e.role)}</span>
+          <span class="ef-tier t-${esc(tier.toLowerCase())}">${esc(tier)}</span>
+        </header>
+        <p class="ef-hunts">${esc(e.hunts)}</p>
+        <p class="ef-meta">${esc(e.tf)}${open ? ` · <b>${open}</b> open` : ''}</p>
+        ${rec}${bt}
+      </article>`;
+    };
+
+    paint(shell(
+      snap([
+        ['Engines', keys.length, 'on the floor'],
+        ['Cleared for capital', cleared, cleared ? 'engines' : 'none of them', cleared ? 'up' : 'dn'],
+        ['Open positions', totalOpen, 'being tracked'],
+        ['Closed on record', closedAll, 'on rostered engines'],
+      ]) +
+      `<section class="ef-core">
+        <div class="ef-core-in">
+          <span class="ef-core-k">Swarm state</span>
+          <p class="ef-core-t">${cleared === 0
+            ? `<b>No engine is cleared for capital.</b> The bar is 30 or more closed
+               trades at t≥2 and nothing on this floor has reached it. Everything
+               below is published, tracked and honest about that.`
+            : `<b>${cleared}</b> of ${keys.length} engines cleared for capital.`}</p>
+          <p class="ef-core-s">Tap any engine for what makes it fire, where its stop
+            comes from, and what would prove it wrong.</p>
+        </div>
+      </section>` +
+      `<div class="ef-grid">${keys.map(card).join('')}</div>` +
+      (() => {
+        /* KEYS IN THE LEDGER THAT ARE NOT ON THIS FLOOR.
+         * The roster is a whitelist — it is what the site publishes as an
+         * engine. The ledger also carries rows from scans that are not on it
+         * (commodity, intraday, bucket allocations). A page headed "every
+         * engine" that silently showed nine of fourteen would be the same
+         * omission this site exists not to make, so the difference is named
+         * and counted. */
+        const extra = Object.keys(live).filter(k => !ENGINE_REGISTRY[k] && (live[k].trades || 0) > 0);
+        if (!extra.length) return '';
+        const tot = extra.reduce((s, k) => s + live[k].trades, 0);
+        const totR = extra.reduce((s, k) => s + (live[k].total_r || 0), 0);
+        /* THEIR RECORDS TOO, NOT JUST THEIR NAMES.
+         * Listing the keys and withholding what they did would be the more
+         * comfortable half of the disclosure: `ohl` alone is 29 closed trades
+         * at -0.602R. A page that names an engine but hides its result is
+         * doing the thing this site exists not to do. */
+        return `<div class="ef-extra">
+          <p><b>${extra.length}</b> further keys appear in the ledger and are not on this
+          floor, carrying <b>${tot}</b> closed trades between them for
+          <b class="${dir(totR)}">${totR > 0 ? '+' : ''}${totR.toFixed(2)}R</b>. They are
+          commodity, intraday and allocation scans rather than published equity engines,
+          so they are recorded but not rostered — and they are in the ledger's totals.</p>
+          <div class="ef-ex-l">${extra.map(k => {
+            const x = live[k];
+            return `<span><code>${esc(k)}</code>
+              ${x.trades >= 20
+                ? `<b class="${dir(x.avg_r)}">${x.avg_r > 0 ? '+' : ''}${Number(x.avg_r).toFixed(3)}R</b>
+                   <em>${x.trades} closed · ${Number(x.win_rate).toFixed(0)}% win</em>`
+                : `<em>${x.trades} closed — too few to measure</em>`}</span>`;
+          }).join('')}</div></div>`;
+      })() +
+      `<p class="hint ef-foot">Live records are this book's own closed signals since
+         2026-08-03 and include every loss. The counter above is closed trades on the
+         <b>rostered</b> engines; the ledger's own total is higher because it also holds
+         the unrostered keys listed above. Backtested records are marked as such and
+         are not evidence of a live edge — the universe they are measured on is the
+         750 names screened today, so companies that collapsed and dropped out are
+         missing, which flatters every long-only result.
+         <a href="#/methodology">How every number here is made →</a></p>`
+    ));
+
+    const openEngine = (k) => {
+      const e = ENGINE_REGISTRY[k], r = ENGINE_RULES[k] || {}, tier = ENGINE_TIER[k] || 'RESEARCH';
+      const L = live[k], B = ENGINE_BACKTEST[k];
+      const n = L?.trades || 0;
+      sheet(`${esc(e.name)} <small>${esc(e.role)}</small>`, `
+        <p class="sh-lead">${esc(e.hunts)}</p>
+        <div class="yoy">
+          <div class="yy"><span>Status</span><b class="ef-tier t-${esc(tier.toLowerCase())}">${esc(tier)}</b></div>
+          <div class="yy"><span>Horizon</span><b>${esc(e.tf)}</b></div>
+          ${e.band ? `<div class="yy"><span>Band</span><b>${esc(e.band)}</b></div>` : ''}
+          <div class="yy"><span>Ledger key</span><b><code>${esc(k)}</code></b></div>
+        </div>
+        <h4 class="sh">What makes it fire</h4>
+        ${(r.triggers || []).length
+          ? `<ul class="ef-rules">${r.triggers.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`
+          : `<p class="hint">The trigger conditions for this engine are not yet written
+               down here. Rather than paraphrase them, this says so.</p>`}
+        ${r.stop ? `<h4 class="sh">Where the stop comes from</h4><p class="ef-p">${esc(r.stop)}</p>` : ''}
+        ${r.targets ? `<h4 class="sh">Where the targets come from</h4><p class="ef-p">${esc(r.targets)}</p>` : ''}
+        ${r.wrong ? `<h4 class="sh">How it can be wrong</h4>
+           <p class="ef-p ef-wrong">${esc(r.wrong)}</p>` : ''}
+        ${r.fixed ? `<h4 class="sh">What was corrected</h4><p class="ef-p ef-fix">${esc(r.fixed)}</p>` : ''}
+        <h4 class="sh">The record</h4>
+        ${n >= 20 ? `<div class="yoy">
+             <div class="yy"><span>Closed trades</span><b>${n}</b></div>
+             <div class="yy"><span>Win rate</span><b>${Number(L.win_rate).toFixed(1)}%</b></div>
+             <div class="yy"><span>Average R</span><b class="${dir(L.avg_r)}">${L.avg_r > 0 ? '+' : ''}${Number(L.avg_r).toFixed(3)}</b></div>
+             <div class="yy"><span>Total R</span><b class="${dir(L.total_r)}">${L.total_r > 0 ? '+' : ''}${Number(L.total_r).toFixed(2)}</b></div>
+           </div>`
+          : `<p class="hint"><b>Insufficient evidence.</b> ${n
+               ? `${n} closed trade${n === 1 ? '' : 's'} is`
+               : 'No closed trades are'} not a sample. No win rate or expectancy is
+             shown for this engine, because a figure drawn from it would be read as
+             evidence and is not.</p>`}
+        ${B ? `<h4 class="sh">Backtest — not a live record</h4>
+           <div class="yoy">
+             <div class="yy"><span>Signals</span><b>${B.n}</b></div>
+             <div class="yy"><span>Expectancy</span><b class="${dir(B.exp)}">${B.exp > 0 ? '+' : ''}${B.exp.toFixed(3)}R</b></div>
+             <div class="yy"><span>Win rate</span><b>${B.win.toFixed(1)}%</b></div>
+             <div class="yy"><span>t-statistic</span><b>${B.t.toFixed(2)}</b></div>
+             <div class="yy"><span>Profit factor</span><b>${B.pf.toFixed(2)}</b></div>
+             <div class="yy"><span>Worst drawdown</span><b class="dn">${B.maxdd.toFixed(2)}R</b></div>
+           </div>
+           <p class="hint">Walk-forward over 149 liquid NSE names, ${B.from} → ${B.to}.
+             Entry at the next bar's open, one position per name at a time, stop checked
+             before target. <b>Survivorship bias is present</b>: the universe is the names
+             screened today, so companies that collapsed and left it are missing.
+             ${B.t >= 2 && B.n >= 30
+               ? 'This clears the 30-trade t≥2 bar <b>in backtest only</b>, and has no live closed trades.'
+               : 'This does <b>not</b> clear the 30-trade t≥2 bar.'}</p>` : ''}`);
+    };
+    main.querySelectorAll('.ef-c').forEach(el => {
+      const go = () => openEngine(el.dataset.eng);
+      el.addEventListener('click', go);
+      el.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); }
+      });
+    });
+  };
+
   R['/methodology'] = async () => {
     paint(prose('How this works', 'Every number, and where it comes from.',
       'No figure on this site is produced by a model that cannot be re-run. This page is how each one is made.', `
@@ -8059,6 +8431,7 @@
    * breadcrumb reading "Today" while you are looking at Today is noise. */
   const WHERE = { '/': '', '/markets': 'Markets', '/ideas': 'Ideas', '/ipo': 'IPO',
                   '/screen': 'Screen', '/signals': 'Signals', '/brief': 'Brief', '/watch': 'Watchlist',
+                  '/engines': 'The floor',
                   '/join': 'The brief', '/methodology': 'Methodology',
                   '/sources': 'Data sources', '/terms': 'Terms', '/privacy': 'Privacy' };
 

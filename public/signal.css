@@ -258,6 +258,38 @@ a{color:inherit;text-decoration:none}
   .tabs a[aria-current="page"]{background:none}
   .tabs a[aria-current="page"]::before{content:"";position:absolute;top:auto;bottom:0;left:14px;right:14px;
     height:2px;background:var(--accent);border-radius:var(--r-1) var(--r-1) 0 0}
+
+  /* ── THE DROPDOWN GROUPS NEVER GOT THE DESKTOP TREATMENT `.tabs a` GETS ──
+   *
+   * The desktop rules for these live further down the file written as bare
+   * `.tabg > summary` — ONE class. The phone rules above are `.tabs .tabg >
+   * summary` — TWO. Specificity does not care which is intended for which
+   * screen, so the phone rules won at every width and desktop rendered the
+   * phone's nav: Discover and Track as 11px grid cells beside 14px flat tabs,
+   * sitting 5px lower because of a `margin:5px 4px` meant for a tab bar at the
+   * bottom of a phone, and 58px tall inside a 46px bar.
+   *
+   * Two labels in one bar at two different sizes and two different baselines
+   * is the kind of thing that reads as "unfinished" before a reader can say
+   * why. Matched to `.tabs a` above, field for field. */
+  .tabs .tabg{display:flex;align-items:stretch}
+  .tabs .tabg > summary{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    position:relative;padding:0 14px;margin:0;min-height:46px;border-radius:0;
+    background:none;
+  }
+  .tabs .tabg[open] > summary,
+  .tabs .tabg > summary:hover{color:var(--text)}
+  /* The active marker is the underline the flat tabs use, not the phone's
+     filled pill — a pill in a horizontal desktop nav reads as a button. */
+  .tabs .tabg.is-here > summary{background:none;color:var(--text)}
+  .tabs .tabg.is-here > summary::before{
+    content:"";position:absolute;bottom:0;left:14px;right:14px;height:2px;
+    background:var(--accent);border-radius:var(--r-1) var(--r-1) 0 0;
+  }
+  /* Anchored to the bar's own edge rather than 8px inside the summary, so the
+     panel lines up with the label that opened it. */
+  .tabs .tabg-m{left:0;top:calc(100% + 1px)}
 }
 
 /* ── LAYOUT ──────────────────────────────────────────────────────────────── */
@@ -872,7 +904,14 @@ body{font-family:var(--ui);font-size:var(--t-6);line-height:1.5;letter-spacing:v
      re-adding the transparency that made the page readable through the
      header in Safari — see the note at the first .bar rule. */
   background:var(--bg)}
-.tabs a{font:500 var(--t-5)/1 var(--ui);letter-spacing:var(--ls-0);color:var(--dim)}
+/* ONE RULE FOR BOTH, DELIBERATELY. A flat tab is an <a> and a dropdown group
+   is a <summary>, and they were sized in different places — this rule set the
+   anchors to 14px while the summaries were left on an 11px phone rule, so the
+   desktop bar showed "Today" and "Discover" at two different sizes on two
+   different baselines. Anything that changes the look of a tab has to change
+   both, so both are named here. */
+.tabs a,
+.tabs .tabg > summary{font:500 var(--t-5)/1 var(--ui);letter-spacing:var(--ls-0);color:var(--dim)}
 .tabs a[aria-current="page"]{color:var(--text)}
 .tabs a[aria-current="page"]::before{background:var(--text)}
 .stat-live{font-size:var(--t-3)}
@@ -2189,7 +2228,8 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
    * the menus have somewhere to go. */
   .tabs{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
     justify-content:stretch;padding:0 4px;overflow:visible}
-  .tabs a{padding:0 8px;font-size:var(--t-3);letter-spacing:var(--ls-0)}
+  .tabs a,
+  .tabs .tabg > summary{padding:0 8px;font-size:var(--t-3);letter-spacing:var(--ls-0)}
   .tabg > summary{padding:0 8px;justify-content:center;width:100%}
   .tabg.is-here > summary::before{left:8px;right:8px}
 }
@@ -2475,7 +2515,8 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 }
 /* The tab strip scrolls horizontally now, so it no longer has to buy room by
    shrinking its own labels below legibility on the narrowest phones. */
-@media(max-width:400px){.tabs a{font-size:var(--t-3);letter-spacing:var(--ls-0)}}
+@media(max-width:400px){.tabs a,
+  .tabs .tabg > summary{font-size:var(--t-3);letter-spacing:var(--ls-0)}}
 
 /* ── WHAT THE SCORE MEANS FOR ACTION ─────────────────────────────────────
    The dial said "26 / LOW CONVICTION" and the page around it said "Today's
@@ -3874,3 +3915,102 @@ html:has(dialog[open]){overflow:hidden}
  * was filed", which are not the same answer. */
 .scr-ins.is-flat{background:transparent;border-color:var(--line);color:var(--dim);opacity:.75}
 .scr-ins.is-flat .ins-g{color:var(--dim)}
+
+/* ── THE FLOOR ───────────────────────────────────────────────────────────────
+ *
+ * Engines as a set of agent panels around a core. Mobile is one column and the
+ * core sits on top; wider screens flow the same cards into a grid. There is no
+ * absolute positioning and no connector geometry, deliberately — a ring of
+ * eight nodes laid out with transforms is a diagram that breaks at the first
+ * width nobody tested, and it cannot be read on a 375px phone anyway.
+ *
+ * All motion is CSS. requestAnimationFrame does not run in a hidden tab, so an
+ * rAF pulse would freeze on whatever frame it stopped on and the floor would
+ * look dead to anyone coming back to it. Everything here also stops dead under
+ * prefers-reduced-motion.                                                     */
+
+.ef-core{margin:4px 0 18px;padding:16px;border:1px solid var(--line2);
+  border-radius:var(--r-4);background:var(--raised);position:relative;overflow:hidden}
+/* A single slow sweep across the core. It reads as "this thing is running"
+   without being a thing that moves while you are trying to read. */
+.ef-core::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(100deg,transparent 40%,
+    color-mix(in srgb,var(--accent) 9%,transparent) 50%,transparent 60%);
+  transform:translateX(-100%);animation:efSweep 7s var(--ease) infinite}
+@keyframes efSweep{to{transform:translateX(100%)}}
+.ef-core-k{display:block;font:600 var(--t-1)/1 var(--ui);text-transform:uppercase;
+  letter-spacing:var(--ls-widest);color:var(--dim);margin-bottom:8px}
+.ef-core-t{margin:0 0 6px;font:400 var(--t-6)/1.45 var(--serif);color:var(--text)}
+.ef-core-s{margin:0;font:400 var(--t-3)/1.45 var(--ui);color:var(--dim)}
+
+.ef-grid{display:grid;gap:12px;grid-template-columns:1fr}
+@media(min-width:680px){.ef-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:1080px){.ef-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+.ef-c{padding:14px;border:1px solid var(--line);border-radius:var(--r-4);
+  background:var(--surface);cursor:pointer;min-width:0;
+  transition:border-color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+.ef-c:hover{border-color:var(--line2)}
+.ef-c:active{transform:scale(.995)}
+.ef-c:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ef-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.ef-name{font:700 var(--t-5)/1 var(--disp);letter-spacing:var(--ls-snug);color:var(--text)}
+.ef-role{font:400 var(--t-2)/1 var(--ui);color:var(--dim)}
+.ef-dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--line2)}
+/* Pulses ONLY where the engine actually has something open. A dot that pulses
+   on every card is decoration; this one is a state. */
+.ef-dot.is-on{background:var(--up);animation:efPulse 2.4s var(--ease) infinite}
+@keyframes efPulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--up) 55%,transparent)}
+  70%{box-shadow:0 0 0 7px transparent}}
+.ef-tier{margin-left:auto;flex:none;font:600 var(--t-1)/1 var(--mono);
+  letter-spacing:var(--ls-wide);padding:4px 7px;border-radius:var(--r-1);
+  border:1px solid var(--line2);color:var(--dim);white-space:nowrap}
+.ef-tier.t-live{background:var(--up-soft);color:var(--up);border-color:transparent}
+.ef-tier.t-paper{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.ef-tier.t-research{background:var(--raised);color:var(--dim)}
+.ef-tier.t-blocked{background:var(--down-soft);color:var(--down);border-color:transparent}
+.ef-hunts{margin:0 0 8px;font:400 var(--t-3)/1.5 var(--ui);color:var(--muted)}
+.ef-meta{margin:0 0 10px;font:400 var(--t-2)/1.4 var(--ui);color:var(--dim)}
+.ef-rec{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px}
+.ef-n{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ef-n b{font:600 var(--t-5)/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.ef-n b.up{color:var(--up)} .ef-n b.dn{color:var(--down)}
+.ef-n em{font:400 var(--t-1)/1 var(--ui);font-style:normal;color:var(--dim);
+  text-transform:uppercase;letter-spacing:var(--ls-wide)}
+.ef-bar{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.ef-bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
+.ef-thin{margin:0;font:400 var(--t-2)/1.5 var(--ui);color:var(--dim)}
+.ef-bt{margin:10px 0 0;padding-top:9px;border-top:1px dashed var(--line2);
+  font:400 var(--t-2)/1.5 var(--ui);color:var(--muted)}
+.ef-btk{display:inline-block;font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);
+  padding:3px 6px;border-radius:var(--r-1);background:var(--warn-soft);color:var(--warn);
+  margin-right:6px}
+.ef-bt em{display:block;margin-top:3px;font-style:normal;color:var(--dim);font-size:var(--t-1)}
+.ef-foot{margin-top:18px}
+
+.ef-rules{margin:0 0 4px;padding:0;list-style:none;display:grid;gap:7px}
+.ef-rules li{position:relative;padding-left:20px;font:400 var(--t-4)/1.5 var(--ui);color:var(--text)}
+.ef-rules li::before{content:"";position:absolute;left:6px;top:.62em;width:5px;height:5px;
+  border-radius:50%;background:var(--accent)}
+.ef-p{margin:0 0 4px;font:400 var(--t-4)/1.55 var(--ui);color:var(--muted)}
+.ef-wrong{color:var(--text);padding:10px 12px;border-radius:var(--r-3);
+  background:var(--down-soft);border-left:2px solid var(--down)}
+.ef-fix{padding:10px 12px;border-radius:var(--r-3);background:var(--raised);
+  border-left:2px solid var(--warn)}
+
+@media(prefers-reduced-motion:reduce){
+  .ef-core::after{animation:none;display:none}
+  .ef-dot.is-on{animation:none}
+  .ef-c{transition:none}
+}
+.ef-extra{margin-top:16px;padding:11px 13px;border-radius:var(--r-3);
+  background:var(--raised);border:1px solid var(--line)}
+.ef-extra code{font:500 var(--t-2)/1 var(--mono);color:var(--muted)}
+.ef-extra p{margin:0 0 9px}
+.ef-ex-l{display:flex;flex-wrap:wrap;gap:8px}
+.ef-ex-l span{display:flex;flex-direction:column;gap:2px;padding:8px 10px;
+  border:1px solid var(--line);border-radius:var(--r-2);background:var(--surface);min-width:0}
+.ef-ex-l code{font:600 var(--t-2)/1 var(--mono);color:var(--text)}
+.ef-ex-l b{font:600 var(--t-4)/1 var(--mono);font-variant-numeric:tabular-nums}
+.ef-ex-l b.up{color:var(--up)} .ef-ex-l b.dn{color:var(--down)}
+.ef-ex-l em{font:400 var(--t-1)/1.3 var(--ui);font-style:normal;color:var(--dim)}
