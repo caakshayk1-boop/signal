@@ -119,7 +119,7 @@
 
   --r:8px;
   --gut:clamp(20px,5vw,40px);
-  --barh:64px; --tkrh:33px; --tabh:56px;
+  --barh:64px; --tkrh:33px; --tabh:58px;
 }
 /* COLOR-SCHEME FOLLOWS THE SITE, NOT THE MACHINE.
    Without this the user agent renders its own surfaces — dialog defaults,
@@ -208,23 +208,56 @@ a{color:inherit;text-decoration:none}
   background:var(--bg);
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-top:1px solid var(--line)}
-.tabs a{display:grid;place-items:center;font:500 var(--t-2)/1 var(--ui);letter-spacing:var(--ls-0);
-  color:var(--dim);position:relative;min-height:44px;min-width:0;padding:0 2px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ── AN APP BAR, NOT A ROW OF LINKS ───────────────────────────────────────
+   It was four text labels with a 2px rule over the active one — a web nav
+   moved to the bottom, which is not the same thing as a tab bar. What makes
+   one read as native is that the active tab is a SHAPE you can see without
+   reading: a filled pill behind the label, a heavier weight, and a target the
+   whole cell wide rather than the width of the word.
+
+   Icons were considered and left out. Four labels at this size are legible and
+   unambiguous; an icon set for "Discover / Track / Brief" would be four
+   pictograms nobody can read without the label underneath, which is how a bar
+   gets taller and less clear at once. */
+.tabs a{display:grid;place-items:center;font:600 var(--t-2)/1 var(--ui);letter-spacing:var(--ls-0);
+  color:var(--dim);position:relative;min-height:48px;min-width:0;padding:0 2px;margin:5px 4px;
+  border-radius:var(--r-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  -webkit-tap-highlight-color:transparent;transition:background .14s,color .14s}
+.tabs a:active{background:var(--raised)}
 /* Seven labels in 375px is 53px each. The type steps down rather than the
    labels truncating — "Marke…" is worse than 9.5px type. */
 @media(max-width:400px){.tabs a{font-size:var(--t-1);letter-spacing:0}}
-.tabs a[aria-current="page"]{color:var(--accent)}
-.tabs a[aria-current="page"]::before{content:"";position:absolute;top:0;left:22%;right:22%;height:2px;
-  background:var(--accent);border-radius:0 0 var(--r-1) var(--r-1)}
+/* THE PILL HAS TO LAND ON THE TAB THAT IS VISIBLE. Two of the four tabs are
+   dropdown GROUPS, so on #/funds the element carrying aria-current is the
+   <a> inside Discover — which is in a closed menu — while the thing the
+   reader sees is the group's summary. Styling only the anchor put the active
+   state on an element nobody could see, and the bar looked like nothing was
+   selected on half the routes. */
+.tabs a[aria-current="page"],
+.tabs .tabg.is-here > summary{color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.tabs .tabg{display:grid;place-items:stretch;min-width:0}
+.tabs .tabg > summary{display:grid;place-items:center;min-height:48px;margin:5px 4px;
+  border-radius:var(--r-2);font:600 var(--t-2)/1 var(--ui);color:var(--dim);
+  cursor:pointer;list-style:none;-webkit-tap-highlight-color:transparent;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
+.tabs .tabg > summary::-webkit-details-marker{display:none}
+.tabs .tabg > summary:active{background:var(--raised)}
+/* The hairline over the active tab goes on a phone — the pill says it, and
+   two indicators for one state is one too many. It comes back on desktop,
+   where the bar is a horizontal nav and a pill would read as a button. */
+.tabs a[aria-current="page"]::before{content:none}
 @media(min-width:760px){
   body{padding-bottom:0}
   /* Below the ticker, not under it. */
   .tabs{position:sticky;top:calc(var(--barh) + var(--tkrh));bottom:auto;height:46px;padding:0 var(--gut);
     grid-auto-columns:max-content;gap:4px;border-top:0;border-bottom:1px solid var(--line);
     max-width:1280px;margin:0 auto;justify-content:start}
-  .tabs a{padding:0 14px;font-size:var(--t-4);min-height:46px}
-  .tabs a[aria-current="page"]::before{top:auto;bottom:0;left:14px;right:14px;border-radius:var(--r-1) var(--r-1) 0 0}
+  .tabs a{padding:0 14px;font-size:var(--t-4);min-height:46px;margin:0;border-radius:0;
+    font-weight:500}
+  .tabs a[aria-current="page"]{background:none}
+  .tabs a[aria-current="page"]::before{content:"";position:absolute;top:auto;bottom:0;left:14px;right:14px;
+    height:2px;background:var(--accent);border-radius:var(--r-1) var(--r-1) 0 0}
 }
 
 /* ── LAYOUT ──────────────────────────────────────────────────────────────── */
@@ -3506,7 +3539,19 @@ html:has(dialog[open]){overflow:hidden}
 .snap-v.up{color:var(--up)} .snap-v.dn{color:var(--down)} .snap-v.ac{color:var(--accent)}
 .snap-s{font:400 var(--t-2)/1.2 var(--ui);color:var(--dim)}
 .snap-n{margin:7px 2px 0;font:400 var(--t-2)/1.45 var(--ui);color:var(--dim)}
-@media (max-width:600px){ .snap-i{padding:9px 13px} }
+/* ── FOUR FACTS, ALL FOUR VISIBLE ─────────────────────────────────────────
+   The strip is a horizontal scroller, which on a 390px phone means the fourth
+   cell is off-screen with nothing saying so: "SCREEN RUN 2026-09-0…" clipped
+   mid-date, and the labels reading as one run-on string at the scroll edge.
+   A summary you have to discover by swiping is not a summary. Two by two,
+   nothing clipped, no scrolling. */
+@media (max-width:600px){
+  .snap-r{display:grid;grid-template-columns:1fr 1fr;overflow-x:visible}
+  .snap-i{padding:11px 13px;white-space:normal;min-width:0}
+  .snap-i:nth-child(2n){border-right:0}
+  .snap-i:nth-child(-n+2){border-bottom:1px solid var(--line)}
+  .snap-k{white-space:normal;line-height:1.25}
+}
 
 /* ── TICKER ───────────────────────────────────────────────────────────────
  * Every instrument the markets page carries, moving slowly enough to read.
