@@ -79,6 +79,40 @@ function health(env) {
   }, { headers: { "Cache-Control": "no-store" } });
 }
 
+/* Routes that write. Never proxied — see the note at the call site. */
+const NO_PROXY = new Set(["/api/subscribe", "/api/client-error"]);
+
+const UPSTREAM = "https://signal.askakshay.com";
+
+async function proxyToProduction(url, request) {
+  const target = UPSTREAM + url.pathname + url.search;
+  try {
+    const res = await fetch(target, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(12000),
+    });
+    const body = await res.text();
+    return new Response(body, {
+      status: res.status,
+      headers: {
+        "content-type": res.headers.get("content-type") || "application/json",
+        "cache-control": "no-store",
+        // Say so, loudly, in every response. A developer reading a number off a
+        // local page has to be able to tell it came from production.
+        "x-signal-dev-proxy": UPSTREAM,
+      },
+    });
+  } catch (e) {
+    // Offline, or production is down. Answer honestly rather than pretending.
+    return Response.json({
+      ok: false,
+      error: `dev proxy to ${UPSTREAM} failed: ${String(e && e.message || e)}`,
+      hint: "No TURSO_URL is set, so this route is proxied to production. " +
+            "Set TURSO_URL and TURSO_TOKEN in .dev.vars to use the real database.",
+    }, { status: 502, headers: { "x-signal-dev-proxy": "failed" } });
+  }
+}
+
 export default {
   /* CRON ENTRY POINT.
    *
@@ -119,6 +153,30 @@ export default {
 
     const handler = ROUTES[url.pathname];
     if (handler) {
+      /* ── LOCAL DEV WITHOUT CREDENTIALS ────────────────────────────────────
+       *
+       * Every read route needs Turso. A developer without those secrets got a
+       * 500 from /api/stats and /api/signals, which meant `wrangler dev` served
+       * a site with no ledger, no record and no ticker, and the UI suite failed
+       * one check on every single run for a reason that had nothing to do with
+       * the code being tested. The standing answer was "that failure is
+       * environmental" — which is a thing you have to remember, every time,
+       * forever, and is indistinguishable from a real regression the day one
+       * appears.
+       *
+       * So when TURSO_URL is absent, read routes are proxied to production.
+       * Real data, always current, nothing to seed or refresh.
+       *
+       * THIS CANNOT FIRE IN PRODUCTION. The deployed Worker has TURSO_URL as a
+       * secret; if it ever lost it the proxy would be the least of the
+       * problems, and /api/health still reports turso_configured honestly so
+       * the condition is visible rather than papered over.
+       *
+       * Writes are never proxied. A subscribe or an error report from a laptop
+       * must not land in the live database. */
+      if (!env.TURSO_URL && request.method === "GET" && !NO_PROXY.has(url.pathname)) {
+        return proxyToProduction(url, request);
+      }
       // A route the site never calls with a body still must not accept one
       // silently; the handlers do their own method checks and answer 405.
       return runVercelHandler(handler, request, ctx);

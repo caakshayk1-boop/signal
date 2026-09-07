@@ -359,6 +359,59 @@
   // IS, the lead says what it MEANS. Blocks with nothing to add omit it.
   const sec = (label, body, n, lead) =>
     `<section class="sec"><div class="sec-h"><h2>${esc(label)}</h2>${n ? `<span class="sec-n">${esc(n)}</span>` : ''}</div>${lead ? `<p class="sec-lead">${esc(lead)}</p>` : ''}${body}</section>`;
+  /* ── ONE EXPANDING ROW, USED EVERYWHERE ───────────────────────────────────
+   *
+   * Most tables on this site already answer a tap: the screen and the funds
+   * sheet open a card, markets opens a sector. The IPO listing table was the
+   * one that did not — 61 rows of eight columns each, every one of them a dead
+   * end. On a phone those columns stack into a labelled list and the row gets
+   * tall, which is exactly where the extra detail should live instead.
+   *
+   * This is a PRIMITIVE, not a fourth bespoke implementation. `xrow` emits the
+   * summary row and a panel after it; a single delegated listener bound once at
+   * startup toggles any of them on any route. Nothing to wire per table, and
+   * nothing to re-wire after a repaint — which is the failure mode of the
+   * per-route handlers this replaces the need for.
+   *
+   * The panel is a SIBLING, not a child. A grid row cannot contain a full-width
+   * block without breaking its own column template, and nesting it inside the
+   * row would also put the detail inside the row's own click target.
+   *
+   * Keyboard: the row is a real button to the assistive tree, Enter and Space
+   * toggle it, and aria-expanded/aria-controls carry the state. */
+  let xrSeq = 0;
+  const xrow = (summary, detail, opts = {}) => {
+    if (!detail) return `<div class="rank-r ${opts.cls || ''}" ${opts.attrs || ''}>${summary}</div>`;
+    const id = `xr${++xrSeq}`;
+    return `<div class="rank-r ${opts.cls || ''} xr" data-xr="${id}" role="button"
+        tabindex="0" aria-expanded="false" aria-controls="${id}" ${opts.attrs || ''}>${summary}
+        <span class="xr-caret" aria-hidden="true"></span></div>
+      <div class="xd" id="${id}" role="region" hidden>${detail}</div>`;
+  };
+
+  /* Bound once, at the document. Survives every repaint on every route. */
+  const xrToggle = (row) => {
+    const panel = document.getElementById(row.getAttribute('aria-controls'));
+    if (!panel) return;
+    const open = panel.hidden;
+    panel.hidden = !open;
+    row.setAttribute('aria-expanded', open ? 'true' : 'false');
+    row.classList.toggle('is-open', open);
+  };
+  document.addEventListener('click', (ev) => {
+    // A link or a button inside the summary keeps its own behaviour.
+    if (ev.target.closest('a, button, .wstar')) return;
+    const row = ev.target.closest('.xr[data-xr]');
+    if (row) xrToggle(row);
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    if (!ev.target.closest) return;
+    if (ev.target.closest('a, button')) return;
+    const row = ev.target.closest('.xr[data-xr]');
+    if (row) { ev.preventDefault(); xrToggle(row); }
+  });
+
   /* ── SNAPSHOT ─────────────────────────────────────────────────────────────
    *
    * One line at the top of a route that answers "what is the state of this
@@ -1796,16 +1849,23 @@
             <span class="s">Engine</span><span class="x">Published</span>
             <span class="x">Closed</span><span class="x">Win rate</span>
           </div>
-          ${rows.map(r => `<div class="rank-r eng">
+          ${/* A LINK, NOT A DEAD ROW. These nine were the only rows left on the
+              site that showed a name and a number and answered nothing when
+              tapped — the floor now holds what each engine fires on, where its
+              stop comes from and how it can be wrong, so the roster points at
+              it rather than restating a fraction of it. */''}
+          ${rows.map(r => `<a class="rank-r eng" href="#/engines"
+              aria-label="${esc(r.label)} — open the engine floor">
             <span class="s"><b>${esc(r.label)}</b></span>
             <span class="x">${r.pub || '—'}</span>
             <span class="x">${r.closed || '—'}</span>
             <span class="x">${r.closed
               ? (Math.round(r.wins / r.closed * 1000) / 10) + '%' : '—'}</span>
-          </div>`).join('')}
+          </a>`).join('')}
         </div>
         <p class="hint">An engine is trusted with capital at 30 closed trades and t&nbsp;≥&nbsp;2.
-          None is there. <a href="#/methodology">How this is measured</a> ·
+          None is there. <a href="#/engines">What each engine fires on</a> ·
+          <a href="#/methodology">How this is measured</a> ·
           <a href="#/signals">Every trade, one by one</a></p>`,
         `${LR.published} published · ${LR.trades} closed`);
     }
@@ -3104,8 +3164,58 @@
      * they survive the scroll down twenty-four rows. */
     const rec = (d.recent_listed || []).slice().sort((a, b) =>
       (b.since_listing_pct ?? -1e9) - (a.since_listing_pct ?? -1e9));
-    const ipoRow = (r, i) => `<div class="rank-r lvl-r" data-since="${
-        Number(r.since_listing_pct) >= 0 ? 'up' : 'dn'}">
+    /* THE ROW SHOWS EIGHT COLUMNS AND STILL COULD NOT ANSWER THE QUESTION.
+     * "How did it list?" needs the issue price beside the first close, and the
+     * table never carried the band and the listing price in a form you could
+     * subtract. That is the whole reason to expand a row rather than add a
+     * ninth column nobody can read on a phone. */
+    /* THE BAND ARRIVES AS PROSE, NOT AS NUMBERS.
+     * `recent_listed` rows carry price_band as "Rs.66 to Rs.70" and have no
+     * price_low/price_high — those two fields exist only on the open and
+     * upcoming rows. Reading Number(r.price_high) off a listed row gives NaN,
+     * so the first version of this panel told every reader the issue price
+     * "could not be read" on all sixty rows. The top of the band is what an
+     * applicant at cut-off actually pays, so that is the number taken. */
+    const bandTop = (s) => {
+      const nums = String(s || '').match(/\d+(?:\.\d+)?/g);
+      if (!nums || !nums.length) return null;
+      const v = Math.max(...nums.map(Number));
+      return Number.isFinite(v) && v > 0 ? v : null;
+    };
+    const ipoDetail = (r) => {
+      const issue = Number(r.price_high) || bandTop(r.price_band);
+      const first = Number(r.first_close);
+      const pop = Number.isFinite(issue) && Number.isFinite(first) && issue
+        ? (first - issue) / issue * 100 : null;
+      /* NO "MOVE AFTER LISTING" ROW.
+       * It was here and it was `(last - first) / first`, which is precisely
+       * what since_listing_pct already is — the panel printed +225.20% and
+       * +225.22% one under the other for the same fact. What the table cannot
+       * already tell you is the LISTING GAIN, issue price against first close,
+       * and the total from the applicant's own cost. */
+      const total = Number.isFinite(issue) && issue && r.last_close != null
+        ? (Number(r.last_close) - issue) / issue * 100 : null;
+      const line = (l, v, cls) => v == null || v === '' ? '' :
+        `<div class="yy"><span>${esc(l)}</span><b class="${cls || ''}">${v}</b></div>`;
+      return `<div class="yoy">
+          ${line('Issue price (band top)', Number.isFinite(issue) ? price(issue) : null)}
+          ${line('Listed at', r.first_close != null ? price(r.first_close) : null)}
+          ${line('Listing gain', pop == null ? null : pct(pop), dir(pop))}
+          ${line('Since listing', r.since_listing_pct == null ? null : pct(r.since_listing_pct), dir(r.since_listing_pct))}
+          ${line('Total from issue price', total == null ? null : pct(total), dir(total))}
+          ${line('Issue closed', String(r.close_date || '').slice(0, 10) || null)}
+          ${line('Sessions measured', r.sessions != null ? r.sessions : null)}
+        </div>
+        <p class="hint">${pop == null
+          ? 'No price band was published for this listing, so no listing gain is shown rather than a guessed one.'
+          : `Listed <b>${pct(pop)}</b> against the top of its band, and is
+             <b>${total == null ? '—' : pct(total)}</b> from that issue price today.
+             An applicant who got an allotment and held has the second number;
+             the table's "since listing" measures from the first close instead,
+             which is what a buyer on day one has.`}
+        </p>`;
+    };
+    const ipoRow = (r, i) => xrow(`
       <span class="i">${i + 1}</span>
       <span class="s"><b>${esc(r.symbol || '')}</b><span>${esc(r.company || '')}</span>${
         symLinks(r.symbol)}</span>
@@ -3118,8 +3228,13 @@
       <span class="x ${dir(r.from_high_pct)}" data-l="Off high">${
         r.from_high_pct != null ? pct(r.from_high_pct) : '—'}</span>
       <span class="m ${dir(r.since_listing_pct)}" data-l="Since listing">${
-        pct(r.since_listing_pct)}</span>
-    </div>`;
+        pct(r.since_listing_pct)}</span>`,
+      ipoDetail(r),
+      { cls: 'lvl-r ipo-lr',
+        // The up/below-issue chips filter on this. Dropping it when the row
+        // became expandable silently broke both chips — the rows stayed put
+        // and nothing errored.
+        attrs: `data-since="${Number(r.since_listing_pct) >= 0 ? 'up' : 'dn'}"` });
     const ipoHead = `<div class="rank-r lvl-r rank-head">
       <span class="i">#</span><span class="s">Company</span>
       <span class="x">Listed</span><span class="x">Price band</span>
@@ -3156,7 +3271,22 @@
       flt.querySelectorAll('.chip').forEach(c =>
         c.setAttribute('aria-pressed', String(c === b)));
       main.querySelectorAll('#ipotbl .rank-r[data-since]').forEach(row => {
-        row.hidden = f !== 'all' && row.dataset.since !== f;
+        const hide = f !== 'all' && row.dataset.since !== f;
+        row.hidden = hide;
+        /* THE PANEL IS A SIBLING, SO IT HAS TO BE HIDDEN TOO.
+         * Filtering only the row left its expanded detail behind — a block of
+         * figures under a heading whose row was no longer on screen. A filtered
+         * row is also collapsed, because reappearing already-open is a state
+         * the reader did not ask for. */
+        const panel = document.getElementById(row.getAttribute('aria-controls') || '');
+        if (panel) {
+          panel.hidden = hide || panel.hidden;
+          if (hide) {
+            panel.hidden = true;
+            row.setAttribute('aria-expanded', 'false');
+            row.classList.remove('is-open');
+          }
+        }
       });
     });
     fillIpoLive();   // upgrades the mirrored figures in place, after paint
@@ -5245,7 +5375,21 @@
       [ledger(), get('/screen.json').then(noteLadder), get('/api/stats')]);
     if (!a.ok) { paint(fail('The signal brief', a.error)); return; }
     const rows = a.rows;
-    const open = rows.filter(r => (r.badge || '').toLowerCase() === 'open'
+    /* SINCE LAUNCH, LIKE EVERY OTHER SURFACE ON THIS SITE.
+     *
+     * This filtered ledger()'s rows by status and by having levels, and not by
+     * date — so the brief drew from every open row the book has ever carried,
+     * back to 2026-06-13, and announced "the highest-scoring of the 148 signals
+     * open right now". The front page, the ledger page and the floor all say
+     * 35, because they all apply sinceLaunch. A reader moving between them saw
+     * the same book claim two populations four times apart.
+     *
+     * It is the second time this exact fault has been fixed here. The note on
+     * the front page's LR block says it: consistency between two pages cannot
+     * come from writing the same filter carefully in both places, it has to
+     * come from calling the same thing. This now calls the same helper. */
+    const open = rows.filter(sinceLaunch)
+                     .filter(r => (r.badge || '').toLowerCase() === 'open'
                                && r.entry && r.sl && r.target1);
     if (!open.length) { paint(`<div class="brief"><div class="b-wrap"><div class="b-hero">
       <div class="b-eyebrow">Trading signal brief</div>
@@ -5620,7 +5764,7 @@
         <p class="b-sub">${askedFor
           ? `You asked for this one.`
           : `<b>Chosen, not recommended.</b> This is the highest-scoring of the
-             <b>${ranked.length}</b> signals open right now, ranked on the measured components —
+             <b>${ranked.length}</b> signals open since ${esc(LAUNCH)}, ranked on the measured components —
              what the market did, not on how far the engine placed its own target.`}
           A ${conviction.toLowerCase().replace(' conviction', '-conviction')} setup built from price
           structure, momentum, volume and defined risk. Every figure below comes from the published ledger,

@@ -639,6 +639,64 @@ try {
        await p.locator(".insti-none").count() === 1);
   }
 
+  /* ── ONE POPULATION, EVERY SURFACE ──────────────────────────────────────
+   * The brief announced "the highest-scoring of the 148 signals open right
+   * now" while the front page, the ledger and the floor all said 35: it
+   * filtered ledger()'s rows by status and never by the launch date. That is
+   * the SECOND time this exact fault has shipped here — the note on the front
+   * page's own record block was written after the first. A number a reader can
+   * compare between two pages is worth a test. */
+  console.log("\n  one population across surfaces");
+  await p.goto(SITE + "#/brief", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE + 5000);
+  const briefTxt = await p.locator("main").innerText();
+  const briefN = Number((briefTxt.match(/highest-scoring of the\s+([\d,]+)\s+signals/) || [])[1]?.replace(/,/g, ""));
+  ok("the brief names the population it ranked within", /signals open since \d{4}-\d{2}-\d{2}/.test(briefTxt.replace(/\s+/g, " ")));
+  if (Number.isFinite(briefN)) {
+    // Whatever it is, it cannot be the all-time open count — that population
+    // reaches back before launch and is several times larger.
+    ok("the brief counts since launch, not all time", briefN < 120, briefN);
+    await p.goto(SITE + "#/", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(SETTLE + 4000);
+    const homeTxt = await p.locator("main").innerText();
+    const homeN = Number((homeTxt.match(/([\d,]+)\s+published since/) || [])[1]?.replace(/,/g, ""));
+    if (Number.isFinite(homeN)) {
+      ok("the brief's open set is a subset of what the front page published",
+         briefN <= homeN, { briefN, homeN });
+    }
+  }
+
+  /* ── THE EXPANDING ROW ──────────────────────────────────────────────────
+   * 61 IPO rows of eight columns each and no way to open one. */
+  console.log("\n  expanding rows");
+  await p.goto(SITE + "#/ipo", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE + 5000);
+  const xrN = await p.locator("#ipotbl .xr").count();
+  ok("the listing rows expand", xrN > 10, xrN);
+  if (xrN) {
+    const row = p.locator("#ipotbl .xr").first();
+    ok("collapsed rows report it", await row.getAttribute("aria-expanded") === "false");
+    await row.click();
+    await p.waitForTimeout(300);
+    ok("clicking expands it", await row.getAttribute("aria-expanded") === "true");
+    const panelId = await row.getAttribute("aria-controls");
+    ok("the panel it names is now visible",
+       await p.locator(`#${panelId}`).isVisible());
+    // The panel must add something the row does not already say.
+    const detail = await p.locator(`#${panelId}`).innerText();
+    ok("the panel shows the issue price the table cannot",
+       /Issue price/.test(detail) && !/could not be read|No price band/.test(detail), detail.slice(0, 80));
+    ok("the panel does not repeat 'since listing' twice",
+       (detail.match(/Since listing/g) || []).length === 1);
+    // Filtering must take the open panel with it.
+    await p.locator('#ipoflt .chip[data-f="dn"]').click();
+    await p.waitForTimeout(400);
+    const orphans = await p.evaluate(() =>
+      [...document.querySelectorAll("#ipotbl .xd")]
+        .filter(x => !x.hidden && x.previousElementSibling && x.previousElementSibling.hidden).length);
+    ok("filtering leaves no orphaned detail panels", orphans === 0, orphans);
+  }
+
   await p.goto(SITE + "#/watch", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 4000);
   ok("the watchlist shows the starred name",
