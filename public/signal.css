@@ -3306,6 +3306,27 @@ html:has(dialog[open]){overflow:hidden}
   font-style:normal;margin-top:4px}
 .roster-r p{font:400 var(--t-3)/1.5 var(--ui);color:var(--muted);margin:7px 0 0}
 
+/* ── THE FOLDED WORKUP ────────────────────────────────────────────────────
+   Eight sections behind one control. The summary has to say what is inside —
+   a bare "Show more" makes the reader gamble a click, and the whole reason
+   these are folded rather than deleted is that they are worth opening. */
+.b-fold{border-top:1px solid var(--b-line);margin-top:8px}
+.b-fold > summary{list-style:none;cursor:pointer;display:flex;flex-direction:column;gap:5px;
+  padding:22px 0;color:var(--text)}
+.b-fold > summary::-webkit-details-marker{display:none}
+.b-fold > summary span{font:600 var(--t-6)/1.2 var(--ui);display:flex;align-items:center;gap:9px}
+.b-fold > summary span::after{content:"";width:8px;height:8px;flex:none;
+  border-right:1.5px solid var(--dim);border-bottom:1.5px solid var(--dim);
+  transform:rotate(45deg) translateY(-2px);transition:transform .18s}
+.b-fold[open] > summary span::after{transform:rotate(-135deg) translateY(-2px)}
+.b-fold > summary i{font:400 var(--t-3)/1.5 var(--ui);font-style:normal;color:var(--dim);
+  max-width:62ch}
+.b-fold > summary:hover span{color:var(--accent)}
+/* The sections inside keep their own rhythm; the first loses its top rule so
+   the fold's own border is not doubled. */
+.b-fold > .b-sec:first-of-type{border-top:0;padding-top:4px}
+@media(prefers-reduced-motion:reduce){.b-fold > summary span::after{transition:none}}
+
 /* ── COLUMN LABELS THAT SURVIVE THE SCROLL ────────────────────────────────
    A 750-row screen, a 24-row IPO table and a 60-fund list all put their
    column names in one row at the top and then scroll them away. By row 40 the

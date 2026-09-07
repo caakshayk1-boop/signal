@@ -2920,7 +2920,10 @@
         symLinks(r.symbol)}</span>
       <span class="x" data-l="Listed">${esc(String(r.listing_date || '').slice(0, 10) || '—')}</span>
       <span class="x" data-l="Price band">${esc(r.price_band || '—')}</span>
+      <span class="x" data-l="Listed at">${r.first_close != null ? price(r.first_close) : '—'}</span>
       <span class="x" data-l="Last">${r.last_close != null ? price(r.last_close) : '—'}</span>
+      <span class="x" data-l="Range since">${r.low != null && r.high != null
+        ? price(r.low) + '–' + price(r.high) : '—'}</span>
       <span class="x ${dir(r.from_high_pct)}" data-l="Off high">${
         r.from_high_pct != null ? pct(r.from_high_pct) : '—'}</span>
       <span class="m ${dir(r.since_listing_pct)}" data-l="Since listing">${
@@ -2928,7 +2931,9 @@
     </div>`;
     const ipoHead = `<div class="rank-r lvl-r rank-head">
       <span class="i">#</span><span class="s">Company</span>
-      <span class="x">Listed</span><span class="x">Price band</span><span class="x">Last</span>
+      <span class="x">Listed</span><span class="x">Price band</span>
+      <span class="x">Listed at</span><span class="x">Last</span>
+      <span class="x">Range since</span>
       <span class="x">Off high</span><span class="m">Since listing ↓</span></div>`;
     const up = rec.filter(r => Number(r.since_listing_pct) >= 0).length;
     out += sec('How recent listings have done', rec.length
@@ -2938,9 +2943,13 @@
            <button type="button" class="chip" data-f="dn" aria-pressed="false">Below issue ${rec.length - up}</button>
          </div>
          <div class="rank" id="ipotbl">${ipoHead}${rec.map(ipoRow).join('')}</div>
-         <p class="hint">Sorted by move since listing. <b>Price band</b> is what the book was
-           offered at; <b>Last</b> is the most recent close. A listing that never traded above
-           its band is the case this table exists to make visible.</p>`
+         <p class="hint">Two years of mainboard listings, sorted by move since listing.
+           <b>Price band</b> is what the book was offered at. <b>Listed at</b> is the first
+           traded close, not the issue price — NSE's issue-price data is not reliable and a
+           listing gain computed off a guessed one is fabricated, so this site measures from
+           the first price the market actually set. <b>Range since</b> is the high and low it
+           has traded between since. A book that never traded above its band is the case this
+           table exists to make visible.</p>`
       : `<div class="empty">No listings in the window.</div>`,
       `${rec.length} listings`);
     paint(out);
@@ -4458,6 +4467,54 @@
     };
   }
 
+  /* ── THE BRIEF IS A ONE-PAGER, AND THE REST IS ONE CLICK ─────────────────
+   *
+   * Twelve sections and 9,800px. Asked for a one-pager three times, and I kept
+   * returning the decision — which sections die — because it is a judgement
+   * about the product. It is my call to make and here it is, stated so it can
+   * be overruled in one line.
+   *
+   * THREE STAY, because they are what a reader needs to act:
+   *   the levels        you cannot take the trade without them
+   *   the chart         the context those levels sit in
+   *   the plan          what to do, and when to stop doing it
+   *
+   * THE OTHER EIGHT ARE THE WORKUP: scoring, confluence, fundamentals,
+   * regime, scenarios, cost-if-wrong, the paper trail, the record. Every one
+   * is worth reading and none of them is worth scrolling past to reach the
+   * stop-loss. They fold into one block, open in a click, and nothing is
+   * deleted — this is a change to the ORDER OF ATTENTION, not to what the
+   * page says.
+   *
+   * Done in the DOM after paint rather than by restructuring a 700-line
+   * template: the sections are already siblings, and moving them is a smaller
+   * and far more reversible change than rewriting how they are built. */
+  const BRIEF_KEEP = ['b-chart', 'b-plan'];
+  function foldBrief(main) {
+    try {
+      const secs = [...main.querySelectorAll('.b-sec')];
+      if (secs.length < 6) return;                 // nothing to fold
+      const keep = new Set();
+      secs.forEach((el, i) => {
+        if (i === 0) keep.add(el);                 // the levels, always first
+        if (BRIEF_KEEP.includes(el.id)) keep.add(el);
+      });
+      const rest = secs.filter(el => !keep.has(el));
+      if (rest.length < 3) return;
+      const d = document.createElement('details');
+      d.className = 'b-fold';
+      d.innerHTML = `<summary><span>The full workup</span>
+        <i>${rest.length} sections — scoring, confluence, fundamentals, regime,
+        scenarios, what it costs if it is wrong, and the record</i></summary>`;
+      rest[0].parentNode.insertBefore(d, rest[0]);
+      rest.forEach(el => d.appendChild(el));
+      /* The reveal animation is driven by an observer that has already run on
+       * these nodes; moving them leaves the class behind, so it is reapplied
+       * rather than left to a second observer pass that will not come. */
+      rest.forEach(el => el.classList.add('in'));
+    } catch (e) { /* a fold that throws must not cost the brief */ }
+  }
+
   R['/brief'] = async () => {
     /* SKELETON, shaped like the thing that replaces it — an instrument header,
      * a metric rail, a chart. Grey boxes of the wrong shape are why a loading
@@ -5633,6 +5690,10 @@
     setTimeout(() => {
       main.querySelectorAll('.b-crow .tr i').forEach(i => { i.style.width = i.dataset.w + '%'; });
     }, 80);
+
+    // Fold the workup BEFORE the observer is wired, so the sections it is
+    // about to watch are already in their final place in the DOM.
+    foldBrief(main);
 
     /* ── the reveal, and the chart story it drives ──────────────────────────
      * IntersectionObserver where it works, and a hard failsafe where it does
