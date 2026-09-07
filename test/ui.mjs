@@ -38,6 +38,24 @@ const ok = (name, cond, detail) => {
 // The routes fetch several feeds each; the brief also fetches a price series.
 const SETTLE = 7000;
 
+/* The brief folds its workup behind a <details>, and innerText is
+ * layout-aware — anything a closed fold is not rendering reads as "". Every
+ * assertion about a widget inside the workup opens it first. Not a weakening:
+ * the widget still has to produce its value, it just has to be on screen to be
+ * read, which is also true of a person looking at the page. */
+const openWorkup = async (page) => {
+  // IDEMPOTENT. A blind click TOGGLES, so calling this twice on one page
+  // closed the fold again and the second assertion failed on a widget that
+  // was fine — which is exactly what happened the first time it was written.
+  const d = page.locator(".b-fold").first();
+  if (!(await d.count())) return;
+  if (await d.evaluate((el) => el.open)) return;
+  await page.locator(".b-fold > summary").first().click();
+  await page.waitForTimeout(500);
+};
+
+
+
 /* HOST_RESOLVER lets a run target a hostname whose DNS has not propagated to
  * THIS machine yet — the site is live for everyone else. Format is Chromium's:
  *   HOST_RESOLVER="MAP signal.askakshay.com 104.21.24.26" node test/ui.mjs https://signal.askakshay.com
@@ -148,6 +166,18 @@ try {
   ok("no NaN, undefined or Infinity anywhere", !/NaN|undefined|Infinity/.test(body),
      (body.match(/NaN|undefined|Infinity/g) || []).slice(0, 3));
 
+  /* THE WORKUP FOLDS, so the dial is behind a click now — and innerText is
+   * layout-aware and returns "" for anything a closed <details> is not
+   * rendering. The value was correct and unreadable, which is a real
+   * distinction: assert the fold opens, then assert the number, so this still
+   * fails if the count-up breaks. */
+  ok("the brief folds its workup", await p.locator(".b-fold > summary").count() === 1);
+  const folded = await p.locator(".b-fold .b-sec").count();
+  ok("the fold holds the sections it names", folded >= 3, folded);
+  const above = await p.locator(".brief > .b-wrap > .b-sec").count();
+  ok("only the essentials sit above the fold", above <= 4, above);
+  await openWorkup(p);
+
   // The count-up must land on its value even where rAF never runs.
   const conf = (await p.locator("#dialN").innerText()).trim();
   ok("confidence resolves to a number", /^(\d+|—)$/.test(conf), conf);
@@ -214,7 +244,8 @@ try {
 
   /* THE TOOLTIP DEFECT. Hover opened the card and the click that followed
    * closed it, so it could not be clicked open on a desktop at all. */
-  const tb = p.locator(".tipb").first();
+  await openWorkup(p);
+  const tb = p.locator(".b-fold .tipb").first();
   await tb.scrollIntoViewIfNeeded();
   await p.waitForTimeout(600);
   await tb.click();
@@ -545,6 +576,7 @@ try {
   await rp.waitForTimeout(SETTLE);
   ok("every section is visible", await rp.locator(".b-reveal:not(.in)").count() === 0);
   ok("every chart overlay is visible", await rp.locator(".b-ov:not(.on)").count() === 0);
+  await openWorkup(rp);
   ok("the confidence figure is written", /^\d+$/.test((await rp.locator("#dialN").innerText()).trim()));
   // The assertion is that the FILL STEP RAN, not that every score is positive:
   // a component genuinely scoring 0 renders a 0% bar, and treating that as
