@@ -103,6 +103,11 @@
      site would be copying the wrong thing. */
   --bg:#FFFFFF; --surface:#FFFFFF; --raised:#F6F7F8;
   --line:rgba(0,0,0,.09); --line2:rgba(0,0,0,.14);
+  /* --warn carried nine meanings and three of them are not warnings: the
+     200-day average is a price level, a starred row is a thing you saved, and
+     the trailing-stop block is a rule. Amber for those taught the reader that
+     amber means caution and then used it for three things that are not. */
+  --ma:#8A6A1F; --saved:#7A5CC4;
   --text:#0A0A0A; --muted:#3E3E3E; --dim:#6B6B6B;
 
   /* The primary action is BLACK, as theirs is — not a brand hue. Accent is
@@ -130,6 +135,7 @@
 :root[data-theme="dark"]{
   --bg:#0B0F14; --surface:#141A22; --raised:#1B222C;
   --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.16);
+  --ma:#C6A24E; --saved:#A98CF0;
   --text:#F2F5F9; --muted:#B3BDCA; --dim:#8D97A5;
   --ink-btn:#F2F5F9; --on-ink:#0B0F14;
   --accent:#5B9CFF; --accent-soft:rgba(91,156,255,.13); --on-accent:#06101F;
@@ -1932,7 +1938,7 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 /* The averages are ticks, not dots: a tick reads as a level, a dot reads as a
    position, and only one of these four things is a position. */
 .pl-m{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;border-radius:var(--r-1);cursor:help}
-.pl-m.is-200{background:var(--warn)}
+.pl-m.is-200{background:var(--ma)}
 .pl-m.is-50{background:var(--accent);opacity:.75}
 .pl-m.is-20{background:var(--dim);opacity:.6}
 .pl-now{position:absolute;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;
@@ -1942,7 +1948,7 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
   font:400 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-wide);color:var(--dim)}
 .pl-key span{display:inline-flex;align-items:center;gap:6px}
 .pl-key i{width:2px;height:11px;border-radius:var(--r-1);display:inline-block}
-.pl-key i.k200{background:var(--warn)} .pl-key i.k50{background:var(--accent)}
+.pl-key i.k200{background:var(--ma)} .pl-key i.k50{background:var(--accent)}
 .pl-key i.k20{background:var(--dim)}
 .pl-key i.know{width:9px;height:9px;border-radius:50%;background:var(--text)}
 
@@ -1956,7 +1962,7 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 .wstar svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.4;
   stroke-linejoin:round}
 .wstar:hover{color:var(--text);background:var(--raised)}
-.wstar[aria-pressed="true"]{color:var(--warn)}
+.wstar[aria-pressed="true"]{color:var(--saved)}
 .wstar[aria-pressed="true"] svg{fill:currentColor;stroke:currentColor}
 
 /* ── ALERT FORM ───────────────────────────────────────────────────────────── */
@@ -2160,7 +2166,7 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 .cardline-k span{display:inline-flex;align-items:center;gap:6px}
 .cardline-k b{color:var(--text);font-weight:500}
 .cardline-k i{width:2px;height:11px;border-radius:var(--r-1);display:inline-block}
-.cardline-k i.k200{background:var(--warn)} .cardline-k i.k50{background:var(--accent)}
+.cardline-k i.k200{background:var(--ma)} .cardline-k i.k50{background:var(--accent)}
 .cardline-k i.k20{background:var(--dim)}
 
 /* ── EDITION BAR ─────────────────────────────────────────────────────────
