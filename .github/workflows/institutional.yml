@@ -1,0 +1,130 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# institutional.yml — build public/institutional.json from exchange filings.
+#
+# WHY THIS RUNS HERE AND NOT ON A LAPTOP.
+#
+# NSE rate-limits by IP, and it does it in two stages: first by answering 200
+# with an empty array (a throttle dressed as an answer), then with a flat 403
+# across both the API and the nsearchives CDN. Developing this script from one
+# machine got that machine blocked within a few hundred requests, which is
+# exactly the behaviour a polite client should expect and design around.
+#
+# So the harvest is a scheduled job with a time budget, and the CACHE IS
+# COMMITTED. Each run resolves whatever it can inside its budget, banks the
+# parsed quarters, and stops cleanly. Coverage accumulates across runs instead
+# of every run racing the rate limiter for all 750 names. A shareholding
+# pattern for a closed quarter never changes, so a quarter banked once is
+# banked for good — the steady state is a handful of new filings a night.
+#
+# CADENCE. Companies file within 21 days of a quarter end, so the data moves in
+# four short bursts a year and is otherwise static. Nightly is generous; it
+# exists so that the backfill completes and so a new listing is picked up
+# without anyone having to remember.
+# ─────────────────────────────────────────────────────────────────────────────
+name: institutional
+
+on:
+  schedule:
+    # 19:10 UTC — after the day's sync-data runs, and outside Indian market
+    # hours, so this job is never competing with NSE's own peak load.
+    - cron: "10 19 * * *"
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "Harvest budget in minutes"
+        default: "20"
+      gap_ms:
+        description: "Minimum gap between requests, ms"
+        default: "1100"
+
+permissions:
+  contents: write
+
+# Never two harvests at once: they would share a rate limit and each would read
+# the other's throttling as its own.
+concurrency:
+  group: institutional
+  cancel-in-progress: false
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    # A hard ceiling above the script's own budget. The script stops itself;
+    # this is the backstop if a single request hangs past its timeout.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+
+      # The calculator has no network in it, so its tests are the cheapest
+      # possible gate and they run BEFORE the harvest rather than after. A
+      # broken quarter-adjacency rule must never reach the point of writing a
+      # feed — every number in it would be wrong in a way that looks right.
+      - name: Test the calculator
+        run: node test/institutional.mjs
+
+      - name: Harvest filings
+        env:
+          INSTI_MAX_MIN: ${{ github.event.inputs.minutes || '20' }}
+          INSTI_GAP_MS:  ${{ github.event.inputs.gap_ms  || '1100' }}
+        run: node scripts/institutional/build.mjs
+
+      # The script exits non-zero rather than writing a feed that is empty or a
+      # regression on the last one, so reaching this step means what is on disk
+      # is at least as good as what is committed.
+      - name: Commit the feed and the cache
+        run: |
+          set -eu
+          git config user.name  "signal-institutional[bot]"
+          git config user.email "signal-institutional@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            # Keep this run's artefacts across the reset — the reset exists to
+            # rebase onto whatever the remote now is, not to discard the work.
+            cp public/institutional.json           /tmp/i.json
+            cp scripts/institutional/cache.json    /tmp/i-cache.json
+            git reset --hard origin/main
+            cp /tmp/i.json        public/institutional.json
+            cp /tmp/i-cache.json  scripts/institutional/cache.json
+            git add public/institutional.json scripts/institutional/cache.json
+            if git diff --cached --quiet; then
+              echo "no new filings resolved this run"
+              exit 0
+            fi
+            git commit -q -m "data: institutional shareholding $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
+            if git push origin main; then echo "pushed on attempt $attempt"; exit 0; fi
+            echo "push rejected — re-applying (attempt $attempt)"
+            sleep $((attempt * 5))
+          done
+          echo "::error::could not push after 3 attempts"
+          exit 1
+
+      - name: Report coverage
+        run: |
+          node -e '
+            const d = require("./public/institutional.json");
+            const pct = (d.measured / d.universe * 100).toFixed(1);
+            console.log(`measured ${d.measured}/${d.universe} (${pct}%) · partial ${d.partial} · latest ${d.latest_period_end}`);
+            const t = {};
+            for (const r of Object.values(d.rows)) t[r.signal] = (t[r.signal] || 0) + 1;
+            console.log(t);
+          '
+
+      # Committing a feed does not publish it — the same lesson sync-data.yml
+      # records. These are static assets that only reach the internet through a
+      # wrangler deploy.
+      - name: Publish to Cloudflare
+        if: success()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is not set — the feed is committed but NOT live."
+            exit 1
+          fi
+          npm ci --omit=dev --no-audit --no-fund || npm install --no-audit --no-fund
+          npx wrangler deploy

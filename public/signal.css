@@ -672,7 +672,14 @@ h4.sh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-tran
 .tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .scr-in,.scr-sel{background:var(--surface);color:var(--text);border:1px solid var(--line);
   border-radius:var(--r-3);padding:11px 12px;font:400 var(--t-5)/1.2 var(--ui);min-height:42px}
-.scr-in{flex:1 1 190px} .scr-sel{flex:0 1 190px;font-family:var(--mono);font-size:var(--t-3)}
+.scr-in{flex:1 1 190px;min-width:0}
+/* min-width:0 is load-bearing. A flex item defaults to min-width:auto, and for
+ * a <select> that resolves to the width of its WIDEST OPTION — so adding a
+ * longer entry to the rank-by menu silently pushed the whole Screen 13px past
+ * a 320px phone, a sideways scroll caused by a word in a dropdown. The select
+ * must be allowed to shrink and ellipsize instead. */
+.scr-sel{flex:0 1 190px;min-width:0;max-width:100%;
+         font-family:var(--mono);font-size:var(--t-3)}
 .scr-in:focus,.scr-sel:focus{outline:none;border-color:var(--live)}
 /* THE NAME COLUMN TOOK ALL THE SLACK AND THEN STARVED. minmax(0,1fr) gave
    identity 700px of a 1198px row at 1440 — measured text ink: 180px median,
@@ -3734,3 +3741,136 @@ html:has(dialog[open]){overflow:hidden}
 .fd-band-lb span.dn b{color:var(--down)}
 .fd-band-lb i{font:400 10px/1 var(--mono);font-style:normal;text-transform:uppercase;
               letter-spacing:.09em;color:var(--dim)}
+
+/* ── INSTITUTIONAL MOVEMENT ──────────────────────────────────────────────────
+ *
+ * FII and DII holding, from the quarterly shareholding pattern. Three places:
+ * a badge on a screen row, a filter group above the table, and a full block on
+ * the company card.
+ *
+ * THE RULE THAT SHAPED ALL THREE: colour is never the only carrier. Every
+ * state also has a glyph (▲▲ ▲ ⇄ ▼ ▼▼) and a signed number, so the difference
+ * between accumulation and distribution survives greyscale, a screenshot, and
+ * a reader who does not distinguish red from green. On a screen whose entire
+ * subject is "who is buying", that is not a nicety.
+ *
+ * No new colours are introduced. --up / --down / --warn already mean rising,
+ * falling and mixed everywhere else on the site, and institutional flow is the
+ * same three states.                                                          */
+
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+/* The row badge. Sits inside the name cell beside the divergence tag, so it
+ * inherits that cell's wrapping rather than adding a column — a ninth column
+ * would have cost the phone layout more than this data is worth. */
+.scr-ins{display:inline-flex;align-items:center;gap:5px;margin-left:8px;
+         font:500 var(--t-1)/1 var(--mono);font-style:normal;font-variant-numeric:tabular-nums;
+         padding:3px 7px;border-radius:var(--r-1);white-space:nowrap;
+         background:var(--raised);color:var(--dim);border:1px solid var(--line)}
+.scr-ins .ins-g{font:700 var(--t-1)/1 var(--mono);letter-spacing:-.05em}
+.scr-ins.is-up{background:var(--up-soft);color:var(--up);border-color:transparent}
+.scr-ins.is-dn{background:var(--down-soft);color:var(--down);border-color:transparent}
+.scr-ins.is-warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+
+/* ── the filter group ─────────────────────────────────────────────────────── */
+.insti-g{margin:4px 0 18px;padding:14px;border:1px solid var(--line);border-radius:var(--r-4);
+         background:var(--surface)}
+.insti-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.insti-h h3{font:600 var(--t-5)/1.2 var(--ui);letter-spacing:var(--ls-snug);margin:0;color:var(--text)}
+.insti-sub{font:400 var(--t-2)/1.35 var(--ui);color:var(--dim);flex:1 1 200px}
+.insti-clear{flex:none;background:none;border:0;padding:4px 2px;cursor:pointer;
+             font:500 var(--t-2)/1 var(--ui);color:var(--accent);text-decoration:underline;
+             text-underline-offset:2px;min-height:32px}
+.insti-g .chips{margin-bottom:8px}
+.insti-p .chip{border-style:dashed}
+.insti-p .chip[aria-pressed="true"]{border-style:solid}
+.insti-rule{margin:-2px 0 10px;color:var(--muted)}
+.insti-cov{margin:10px 0 0;padding-top:10px;border-top:1px solid var(--line);color:var(--dim)}
+.insti-none{margin:4px 0 16px;color:var(--dim)}
+
+.insti-adv{border-top:1px solid var(--line);padding-top:4px;margin-top:4px}
+.insti-adv>summary{cursor:pointer;padding:9px 2px;min-height:38px;display:flex;align-items:center;
+                   font:500 var(--t-3)/1 var(--ui);color:var(--muted);list-style:none}
+.insti-adv>summary::-webkit-details-marker{display:none}
+.insti-adv>summary::after{content:'+';margin-left:6px;color:var(--dim);font:400 var(--t-5)/1 var(--mono)}
+.insti-adv[open]>summary::after{content:'−'}
+.insti-adv>summary:hover{color:var(--text)}
+.ia-grid{display:grid;gap:10px;padding:4px 0 8px}
+.ia-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ia-row>b{flex:0 0 100%;font:500 var(--t-2)/1 var(--ui);color:var(--muted);
+          text-transform:uppercase;letter-spacing:var(--ls-wide)}
+.ia-f{display:flex;flex-direction:column;gap:3px;flex:1 1 120px;min-width:0}
+.ia-f>span{font:400 var(--t-1)/1 var(--ui);color:var(--dim)}
+.ia-in{width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--line2);
+       border-radius:var(--r-2);background:var(--bg);color:var(--text);
+       font:500 var(--t-4)/1 var(--mono);font-variant-numeric:tabular-nums}
+.ia-in:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.ia-tr .chips{margin:0;flex:1 1 auto}
+
+/* ── the card: verdict line ───────────────────────────────────────────────── */
+.insti-v{display:flex;align-items:center;gap:10px;margin:10px 0;padding:10px 12px;
+         border-radius:var(--r-3);background:var(--raised);border:1px solid var(--line)}
+.insti-v.is-up{background:var(--up-soft);border-color:transparent}
+.insti-v.is-dn{background:var(--down-soft);border-color:transparent}
+.insti-v.is-warn{background:var(--warn-soft);border-color:transparent}
+.iv-g{flex:none;font:700 var(--t-5)/1 var(--mono);letter-spacing:-.06em;color:var(--dim)}
+.insti-v.is-up .iv-g{color:var(--up)} .insti-v.is-dn .iv-g{color:var(--down)}
+.insti-v.is-warn .iv-g{color:var(--warn)}
+.iv-t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.iv-t b{font:600 var(--t-4)/1.2 var(--ui);color:var(--text)}
+.iv-t em{font:400 var(--t-2)/1.3 var(--ui);font-style:normal;color:var(--muted)}
+
+/* ── the card: score, with its working shown ──────────────────────────────── */
+.isc{margin:12px 0;border:1px solid var(--line);border-radius:var(--r-3);overflow:hidden}
+.isc-h{display:flex;align-items:center;gap:12px;padding:12px;background:var(--raised);
+       border-bottom:1px solid var(--line)}
+.isc-n{font:700 var(--t-9)/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.isc-n.up{color:var(--up)} .isc-n.dn{color:var(--down)}
+.isc-b{display:flex;flex-direction:column;gap:2px}
+.isc-b{font:600 var(--t-4)/1.2 var(--ui);color:var(--text)}
+.isc-b em{font:400 var(--t-1)/1.2 var(--ui);font-style:normal;color:var(--dim);
+          text-transform:uppercase;letter-spacing:var(--ls-wide)}
+.isc-r{display:flex;align-items:baseline;gap:10px;padding:9px 12px;border-top:1px solid var(--line)}
+.isc-r:first-of-type{border-top:0}
+.isc-w{flex:none;width:34px;font:500 var(--t-2)/1 var(--mono);color:var(--dim);
+       font-variant-numeric:tabular-nums}
+.isc-l{flex:1 1 auto;font:400 var(--t-3)/1.3 var(--ui);color:var(--muted);min-width:0}
+.isc-v{flex:none;font:500 var(--t-3)/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.isc-v.up{color:var(--up)} .isc-v.dn{color:var(--down)}
+.isc-n2{margin:0;padding:9px 12px;border-top:1px solid var(--line);background:var(--raised);
+        font:400 var(--t-2)/1.4 var(--ui);color:var(--dim)}
+
+/* ── the card: eight-quarter bars ─────────────────────────────────────────── */
+.ispark{margin:12px 0;padding:0}
+.ispark figcaption{font:400 var(--t-2)/1.3 var(--ui);color:var(--dim);margin-bottom:8px}
+.isp-r{display:flex;align-items:flex-end;gap:6px;height:64px;padding-bottom:18px;position:relative;
+       overflow-x:auto;-webkit-overflow-scrolling:touch}
+.isp-r::-webkit-scrollbar{display:none}
+.isp-q{flex:1 1 0;min-width:30px;height:100%;display:flex;flex-direction:column;
+       align-items:center;justify-content:flex-end;position:relative}
+.isp-bars{display:flex;align-items:flex-end;gap:2px;height:100%;width:100%;justify-content:center}
+.isp-bars i{width:7px;border-radius:1px 1px 0 0;min-height:2px;display:block}
+.isp-f{background:var(--accent)}
+.isp-d{background:var(--ma)}
+.isp-q>span{position:absolute;bottom:-17px;font:400 var(--t-1)/1 var(--mono);color:var(--dim);
+            white-space:nowrap}
+.isp-k{display:flex;align-items:center;gap:6px;margin:6px 0 0;
+       font:400 var(--t-2)/1 var(--ui);color:var(--dim)}
+.isp-k i{width:9px;height:9px;border-radius:2px;display:inline-block;margin-left:8px}
+.isp-k i:first-child{margin-left:0}
+
+@media (max-width:560px){
+  .insti-g{padding:12px 11px}
+  .ia-row>b{flex:0 0 100%}
+  .isc-l{font-size:var(--t-2)}
+  /* The badge drops to its own line under the company name rather than
+   * squeezing the name to nothing on a 360 px screen. */
+  .scr-ins{margin-left:0;margin-top:4px}
+}
+
+/* A measured-but-flat quarter. Present, legible, and deliberately the quietest
+ * thing in the row: the reader needs to know it was measured, not to look at
+ * it. Without this state a blank cell means both "nothing moved" and "nothing
+ * was filed", which are not the same answer. */
+.scr-ins.is-flat{background:transparent;border-color:var(--line);color:var(--dim);opacity:.75}
+.scr-ins.is-flat .ins-g{color:var(--dim)}

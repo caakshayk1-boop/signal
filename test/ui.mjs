@@ -543,6 +543,102 @@ try {
   const pg2 = (await p.locator(".scr-r:not(.rank-head) .i").first().innerText()).trim();
   ok("row numbering continues onto page two", pg1 === "1" && pg2 === "41", { pg1, pg2 });
 
+  /* ── INSTITUTIONAL MOVEMENT ─────────────────────────────────────────────
+   * These run against whatever coverage the instiFeed currently carries, so they
+   * assert BEHAVIOUR rather than a row count: the filters must agree with the
+   * badges, the badges must not appear without a comparable quarter, and the
+   * whole group must degrade to one sentence when the instiFeed is thin. A test
+   * that demanded N accumulating names would fail on a quiet quarter, which is
+   * a real market state and not a defect. */
+  console.log("\n  institutional movement");
+  await p.goto(SITE + "#/screen", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE + 6000);
+
+  const instiFeed = await p.evaluate(async () => {
+    try { return await fetch("/institutional.json").then(r => r.ok ? r.json() : null); }
+    catch { return null; }
+  });
+  ok("the institutional feed is served", !!instiFeed, instiFeed ? `${instiFeed.measured}/${instiFeed.universe}` : "missing");
+
+  if (instiFeed) {
+    // Nothing anywhere may claim a holding outside 0-100, and no change may be
+    // reported without both periods that produced it. This is the assertion
+    // that catches a taxonomy scale regression — the bug that read a 3.36%
+    // stake as 336%.
+    const bad = Object.entries(instiFeed.rows).filter(([, x]) =>
+      [x.fii, x.dii, x.promoter, x.publicHold].some(v => v != null && (v < 0 || v > 100)));
+    ok("no holding is outside 0-100%", bad.length === 0, bad.slice(0, 3).map(b => b[0]));
+
+    const orphan = Object.entries(instiFeed.rows).filter(([, x]) =>
+      x.fii_pp != null && !x.prev_period);
+    ok("no change is reported without a comparison quarter", orphan.length === 0,
+       orphan.slice(0, 3).map(o => o[0]));
+
+    const notComplete = Object.entries(instiFeed.rows).filter(([, x]) =>
+      x.quality !== "complete" && (x.fii_pp != null || x.score != null));
+    ok("a partial reading carries neither a change nor a score",
+       notComplete.length === 0, notComplete.slice(0, 3).map(o => o[0]));
+  }
+
+  const grp = p.locator(".insti-g");
+  ok("the institutional filter group renders", await grp.count() === 1);
+
+  if (instiFeed && instiFeed.measured > 0) {
+    ok("the five quick filters are offered",
+       await p.locator('.insti-g .chip[data-ic]').count() === 6);   // 5 + "Any"
+
+    // Filtering to accumulation must return ONLY names the instiFeed classifies
+    // that way — the filter and the badge read the same precomputed field, and
+    // this is what proves they cannot drift apart.
+    await p.locator('.insti-g .chip[data-ic="both_acc"]').click();
+    await p.waitForTimeout(900);
+    const shown = await p.evaluate(() => [...document.querySelectorAll(".scr-r:not(.rank-head)")]
+      .map(r => r.dataset.sym));
+    const wrong = shown.filter(s => instiFeed.rows[s]?.signal !== "strong_accumulation");
+    ok("the accumulation filter returns only accumulating names", wrong.length === 0, wrong.slice(0, 3));
+    ok("every filtered row carries its badge",
+       shown.length === 0 || await p.locator(".scr-r:not(.rank-head) .scr-ins").count() === shown.length);
+
+    // The badge must be readable without colour.
+    if (shown.length) {
+      const glyph = await p.locator(".scr-r:not(.rank-head) .scr-ins .ins-g").first().innerText();
+      ok("the badge carries a glyph, not colour alone", /[▲▼⇄]/.test(glyph), glyph);
+    }
+
+    // Compare the RESULT COUNTS, not the rows on screen: the table paginates at
+    // 40, so a filter matching 59 names and no filter at all both render 40
+    // rows and the original assertion was comparing two page sizes.
+    const matched = async () => (await p.locator(".sec-n").first().innerText()).trim();
+    const filteredCount = await matched();
+    await p.locator('.insti-g .chip[data-ic=""]').click();
+    await p.waitForTimeout(900);
+    const allCount = await matched();
+    ok("clearing the filter restores the universe", filteredCount !== allCount,
+       { filteredCount, allCount });
+
+    // The card is where the full reading lives.
+    const sym = Object.keys(instiFeed.rows).find(s => instiFeed.rows[s].quality === "complete");
+    await p.evaluate(s => { location.hash = "#/screen"; window.__t = s; }, sym);
+    await p.waitForTimeout(400);
+    const opened = await p.evaluate(async (s) => {
+      const row = document.querySelector(`.scr-r[data-sym="${s}"]`);
+      if (row) { row.click(); return true; }
+      return false;
+    }, sym);
+    if (opened) {
+      await p.waitForTimeout(1200);
+      ok("the card names both periods it compared",
+         /compared with/.test(await p.locator("dialog#sheet").innerText()));
+      ok("the score prints its own weights",
+         await p.locator(".isc .isc-w").count() >= 3);
+      await p.keyboard.press("Escape");
+      await p.waitForTimeout(300);
+    }
+  } else {
+    ok("a thin instiFeed says so instead of rendering empty controls",
+       await p.locator(".insti-none").count() === 1);
+  }
+
   await p.goto(SITE + "#/watch", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 4000);
   ok("the watchlist shows the starred name",
@@ -731,9 +827,18 @@ try {
   console.log("\n  320 x 568 — the narrowest phone in use");
   const mCtx = await browser.newContext({ viewport: { width: 320, height: 568 } });
   const mp = await mCtx.newPage();
-  for (const route of ["#/", "#/markets", "#/brief", "#/signals", "#/methodology"]) {
+  // EVERY route, not five of them. The narrow-phone check covered #/, markets,
+  // brief, signals and methodology — so screen, ideas, news, ipo, funds and
+  // watch, which carry the widest content on the site (a 750-row table and
+  // three others), were the six that were never measured. A sideways scroll is
+  // the defect this whole block exists to catch, and it was unmeasured exactly
+  // where it was most likely.
+  for (const route of ["#/", "#/markets", "#/screen", "#/ideas", "#/news", "#/ipo",
+                       "#/funds", "#/watch", "#/signals", "#/brief", "#/methodology"]) {
     await mp.goto(SITE + route, { waitUntil: "domcontentloaded" });
-    await mp.waitForTimeout(SETTLE);
+    // The screen fetches 1.4 MB before it lays out; the shorter settle used by
+    // the other routes measured it mid-skeleton and would have passed anything.
+    await mp.waitForTimeout(route === "#/screen" ? SETTLE + 6000 : SETTLE);
     const ox = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     // <= 0, not === 0 — see the note on the 1440 check above.
     ok(`${route} does not scroll sideways`, ox <= 0, ox);

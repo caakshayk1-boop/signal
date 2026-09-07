@@ -3019,6 +3019,182 @@
    * predicates are ANDed. Empty means everything, which is what "All" now
    * does rather than being a filter that happens to return true. */
   let scrQ = '', scrPresets = new Set(), scrSort = 'comp', scrPage = 0, SCRDIV = null;
+
+  /* ── INSTITUTIONAL MOVEMENT ────────────────────────────────────────────────
+   *
+   * Who is buying a company is a different question from whether its chart is
+   * breaking out, and it is the one question on this screen that cannot be
+   * derived from price. It comes from the shareholding pattern every listed
+   * company files with the exchange each quarter — FII against DII, in
+   * percentage points, quarter on quarter.
+   *
+   * NOTHING IS COMPUTED HERE. institutional.json arrives with the changes,
+   * streaks, classification and score already worked out by
+   * scripts/institutional/ — a browser must never be asked to reconstruct a
+   * trend from 22 quarters of filings, and more importantly the rule that
+   * makes the arithmetic honest (subtract ADJACENT quarters only, never span a
+   * gap) has to live in one place with tests around it. This file reads
+   * fields; it does not derive them.
+   *
+   * THREE THINGS IT HAS TO ANSWER, in this order:
+   *   1. are institutions buying or selling
+   *   2. is the move big enough to matter        (0.25 pp is the gate)
+   *   3. is it one quarter or an established trend
+   *
+   * PERCENTAGE POINTS, ALWAYS. FII 10% → 12% is +2.00 pp. It is never +20%,
+   * and every label on screen says "pp" so the two can never be read as one.  */
+
+  let INSTI = null;                    // sym → the precomputed row
+  let INSTI_META = null;               // coverage and period, for the footnote
+  let instiChip = '';                  // one of INSTI_CHIPS, or none
+  let instiPreset = '';                // one of INSTI_PRESETS, or none
+  let instiTrend = 0;                  // minimum streak length, 0 = off
+  let instiAdvOpen = false;
+  const instiAdv = { fiiMin: '', fiiMax: '', diiMin: '', diiMax: '', holdMin: '', holdMax: '' };
+
+  const TH_PP = 0.25;                  // materiality gate, mirrors compute.mjs
+  const instiOf = sym => (INSTI && INSTI[sym]) || null;
+
+  /* Loaded once, alongside the screen. Its own request rather than a field on
+   * screen.json because it refreshes on a QUARTERLY cadence while the screen
+   * refreshes daily: bundling them would push a 1.4 MB rebuild through the
+   * pipeline every time a company filed, and would drop institutional data
+   * entirely on any day the screen build failed. */
+  async function loadInsti() {
+    if (INSTI) return INSTI;
+    const r = await get('/institutional.json');
+    if (!r.ok) { INSTI = {}; INSTI_META = null; return INSTI; }
+    INSTI = r.data.rows || {};
+    INSTI_META = r.data;
+    return INSTI;
+  }
+
+  /* Signed, two decimals, with the unit attached. A change of exactly zero
+   * prints "0.00 pp" rather than "+0.00 pp" — a plus sign on nothing reads as
+   * a rounded-down increase. */
+  const ppFmt = v => v == null ? '—'
+    : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(2)} pp`;
+  /* The same number at badge precision. Shares ppFmt's sign so a row and its
+   * own tooltip cannot show a typographic minus in one and a hyphen in the
+   * other for the identical figure. */
+  const sign1 = v => v == null ? '—'
+    : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)}`;
+
+  /* THE GLYPH CARRIES THE MEANING, NOT THE COLOUR. Every institutional state
+   * is legible in greyscale, in a screenshot, and to anyone who does not
+   * distinguish red from green — which on a screen whose whole claim is
+   * "accumulation" versus "distribution" is not an accessibility nicety, it is
+   * whether the row is readable at all. Colour repeats the glyph; it never
+   * replaces it. */
+  const INSTI_LOOK = {
+    strong_accumulation: ['▲▲', 'up',   'Strong accumulation',  'Both FII and DII added'],
+    fii_accumulation:    ['▲',  'up',   'FII accumulation',     'Foreign institutions added, domestic flat'],
+    dii_accumulation:    ['▲',  'up',   'DII accumulation',     'Domestic institutions added, foreign flat'],
+    rotation:            ['⇄',  'warn', 'Rotation',             'One side bought what the other sold'],
+    fii_reduction:       ['▼',  'dn',   'FII reducing',         'Foreign institutions cut, domestic flat'],
+    dii_reduction:       ['▼',  'dn',   'DII reducing',         'Domestic institutions cut, foreign flat'],
+    distribution:        ['▼▼', 'dn',   'Distribution',         'Both FII and DII cut'],
+    neutral:             ['·',  'flat', 'No material change',   `Neither side moved more than ${TH_PP} pp`],
+    unknown:             ['?',  'flat', 'Not measurable',       'No comparable previous quarter'],
+  };
+
+  /* The five quick filters. Each is a predicate over the PRECOMPUTED fields —
+   * no arithmetic, so a filter can never disagree with the badge beside it. */
+  const INSTI_CHIPS = {
+    fii_acc:  ['FII accumulating',  x => x.fii_pp != null && x.fii_pp >= TH_PP],
+    dii_acc:  ['DII accumulating',  x => x.dii_pp != null && x.dii_pp >= TH_PP],
+    both_acc: ['Both accumulating', x => x.signal === 'strong_accumulation'],
+    dist:     ['Distribution',      x => x.signal === 'distribution'],
+    rot:      ['Rotation',          x => x.signal === 'rotation'],
+  };
+
+  /* Saved screens. Each states its own rule in the interface, because a preset
+   * whose logic is hidden is a recommendation wearing a filter's clothes.
+   *
+   * There is deliberately no fourth "exit warning" preset: FII down AND DII
+   * down IS the Distribution chip above, and shipping the same query twice
+   * under two names would make the screen look richer than it is. */
+  const INSTI_PRESETS = {
+    smart:      ['Smart money accumulation', 'FII ≥ +0.50 pp and DII ≥ +0.25 pp',
+                 x => x.fii_pp != null && x.dii_pp != null && x.fii_pp >= 0.5 && x.dii_pp >= TH_PP],
+    conviction: ['Strong FII conviction', 'FII up 2+ quarters running, and ≥ +0.50 pp this quarter',
+                 x => x.fii_streak >= 2 && x.fii_pp != null && x.fii_pp >= 0.5],
+    turnaround: ['Institutional turnaround', 'Combined holding fell last quarter and rose this one',
+                 x => x.insti_prev_pp != null && x.insti_pp != null
+                      && x.insti_prev_pp <= -TH_PP && x.insti_pp >= TH_PP],
+  };
+
+  /* Which holding the trend-duration control is talking about. It follows the
+   * chip so the two controls can never contradict each other, and the label is
+   * rewritten to say which — an unlabelled "2Q+" beside an FII filter is a
+   * question, not a control. */
+  const instiTrendKey = () =>
+    instiChip === 'fii_acc' ? ['fii_streak', 'FII']
+    : instiChip === 'dii_acc' ? ['dii_streak', 'DII']
+    : ['insti_streak', 'Institutions'];
+
+  const instiFiltered = () => instiChip || instiPreset || instiTrend
+    || Object.values(instiAdv).some(v => v !== '');
+
+  /* One predicate for every institutional control. A row with no institutional
+   * data FAILS any active institutional filter — it is excluded, not assumed
+   * flat. "Not measured" is not a value that can satisfy "FII accumulating". */
+  const instiPass = r => {
+    if (!instiFiltered()) return true;
+    const x = instiOf(r.sym);
+    if (!x) return false;
+    if (instiChip && !INSTI_CHIPS[instiChip][1](x)) return false;
+    if (instiPreset && !INSTI_PRESETS[instiPreset][2](x)) return false;
+    if (instiTrend) {
+      const v = x[instiTrendKey()[0]];
+      if (!(typeof v === 'number' && v >= instiTrend)) return false;
+    }
+    const rng = (v, lo, hi) => {
+      if (lo === '' && hi === '') return true;
+      if (v == null) return false;
+      if (lo !== '' && v < Number(lo)) return false;
+      if (hi !== '' && v > Number(hi)) return false;
+      return true;
+    };
+    return rng(x.fii_pp, instiAdv.fiiMin, instiAdv.fiiMax)
+        && rng(x.dii_pp, instiAdv.diiMin, instiAdv.diiMax)
+        && rng(x.insti,  instiAdv.holdMin, instiAdv.holdMax);
+  };
+
+  const instiReset = () => {
+    instiChip = ''; instiPreset = ''; instiTrend = 0;
+    for (const k of Object.keys(instiAdv)) instiAdv[k] = '';
+  };
+
+  /* The row badge. Compact by necessity — this sits inside a table cell on a
+   * 360 px phone — so it carries the two numbers and the glyph, and the full
+   * reading (levels, streak, score, the two periods compared) lives on the
+   * card a tap away.
+   *
+   * IT RENDERS ON EVERY MEASURED ROW, INCLUDING THE FLAT ONES.
+   * The first version suppressed neutral rows to keep the table quiet. That
+   * was the wrong instrument: with 744 of 750 names measured it left a third
+   * of the table blank, and a blank cell could not be told apart from a name
+   * with no filing at all — the exact "no data" / "no change" conflation this
+   * whole module is built to prevent, reintroduced in the presentation layer.
+   * Noise is handled by WEIGHT instead: a flat quarter renders muted, with a
+   * mid dot and no colour, so the eye still lands on the movers while the
+   * reader can see that flat was measured and flat is what it was.
+   *
+   * A row with no comparable quarter renders nothing here, because it has
+   * nothing to report; its card says why. */
+  const instiBadge = sym => {
+    const x = instiOf(sym);
+    if (!x || x.quality !== 'complete') return '';
+    const [g, cls, label] = INSTI_LOOK[x.signal] || INSTI_LOOK.neutral;
+    return `<i class="scr-ins is-${cls}" title="${esc(label)} · FII ${ppFmt(x.fii_pp)}, DII ${ppFmt(x.dii_pp)} in ${esc(x.period)} vs ${esc(x.prev_period)}">
+      ${/* A span, not a <b>. The symbol in this cell is the <b>, and a second
+           one here made `.s b` ambiguous — it broke an existing test that
+           reads the ticker off the row, which is the right complaint: this
+           glyph is a decorative restatement of the label beside it, not a
+           second piece of emphasis. */''}<span class="ins-g" aria-hidden="true">${g}</span><span class="vh">${esc(label)}. </span>FII ${sign1(x.fii_pp)} · DII ${sign1(x.dii_pp)} pp</i>`;
+  };
+
   const PRESETS = {
     all:        ['Everything',     () => true],
     /* Verdict filters come first because they answer the question a reader
@@ -3042,7 +3218,277 @@
     compounder: ['Compounders',    r => (r.roce ?? 0) >= 20 && (r.rev_cagr ?? 0) >= 12],
   };
   const SORTS = { comp: 'Composite', q: 'Quality', g: 'Growth', v: 'Value',
-                  tech: 'Technical', r1m: '1M return', roce: 'ROCE', mcap_cr: 'Size' };
+                  tech: 'Technical', r1m: '1M return', roce: 'ROCE', mcap_cr: 'Size',
+                  // Institutional sorts read from institutional.json rather than
+                  // from the row, so they go through sortVal() below. They are
+                  // listed last deliberately: institutional movement is one
+                  // input among many, and putting it at the top of the ranking
+                  // menu would imply the screen rates it above everything else.
+                  i_fii: 'FII change', i_dii: 'DII change',
+                  i_tot: 'Institutional change', i_score: 'Institutional score',
+                  i_streak: 'Accumulation streak', i_dist: 'Heaviest selling' };
+
+  /* Sorting reaches across two feeds. A row's own fields come off the row; the
+   * six institutional keys come from the precomputed feed keyed by symbol.
+   * Returning null (not 0) for a name with no institutional filing is what
+   * keeps unmeasured companies at the BOTTOM of an institutional sort instead
+   * of in the middle of it pretending to be flat. */
+  const sortVal = (r, k) => {
+    if (!k.startsWith('i_')) return r[k];
+    const x = instiOf(r.sym);
+    if (!x) return null;
+    switch (k) {
+      case 'i_fii':    return x.fii_pp;
+      case 'i_dii':    return x.dii_pp;
+      case 'i_tot':    return x.insti_pp;
+      case 'i_score':  return x.score;
+      case 'i_streak': return x.insti_streak;
+      // Descending on the negated change, so the heaviest selling sorts first
+      // in the same one-direction sort every other column uses.
+      case 'i_dist':   return x.insti_pp == null ? null : -x.insti_pp;
+      default:         return null;
+    }
+  };
+
+  /* ── THE INSTITUTIONAL FILTER GROUP ───────────────────────────────────────
+   *
+   * Its own labelled group rather than five more chips in the existing row.
+   * The chips above filter on price and fundamentals; these filter on who owns
+   * the company, which is a different question and a different data source
+   * with a different refresh cadence. Mixing them would imply they are all
+   * measured the same way and all as fresh as each other, and they are not:
+   * one is today's close, the other is last quarter's filing.
+   *
+   * Three tiers, and only the first is open by default:
+   *   · five chips        — the whole question, most of the time
+   *   · three saved screens, each printing its own rule
+   *   · numeric ranges    — behind <details>, for the reader who wants them
+   *
+   * <details> because it opens with no JavaScript, closes on Escape, and is
+   * announced correctly — the three things a hand-rolled disclosure has to be
+   * rebuilt to do. */
+  const instiTools = () => {
+    if (!INSTI) return '';
+    if (!INSTI_META || !INSTI_META.measured) {
+      // Present but empty. Said once, plainly, rather than rendering five
+      // controls that would every one of them return nothing.
+      return `<p class="hint insti-none">Institutional movement is not available for this
+        build — no shareholding filings were resolved.</p>`;
+    }
+    const [, trendWho] = instiTrendKey();
+    /* `attr` names which group the chip belongs to — data-ic for the quick
+     * filters, data-ip for the saved screens. They were both emitting data-ic
+     * and the preset chips were told apart by ALSO carrying data-ip, which
+     * made "how many quick filters are there" unanswerable by selector and
+     * left the click handler branching on an attribute rather than on which
+     * control was pressed. One attribute each. */
+    const chip = (attr, k, on, label, extra = '') =>
+      `<button type="button" class="chip${on ? ' on' : ''}" ${extra}
+        ${attr}="${esc(k)}" aria-pressed="${on}">${esc(label)}</button>`;
+    const num = (k, ph, lab) => `<label class="ia-f"><span>${esc(lab)}</span>
+      <input type="number" step="0.05" inputmode="decimal" class="ia-in" data-ia="${esc(k)}"
+             value="${esc(instiAdv[k])}" placeholder="${esc(ph)}" aria-label="${esc(lab)}"></label>`;
+    const active = instiFiltered();
+
+    return `<section class="insti-g" aria-label="Institutional movement filters">
+      <div class="insti-h">
+        <h3>Institutional movement</h3>
+        <span class="insti-sub">FII and DII holding, ${esc(INSTI_META.latest_period_end
+          ? 'latest quarterly filings' : 'quarterly filings')} · change in percentage points</span>
+        ${active ? `<button type="button" class="insti-clear" id="insti-clear">Clear</button>` : ''}
+      </div>
+      <div class="chips" role="group" aria-label="Institutional quick filters">
+        ${chip('data-ic', '', !instiChip && !instiPreset, 'Any')}
+        ${Object.entries(INSTI_CHIPS).map(([k, [l]]) => chip('data-ic', k, instiChip === k, l)).join('')}
+      </div>
+      <div class="chips insti-p" role="group" aria-label="Saved institutional screens">
+        ${Object.entries(INSTI_PRESETS).map(([k, [l, rule]]) =>
+          chip('data-ip', k, instiPreset === k, l, `title="${esc(rule)}"`)).join('')}
+      </div>
+      ${instiPreset ? `<p class="hint insti-rule"><b>${esc(INSTI_PRESETS[instiPreset][0])}</b>
+        — ${esc(INSTI_PRESETS[instiPreset][1])}.</p>` : ''}
+      <details class="insti-adv"${instiAdvOpen ? ' open' : ''}>
+        <summary>Ranges and trend length</summary>
+        <div class="ia-grid">
+          <div class="ia-row"><b>FII change</b>${num('fiiMin', 'min pp', 'Minimum FII change, percentage points')}${num('fiiMax', 'max pp', 'Maximum FII change, percentage points')}</div>
+          <div class="ia-row"><b>DII change</b>${num('diiMin', 'min pp', 'Minimum DII change, percentage points')}${num('diiMax', 'max pp', 'Maximum DII change, percentage points')}</div>
+          <div class="ia-row"><b>Total institutional holding</b>${num('holdMin', 'min %', 'Minimum institutional holding, percent')}${num('holdMax', 'max %', 'Maximum institutional holding, percent')}</div>
+          <div class="ia-row ia-tr"><b>${esc(trendWho)} rising for</b>
+            <div class="chips" role="group" aria-label="Trend length">
+              ${[[0, 'Any'], [1, '1Q'], [2, '2Q'], [3, '3Q+']].map(([n, l]) =>
+                `<button type="button" class="chip${instiTrend === n ? ' on' : ''}"
+                  data-it="${n}" aria-pressed="${instiTrend === n}">${l}</button>`).join('')}
+            </div>
+          </div>
+        </div>
+        <p class="hint">Changes are in <b>percentage points</b>: a holding that goes from
+          10% to 12% has risen <b>2.00 pp</b>, not 20%. A move under
+          ${TH_PP} pp is treated as no change.</p>
+      </details>
+      <p class="hint insti-cov">Measured for <b>${INSTI_META.measured}</b> of
+        ${INSTI_META.universe} names${INSTI_META.latest_period_end
+          ? ` · latest filing ${esc(INSTI_META.latest_period_end)}` : ''}.
+        Names with no comparable quarter are excluded from these filters rather
+        than counted as unchanged. <a href="#/methodology">How this is measured →</a></p>
+    </section>`;
+  };
+
+  /* Every institutional control, delegated from one place. Called after each
+   * draw() because draw() replaces the whole subtree. */
+  const wireInsti = (draw) => {
+    const root = main.querySelector('.insti-g');
+    if (!root) return;
+    const redraw = () => { scrPage = 0; draw(); };
+    root.querySelectorAll('.chip[data-ic]').forEach(b => b.addEventListener('click', () => {
+      const k = b.dataset.ic;
+      instiChip = (k === '' || instiChip === k) ? '' : k;
+      if (k === '') instiPreset = '';            // "Any" clears both groups
+      redraw();
+    }));
+    root.querySelectorAll('.chip[data-ip]').forEach(b => b.addEventListener('click', () => {
+      const k = b.dataset.ip;
+      instiPreset = instiPreset === k ? '' : k;
+      redraw();
+    }));
+    root.querySelectorAll('.chip[data-it]').forEach(b => b.addEventListener('click', () => {
+      instiTrend = Number(b.dataset.it) || 0; redraw();
+    }));
+    const adv = root.querySelector('.insti-adv');
+    if (adv) adv.addEventListener('toggle', () => { instiAdvOpen = adv.open; });
+    root.querySelectorAll('.ia-in').forEach(inp => inp.addEventListener('input', () => {
+      // Coalesced and focus-preserving, the same way the search box is: a
+      // redraw on every keystroke would otherwise steal the caret mid-number.
+      clearTimeout(inp._t);
+      inp._t = setTimeout(() => {
+        instiAdv[inp.dataset.ia] = inp.value.trim();
+        const k = inp.dataset.ia, at = inp.selectionStart;
+        redraw();
+        const n = main.querySelector(`.ia-in[data-ia="${k}"]`);
+        if (n) { n.focus(); try { n.setSelectionRange(at, at); } catch (e) { /* number input */ } }
+      }, 220);
+    }));
+    const clr = root.querySelector('#insti-clear');
+    if (clr) clr.addEventListener('click', () => { instiReset(); redraw(); });
+  };
+
+  /* ── OWNERSHIP, ON THE CARD ───────────────────────────────────────────────
+   *
+   * This block replaced one built on Yahoo's `heldPercentInsiders` and
+   * `heldPercentInstitutions`. Two things were wrong with it and neither was
+   * visible on screen:
+   *   · "Promoters / insiders" was Yahoo's insiders bucket, which is WIDER
+   *     than SEBI's promoter definition — the upstream fetcher's own comment
+   *     records Dixon reading 40.1% against a real promoter stake nearer 32%.
+   *   · "Institutions" was a single undated snapshot with no FII/DII split and
+   *     no history, so it could not answer the only question worth asking of
+   *     an ownership number: which way is it moving.
+   * Both now come from the company's own quarterly filing, and the block names
+   * the two periods it compared. Where there is no filing the Yahoo figure is
+   * still shown — labelled as the estimate it is, not as the filing.
+   *
+   * The share-count warning is kept verbatim: it is about dilution, comes from
+   * the accounts rather than the shareholding pattern, and is orthogonal. */
+  const instiCard = (r) => {
+    const dil = r.shares_changed == null ? '' :
+      `<div class="yy"><span>Share count</span><b class="${r.shares_changed ? 'dn' : 'up'}">${
+        r.shares_changed ? 'Changed — check dilution' : 'Unchanged'}</b></div>`;
+    const x = instiOf(r.sym);
+
+    if (!x || x.quality === 'unavailable') {
+      return `<div class="yoy">
+        ${r.insiders != null ? `<div class="yy"><span>Insiders <i class="u">estimate</i></span><b>${Number(r.insiders).toFixed(1)}%</b></div>` : ''}
+        ${r.instis != null ? `<div class="yy"><span>Institutions <i class="u">estimate</i></span><b>${Number(r.instis).toFixed(1)}%</b></div>` : ''}
+        ${dil}</div>
+      <p class="hint">No quarterly shareholding filing was resolved for this name, so the
+        figures above are Yahoo's wider estimate rather than the company's filing.
+        They carry no FII/DII split and no comparison quarter.</p>`;
+    }
+
+    const lvl = (l, v) => v == null ? '' :
+      `<div class="yy"><span>${esc(l)}</span><b>${Number(v).toFixed(2)}<i class="u">%</i></b></div>`;
+
+    const levels = `<div class="yoy">
+      ${lvl('Promoters', x.promoter)}${lvl('FII', x.fii)}${lvl('DII', x.dii)}
+      ${lvl('Public', x.publicHold)}${dil}</div>`;
+
+    // Partial: say exactly what is missing instead of printing a change that
+    // was measured across a gap.
+    if (x.quality !== 'complete') {
+      return levels + `<p class="hint">Holdings as filed for <b>${esc(x.period)}</b>.
+        No quarter-on-quarter change is shown — ${esc(x.reason || 'no comparable previous quarter')}.</p>`;
+    }
+
+    const [glyph, cls, label, gloss] = INSTI_LOOK[x.signal] || INSTI_LOOK.neutral;
+    const mv = (l, v, streak) => `<div class="yy"><span>${esc(l)}</span>
+      <b class="${dir(v)}">${ppFmt(v)}</b>${streak ? `<i class="u">${esc(streak)}</i>` : ''}</div>`;
+    const streakWord = n => !n ? '' :
+      `${Math.abs(n)}Q ${n > 0 ? 'rising' : 'falling'}`;
+
+    /* THE SCORE, WITH ITS WORKING SHOWN. A 0–100 composite is an opinion, and
+     * an opinion presented as a bare number is the thing this site exists not
+     * to do. Every weight and every input is printed beside it, and each input
+     * is also printed raw above, so the reader can disagree with the model
+     * without having to reconstruct it. */
+    const bandCls = x.score == null ? '' : x.score >= 65 ? 'up' : x.score <= 39 ? 'dn' : '';
+    const comp = (w, l, raw, shown) => `<div class="isc-r">
+      <span class="isc-w">${w}%</span><span class="isc-l">${esc(l)}</span>
+      <span class="isc-v ${dir(raw)}">${esc(shown)}</span></div>`;
+    const scoreBlock = x.score == null ? '' : `
+      <div class="isc">
+        <div class="isc-h"><span class="isc-n ${bandCls}">${x.score}</span>
+          <span class="isc-b">${esc(x.band_label || '')}<em>Institutional strength · 0–100</em></span></div>
+        ${comp(40, 'FII change this quarter', x.fii_pp, ppFmt(x.fii_pp))}
+        ${comp(30, 'DII change this quarter', x.dii_pp, ppFmt(x.dii_pp))}
+        ${comp(20, 'Multi-quarter consistency', x.insti_streak,
+               x.insti_streak ? streakWord(x.insti_streak) : 'no run')}
+        ${comp(10, 'Acceleration', (x.fii_accel_pp ?? 0) + (x.dii_accel_pp ?? 0),
+               x.fii_accel_pp == null && x.dii_accel_pp == null ? 'not measurable'
+                 : `FII ${ppFmt(x.fii_accel_pp)} · DII ${ppFmt(x.dii_accel_pp)}`)}
+        <p class="isc-n2">A weighted reading of the four figures above, each capped so one
+          outsized quarter cannot carry the score. It ranks names; it does not value them.</p>
+      </div>`;
+
+    return levels + `
+      <div class="insti-v is-${esc(cls)}">
+        <span class="iv-g" aria-hidden="true">${glyph}</span>
+        <span class="iv-t"><b>${esc(label)}</b>
+          <em>${esc(x.signal_direction || gloss)}</em></span>
+      </div>
+      <div class="yoy">
+        ${mv('FII, quarter on quarter', x.fii_pp, streakWord(x.fii_streak))}
+        ${mv('DII, quarter on quarter', x.dii_pp, streakWord(x.dii_streak))}
+        ${mv('Combined institutional', x.insti_pp, streakWord(x.insti_streak))}
+      </div>
+      ${instiSpark(x)}
+      ${scoreBlock}
+      <p class="hint">Holdings as filed. Latest <b>${esc(x.period)}</b> (${esc(x.period_end)}),
+        compared with <b>${esc(x.prev_period)}</b> — consecutive quarters.
+        Changes are in percentage points; a move under ${TH_PP} pp is treated as no change.
+        Source: the company's shareholding pattern filed with the exchange.</p>`;
+  };
+
+  /* Eight quarters of FII and DII as two thin bars per quarter. Deliberately
+   * not a line chart: the question is "which way, and for how long", which
+   * paired bars answer at a glance and at 40 px tall. Values are in the table
+   * behind it for anyone who cannot use the picture. */
+  const instiSpark = (x) => {
+    const s = (x.series || []).filter(q => q.f != null || q.d != null);
+    if (s.length < 3) return '';
+    const max = Math.max(...s.flatMap(q => [q.f ?? 0, q.d ?? 0]), 1);
+    return `<figure class="ispark">
+      <figcaption>FII and DII holding, last ${s.length} quarters filed</figcaption>
+      <div class="isp-r" role="img" aria-label="${esc(s.map(q =>
+        `${q.p}: FII ${q.f == null ? 'not filed' : q.f.toFixed(1) + '%'}, DII ${q.d == null ? 'not filed' : q.d.toFixed(1) + '%'}`).join('. '))}">
+        ${s.map(q => `<div class="isp-q">
+          <div class="isp-bars">
+            <i class="isp-f" style="height:${((q.f ?? 0) / max * 100).toFixed(1)}%"></i>
+            <i class="isp-d" style="height:${((q.d ?? 0) / max * 100).toFixed(1)}%"></i>
+          </div><span>${esc(q.p.replace(/^Q(\d) FY/, 'Q$1·'))}</span>
+        </div>`).join('')}
+      </div>
+      <p class="isp-k"><i class="isp-f"></i>FII <i class="isp-d"></i>DII</p>
+    </figure>`;
+  };
 
   R['/screen'] = async () => {
     const screenSnap = rows => ((num) => snap([
@@ -3062,10 +3508,13 @@
       `<div class="sk" style="height:320px"></div>`));
 
     if (!SCREEN) {
-      const r = noteLadder(await get('/screen.json'));
+      // In parallel, and institutional data is allowed to fail: it is one
+      // section of one screen, and losing it must never cost the reader the
+      // 750 rows they actually came for.
+      const [r] = await Promise.all([get('/screen.json').then(noteLadder), loadInsti()]);
       if (!r.ok) { paint(shell(fail('The screen', r.error))); return; }
       SCREEN = (r.data.rows || []).filter(x => x && x.sym);
-    }
+    } else await loadInsti();
 
     let shownRows = [];          // the page the live quote call must ask for
     const draw = () => {
@@ -3075,7 +3524,8 @@
         .filter(r => !q || (r.sym || '').toLowerCase().includes(q)
                         || (r.name || '').toLowerCase().includes(q)
                         || (r.sector || '').toLowerCase().includes(q))
-        .sort((a, b) => (b[scrSort] ?? -1e9) - (a[scrSort] ?? -1e9));
+        .filter(instiPass)
+        .sort((a, b) => (sortVal(b, scrSort) ?? -1e9) - (sortVal(a, scrSort) ?? -1e9));
 
       main.innerHTML = shell(
         screenSnap(SCREEN) +
@@ -3106,6 +3556,7 @@
         <p class="hint chips-hint">${scrPresets.size > 1
           ? `Showing names that clear <b>all ${scrPresets.size}</b> of these at once.`
           : 'Filters combine — pick as many as you like.'}</p>` +
+        instiTools() +
         // 40, not 60: /api/signals?px= takes 40 symbols a call, so a 40-row
         // page is exactly one request and every visible row can carry a live
         // mark. A 60-row page would leave a third of the screen showing the
@@ -3162,6 +3613,7 @@
        * them behave as filter presets: b.dataset.p was undefined, undefined
        * went into the preset Set, and the next draw threw on
        * PRESETS[undefined][1]. A delegated handler has to name what it owns. */
+      wireInsti(draw);
       main.querySelectorAll('.chip[data-p]').forEach(b =>
         b.addEventListener('click', () => {
           const k = b.dataset.p;
@@ -3477,7 +3929,7 @@
       const v200 = r.sma200 ? (r.price - r.sma200) / r.sma200 * 100 : null;
       return `<div class="rank-r scr-r" data-sym="${esc(r.sym)}" role="button" tabindex="0">
         <span class="i">${(offset || 0) + i + 1}</span>
-        <span class="s">${watchBtn(r.sym)}<b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span></span>
+        <span class="s">${watchBtn(r.sym)}<b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span>${instiBadge(r.sym)}</span>
         <span class="x" data-l="Price" data-px>₹${esc(r.price ?? '—')}</span>
         <!-- Filled by the live quote call below. An em dash, not a bullet: a
              cell that never fills should read as "not measured" like every
@@ -3626,6 +4078,10 @@
       if (!r0.ok) { sheet(esc(sym), fail('The company card', r0.error)); return; }
       SCREEN = (r0.data.rows || []).filter(x => x && x.sym);
     }
+    // The card can be opened from Today, Markets, Ideas or search, none of
+    // which touch the Screen route, so the institutional feed is requested
+    // here too. It resolves instantly on the second card.
+    await loadInsti();
     const r = (SCREEN || []).find(x => x.sym === sym);
     if (!r) {
       sheet(esc(sym), `<div class="empty">${esc(sym)} is not in the 750-name screen,
@@ -3807,9 +4263,7 @@
         ${fact('Current ratio', r.curr, 'x')}${fact('Tax rate', r.tax)}</div>
 
       <h4 class="sh">Who owns it</h4>
-      <div class="yoy">${fact('Promoters / insiders', r.insiders)}${fact('Institutions', r.instis)}
-        ${r.shares_changed != null ? `<div class="yy"><span>Share count</span><b class="${r.shares_changed ? 'dn' : 'up'}">${
-          r.shares_changed ? 'Changed — check dilution' : 'Unchanged'}</b></div>` : ''}</div>
+      ${instiCard(r)}
 
       <h4 class="sh">Growth${r.fy_count ? ` <em>· compound, over ${esc(r.fy_count)} years of accounts</em>` : ''}</h4>
       <div class="yoy">${yoy('Revenue CAGR', r.rev_cagr)}${yoy('EBITDA CAGR', r.ebitda_cagr)}
@@ -7040,6 +7494,37 @@
         record it is the primary key for — so the key never moves. TIDAL appears twice because
         <code>magic</code> and <code>magicmagic</code> are one screen run at two depths off the
         52-week high, which is what they have always been.</p>
+
+      <h3>Institutional movement — FII and DII</h3>
+      <p>Every listed company files a shareholding pattern with the exchange each quarter. The
+        Screen reads that filing directly and reports two figures: holding by <b>foreign</b>
+        institutions (FII/FPI) and by <b>domestic</b> institutions (DII — mutual funds, insurers,
+        banks, pension funds). Neither is estimated and neither comes from a data vendor's
+        summary; both are the categories in the company's own filing.</p>
+      <p><b>Changes are in percentage points.</b> A holding that moves from 10% to 12% has risen
+        <b>2.00 pp</b>. It has not risen 20%, and this site never states it that way. A move
+        smaller than <b>0.25 pp</b> is treated as no change at all.</p>
+      <p><b>Only consecutive quarters are compared.</b> This is the whole reason the figures can
+        be trusted, and it is not automatic: the exchange's own feed mixes quarter-end filings
+        with interim ones — a bonus issue, an open offer — and subtracting across them produces
+        a number that looks exactly like a quarterly move and is not one. Interim filings are
+        dropped, and where the previous quarter is missing the change is reported as
+        <b>not measurable</b> rather than as zero. A company with no comparable quarter is
+        excluded from the institutional filters instead of being counted as unchanged.</p>
+      <p>Each name is classified from the two changes alone: both up is <b>accumulation</b>,
+        both down is <b>distribution</b>, opposite directions is <b>rotation</b>, and one side
+        moving while the other sits still is named for the side that moved. Most companies in
+        most quarters are none of these, and are labelled as such.</p>
+      <p>The <b>institutional strength score</b> (0–100) is the one figure here that is a model
+        rather than a measurement: 40% this quarter's FII change, 30% the DII change, 20% how
+        many consecutive quarters the combined holding has moved one way, 10% whether the move
+        is speeding up. Each input is capped before weighting, so a single outsized quarter
+        cannot carry the score. It is shown with every input printed beside it, and never
+        without the raw percentages. It ranks names; it does not value them.</p>
+      <p class="hint">Shareholding is filed quarterly, within 21 days of the quarter end — so
+        this data is <b>weeks to months old by design</b>, and is the slowest-moving thing on
+        this site. It says who owned the company at a date in the past. It does not say who is
+        buying it today.</p>
 
       <h3>The confidence score</h3>
       <p>Five components — structure, momentum, trend, volume and reward-to-risk — each scored

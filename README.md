@@ -77,6 +77,49 @@ serving its last good copy of every feed instead of failing with it.** A feed
 that comes back as invalid JSON or does not come back at all is skipped, never
 allowed to overwrite a good copy.
 
+### `institutional.json` — the one feed this repo builds itself
+
+FII and DII holding per company, from the quarterly shareholding pattern each
+listed company files with the exchange. Built by `scripts/institutional/`,
+scheduled by `.github/workflows/institutional.yml`, and consumed by the Screen.
+
+    NSE shareholding master (per symbol)
+      → canonical quarter-ends only          compute.mjs · isQuarterEnd
+      → SHP XBRL per quarter                 cached by recordId, committed
+      → seven percentages                    parse.mjs
+      → QoQ · acceleration · streaks · class · score      compute.mjs
+      → public/institutional.json
+
+Three things about it are worth knowing before touching it.
+
+**Only adjacent quarters are subtracted.** NSE's feed mixes quarter-end filings
+with interim ones — a bonus issue, an open offer. Subtracting across them
+yields a number that looks exactly like a quarterly move and is not one, so
+interim filings are dropped and a missing previous quarter gives `null`, never
+`0`. `test/institutional.mjs` pins this with the three interim dates actually
+present in the live feed.
+
+**Two SEBI taxonomies, two scales.** Filings on the `2025-10-31` schema write a
+percentage as a fraction (`0.4969`); the `2022-09-30` schema writes it directly
+(`49.69`). NSE serves both in one company's history. The parser derives the
+scale from the document — promoter plus public is 100% by definition — rather
+than trusting the version string, and returns nulls rather than guessing when
+neither reading holds. Getting this wrong does not produce an obviously silly
+number in the table; it produces a fabricated hundred-point "change" in every
+quarter that spans the boundary.
+
+**NSE rate-limits by IP, and lies about it first.** The throttle answers `200`
+with `[]` — indistinguishable from a company that never filed — before it
+escalates to a flat `403` across the API and the archive CDN. So the harvest is
+single-flight, paced, backed off, time-budgeted and **resumable**: the parsed
+cache is committed, a quarter once banked is never refetched, and coverage
+accumulates across nightly runs instead of every run racing the limiter for all
+750 names. A run that resolves nothing, or fewer names than the last one, exits
+non-zero without writing.
+
+    node scripts/institutional/build.mjs      # INSTI_MAX_MIN, INSTI_GAP_MS
+    node test/institutional.mjs               # no network, runs in ms
+
 ---
 
 ## Running it locally
