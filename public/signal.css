@@ -3545,6 +3545,8 @@ html:has(dialog[open]){overflow:hidden}
 /* A results date inside ten days is a caution, which is what amber now
    exclusively means. */
 .vv.warn{color:var(--warn)}
+/* A flat move is neither direction and must not borrow either colour. */
+.pill.pill-flat{background:var(--raised);color:var(--dim)}
 .cardmeta b.warn{color:var(--warn)}
 .cardmeta b.up{color:var(--up)} .cardmeta b.dn{color:var(--down)}
 /* Manrope has tabular figures; they were never requested here. */

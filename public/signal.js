@@ -4070,7 +4070,12 @@
       const unreal = open && live ? pnlOf(r.entry, live.price, r.action) : null;
       const shown = open ? unreal : (r.pnl_pct == null ? null : Number(r.pnl_pct));
       const pill = shown == null ? `<span class="pill pill-ac">open</span>`
-        : `<span class="pill ${shown > 0 ? 'pill-up' : 'pill-dn'}">${pct(shown)}${open ? ' live' : ''}</span>`;
+        /* ZERO IS NOT A LOSS. This was a two-way test, so a flat move — which
+         * is what an unmoved stock prints, and what every signal filed today
+         * shows before its first tick — came out in the down colour.
+         * COCHINSHIP read "0.00% live" in red having not moved at all. */
+        : `<span class="pill ${shown > 0 ? 'pill-up' : shown < 0 ? 'pill-dn' : 'pill-flat'}">${
+            pct(shown)}${open ? ' live' : ''}</span>`;
       return `<article class="card" data-sym="${esc(r.symbol || '')}" role="button" tabindex="0">
         <div class="card-h">
           <span class="sym">${esc(r.symbol || '')}</span>
@@ -4086,8 +4091,22 @@
             open ? (live ? price(live.price, cur) : '<span style="color:var(--dim)">no mark</span>')
                  : cur + esc(r.exit_price ?? '—')}</span></div>
           <div><span class="kk">Stop</span><span class="vv dn">${price(r.sl, cur)}</span></div>
-          <div><span class="kk">Target 1</span><span class="vv up">${price(r.target1, cur)}</span></div>
-          <div><span class="kk">Target 2</span><span class="vv up">${price(r.target2, cur)}</span></div>
+          ${/* ── SHOW THE TARGETS THAT EXIST, NOT THE FIRST TWO SLOTS ──────
+              * Hardcoded to Target 1 and Target 2. When the read layer blanks
+              * T2 — because it collapsed into T1 and is not a separate exit —
+              * the card printed "Target 2 —" and never showed T3 at all, while
+              * the scale-out underneath paid the balance out at it. COCHINSHIP
+              * live: "Target 2 —" above a rung reading "70% at ₹1,971, at the
+              * third", a number appearing nowhere in the grid it belongs to.
+              *
+              * The row is built from the targets the signal actually has and
+              * each is labelled by WHICH one it is, so a two-target signal
+              * shows T1 and T3 rather than T1 and a blank. */''}
+          ${[['Target 1', lvl(r.target1)], ['Target 2', lvl(r.target2)],
+             ['Target 3', lvl(r.target3)]]
+              .filter(([, v]) => v !== null)
+              .map(([k, v]) => `<div><span class="kk">${k}</span>
+                <span class="vv up">${price(v, cur)}</span></div>`).join('')}
           ${(() => {
             /* ── R:R MUST REFER TO A TARGET ON THE CARD ────────────────────
              * The stored `rr` is quoted off T2 by the engines that emit one.
