@@ -3542,6 +3542,13 @@ html:has(dialog[open]){overflow:hidden}
 /* Which target the R:R refers to, inline with the label rather than a
    separate row — it qualifies the number, it is not a fact of its own. */
 .kk-q{font-style:normal;font-size:var(--t-1);color:var(--dim);letter-spacing:0}
+/* A results date inside ten days is a caution, which is what amber now
+   exclusively means. */
+.vv.warn{color:var(--warn)}
+.cardmeta b.warn{color:var(--warn)}
+.cardmeta b.up{color:var(--up)} .cardmeta b.dn{color:var(--down)}
+/* Manrope has tabular figures; they were never requested here. */
+.cardmeta b{font-variant-numeric:tabular-nums}
 /* ── FOUR FACTS, ALL FOUR VISIBLE ─────────────────────────────────────────
    The strip is a horizontal scroller, which on a 390px phone means the fourth
    cell is off-screen with nothing saying so: "SCREEN RUN 2026-09-0…" clipped

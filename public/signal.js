@@ -1827,6 +1827,36 @@
       <div><span class="kk">ROCE</span><span class="vv ${dir(p.roce)}">${p.roce != null ? p.roce.toFixed(1) + '%' : '—'}</span></div>
       <div><span class="kk">Piotroski</span><span class="vv">${p.piotroski != null ? p.piotroski + '/9' : '—'}</span></div>
       <div><span class="kk">RSI 14D</span><span class="vv">${p.rsi != null ? Math.round(p.rsi) : '—'}</span></div>
+      ${/* ── FOUR FIGURES THE SCREEN COMPUTES AND NOTHING SHOWED ──────────
+          * sd1y on all 750 rows, r3y_cagr on 635, roce_trend on 679 and
+          * next_earnings on 274 — computed on every build, shipped in a 1.5MB
+          * file the page downloads anyway, and rendered nowhere. The card
+          * showed seven pure technicals a broker gives away.
+          *
+          * Volatility is here because it is the denominator VECTOR ranks on
+          * and the thing that decides position size. ROCE trend is here
+          * because a returns figure without its direction is half a fact —
+          * "18%, peaked" and "18%, improving" are different companies. */''}
+      <div><span class="kk">Volatility <i class="kk-q">1y</i></span><span class="vv">${
+        p.sd1y != null ? Number(p.sd1y).toFixed(0) + '%' : '—'}</span></div>
+      <div><span class="kk">3Y CAGR</span><span class="vv ${dir(p.r3y_cagr)}">${
+        p.r3y_cagr != null ? Number(p.r3y_cagr).toFixed(0) + '%' : '—'}</span></div>
+      <div><span class="kk">ROCE trend</span><span class="vv">${
+        p.roce_trend ? esc(String(p.roce_trend)) : '—'}</span></div>
+      ${(() => {
+        /* ── THE ONE DATE THAT CHANGES A SWING TRADE ──────────────────────
+         * A setup that runs into a results print is a different trade from the
+         * same setup two weeks clear of one, and the screen has known the date
+         * all along. Counted in days rather than shown as a date, because
+         * "in 4 days" is the form the decision is made in. */
+        if (!p.next_earnings) return '<div><span class="kk">Results</span><span class="vv">—</span></div>';
+        const d = new Date(p.next_earnings + 'T00:00:00');
+        const days = Math.round((d - new Date()) / 86400000);
+        const near = days >= 0 && days <= 10;
+        return `<div><span class="kk">Results</span><span class="vv${near ? ' warn' : ''}">${
+          days < 0 ? esc(String(p.next_earnings).slice(5)) :
+          days === 0 ? 'today' : 'in ' + days + 'd'}</span></div>`;
+      })()}
     </div>
     ${p.entry ? `<div class="kv lv-plan">
       <div><span class="kk">Entry</span><span class="vv">${price(p.entry)}</span></div>
@@ -3679,6 +3709,31 @@
           ? Math.round(r.mcap_cr).toLocaleString('en-IN') : '—'} cr</b></span>
         <span><i>Industry</i><b>${esc(r.ind || r.sector || '—')}</b></span>
         <span><i>Accounts to</i><b>${esc(r.fy || '—')}</b></span>
+        ${/* ── FOUR FIGURES THE SCREEN COMPUTES AND NOTHING SHOWED ──────────
+            * sd1y on all 750 rows, r3y_cagr on 635, roce_trend on 679,
+            * next_earnings on 274 — computed every build, shipped inside a
+            * 1.5MB file this page downloads anyway, rendered nowhere.
+            *
+            * Volatility because it is the denominator VECTOR ranks on and the
+            * number that decides position size. ROCE trend because a return
+            * without its direction is half a fact: "18%, peaked" and "18%,
+            * improving" are different companies. And the results date because
+            * a swing setup running into a print is a different trade — counted
+            * in days, which is the form the decision is made in. */''}
+        <span><i>Volatility 1y</i><b>${r.sd1y != null
+          ? Number(r.sd1y).toFixed(0) + '%' : '—'}</b></span>
+        <span><i>3Y CAGR</i><b class="${dir(r.r3y_cagr)}">${r.r3y_cagr != null
+          ? Number(r.r3y_cagr).toFixed(0) + '%' : '—'}</b></span>
+        <span><i>ROCE trend</i><b>${r.roce_trend ? esc(String(r.roce_trend)) : '—'}</b></span>
+        ${(() => {
+          if (!r.next_earnings) return '<span><i>Results</i><b>—</b></span>';
+          const d = new Date(String(r.next_earnings).slice(0, 10) + 'T00:00:00');
+          const days = Math.round((d - new Date()) / 86400000);
+          const near = days >= 0 && days <= 10;
+          return `<span><i>Results</i><b class="${near ? 'warn' : ''}">${
+            days < 0 ? esc(String(r.next_earnings).slice(5, 10))
+            : days === 0 ? 'today' : 'in ' + days + 'd'}</b></span>`;
+        })()}
       </div>
       ${cardLine}
       <div id="ccHost" class="cc"><div class="sk" style="height:150px"></div></div>
