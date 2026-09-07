@@ -82,7 +82,7 @@ try {
       errs.push(`http ${r.status()} ${new URL(r.url()).pathname}${new URL(r.url()).search}`);
   });
 
-  await p.goto(SITE + "#/markets", { waitUntil: "domcontentloaded" });
+  await p.goto(SITE + "/markets", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE);
 
   /* ONE RELOAD BEFORE JUDGING THE BOARD.
@@ -159,7 +159,7 @@ try {
 
   /* ── BRIEF ───────────────────────────────────────────────────────────── */
   console.log("\n  /brief");
-  await p.goto(SITE + "#/brief", { waitUntil: "domcontentloaded" });
+  await p.goto(SITE + "/brief", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE);
 
   const body = await p.locator("main").innerText();
@@ -277,7 +277,7 @@ try {
    * briefSym was consumed on first use, so the 60-second repaint fell back to
    * "highest reward-to-risk" and quietly changed which company was on screen
    * while someone was reading it. */
-  await p.goto(SITE + "#/signals", { waitUntil: "domcontentloaded" });
+  await p.goto(SITE + "/signals", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE);
   /* THERE MAY BE NO CARDS, AND THAT IS A REAL STATE.
    *
@@ -344,7 +344,7 @@ try {
    * page still looks finished, which is the failure this whole file exists for.
    */
   console.log("\n  premium build");
-  await p.goto(SITE + "#/", { waitUntil: "domcontentloaded" });
+  await p.goto(SITE + "/", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE);
 
   ok("the hero renders", await p.locator(".hero h1").count() === 1);
@@ -365,7 +365,7 @@ try {
    * broke: this line crashed the run, and every assertion after it, including
    * the route sweep that exists to catch exactly that, never executed. A
    * missing element is a FAILED CHECK, not a dead suite. */
-  const ctaText = await p.locator('.hero-cta a[href="#/brief"]')
+  const ctaText = await p.locator('.hero-cta a[href="/brief"]')
     .innerText({ timeout: 8000 }).catch(() => null);
   ok("the CTA states how long the brief takes",
      !!ctaText && ctaText.includes("60 seconds"), ctaText);
@@ -426,7 +426,7 @@ try {
      tkr && `${tkr.items} items / ${tkr.segs} segments`);
 
   ok("the hero leads with the measured record",
-     (await p.locator(".hero-cta a").first().getAttribute("href")) === "#/signals");
+     (await p.locator(".hero-cta a").first().getAttribute("href")) === "/signals");
   ok("the header CTA names the product action",
      (await p.locator(".btn-cta").innerText()).toLowerCase().includes("brief"));
   /* THE CHIP REPORTS A MEASUREMENT, NOT A LABEL.
@@ -448,7 +448,7 @@ try {
   // Empty on Today on purpose — a breadcrumb reading "Today" on Today is noise.
   ok("the contextual label is empty on Today",
      (await p.locator("#barWhere").innerText()).trim() === "");
-  await p.goto(SITE + "#/markets", { waitUntil: "domcontentloaded" });
+  await p.goto(SITE + "/markets", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE);
   ok("the contextual label follows the route",
      (await p.locator("#barWhere").innerText()).trim() === "Markets");
@@ -463,14 +463,14 @@ try {
   await p.keyboard.press("Enter");
   await p.waitForTimeout(2500);
   ok("the palette navigates on Enter",
-     (await p.evaluate(() => location.hash)) === "#/methodology");
+     (await p.evaluate(() => location.pathname)) === "/methodology");
 
   // Four pages that publish what the product can and cannot do. A disclosure
   // page that renders empty is worse than no page.
-  for (const [route, must] of [["#/methodology", "multiples of the risk"],
-                               ["#/sources", "Yahoo"],
-                               ["#/terms", "not investment advice"],
-                               ["#/privacy", "No accounts"]]) {
+  for (const [route, must] of [["/methodology", "multiples of the risk"],
+                               ["/sources", "Yahoo"],
+                               ["/terms", "not investment advice"],
+                               ["/privacy", "No accounts"]]) {
     await p.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(3500);
     const t = await p.locator("main").innerText();
@@ -478,7 +478,7 @@ try {
        t.length > 600 && t.toLowerCase().includes(must.toLowerCase()), t.length);
   }
 
-  await p.goto(SITE + "#/signals", { waitUntil: "domcontentloaded" });
+  await p.goto(SITE + "/signals", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE);
   /* THE CURVE IS SCOPED TO LAUNCH, so it is legitimately empty until a signal
    * published on or after that date closes. The assertion is therefore not
@@ -520,7 +520,7 @@ try {
    * that click), and that an alert actually fires rather than merely saving.
    */
   console.log("\n  watchlist and alerts");
-  await p.goto(SITE + "#/screen", { waitUntil: "domcontentloaded" });
+  await p.goto(SITE + "/screen", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 6000);
   ok("the price line is drawn for the screen rows", await p.locator(".scr-r .pl").count() > 20);
   ok("its 200-day and 50-day markers are placed",
@@ -551,7 +551,7 @@ try {
    * that demanded N accumulating names would fail on a quiet quarter, which is
    * a real market state and not a defect. */
   console.log("\n  institutional movement");
-  await p.goto(SITE + "#/screen", { waitUntil: "domcontentloaded" });
+  await p.goto(SITE + "/screen", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 6000);
 
   const instiFeed = await p.evaluate(async () => {
@@ -618,7 +618,10 @@ try {
 
     // The card is where the full reading lives.
     const sym = Object.keys(instiFeed.rows).find(s => instiFeed.rows[s].quality === "complete");
-    await p.evaluate(s => { location.hash = "#/screen"; window.__t = s; }, sym);
+    // Routing is pushState now; assigning location.hash navigates nowhere.
+    await p.goto(SITE + "/screen", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(SETTLE + 5000);
+    await p.evaluate(s => { window.__t = s; }, sym);
     await p.waitForTimeout(400);
     const opened = await p.evaluate(async (s) => {
       const row = document.querySelector(`.scr-r[data-sym="${s}"]`);
@@ -647,7 +650,7 @@ try {
    * page's own record block was written after the first. A number a reader can
    * compare between two pages is worth a test. */
   console.log("\n  one population across surfaces");
-  await p.goto(SITE + "#/brief", { waitUntil: "domcontentloaded" });
+  await p.goto(SITE + "/brief", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 5000);
   const briefTxt = await p.locator("main").innerText();
   const briefN = Number((briefTxt.match(/highest-scoring of the\s+([\d,]+)\s+signals/) || [])[1]?.replace(/,/g, ""));
@@ -656,7 +659,7 @@ try {
     // Whatever it is, it cannot be the all-time open count — that population
     // reaches back before launch and is several times larger.
     ok("the brief counts since launch, not all time", briefN < 120, briefN);
-    await p.goto(SITE + "#/", { waitUntil: "domcontentloaded" });
+    await p.goto(SITE + "/", { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(SETTLE + 4000);
     const homeTxt = await p.locator("main").innerText();
     const homeN = Number((homeTxt.match(/([\d,]+)\s+published since/) || [])[1]?.replace(/,/g, ""));
@@ -666,13 +669,25 @@ try {
     }
   }
 
+  /* THE FLOOR IS THE THIRD SURFACE TO GET THIS WRONG. It counted every OPEN
+   * row ever and reported 182 open positions while the brief said 33. Any
+   * surface that shows an open count must draw from the same population. */
+  await p.goto(SITE + "/engines", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE + 5000);
+  const floorTxt = await p.locator("main").innerText();
+  const floorOpen = Number((floorTxt.match(/Open positions\s+([\d,]+)/i) || [])[1]?.replace(/,/g, ""));
+  if (Number.isFinite(floorOpen)) {
+    ok("the floor's open count is a since-launch population", floorOpen < 120, floorOpen);
+  }
+
   /* ── THE EXPANDING ROW ──────────────────────────────────────────────────
    * 61 IPO rows of eight columns each and no way to open one. */
   console.log("\n  expanding rows");
-  await p.goto(SITE + "#/ipo", { waitUntil: "domcontentloaded" });
+  await p.goto(SITE + "/ipo", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 5000);
   const xrN = await p.locator("#ipotbl .xr").count();
   ok("the listing rows expand", xrN > 10, xrN);
+
   if (xrN) {
     const row = p.locator("#ipotbl .xr").first();
     ok("collapsed rows report it", await row.getAttribute("aria-expanded") === "false");
@@ -697,7 +712,56 @@ try {
     ok("filtering leaves no orphaned detail panels", orphans === 0, orphans);
   }
 
-  await p.goto(SITE + "#/watch", { waitUntil: "domcontentloaded" });
+  /* ── ROUTING: REAL PATHS, AND OLD LINKS STILL LAND ──────────────────────
+   * The migration off hash routing rewrites every URL ever shared. The shim
+   * that keeps /#/markets working is the single most breakable thing in it,
+   * and its failure mode is silent: the old link renders the front page and
+   * looks like a slow load. */
+  console.log("\n  routing");
+  for (const [route, wantIn] of [["/markets", "Markets"], ["/screen", "Screen"],
+                                 ["/signals", "ledger"], ["/engines", "floor"]]) {
+    await p.goto(SITE + route, { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(SETTLE + 2500);
+    const title = await p.title();
+    ok(`${route} serves its own <title>`, title.toLowerCase().includes(wantIn.toLowerCase()), title);
+    const canon = await p.evaluate(() => document.querySelector('link[rel="canonical"]')?.getAttribute("href"));
+    ok(`${route} canonical names itself`, String(canon).endsWith(route), canon);
+    const og = await p.evaluate(() => document.querySelector('meta[property="og:title"]')?.getAttribute("content"));
+    ok(`${route} has its own og:title`, String(og).toLowerCase().includes(wantIn.toLowerCase()), og);
+  }
+  // The shim: an old shared link must land on the page it named.
+  await p.goto(SITE + "/#/engines", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE + 2500);
+  ok("an old #/ link is rewritten to the real path",
+     (await p.evaluate(() => location.pathname)) === "/engines",
+     await p.evaluate(() => location.pathname));
+  ok("...and renders that route, not the front page",
+     (await p.title()).toLowerCase().includes("floor"), await p.title());
+
+  // The company page: a card with a URL.
+  await p.goto(SITE + "/stock/RELIANCE", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE + 6000);
+  ok("/stock/:sym renders the company", (await p.title()).startsWith("RELIANCE"), await p.title());
+  ok("the company page sets its own og:title",
+     (await p.evaluate(() => document.querySelector('meta[property="og:title"]')?.getAttribute("content") || "")).startsWith("RELIANCE"));
+  ok("an unknown symbol says so rather than erroring", await (async () => {
+    await p.goto(SITE + "/stock/NOTAREALTICKER", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(SETTLE + 5000);
+    const txt = await p.locator("main").innerText();
+    return /not in the 750-name screen/i.test(txt);
+  })());
+
+  /* THE .NS SUFFIX. Symbols reach the card from feeds that carry the exchange
+   * suffix; SCREEN stores bare ones. The mismatch reported itself as "not in
+   * the 750-name screen", a sentence about the universe used for a string
+   * format problem. */
+  await p.goto(SITE + "/stock/PAYTM.NS", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE + 6000);
+  ok("a .NS symbol resolves to the bare one",
+     !/not in the 750-name screen/i.test(await p.locator("main").innerText()),
+     await p.title());
+
+  await p.goto(SITE + "/watch", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 4000);
   ok("the watchlist shows the starred name",
      (await p.locator("main").innerText()).includes(wSym));
@@ -726,7 +790,7 @@ try {
   console.log("\n  prefers-reduced-motion: reduce");
   const rmCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
   const rp = await rmCtx.newPage();
-  await rp.goto(SITE + "#/brief", { waitUntil: "domcontentloaded" });
+  await rp.goto(SITE + "/brief", { waitUntil: "domcontentloaded" });
   await rp.waitForTimeout(SETTLE);
   ok("every section is visible", await rp.locator(".b-reveal:not(.in)").count() === 0);
   ok("every chart overlay is visible", await rp.locator(".b-ov:not(.on)").count() === 0);
@@ -753,7 +817,7 @@ try {
   console.log("\n  /funds — the screen, and one fund's sheet");
   const fCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await fCtx.newPage();
-  await page.goto(SITE + "#/funds", { waitUntil: "domcontentloaded" });
+  await page.goto(SITE + "/funds", { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(SETTLE);
 
   const feed = await page.evaluate(async () => {
@@ -827,9 +891,9 @@ try {
    * So this sweeps every route and asserts both: no thrown error, and no
    * rendered failure panel. The second is the one that would have caught it. */
   console.log("\n  every route — thrown errors and rendered failures");
-  const ROUTES = ["#/", "#/markets", "#/signals", "#/brief", "#/screen", "#/ideas",
-                  "#/news", "#/ipo", "#/funds", "#/watch", "#/engines", "#/join",
-                  "#/methodology", "#/sources", "#/terms", "#/privacy"];
+  const ROUTES = ["/", "/markets", "/signals", "/brief", "/screen", "/ideas",
+                  "/news", "/ipo", "/funds", "/watch", "/engines", "/join",
+                  "/methodology", "/sources", "/terms", "/privacy"];
   const swCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const sw = await swCtx.newPage();
 
@@ -870,7 +934,7 @@ try {
    * cannot announce its own failure. A deliberate throw is injected and the
    * POST it should produce is intercepted — asserting the wiring end to end
    * rather than that a listener was merely attached. */
-  await sw.goto(SITE + "#/methodology", { waitUntil: "domcontentloaded" });
+  await sw.goto(SITE + "/methodology", { waitUntil: "domcontentloaded" });
   await sw.waitForTimeout(3000);
   await sw.evaluate(() => { setTimeout(() => { throw new Error("ui-suite canary"); }, 0); });
   await sw.waitForTimeout(3000);
@@ -891,12 +955,12 @@ try {
   // three others), were the six that were never measured. A sideways scroll is
   // the defect this whole block exists to catch, and it was unmeasured exactly
   // where it was most likely.
-  for (const route of ["#/", "#/markets", "#/screen", "#/ideas", "#/news", "#/ipo",
-                       "#/funds", "#/watch", "#/engines", "#/signals", "#/brief", "#/methodology"]) {
+  for (const route of ["/", "/markets", "/screen", "/ideas", "/news", "/ipo",
+                       "/funds", "/watch", "/engines", "/signals", "/brief", "/methodology"]) {
     await mp.goto(SITE + route, { waitUntil: "domcontentloaded" });
     // The screen fetches 1.4 MB before it lays out; the shorter settle used by
     // the other routes measured it mid-skeleton and would have passed anything.
-    await mp.waitForTimeout(route === "#/screen" ? SETTLE + 6000 : SETTLE);
+    await mp.waitForTimeout(route === "/screen" ? SETTLE + 6000 : SETTLE);
     const ox = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     // <= 0, not === 0 — see the note on the 1440 check above.
     ok(`${route} does not scroll sideways`, ox <= 0, ox);

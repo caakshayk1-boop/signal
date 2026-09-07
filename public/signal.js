@@ -63,7 +63,7 @@
     try {
       const msg = String(message || '').slice(0, 500);
       if (!msg || errSent >= 5) return;
-      const route = (location.hash || '#/').slice(0, 120);
+      const route = (location.pathname || '/').slice(0, 120);
       const key = route + '|' + msg;
       if (ERR_SEEN.has(key)) return;
       ERR_SEEN.add(key);
@@ -1624,7 +1624,7 @@
                    Earlier signals stay on
                    <a href="https://news.askakshay.com">news.askakshay.com</a>.`
                 : `The ledger is not answering this minute —
-                   <a href="#/signals">open the record</a> rather than take this page's word.`}
+                   <a href="/signals">open the record</a> rather than take this page's word.`}
               </p>`;
           }
           /* BELOW FIVE, THE HEADLINE STATES THE COUNT AND NOT A VERDICT.
@@ -1668,9 +1668,9 @@
             </p>`;
         })()}
         <div class="hero-cta">
-          <a class="btn-hero" href="#/signals">The record
+          <a class="btn-hero" href="/signals">The record
             <em>every trade, graded, with the losses</em></a>
-          <a class="btn-ghost" href="#/brief">Today’s brief · ${CURVE_MIN} →</a>
+          <a class="btn-ghost" href="/brief">Today’s brief · ${CURVE_MIN} →</a>
         </div>
       </div>
       <div class="hero-r">
@@ -1854,7 +1854,7 @@
               tapped — the floor now holds what each engine fires on, where its
               stop comes from and how it can be wrong, so the roster points at
               it rather than restating a fraction of it. */''}
-          ${rows.map(r => `<a class="rank-r eng" href="#/engines"
+          ${rows.map(r => `<a class="rank-r eng" href="/engines"
               aria-label="${esc(r.label)} — open the engine floor">
             <span class="s"><b>${esc(r.label)}</b></span>
             <span class="x">${r.pub || '—'}</span>
@@ -1864,9 +1864,9 @@
           </a>`).join('')}
         </div>
         <p class="hint">An engine is trusted with capital at 30 closed trades and t&nbsp;≥&nbsp;2.
-          None is there. <a href="#/engines">What each engine fires on</a> ·
-          <a href="#/methodology">How this is measured</a> ·
-          <a href="#/signals">Every trade, one by one</a></p>`,
+          None is there. <a href="/engines">What each engine fires on</a> ·
+          <a href="/methodology">How this is measured</a> ·
+          <a href="/signals">Every trade, one by one</a></p>`,
         `${LR.published} published · ${LR.trades} closed`);
     }
 
@@ -1960,7 +1960,7 @@
           : `The live wire did not answer, so this is the daily file. The first four are the stories
              touching the most screened names and stay put for the day; the rest rotate every twenty
              minutes so you see more of it.`}
-          <a href="#/news" class="more-l">Read all ${wire.length}, with the names each one touches &rarr;</a></p>`
+          <a href="/news" class="more-l">Read all ${wire.length}, with the names each one touches &rarr;</a></p>`
       : `<div class="empty">The wire is quiet.</div>`,
       /* "18 stories" over a list of six is a caption contradicting the thing
        * it captions. Say what is on screen, and link to the rest. */
@@ -2623,7 +2623,7 @@
             <span class="t5t">${esc(x.title || '')}</span>
             ${x.summary ? `<span class="t5d">${esc(String(x.summary).slice(0, 170))}</span>` : ''}
           </a>`).join('')}</div>
-          <p class="hint"><a class="more-l" href="#/news">Open the full wire, with the names each story touches &rarr;</a></p>`
+          <p class="hint"><a class="more-l" href="/news">Open the full wire, with the names each story touches &rarr;</a></p>`
         : `<div class="empty">The wire is quiet.</div>`}`);
     }
 
@@ -2873,7 +2873,7 @@
         wk ? ['This week', wk, 'top picks'] : null,
         ['Cleared for capital', '0', 'of 7 engines', 'dn'],
       ], 'No engine has 30 closed trades at t&nbsp;≥&nbsp;2, so nothing here is a '
-       + 'recommendation. <a href="#/signals">The record</a> is the reason.');
+       + 'recommendation. <a href="/signals">The record</a> is the reason.');
     }
 
     /* ── MULTIBAGGERS LEAD ────────────────────────────────────────────────
@@ -3183,7 +3183,12 @@
       return Number.isFinite(v) && v > 0 ? v : null;
     };
     const ipoDetail = (r) => {
-      const issue = Number(r.price_high) || bandTop(r.price_band);
+      // recent_listed carries NO price_high — that field exists only on the
+      // open and upcoming rows. Reading it here was a dead branch hidden behind
+      // an `||`, which is how the first version of this panel came to tell all
+      // sixty rows that the issue price "could not be read". The band is the
+      // only source a listed row has, so it is the only one consulted.
+      const issue = bandTop(r.price_band);
       const first = Number(r.first_close);
       const pop = Number.isFinite(issue) && Number.isFinite(first) && issue
         ? (first - issue) / issue * 100 : null;
@@ -3620,7 +3625,7 @@
         ${INSTI_META.universe} names${INSTI_META.latest_period_end
           ? ` · latest filing ${esc(INSTI_META.latest_period_end)}` : ''}.
         Names with no comparable quarter are excluded from these filters rather
-        than counted as unchanged. <a href="#/methodology">How this is measured →</a></p>
+        than counted as unchanged. <a href="/methodology">How this is measured →</a></p>
     </section>`;
   };
 
@@ -3872,9 +3877,17 @@
             <button type="button" class="pg" data-pg="next" ${scrPage >= pages - 1 ? 'disabled' : ''}>Next →</button>
           </div>`;
           const key = PLKEY;
-          const title = scrPresets.size
-            ? [...scrPresets].map(k => PRESETS[k][0]).join(' + ')
-            : PRESETS.all[0];
+          /* THE HEADING HAS TO NAME EVERY ACTIVE FILTER.
+           * It read only the price/fundamental chips, so a screen filtered to
+           * "FII accumulating + Institutional turnaround" was headed
+           * "Everything" above 20 of 750 rows — a heading that contradicts the
+           * count beside it. */
+          const parts = [...scrPresets].map(k => PRESETS[k][0]);
+          if (instiChip) parts.push(INSTI_CHIPS[instiChip][0]);
+          if (instiPreset) parts.push(INSTI_PRESETS[instiPreset][0]);
+          if (instiTrend) parts.push(`${instiTrendKey()[1]} rising ${instiTrend}Q+`);
+          if (Object.values(instiAdv).some(v => v !== '')) parts.push('custom ranges');
+          const title = parts.length ? parts.join(' + ') : PRESETS.all[0];
           return sec(title, rows.length ? screenTable(page, from) + heatKey(20, 'Distance from the moving averages') + key + nav
             : `<div class="empty">Nothing matches. Try a different preset or clear the search.</div>`,
             `${rows.length} of ${SCREEN.length}`);
@@ -4214,11 +4227,15 @@
       <span class="i">#</span><span class="s">Name</span>
       <span class="x">Price</span><span class="x">Today</span><span class="x">vs 50D</span>
       <span class="x">vs 200D</span><span class="x">RSI 14D</span><span class="m">1M</span>
+      <span class="x">52w low</span><span class="x">52w high</span>
     </div>
     ${rows.map((r, i) => {
       const v50 = r.sma50 ? (r.price - r.sma50) / r.sma50 * 100 : null;
       const v200 = r.sma200 ? (r.price - r.sma200) / r.sma200 * 100 : null;
-      return `<div class="rank-r scr-r" data-sym="${esc(r.sym)}" role="button" tabindex="0">
+      /* data-sym opens the sheet, which keeps your place in 750 rows.
+       * data-href gives the same row a real destination, so the company page
+       * is reachable and shareable rather than existing only behind a tap. */
+      return `<div class="rank-r scr-r" data-sym="${esc(r.sym)}" data-href="/stock/${encodeURIComponent(r.sym)}" role="button" tabindex="0">
         <span class="i">${(offset || 0) + i + 1}</span>
         <span class="s">${watchBtn(r.sym)}<b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span>${instiBadge(r.sym)}</span>
         <span class="x" data-l="Price" data-px>₹${esc(r.price ?? '—')}</span>
@@ -4230,6 +4247,18 @@
         <span class="x ${dir(v200)} ${heatCell(v200, 20)}" data-l="vs 200D" data-v200>${v200 == null ? '—' : pct(v200)}</span>
         <span class="x" data-l="RSI" style="color:${(r.rsi ?? 50) > 70 ? 'var(--warn)' : (r.rsi ?? 50) < 35 ? 'var(--accent)' : 'var(--dim)'}">${r.rsi != null ? Math.round(r.rsi) : '—'}</span>
         <span class="m ${dir(r.r1m)} ${heatCell(r.r1m, 12)}" data-l="1 month">${pct(r.r1m)}</span>
+        ${/* THE YEAR'S RANGE, AS NUMBERS.
+             The price line under each row already draws where the close sits
+             between the two, but a bar cannot be read off. The distance from
+             each extreme is what makes the pair decision-useful: a 52-week
+             high of 2,008 means nothing until you know the close is 3% under
+             it, and a low means nothing until you know it is 47% above it. */''}
+        <span class="x" data-l="52w low">${r.low52 != null
+          ? `${price(r.low52)}${r.price ? `<i class="u52 up">+${((r.price - r.low52) / r.low52 * 100).toFixed(0)}%</i>` : ''}`
+          : '—'}</span>
+        <span class="x" data-l="52w high">${r.high52 != null
+          ? `${price(r.high52)}${r.price ? `<i class="u52 ${r.price >= r.high52 ? 'up' : 'dn'}">${((r.price - r.high52) / r.high52 * 100).toFixed(0)}%</i>` : ''}`
+          : '—'}</span>
         <span class="pl-w">${priceLine(r)}</span>
       </div>`; }).join('')}</div>`;
 
@@ -4361,25 +4390,33 @@
     draw();
   }
 
-  async function openStock(sym) {
-    if (!SCREEN) {
-      sheet(esc(sym), `<div class="sk" style="height:210px"></div>
-        <p class="hint">Loading the screen — about 260 KB, once per session.</p>`);
-      const r0 = noteLadder(await get('/screen.json'));
-      if (!r0.ok) { sheet(esc(sym), fail('The company card', r0.error)); return; }
-      SCREEN = (r0.data.rows || []).filter(x => x && x.sym);
-    }
-    // The card can be opened from Today, Markets, Ideas or search, none of
-    // which touch the Screen route, so the institutional feed is requested
-    // here too. It resolves instantly on the second card.
-    await loadInsti();
-    const r = (SCREEN || []).find(x => x.sym === sym);
-    if (!r) {
-      sheet(esc(sym), `<div class="empty">${esc(sym)} is not in the 750-name screen,
-        so there is no card for it — it may be an index, a commodity, or a name
-        outside the screened universe.</div>`);
-      return;
-    }
+  /* The same card as a PAGE. The sheet is for keeping your place in a table;
+   * this is for a link you can send someone. One builder, two frames. */
+  const stockPage = (r) => {
+    const { body } = stockCard(r);
+    return `<div class="route-h stock-h">
+        <span class="eyebrow">Company · ${esc(r.sector || 'NSE')}</span>
+        <h1>${watchBtn(r.sym)}${esc(r.sym)}</h1>
+        <p>${esc(r.name || '')}</p>
+      </div>
+      <div class="stock-pg">${body}</div>
+      <p class="hint stock-back"><a href="/screen">← All 750 names</a> ·
+        <a href="/signals">The ledger</a> · <a href="/engines">What fires a signal</a></p>`;
+  };
+  /* The sheet wires its own chart on open; the page has to do the same. */
+  const wireStockPage = (r) => { wireCardChart(r.sym); };
+
+  /* ── THE COMPANY CARD, BUILT ONCE ─────────────────────────────────────────
+   *
+   * Rendered in two places: as a bottom sheet from any table (keeps your place
+   * in a 750-row list) and as the /stock/:sym page (has a URL, so it can be
+   * shared, bookmarked and opened in a tab). They are the SAME markup from
+   * this one function — the alternative is two cards that agree until one of
+   * them is edited, which is the fault this file has already recorded twice
+   * in other places.
+   *
+   * Returns {title, body}. It renders nothing itself and touches no DOM. */
+  function stockCard(r) {
     const bar = (v, max = 100) => `<span class="mini-bar"><i style="width:${Math.max(0, Math.min(100, (v ?? 0) / max * 100)).toFixed(0)}%"></i></span>`;
     const score = (k, l) => r[k] == null ? '' : `<div class="sc-t">
       <span class="sc-l">${esc(l)}</span><span class="sc-v">${Number(r[k]).toFixed(1)}</span>${bar(r[k])}</div>`;
@@ -4441,7 +4478,8 @@
       </div>
     </div>` : '';
 
-    sheet(`${watchBtn(r.sym)}${esc(r.sym)} <small>${esc(r.name || '')}</small>`, `
+    const title = `${watchBtn(r.sym)}${esc(r.sym)} <small>${esc(r.name || '')}</small>`;
+    const body = `
       ${/* LABEL THE NUMBERS. This line read "₹1363.1 · Capital Goods ·
           * ₹10,556 cr · accounts to FY26" — two unexplained figures on the
           * first line of a company card. The first is the close the screen was
@@ -4570,7 +4608,43 @@
       <div class="yoy">${yoy('vs 50-day', r.sma50 ? (r.price - r.sma50) / r.sma50 * 100 : null)}
         ${yoy('vs 200-day', r.sma200 ? (r.price - r.sma200) / r.sma200 * 100 : null)}
         ${yoy('From 52w high', r.from_high)}${yoy('RSI', r.rsi, '')}</div>
-      <div class="card-foot" style="margin-top:14px">${symLinks(r.sym)}</div>`);
+      <div class="card-foot" style="margin-top:14px">${symLinks(r.sym)}</div>`;
+    return { title, body };
+  }
+
+  /* SYMBOLS ARRIVE IN TWO SPELLINGS.
+   * SCREEN stores bare NSE symbols (PAYTM). Several feeds — and every Yahoo
+   * round-trip — carry the exchange suffix (PAYTM.NS). A card opened from one
+   * of those looked the symbol up verbatim, missed, and told the reader the
+   * company "is not in the 750-name screen", which is a sentence about the
+   * universe used to report a string-format mismatch. This repo has already
+   * been bitten by the same suffix in the sector cap and the dedupe guard.
+   * Normalised once, here, so every caller agrees. */
+  const bareSym = (s) => String(s || '').trim().toUpperCase()
+    .replace(/\.(NS|BO|BSE|NSE)$/i, '');
+
+  async function openStock(rawSym) {
+    const sym = bareSym(rawSym);
+    if (!SCREEN) {
+      sheet(esc(sym), `<div class="sk" style="height:210px"></div>
+        <p class="hint">Loading the screen — about 260 KB, once per session.</p>`);
+      const r0 = noteLadder(await get('/screen.json'));
+      if (!r0.ok) { sheet(esc(sym), fail('The company card', r0.error)); return; }
+      SCREEN = (r0.data.rows || []).filter(x => x && x.sym);
+    }
+    // The card can be opened from Today, Markets, Ideas or search, none of
+    // which touch the Screen route, so the institutional feed is requested
+    // here too. It resolves instantly on the second card.
+    await loadInsti();
+    const r = (SCREEN || []).find(x => x.sym === sym);
+    if (!r) {
+      sheet(esc(sym), `<div class="empty">${esc(sym)} is not in the 750-name screen,
+        so there is no card for it — it may be an index, a commodity, or a name
+        outside the screened universe.</div>`);
+      return;
+    }
+    const { title: cardTitle, body: cardBody } = stockCard(r);
+    sheet(cardTitle, cardBody);
 
     /* One live quote, for the name actually being read. Marking all 750 is not
      * possible — Yahoo takes 20 symbols a call — and marking the 60 on screen
@@ -4883,7 +4957,7 @@
         <div class="card-foot">
           <span class="mono" style="font-size:var(--t-2);color:var(--dim)">${esc(String(r.alert_date || r.date || '').slice(0, 10))}
             ${r.status ? ' · ' + esc(String(r.status).replace(/_/g, ' ').toLowerCase()) : ''}</span>
-          ${open ? `<a class="brief-link" href="#/brief" data-brief="${esc(r.symbol)}">Full brief →</a>` : ''}
+          ${open ? `<a class="brief-link" href="/brief" data-brief="${esc(r.symbol)}">Full brief →</a>` : ''}
           ${symLinks(r.symbol, r.tv)}
         </div>
         ${r.remarks ? `<div class="card-body">${esc(engineWords(String(r.remarks).slice(0, 180)))}</div>` : ''}
@@ -5833,7 +5907,7 @@
           <div class="b-vk">The verdict</div>
           <h2>${head}</h2><p>${body}</p>
           <p class="b-vs">The bar is 30 closed trades at a t-statistic of 2 or better.
-            <a href="#/signals">See the record</a>.</p>
+            <a href="/signals">See the record</a>.</p>
         </div>`;
       })()}
 
@@ -6258,7 +6332,7 @@
             <b style="color:var(--b-ink)">They are annual, not quarterly</b> — no quarterly series
             exists in this product, so none is shown. Filings get restated and these figures move.
             Anything the screen does not carry reads <b style="color:var(--b-ink)">Not measured</b>
-            rather than being estimated. <a href="#/methodology" style="color:var(--b-acc)">How the
+            rather than being estimated. <a href="/methodology" style="color:var(--b-acc)">How the
             screen is built →</a></p>`;
         })()}
       </section>
@@ -6885,7 +6959,7 @@
       } else if (ev.key === 'Enter') {
         ev.preventDefault();
         const hit = cmdRows[cmdIdx];
-        if (hit) { cmdEl.close(); location.hash = '#' + hit.href; }
+        if (hit) { cmdEl.close(); go(hit.href); }
       }
     });
     return cmdEl;
@@ -6908,7 +6982,7 @@
       ? SCREEN.filter(r => (r.sym || '').toLowerCase().includes(t)
                         || (r.name || '').toLowerCase().includes(t))
               .slice(0, 6)
-              .map(r => ({ href: '/screen', name: r.sym, desc: r.name || '', kind: 'Company',
+              .map(r => ({ href: '/stock/' + encodeURIComponent(r.sym), name: r.sym, desc: r.name || '', kind: 'Company',
                            sym: r.sym }))
       : [];
     cmdRows = routes.concat(names);
@@ -6925,8 +6999,8 @@
     list.querySelectorAll('.cmd-r').forEach(b => b.addEventListener('click', () => {
       const hit = cmdRows[Number(b.dataset.i)];
       cmdEl.close();
-      if (hit.sym) { location.hash = '#/screen'; setTimeout(() => openStock(hit.sym), 400); }
-      else location.hash = '#' + hit.href;
+      if (hit.sym) go('/stock/' + encodeURIComponent(hit.sym));
+      else go(hit.href);
     }));
     markCmd();
   }
@@ -7239,7 +7313,7 @@
             </div>`).join('')}
           </div>` : ''}
         <p class="sheet-p" style="margin-top:14px">
-          <a href="#/methodology" style="color:var(--accent)">How this is measured →</a></p>`);
+          <a href="/methodology" style="color:var(--accent)">How this is measured →</a></p>`);
     };
   }
 
@@ -7711,7 +7785,7 @@
           ${x.summary ? `<p class="nwc-d">${esc(x.summary)}</p>` : ''}
           ${hits.length ? `<div class="nwc-w">
             <span class="nwc-wl">What it touches</span>
-            <div class="nwc-cs">${hits.map(r => `<a class="nw-c ${dir(r.r1d)}" href="#/screen"
+            <div class="nwc-cs">${hits.map(r => `<a class="nw-c ${dir(r.r1d)}" href="/screen"
                  title="${esc(r.name || '')} — ${esc(r.sector || '')}">
                <b>${esc(r.sym)}</b><i>${pct(r.r1d)}</i></a>`).join('')}</div>
             ${secs.length ? `<p class="nwc-sec">${esc(secs.join(' · '))}${
@@ -7806,8 +7880,15 @@
     const [st, sg] = await Promise.all([get('/api/stats'), get('/api/signals?limit=400')]);
     const live = {};
     if (st.ok) for (const r of (st.data.by_signal_type || [])) live[r.key] = r;
+    /* SINCE LAUNCH, LIKE EVERY OTHER SURFACE. THIRD TIME.
+     * This counted every OPEN row the book has ever carried, so the floor
+     * reported 182 open positions and TIDAL alone showed 49, while the brief
+     * and the front page — which apply sinceLaunch — said 33 and 34. Same
+     * fault as the brief, same fix, and the reason it happened again is that
+     * each surface still derives its own population instead of asking for one. */
     const openBy = {};
     if (sg.ok) for (const r of (sg.data.rows || sg.data.signals || [])) {
+      if (!sinceLaunch(r)) continue;
       if (String(r.status || '').toUpperCase() === 'OPEN') openBy[r.signal_type] = (openBy[r.signal_type] || 0) + 1;
     }
 
@@ -7921,7 +8002,7 @@
          are not evidence of a live edge — the universe they are measured on is the
          750 names screened today, so companies that collapsed and dropped out are
          missing, which flatters every long-only result.
-         <a href="#/methodology">How every number here is made →</a></p>`
+         <a href="/methodology">How every number here is made →</a></p>`
     ));
 
     const openEngine = (k) => {
@@ -7982,6 +8063,64 @@
         if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(); }
       });
     });
+  };
+
+  /* ── /stock/:sym — THE DEEP LINK ──────────────────────────────────────────
+   *
+   * Every company card on this site was a bottom sheet: it had no URL, so it
+   * could not be shared, bookmarked, opened in a new tab, or returned to with
+   * the back button. Under hash routing there was nowhere to put one.
+   *
+   * The sheet stays — it is the right shape for "glance at this while I keep
+   * my place in a 750-row table". This route is the other half: the same card
+   * as a page you can send someone. Both render from ONE function, so they
+   * cannot drift; the sheet is the page in a drawer.
+   *
+   * ORDER IS THE ARGUMENT. Signal first, then why, then evidence, then the
+   * detail — a reader deciding whether to spend more time on a name should not
+   * have to read a balance sheet to find out the engine has no position. */
+  R['/stock/:id'] = async () => {
+    const sym = bareSym(routeParam());
+    if (!sym) { go('/screen', { replace: true }); return; }
+    paint(head(sym, 'Loading the card…', 'Company') + skel('sk-card', 3));
+
+    if (!SCREEN) {
+      const r0 = noteLadder(await get('/screen.json'));
+      if (r0.ok) SCREEN = (r0.data.rows || []).filter(x => x && x.sym);
+    }
+    await loadInsti();
+    const r = (SCREEN || []).find(x => x.sym === sym);
+    if (!r) {
+      paint(head(esc(sym), '', 'Company') + `<div class="empty">
+        <b>${esc(sym)}</b> is not in the 750-name screen, so there is no card for it.
+        It may be an index, a commodity, or a name outside the screened universe.
+        <p style="margin-top:12px"><a href="/screen">Browse the screen →</a></p></div>`);
+      return;
+    }
+    /* The page's own head — ALL of it, not just the title.
+     * The first version set title, description and canonical and left og:* on
+     * the homepage's copy, so a company link pasted into a chat unfurled as
+     * "Signal — Indian markets, every morning". The social card is the half of
+     * the metadata anyone actually sees. */
+    const title = `${sym} — ${r.name || 'Company'} · Signal`;
+    const desc = `${r.name || sym}: price against its own year, trend, quality and value scores, `
+               + `and FII/DII holding quarter on quarter from the company's own filings.`;
+    const url = ORIGIN + '/stock/' + encodeURIComponent(sym);
+    document.title = title;
+    const set = (sel, attr, val) => {
+      const el = document.querySelector(sel);
+      if (el) el.setAttribute(attr, val);
+    };
+    set('meta[name="description"]', 'content', desc);
+    set('link[rel="canonical"]', 'href', url);
+    set('meta[property="og:title"]', 'content', title);
+    set('meta[property="og:description"]', 'content', desc);
+    set('meta[property="og:url"]', 'content', url);
+    set('meta[name="twitter:title"]', 'content', title);
+    set('meta[name="twitter:description"]', 'content', desc);
+
+    paint(stockPage(r));
+    wireStockPage(r);
   };
 
   R['/methodology'] = async () => {
@@ -8151,7 +8290,7 @@
         wrong at any time, without notice.</p>
 
       <p class="prose-note">Built by <b>Akshay Kothari</b>. Questions:
-        <a href="#/join" style="color:var(--accent)">get the brief</a> and reply to it.</p>`));
+        <a href="/join" style="color:var(--accent)">get the brief</a> and reply to it.</p>`));
   };
 
   R['/privacy'] = async () => {
@@ -8173,7 +8312,7 @@
       <h3>Third parties</h3>
       <p>Fonts are served from this domain, not a font network. There is no analytics script, no
         advertising, no social pixel and no session recording. Price requests go to the data
-        providers named on the <a href="#/sources" style="color:var(--accent)">Data sources</a>
+        providers named on the <a href="/sources" style="color:var(--accent)">Data sources</a>
         page; those requests come from the server, not from your browser.</p>
 
       <h3>Logs</h3>
@@ -8257,7 +8396,7 @@
       that has not closed has a mark, not a result.
       ${c.end < 0 ? `<b> This curve ends below zero. That is the record, and it is published for
       the same reason the winners are.</b>` : ''}
-      <a href="#/methodology" style="color:var(--accent)">How R is measured →</a></p>`;
+      <a href="/methodology" style="color:var(--accent)">How R is measured →</a></p>`;
   };
 
   /* Crosshair. Same interaction as the brief's chart so the two read as one
@@ -8472,7 +8611,7 @@
           <span class="m ${dir(r.r1m)}">${pct(r.r1m)}</span>
           <span class="pl-w">${priceLine(r)}</span>
         </div>`; }).join('')}</div>`
-      : `<div class="empty">Nothing starred yet. Open <a href="#/screen" style="color:var(--accent)">Screen</a>
+      : `<div class="empty">Nothing starred yet. Open <a href="/screen" style="color:var(--accent)">Screen</a>
          or any company card and press the star.</div>`,
       syms.length ? `${syms.length} name${syms.length > 1 ? 's' : ''}` : '');
     if (syms.length) out = out.replace(/<\/section>$/, PLKEY + '</section>');
@@ -8565,10 +8704,110 @@
     }
   };
 
-  /* ── router ────────────────────────────────────────────────────────────── */
+  /* ── router ──────────────────────────────────────────────────────────────
+   *
+   * REAL PATHS, NOT HASH FRAGMENTS.
+   *
+   * Every route used to live behind a `#`. A fragment is never sent to the
+   * server, so /markets and /screen were the same URL to everything that is
+   * not a browser running our JavaScript: one title, one description, one
+   * canonical, one Open Graph card for thirteen different pages. A link to the
+   * ledger shared in a chat unfurled as the homepage. The sitemap could
+   * honestly list exactly one URL, and did.
+   *
+   * The Worker now serves index.html for any unknown path
+   * (not_found_handling: single-page-application in wrangler.jsonc), so
+   * /markets is a real URL that returns real HTML, and setHead() below gives
+   * each one its own metadata.
+   *
+   * OLD LINKS STILL WORK. Anything already shared as /#/markets is rewritten
+   * to /markets on boot, before the first render — see the shim at the bottom
+   * of this file. Nothing that was ever shared 404s. */
   const routeOf = () => {
-    const h = (location.hash || '#/').replace(/^#/, '');
-    return R[h] ? h : '/';
+    const p = (location.pathname || '/').replace(/\/+$/, '') || '/';
+    if (R[p]) return p;
+    // /stock/RELIANCE and friends resolve to their pattern.
+    const seg = p.split('/').filter(Boolean);
+    if (seg.length === 2 && R['/' + seg[0] + '/:id']) return '/' + seg[0] + '/:id';
+    return '/';
+  };
+  /* The parameter of a pattern route, e.g. RELIANCE from /stock/RELIANCE. */
+  const routeParam = () => {
+    const seg = (location.pathname || '/').split('/').filter(Boolean);
+    return seg.length === 2 ? decodeURIComponent(seg[1]) : '';
+  };
+
+  /* ONE WAY TO CHANGE ROUTE. Assigning location.hash from three places was how
+   * the old router worked; a pushState scattered the same way would be worse,
+   * because it does not fire an event of its own. */
+  const go = (path, { replace = false } = {}) => {
+    const to = path.startsWith('#') ? path.slice(1) : path;
+    if (to === location.pathname) { render(); return; }
+    history[replace ? 'replaceState' : 'pushState'](null, '', to);
+    render();
+  };
+
+  /* ── PER-ROUTE METADATA ───────────────────────────────────────────────────
+   *
+   * Under hash routing this could not exist: every route was one URL, so every
+   * route shared one title, one description, one canonical and one Open Graph
+   * card. Now that /markets is a real URL, it gets its own.
+   *
+   * Written on every render, from one table, so a route cannot acquire a title
+   * without a description or a canonical — the three drift apart the moment
+   * they live in three places.
+   *
+   * This is NOT a substitute for server-rendered HTML. A crawler that executes
+   * JavaScript sees these; a link-unfurl bot that does not will see whatever
+   * the shell shipped with. scripts/prerender.mjs writes the shell's copy, and
+   * the per-route prerender is the remaining half of that job. */
+  const META = {
+    '/':            ['Signal — Indian markets, every morning',
+                     'Nifty breadth, sector heat, IPO books open now, ranked trade ideas and a public signal ledger. India’s markets in one screen, rebuilt before every open.'],
+    '/markets':     ['Markets — the board, 71 instruments with a year of context',
+                     'Indices, sectors, commodities and currencies on one board, each against its own 52-week range. Sector heat, breadth and what moved today.'],
+    '/screen':      ['Screen — all 750 NSE names, filterable',
+                     'Every name in the universe on price, trend, quality, value and institutional flow. FII and DII holding quarter on quarter, from the company’s own filings.'],
+    '/signals':     ['Signals — the public ledger, wins and losses both',
+                     'Every call this book has published, open and closed, with the entry, stop and targets it was sent with and what it actually did.'],
+    '/engines':     ['The floor — every engine, what fires it, what it has done',
+                     'Nine engines with their trigger conditions, where each stop comes from, how each can be wrong, and its measured record. Nothing is cleared for capital.'],
+    '/ideas':       ['Ideas — this week’s multibaggers and what they were picked at',
+                     'The weekly leadership screen, with the price each name was picked at and what it has done since.'],
+    '/ipo':         ['IPO — books open now, and how last year’s listings did',
+                     'Issues open and upcoming with demand, valuation and peer comparison, plus every recent listing measured against its issue price.'],
+    '/news':        ['News — the wire, and the screened names each story touches',
+                     'Market news filtered to what touches the 750-name screen, with the companies each story affects.'],
+    '/funds':       ['Funds — SIP screen over AMFI NAV, Direct plans only',
+                     'Mutual funds ranked on three- and five-year return against their own drawdown and volatility. Direct plans only, because the cost difference compounds.'],
+    '/watch':       ['Watchlist — your names, sorted by what needs attention',
+                     'The names you follow, ranked by what changed rather than alphabetically.'],
+    '/brief':       ['Today’s brief — one setup, in full',
+                     'The highest-scoring open signal, with every figure behind it: levels, evidence, what would invalidate it, and the engine’s own record.'],
+    '/methodology': ['Methodology — how every number here is made',
+                     'Every engine, every score, every stop and target rule, and the sample size behind each claim.'],
+    '/sources':     ['Data sources — where each number comes from',
+                     'The feed behind every figure on this site, and how fresh each one is.'],
+    '/terms':       ['Terms', 'Terms of use for signal.askakshay.com.'],
+    '/privacy':     ['Privacy', 'What this site stores, and what it does not.'],
+    '/join':        ['The brief — every morning', 'One setup a day, in full, by email.'],
+  };
+  const ORIGIN = 'https://signal.askakshay.com';
+  const setHead = (route) => {
+    const [title, desc] = META[route] || META['/'];
+    const url = ORIGIN + (location.pathname === '/' ? '/' : location.pathname);
+    document.title = title;
+    const set = (sel, attr, val) => {
+      const el = document.querySelector(sel);
+      if (el) el.setAttribute(attr, val);
+    };
+    set('meta[name="description"]', 'content', desc);
+    set('link[rel="canonical"]', 'href', url);
+    set('meta[property="og:title"]', 'content', title);
+    set('meta[property="og:description"]', 'content', desc);
+    set('meta[property="og:url"]', 'content', url);
+    set('meta[name="twitter:title"]', 'content', title);
+    set('meta[name="twitter:description"]', 'content', desc);
   };
 
   /* The route's own name, shown beside the brand. Empty on Today, because a
@@ -8581,6 +8820,8 @@
 
   async function render() {
     const path = routeOf();
+    // Title, description, canonical and the social card, every navigation.
+    setHead(path);
     const where = document.getElementById('barWhere');
     if (where) where.textContent = WHERE[path] || '';
     /* The tab bar scrolls on a phone, so the active tab can be off-screen.
@@ -8688,7 +8929,36 @@
     if (sum) sum.focus();
   });
 
-  window.addEventListener('hashchange', render);
+  /* A pushState fires nothing, so navigation is driven by two things: the
+   * click interceptor below, and the back/forward button. */
+  window.addEventListener('popstate', render);
+
+  /* INTERNAL LINKS ARE INTERCEPTED, EXTERNAL ONES ARE NOT.
+   * A plain left-click on a same-origin link routes in place; anything a
+   * reader does to open a link in a new tab — middle click, cmd, ctrl, shift,
+   * target=_blank, download — is left alone, because breaking that is the
+   * fastest way to make an app feel like it is fighting the browser. */
+  document.addEventListener('click', (ev) => {
+    if (ev.defaultPrevented || ev.button !== 0) return;
+    if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+    const a = ev.target.closest && ev.target.closest('a[href]');
+    if (!a) return;
+    if (a.target && a.target !== '_self') return;
+    if (a.hasAttribute('download') || a.getAttribute('rel') === 'external') return;
+    const href = a.getAttribute('href') || '';
+    if (!href.startsWith('/') || href.startsWith('//')) return;   // external or protocol-relative
+    if (href.startsWith('/api/')) return;
+    ev.preventDefault();
+    go(href);
+  });
+
+  /* OLD SHARED LINKS. /#/markets becomes /markets before anything renders, so
+   * a link posted months ago lands on the page it named rather than the front
+   * page. replaceState, not pushState: the fragment form should not become a
+   * back-button step. */
+  if (/^#\/[a-z]/i.test(location.hash || '')) {
+    history.replaceState(null, '', location.hash.slice(1) + location.search);
+  }
 
   /* LIVE, AROUND THE CLOCK.
    *

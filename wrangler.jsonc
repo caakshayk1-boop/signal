@@ -20,9 +20,15 @@
     // The Worker runs FIRST and falls through to assets, which is what lets
     // /api/* be claimed before a static file of the same name could shadow it.
     "run_worker_first": ["/api/*"],
-    // A hash route (#/markets) never reaches the server, so there is no SPA
-    // rewrite to configure — every real path is a real file.
-    "not_found_handling": "404-page"
+    // EVERY ROUTE IS A REAL PATH NOW, so the server has to answer for paths it
+    // has no file for. /markets, /screen, /signals and /stock/RELIANCE all
+    // return index.html and the router takes it from there.
+    //
+    // This is what makes per-route metadata possible at all: a fragment is
+    // never sent to the server, so under hash routing every page shared the
+    // homepage's title, description, canonical and Open Graph card. A link to
+    // the ledger unfurled in a chat as the front page.
+    "not_found_handling": "single-page-application"
   },
 
   // ── THE PIPELINE WATCHDOG ────────────────────────────────────────────────
