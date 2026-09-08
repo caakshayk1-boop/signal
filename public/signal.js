@@ -3340,6 +3340,7 @@
    * PERCENTAGE POINTS, ALWAYS. FII 10% → 12% is +2.00 pp. It is never +20%,
    * and every label on screen says "pp" so the two can never be read as one.  */
 
+  let RADAR_BREADTH = null, RADAR_NODES = null;
   let INSTI = null;                    // sym → the precomputed row
   let INSTI_META = null;               // coverage and period, for the footnote
   let instiChip = '';                  // one of INSTI_CHIPS, or none
@@ -6928,6 +6929,7 @@
     ['/news', 'News', 'The full wire, and the screened names each story touches'],
     ['/signals', 'Signals', 'The public ledger — wins and losses'],
     ['/brief', 'Brief', 'Today’s setup, in full'],
+    ['/radar', 'Signal radar', 'What the market is doing, and which names carry it'],
     ['/engines', 'The floor', 'Every engine — what fires it, and what it has done'],
     ['/methodology', 'Methodology', 'How every number on this site is made'],
     ['/sources', 'Data sources', 'Where the prices come from, and what that means'],
@@ -8123,6 +8125,258 @@
     wireStockPage(r);
   };
 
+  /* ── SIGNAL RADAR ─────────────────────────────────────────────────────────
+   *
+   * One screen for "what is the market doing, and which names are carrying it".
+   *
+   * THE SCORE IS A MODEL AND SAYS SO. There was no 0–100 per-stock composite in
+   * this data; it is built here from four things the screen already measures,
+   * and every component is printed beside the total. The alternative — a bare
+   * number — is the thing this site exists not to do.
+   *
+   * IT DOES NOT INVENT A SECOND VOCABULARY. A radar with STRONG_BUY / BUY /
+   * ACCUMULATING / WEAKENING labels would be a second taxonomy competing with
+   * the verdict already published on every row of the screen (BUY / WAIT /
+   * WATCH / AVOID, from verdict.py). Two vocabularies for one idea is how a
+   * product stops being trusted, so the radar shows the EXISTING verdict and
+   * uses the score only for strength.
+   *
+   * MOBILE IS NOT A SHRUNKEN RADAR. Eight nodes on a ring is unreadable at
+   * 375px, so the phone gets a ranked vertical feed of the same data and the
+   * ring is opt-in. Same numbers, different shape.
+   *
+   * MOTION IS CSS. requestAnimationFrame does not run in a hidden tab — a trap
+   * this repo has already hit — so an rAF-driven pulse would freeze mid-frame
+   * and the radar would look dead on return. */
+
+  /* Bounded 0–100 from a value's position in a range. Saturating, so one
+   * outlier cannot own a component. */
+  const band = (v, lo, hi) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return null;
+    return Math.max(0, Math.min(100, ((n - lo) / (hi - lo)) * 100));
+  };
+  const avg = (xs) => {
+    const v = xs.filter(x => x != null);
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  };
+
+  /* The four components. Each returns 0–100 or null; a missing one is dropped
+   * from the mean rather than scored zero, which would push every thinly
+   * covered name toward the middle and call that "neutral". */
+  const radarParts = (r) => {
+    const x = instiOf(r.sym);
+    const trend = avg([
+      r.sma50 && r.price ? band((r.price - r.sma50) / r.sma50 * 100, -8, 12) : null,
+      r.sma200 && r.price ? band((r.price - r.sma200) / r.sma200 * 100, -20, 30) : null,
+      r.above_mas != null ? band(r.above_mas, 0, 3) : null,
+    ]);
+    const momentum = avg([
+      band(r.r1m, -12, 14), band(r.r3m, -20, 28),
+      r.rs3m != null ? band(r.rs3m, -1.2, 1.6) : null,
+    ]);
+    const volume = r.vol_spike != null ? band(r.vol_spike, 0.7, 2.6) : null;
+    // Institutional is the only component with a real external source.
+    const institutional = x && x.quality === 'complete' && x.score != null ? x.score : null;
+    return { trend, momentum, volume, institutional };
+  };
+  const RADAR_W = { momentum: 0.30, trend: 0.30, volume: 0.20, institutional: 0.20 };
+  const radarScore = (parts) => {
+    const live = Object.entries(parts).filter(([, v]) => v != null);
+    if (live.length < 2) return null;             // two components is not a score
+    const w = live.reduce((s, [k]) => s + RADAR_W[k], 0);
+    return Math.round(live.reduce((s, [k, v]) => s + RADAR_W[k] * v, 0) / w);
+  };
+
+  /* MARKET CORE. Breadth is the honest centre of "what is the market doing" —
+   * an index level says what fifty weighted names did, breadth says what 750
+   * actually did. Every term is printed in the drawer. */
+  const marketCore = (b) => {
+    if (!b) return null;
+    const rows = [
+      ['Breadth · above the 50-day', band(b.above50, 20, 80), 30],
+      ['Trend · above the 200-day', band(b.above200, 25, 85), 25],
+      ['Participation · advancing', band(b.counted ? b.advancing / b.counted * 100 : null, 25, 75), 20],
+      ['Momentum · median 1-month', band(b.median_1m, -8, 8), 15],
+      ['Leadership · at a 52-week high', band(b.counted ? b.at_52w_high / b.counted * 100 : null, 0, 8), 10],
+    ].filter(r => r[1] != null);
+    if (!rows.length) return null;
+    const wsum = rows.reduce((s, r) => s + r[2], 0);
+    const score = Math.round(rows.reduce((s, r) => s + r[1] * r[2], 0) / wsum);
+    const state = score >= 66 ? ['Risk-on', 'up'] : score >= 45 ? ['Neutral', ''] : ['Risk-off', 'dn'];
+    return { score, state, rows, wsum };
+  };
+
+  const VERDICT_LOOK = {
+    BUY:   ['up',   'Buy'],
+    WAIT:  ['warn', 'Wait for entry'],
+    WATCH: ['',     'Watch'],
+    AVOID: ['dn',   'Avoid'],
+  };
+  const strengthWord = (s) => s == null ? 'Not scored'
+    : s >= 75 ? 'Strong' : s >= 60 ? 'Firm' : s >= 45 ? 'Moderate' : s >= 30 ? 'Soft' : 'Weak';
+
+  R['/radar'] = async () => {
+    const shell = body => head('Signal radar',
+      'What the market is doing, and which names are carrying it.', 'Radar') + body;
+    paint(shell(`<div class="sk" style="height:420px"></div>`));
+
+    if (!SCREEN) {
+      const r0 = noteLadder(await get('/screen.json'));
+      if (!r0.ok) { paint(shell(fail('The radar', r0.error))); return; }
+      SCREEN = (r0.data.rows || []).filter(x => x && x.sym);
+      RADAR_BREADTH = r0.data.breadth || null;
+    }
+    await loadInsti();
+    const core = marketCore(RADAR_BREADTH);
+
+    /* RANKED, NOT SAMPLED. Liquidity is a gate rather than a term: a name that
+     * cannot be bought does not become interesting because its score is high. */
+    const ranked = SCREEN
+      .filter(r => (r.turnover_cr ?? 0) >= 5)
+      .map(r => { const parts = radarParts(r); return { r, parts, score: radarScore(parts) }; })
+      .filter(n => n.score != null)
+      .sort((a, b) => b.score - a.score);
+
+    if (!ranked.length) {
+      paint(shell(`<div class="empty">No name has enough measured components to score today.
+        The radar needs at least two of trend, momentum, volume and institutional flow.</div>`));
+      return;
+    }
+    const nodes = ranked.slice(0, 8);
+    RADAR_NODES = nodes;
+
+    paint(shell(
+      (core ? `<section class="rd-core-wrap">
+        <button type="button" class="rd-core" id="rdCore" aria-expanded="false" aria-controls="rdCoreD">
+          <span class="rd-core-k">Market signal</span>
+          <span class="rd-core-n ${core.state[1]}">${core.score}<em>/100</em></span>
+          <span class="rd-core-s ${core.state[1]}">${core.state[0]}</span>
+          <span class="rd-core-h">How this is built ▾</span>
+        </button>
+        <div class="rd-core-d" id="rdCoreD" hidden>
+          ${core.rows.map(([l, v, w]) => `<div class="rd-cr">
+            <span class="rd-cw">${w}%</span><span class="rd-cl">${esc(l)}</span>
+            <span class="rd-cv">${Math.round(v)}</span>
+            <span class="rd-cb"><i style="width:${Math.round(v)}%"></i></span>
+          </div>`).join('')}
+          <p class="rd-cn">A weighted reading of breadth over <b>${RADAR_BREADTH.counted}</b> names,
+            as of ${esc(RADAR_BREADTH.as_of || '—')}. It describes the market, not any one stock,
+            and it is a <b>model</b> — every term and weight is above.</p>
+        </div>
+      </section>` : '') +
+      `<div class="rd-stage">${radarSvg(nodes)}</div>` +
+      sec('Top signals', `<div class="rd-feed">${nodes.map((n, i) => radarRow(n, i)).join('')}</div>`,
+          `${nodes.length} of ${ranked.length} scored`) +
+      `<p class="hint rd-foot"><b>The score is a model, not a measurement.</b> It weights
+        momentum 30, trend 30, volume 20 and institutional flow 20, over the screen's own
+        fields; a name missing a component is scored on the rest rather than penalised.
+        The verdict beside it (Buy / Wait / Watch / Avoid) is the screen's own reading and is
+        not derived from this score. Names under ₹5 cr of daily turnover are excluded.
+        <a href="/methodology">How every number here is made →</a></p>`
+    ));
+    wireRadar();
+  };
+
+  /* The ring. SVG, laid out from the node count so nothing overlaps, and hidden
+   * on a phone by CSS in favour of the list below it. */
+  const radarSvg = (nodes) => {
+    const W = 680, H = 420, cx = W / 2, cy = H / 2;
+    const n = nodes.length;
+    return `<svg class="rd-svg" viewBox="0 0 ${W} ${H}" role="img"
+      aria-label="Signal radar: ${nodes.map(x => `${x.r.sym} scores ${x.score}`).join(', ')}">
+      <circle cx="${cx}" cy="${cy}" r="150" class="rd-ring"/>
+      <circle cx="${cx}" cy="${cy}" r="100" class="rd-ring"/>
+      ${nodes.map((nd, i) => {
+        const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+        // Stronger signals sit closer in. Distance carries meaning.
+        const rad = 96 + (100 - nd.score) * 0.75;
+        const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
+        const w = 0.6 + (nd.score / 100) * 2.2;
+        const cls = nd.score >= 60 ? 'is-up' : nd.score < 40 ? 'is-dn' : '';
+        return `<line class="rd-link ${cls}" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"
+                  stroke-width="${w.toFixed(2)}"/>
+                <g class="rd-node ${cls}" data-rsym="${esc(nd.r.sym)}" tabindex="0" role="button"
+                   aria-label="${esc(nd.r.sym)}, score ${nd.score}">
+                  <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(9 + nd.score / 14).toFixed(1)}"/>
+                  <text x="${x.toFixed(1)}" y="${(y - 18).toFixed(1)}">${esc(nd.r.sym)}</text>
+                  <text class="rd-ns" x="${x.toFixed(1)}" y="${(y + 26).toFixed(1)}">${nd.score}</text>
+                </g>`;
+      }).join('')}
+      <circle cx="${cx}" cy="${cy}" r="40" class="rd-hub"/>
+      <text class="rd-hubt" x="${cx}" y="${cy + 5}">SIGNAL</text>
+    </svg>`;
+  };
+
+  const radarRow = (nd, i) => {
+    const r = nd.r, x = instiOf(r.sym);
+    const v = (r.vd && r.vd.c) || '';
+    const [vcls, vlabel] = VERDICT_LOOK[v] || ['', 'Not rated'];
+    const p = nd.parts;
+    const bar = (l, val) => `<span class="rd-p"><em>${esc(l)}</em>
+      <i><b style="width:${val == null ? 0 : Math.round(val)}%"></b></i>
+      <u>${val == null ? '—' : Math.round(val)}</u></span>`;
+    return `<article class="rd-row" data-rsym="${esc(r.sym)}" role="button" tabindex="0">
+      <span class="rd-rank">${i + 1}</span>
+      <span class="rd-id"><b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span>
+        <em class="rd-v ${vcls}">${esc(vlabel)}</em></span>
+      <span class="rd-px">${price(r.price)}<i class="${dir(r.r1d)}">${pct(r.r1d)}</i></span>
+      <span class="rd-sc"><b>${nd.score}</b><em>${esc(strengthWord(nd.score))}</em></span>
+      <span class="rd-parts">${bar('Trend', p.trend)}${bar('Momentum', p.momentum)}${bar('Volume', p.volume)}${bar('Institutional', p.institutional)}</span>
+      ${x && x.quality === 'complete' && x.signal !== 'neutral' && x.signal !== 'unknown'
+        ? `<span class="rd-fii">FII ${ppFmt(x.fii_pp)} · DII ${ppFmt(x.dii_pp)}</span>` : ''}
+    </article>`;
+  };
+
+  const wireRadar = () => {
+    const core = document.getElementById('rdCore');
+    if (core) core.addEventListener('click', () => {
+      const d = document.getElementById('rdCoreD');
+      const open = d.hidden; d.hidden = !open;
+      core.setAttribute('aria-expanded', open ? 'true' : 'false');
+      core.classList.toggle('is-open', open);
+    });
+    const open = (sym) => {
+      const nd = (RADAR_NODES || []).find(n => n.r.sym === sym);
+      if (!nd) return;
+      const p = nd.parts, r = nd.r, x = instiOf(sym);
+      const line = (l, w, val) => `<div class="isc-r"><span class="isc-w">${w}%</span>
+        <span class="isc-l">${esc(l)}</span>
+        <span class="isc-v">${val == null ? 'not measured' : Math.round(val)}</span></div>`;
+      sheet(`${esc(sym)} <small>${esc(r.name || '')}</small>`, `
+        <div class="isc"><div class="isc-h">
+          <span class="isc-n ${nd.score >= 60 ? 'up' : nd.score < 40 ? 'dn' : ''}">${nd.score}</span>
+          <span class="isc-b">${esc(strengthWord(nd.score))}<em>Radar score · 0–100 · a model</em></span></div>
+          ${line('Momentum', 30, p.momentum)}${line('Trend', 30, p.trend)}
+          ${line('Volume', 20, p.volume)}${line('Institutional flow', 20, p.institutional)}
+          <p class="isc-n2">Components missing for this name are left out of the mean rather than
+            scored zero. The score ranks names; it does not value them.</p></div>
+        <h4 class="sh">The screen's own verdict</h4>
+        <p class="ef-p">${esc((r.vd && r.vd.l) || 'Not rated')}${r.vd && r.vd.o ? ` — ${esc(r.vd.o)}` : ''}</p>
+        ${x && x.quality === 'complete' ? `<h4 class="sh">Institutional flow</h4>
+          <div class="yoy">
+            <div class="yy"><span>FII, quarter on quarter</span><b class="${dir(x.fii_pp)}">${ppFmt(x.fii_pp)}</b></div>
+            <div class="yy"><span>DII, quarter on quarter</span><b class="${dir(x.dii_pp)}">${ppFmt(x.dii_pp)}</b></div>
+            <div class="yy"><span>Reading</span><b>${esc(x.signal_label || '')}</b></div>
+          </div>` : ''}
+        <p class="hint" style="margin-top:14px">
+          <a href="/stock/${encodeURIComponent(sym)}">Open the full company card →</a></p>`);
+    };
+    /* data-rsym, NOT data-sym.
+     * The global click handler claims every [data-sym] and opens the company
+     * card, so binding the radar's own panel to the same attribute meant both
+     * fired and the card won — the score decomposition this screen exists to
+     * show was unreachable. One attribute, one owner; the panel links to the
+     * full card for anyone who wants it. */
+    document.querySelectorAll('.rd-row, .rd-node').forEach(el => {
+      const sym = el.getAttribute('data-rsym');
+      el.addEventListener('click', () => open(sym));
+      el.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(sym); }
+      });
+    });
+  };
+
   R['/methodology'] = async () => {
     paint(prose('How this works', 'Every number, and where it comes from.',
       'No figure on this site is produced by a model that cannot be re-run. This page is how each one is made.', `
@@ -8770,6 +9024,8 @@
                      'Every name in the universe on price, trend, quality, value and institutional flow. FII and DII holding quarter on quarter, from the company’s own filings.'],
     '/signals':     ['Signals — the public ledger, wins and losses both',
                      'Every call this book has published, open and closed, with the entry, stop and targets it was sent with and what it actually did.'],
+    '/radar':       ['Signal radar — the market, and the names carrying it',
+                     'A breadth-based market score with every term printed, and the eight highest-scoring names ranked on trend, momentum, volume and institutional flow.'],
     '/engines':     ['The floor — every engine, what fires it, what it has done',
                      'Nine engines with their trigger conditions, where each stop comes from, how each can be wrong, and its measured record. Nothing is cleared for capital.'],
     '/ideas':       ['Ideas — this week’s multibaggers and what they were picked at',
@@ -8814,7 +9070,7 @@
    * breadcrumb reading "Today" while you are looking at Today is noise. */
   const WHERE = { '/': '', '/markets': 'Markets', '/ideas': 'Ideas', '/ipo': 'IPO',
                   '/screen': 'Screen', '/signals': 'Signals', '/brief': 'Brief', '/watch': 'Watchlist',
-                  '/engines': 'The floor',
+                  '/engines': 'The floor', '/radar': 'Radar',
                   '/join': 'The brief', '/methodology': 'Methodology',
                   '/sources': 'Data sources', '/terms': 'Terms', '/privacy': 'Privacy' };
 

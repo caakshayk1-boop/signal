@@ -84,7 +84,32 @@ const NO_PROXY = new Set(["/api/subscribe", "/api/client-error"]);
 
 const UPSTREAM = "https://signal.askakshay.com";
 
+/* THE PROXY CACHES, BECAUSE IT PUTS LOAD ON PRODUCTION.
+ *
+ * The UI suite visits fifteen routes and several of them fetch /api/ticker,
+ * /api/markets and /api/wire. Uncached, one local test run made dozens of calls
+ * to production, which forwards them to Yahoo — and two consecutive runs was
+ * enough to get 503s back and fail the suite for a reason that had nothing to
+ * do with the code. A convenience for local development must not become a
+ * denial-of-service against the live site.
+ *
+ * 60 seconds is long enough that a whole suite run is one upstream call per
+ * route, and short enough that a developer watching a number change still sees
+ * it change. In-memory only: wrangler dev keeps one isolate, and nothing here
+ * should outlive it. */
+const DEV_CACHE = new Map();
+const DEV_TTL_MS = 60_000;
+
 async function proxyToProduction(url, request) {
+  const key = url.pathname + url.search;
+  const hit = DEV_CACHE.get(key);
+  if (hit && Date.now() - hit.at < DEV_TTL_MS) {
+    return new Response(hit.body, {
+      status: hit.status,
+      headers: { "content-type": hit.type, "cache-control": "no-store",
+                 "x-signal-dev-proxy": UPSTREAM + " (cached)" },
+    });
+  }
   const target = UPSTREAM + url.pathname + url.search;
   try {
     const res = await fetch(target, {
@@ -92,6 +117,12 @@ async function proxyToProduction(url, request) {
       signal: AbortSignal.timeout(12000),
     });
     const body = await res.text();
+    // Only a good answer is cached. Caching a 503 would pin the failure for a
+    // minute and make the outage look longer than it was.
+    if (res.ok) {
+      DEV_CACHE.set(key, { at: Date.now(), body, status: res.status,
+                           type: res.headers.get("content-type") || "application/json" });
+    }
     return new Response(body, {
       status: res.status,
       headers: {

@@ -761,6 +761,74 @@ try {
      !/not in the 750-name screen/i.test(await p.locator("main").innerText()),
      await p.title());
 
+
+  /* ── SIGNAL RADAR ───────────────────────────────────────────────────────
+   * The score is a model, so the thing worth testing is that it always shows
+   * its working and never contradicts its own components. */
+  console.log("\n  signal radar");
+  await p.goto(SITE + "/radar", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE + 7000);
+  const rdRows = await p.locator(".rd-row").count();
+  ok("the radar ranks names", rdRows > 2, rdRows);
+  ok("the market core states a score", /\d+\/100/.test(await p.locator(".rd-core-n").innerText()));
+  // The core must print every term, not just a number.
+  await p.locator("#rdCore").click();
+  await p.waitForTimeout(400);
+  const terms = await p.locator(".rd-cr").count();
+  ok("the market score prints its own decomposition", terms >= 4, terms);
+  const weights = await p.evaluate(() =>
+    [...document.querySelectorAll(".rd-cw")].map(x => parseInt(x.textContent, 10)));
+  ok("its weights sum to 100", weights.reduce((a, b) => a + b, 0) === 100, weights);
+
+  // A row's total must agree with the components printed beside it.
+  const agree = await p.evaluate(() => {
+    const W = { Momentum: 30, Trend: 30, Volume: 20, Institutional: 20 };
+    const r = document.querySelector(".rd-row");
+    const total = Number(r.querySelector(".rd-sc b").textContent);
+    let num = 0, den = 0;
+    for (const p of r.querySelectorAll(".rd-p")) {
+      const k = p.querySelector("em").textContent.trim();
+      const v = p.querySelector("u").textContent.trim();
+      if (v === "—") continue;
+      num += Number(v) * W[k]; den += W[k];
+    }
+    return den ? { total, computed: Math.round(num / den) } : null;
+  });
+  if (agree) ok("a row's score equals its own components",
+                Math.abs(agree.total - agree.computed) <= 1, agree);
+
+  // The radar must not invent a second signal vocabulary.
+  const verdicts = await p.evaluate(() =>
+    [...document.querySelectorAll(".rd-v")].map(x => x.textContent.trim()));
+  const allowed = new Set(["Buy", "Wait for entry", "Watch", "Avoid", "Not rated"]);
+  ok("it uses the site's own verdict words, not a new taxonomy",
+     verdicts.every(v => allowed.has(v)), [...new Set(verdicts)]);
+
+  /* The ring is desktop-only; the phone gets the list. This block runs in the
+   * 1440px context, so the viewport has to be narrowed for the check — the
+   * first version asserted phone behaviour while sitting at desktop width and
+   * reported the layout as broken when it was correct. */
+  const ringByWidth = await (async () => {
+    const wide = await p.evaluate(() => getComputedStyle(document.querySelector(".rd-stage")).display);
+    await p.setViewportSize({ width: 375, height: 812 });
+    await p.waitForTimeout(500);
+    const narrow = await p.evaluate(() => getComputedStyle(document.querySelector(".rd-stage")).display);
+    await p.setViewportSize({ width: 1440, height: 900 });
+    await p.waitForTimeout(400);
+    return { wide, narrow };
+  })();
+  ok("the ring renders on desktop", ringByWidth.wide === "block", ringByWidth);
+  ok("the ring is not rendered at phone width", ringByWidth.narrow === "none", ringByWidth);
+
+  // Clicking a row opens the radar's panel, not the company card.
+  await p.locator(".rd-row").first().click();
+  await p.waitForTimeout(700);
+  const panel = await p.locator("dialog#sheet").innerText();
+  ok("a row opens the radar panel with its weights", /RADAR SCORE/i.test(panel));
+  ok("the panel links on to the full company card", /full company card/i.test(panel));
+  await p.keyboard.press("Escape");
+  await p.waitForTimeout(300);
+
   await p.goto(SITE + "/watch", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 4000);
   ok("the watchlist shows the starred name",
@@ -892,7 +960,7 @@ try {
    * rendered failure panel. The second is the one that would have caught it. */
   console.log("\n  every route — thrown errors and rendered failures");
   const ROUTES = ["/", "/markets", "/signals", "/brief", "/screen", "/ideas",
-                  "/news", "/ipo", "/funds", "/watch", "/engines", "/join",
+                  "/news", "/ipo", "/funds", "/watch", "/engines", "/radar", "/join",
                   "/methodology", "/sources", "/terms", "/privacy"];
   const swCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const sw = await swCtx.newPage();
@@ -956,7 +1024,7 @@ try {
   // the defect this whole block exists to catch, and it was unmeasured exactly
   // where it was most likely.
   for (const route of ["/", "/markets", "/screen", "/ideas", "/news", "/ipo",
-                       "/funds", "/watch", "/engines", "/signals", "/brief", "/methodology"]) {
+                       "/funds", "/watch", "/engines", "/radar", "/signals", "/brief", "/methodology"]) {
     await mp.goto(SITE + route, { waitUntil: "domcontentloaded" });
     // The screen fetches 1.4 MB before it lays out; the shorter settle used by
     // the other routes measured it mid-skeleton and would have passed anything.

@@ -4064,3 +4064,95 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .u52{display:block;font:400 var(--t-1)/1.2 var(--mono);font-style:normal;
      font-variant-numeric:tabular-nums;color:var(--dim);margin-top:1px}
 .u52.up{color:var(--up)} .u52.dn{color:var(--down)}
+
+/* ── SIGNAL RADAR ────────────────────────────────────────────────────────────
+ * A ring on a wide screen, a ranked list on a phone. Not the same layout
+ * scaled: eight labelled nodes on a circle is unreadable at 375px, so the ring
+ * is simply not rendered there and the list — which carries the identical
+ * numbers — is the whole experience.
+ * All motion is CSS. rAF does not run in a hidden tab, so an rAF pulse would
+ * freeze mid-frame and the radar would look dead on return to it. */
+.rd-core-wrap{margin:4px 0 18px}
+.rd-core{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:14px;
+  width:100%;text-align:left;padding:16px;border:1px solid var(--line2);border-radius:var(--r-4);
+  background:var(--raised);cursor:pointer;min-height:44px}
+.rd-core-k{font:600 var(--t-1)/1 var(--ui);text-transform:uppercase;
+  letter-spacing:var(--ls-widest);color:var(--dim)}
+.rd-core-n{font:700 var(--t-10)/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.rd-core-n em{font:400 var(--t-3)/1 var(--mono);font-style:normal;color:var(--dim);margin-left:2px}
+.rd-core-n.up{color:var(--up)} .rd-core-n.dn{color:var(--down)}
+.rd-core-s{font:600 var(--t-5)/1 var(--ui);color:var(--muted)}
+.rd-core-s.up{color:var(--up)} .rd-core-s.dn{color:var(--down)}
+.rd-core-h{font:500 var(--t-2)/1 var(--ui);color:var(--accent);white-space:nowrap}
+.rd-core.is-open .rd-core-h{opacity:.6}
+.rd-core-d{padding:14px 16px;border:1px solid var(--line);border-top:0;
+  border-radius:0 0 var(--r-4) var(--r-4);background:var(--surface)}
+.rd-cr{display:grid;grid-template-columns:38px 1fr 34px 84px;align-items:center;gap:10px;
+  padding:7px 0;border-top:1px solid var(--line)}
+.rd-cr:first-child{border-top:0}
+.rd-cw{font:500 var(--t-2)/1 var(--mono);color:var(--dim)}
+.rd-cl{font:400 var(--t-3)/1.3 var(--ui);color:var(--muted);min-width:0}
+.rd-cv{font:600 var(--t-4)/1 var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.rd-cb{height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.rd-cb i{display:block;height:100%;background:var(--accent)}
+.rd-cn{margin:10px 0 0;font:400 var(--t-2)/1.5 var(--ui);color:var(--dim)}
+
+.rd-stage{display:none}
+.rd-svg{width:100%;height:auto;display:block}
+.rd-ring{fill:none;stroke:var(--line);stroke-width:1}
+.rd-link{stroke:var(--line2);opacity:.55}
+.rd-link.is-up{stroke:var(--up);opacity:.5}
+.rd-link.is-dn{stroke:var(--down);opacity:.4}
+.rd-node circle{fill:var(--surface);stroke:var(--line2);stroke-width:1.5;cursor:pointer;
+  transition:stroke var(--t-fast) var(--ease)}
+.rd-node.is-up circle{stroke:var(--up)} .rd-node.is-dn circle{stroke:var(--down)}
+.rd-node:hover circle,.rd-node:focus-visible circle{stroke-width:2.5}
+.rd-node text{fill:var(--text);font:600 12px var(--ui);text-anchor:middle;pointer-events:none}
+.rd-node .rd-ns{fill:var(--dim);font:500 11px var(--mono)}
+.rd-hub{fill:var(--raised);stroke:var(--accent);stroke-width:1.5}
+.rd-hubt{fill:var(--accent);font:700 11px var(--ui);letter-spacing:.1em;text-anchor:middle}
+
+.rd-feed{display:grid;gap:8px}
+.rd-row{display:grid;gap:4px 12px;padding:13px 14px;border:1px solid var(--line);
+  border-radius:var(--r-3);background:var(--surface);cursor:pointer;
+  grid-template-columns:22px minmax(0,1fr) auto;align-items:start}
+.rd-row:hover{border-color:var(--line2)}
+.rd-row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rd-rank{font:600 var(--t-3)/1.4 var(--mono);color:var(--dim)}
+.rd-id{display:flex;flex-direction:column;gap:2px;min-width:0}
+.rd-id b{font:700 var(--t-5)/1.2 var(--disp);letter-spacing:var(--ls-snug)}
+.rd-id span{font:400 var(--t-2)/1.3 var(--ui);color:var(--dim);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rd-v{font:600 var(--t-1)/1 var(--ui);font-style:normal;text-transform:uppercase;
+  letter-spacing:var(--ls-wide);color:var(--dim);margin-top:3px}
+.rd-v.up{color:var(--up)} .rd-v.dn{color:var(--down)} .rd-v.warn{color:var(--warn)}
+.rd-px{text-align:right;font:500 var(--t-4)/1.3 var(--mono);font-variant-numeric:tabular-nums}
+.rd-px i{display:block;font:400 var(--t-2)/1.3 var(--mono);font-style:normal}
+.rd-px i.up{color:var(--up)} .rd-px i.dn{color:var(--down)}
+.rd-sc{grid-column:3;text-align:right}
+.rd-sc b{font:700 var(--t-7)/1 var(--mono);font-variant-numeric:tabular-nums}
+.rd-sc em{display:block;font:400 var(--t-1)/1.3 var(--ui);font-style:normal;color:var(--dim);
+  text-transform:uppercase;letter-spacing:var(--ls-wide)}
+.rd-parts{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:5px 14px;margin-top:6px}
+.rd-p{display:grid;grid-template-columns:76px 1fr 26px;align-items:center;gap:7px}
+.rd-p em{font:400 var(--t-1)/1 var(--ui);font-style:normal;color:var(--dim)}
+.rd-p i{height:4px;border-radius:2px;background:var(--line);overflow:hidden;display:block}
+.rd-p i b{display:block;height:100%;background:var(--accent);border-radius:2px}
+.rd-p u{font:500 var(--t-1)/1 var(--mono);text-decoration:none;color:var(--muted);text-align:right}
+.rd-fii{grid-column:1/-1;font:500 var(--t-1)/1 var(--mono);color:var(--dim);margin-top:5px}
+.rd-foot{margin-top:18px}
+
+@media(min-width:820px){
+  .rd-stage{display:block;margin:0 0 20px}
+  .rd-row{grid-template-columns:26px minmax(0,1.5fr) auto auto minmax(0,1.6fr)}
+  .rd-parts{grid-column:auto;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:0}
+  .rd-fii{grid-column:2/-1}
+}
+@media(max-width:560px){
+  .rd-core{grid-template-columns:auto 1fr;gap:8px 12px}
+  .rd-core-k{grid-column:1/-1}
+  .rd-core-h{grid-column:1/-1;margin-top:4px}
+  .rd-p{grid-template-columns:70px 1fr 24px}
+}
+@media(prefers-reduced-motion:reduce){.rd-node circle{transition:none}}
