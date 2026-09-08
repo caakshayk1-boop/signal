@@ -8353,14 +8353,21 @@
         ranked.slice(0, 20).map(nd => `<button type="button" class="rd-u" role="listitem"
           data-rsym="${esc(nd.r.sym)}" aria-label="${esc(nd.r.sym)}, score ${nd.score} of 100">
           ${radarCardInner(nd)}</button>`).join('')
-      }</div>`, `top 20 of ${ranked.length}`) +
+      }</div>`, 'swipe →') +
+      /* "top 20 of 694" over a strip, then "8 of 694 scored" over a list of 8,
+       * read as one section contradicting the next. Each count now describes
+       * the thing directly under it, and the strip says how to see the rest of
+       * its twenty rather than claiming a number the screen does not show. */
       sec('Top signals', `<div class="rd-feed">${nodes.map((n, i) => radarRow(n, i)).join('')}</div>`,
-          `${nodes.length} of ${ranked.length} scored`) +
+          `${nodes.length} shown`) +
       `<p class="hint rd-foot"><b>The score is a model, not a measurement.</b> It weights
         momentum 30, trend 30, volume 20 and institutional flow 20, over the screen's own
         fields; a name missing a component is scored on the rest rather than penalised.
         The verdict beside it (Buy / Wait / Watch / Avoid) is the screen's own reading and is
-        not derived from this score. Names under ₹5 cr of daily turnover are excluded.
+        not derived from this score. <b>${ranked.length}</b> of the 750 screened names could be
+        scored — the rest are under ₹5 cr of daily turnover, or have fewer than two of the
+        four components measurable. The strip above carries the top 20; the ring and the
+        list carry the top ${nodes.length}.
         <a href="/methodology">How every number here is made →</a></p>`
     ));
     wireRadar(nodes, ranked);
@@ -8439,16 +8446,16 @@
     const sp = sparkPath(RADAR_SERIES[r.sym]);
     const v = (r.vd && r.vd.c) || '';
     const [vcls, vlabel] = VERDICT_LOOK[v] || ['', 'Not rated'];
-    return `<span class="rc-t"><b>${esc(r.sym)}</b>
+    return `<span class="rdc-t"><b>${esc(r.sym)}</b>
         <i class="${dir(r.r1d)}">${pct(r.r1d)}</i></span>
-      <span class="rc-v ${vcls}">${esc(vlabel)}</span>
-      <span class="rc-b"><i style="width:${nd.score}%"></i></span>
-      <span class="rc-m"><u>${nd.score}</u>
-        ${sp ? `<svg class="rc-sp ${sp.up ? 'up' : 'dn'}" viewBox="0 0 74 22" aria-hidden="true">
-                  <path class="rc-spa" d="${sp.area}"/><path class="rc-spl" d="${sp.d}"/></svg>`
-             : `<em class="rc-nosp">no series</em>`}
+      <span class="rdc-v ${vcls}">${esc(vlabel)}</span>
+      <span class="rdc-b"><i style="width:${nd.score}%"></i></span>
+      <span class="rdc-m"><u>${nd.score}</u>
+        ${sp ? `<svg class="rdc-sp ${sp.up ? 'up' : 'dn'}" viewBox="0 0 74 22" aria-hidden="true">
+                  <path class="rdc-spa" d="${sp.area}"/><path class="rdc-spl" d="${sp.d}"/></svg>`
+             : `<em class="rdc-nosp">no series</em>`}
         ${x && x.quality === 'complete' && x.insti_pp != null
-          ? `<em class="rc-fii ${dir(x.insti_pp)}">${x.insti_pp > 0 ? '▲' : x.insti_pp < 0 ? '▼' : '·'}</em>` : ''}
+          ? `<em class="rdc-fii ${dir(x.insti_pp)}">${x.insti_pp > 0 ? '▲' : x.insti_pp < 0 ? '▼' : '·'}</em>` : ''}
       </span>`;
   };
 
@@ -8567,12 +8574,16 @@
         RADAR_SERIES[sym] = res.data.points.slice(-40).map(p => Number(p.c)).filter(Number.isFinite);
         const sp = sparkPath(RADAR_SERIES[sym]);
         if (!sp) continue;
-        main.querySelectorAll(`[data-rsym="${CSS.escape(sym)}"] .rc-nosp`).forEach(ph => {
+        /* rdc-, not rc-. The rename that fixed the namespace collision covered
+         * the renderer and stopped at wireRadar — this selector sat just past
+         * it, so every placeholder kept saying "no series" while the data was
+         * arriving fine. A rename is only done when the SELECTORS move too. */
+        main.querySelectorAll(`[data-rsym="${CSS.escape(sym)}"] .rdc-nosp`).forEach(ph => {
           const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          svg.setAttribute('class', `rc-sp ${sp.up ? 'up' : 'dn'}`);
+          svg.setAttribute('class', `rdc-sp ${sp.up ? 'up' : 'dn'}`);
           svg.setAttribute('viewBox', '0 0 74 22');
           svg.setAttribute('aria-hidden', 'true');
-          svg.innerHTML = `<path class="rc-spa" d="${sp.area}"/><path class="rc-spl" d="${sp.d}"/>`;
+          svg.innerHTML = `<path class="rdc-spa" d="${sp.area}"/><path class="rdc-spl" d="${sp.d}"/>`;
           ph.replaceWith(svg);
         });
       }

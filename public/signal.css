@@ -4192,24 +4192,24 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .rd-card:hover,.rd-u:hover{border-color:var(--accent);transform:translateY(-1px)}
 .rd-card:focus-visible,.rd-u:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .rd-u{flex:0 0 156px;scroll-snap-align:start}
-.rc-t{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
-.rc-t b{font:700 var(--t-4)/1 var(--disp);letter-spacing:var(--ls-snug);color:var(--text)}
-.rc-t i{font:500 var(--t-1)/1 var(--mono);font-style:normal;font-variant-numeric:tabular-nums}
-.rc-t i.up{color:var(--up)} .rc-t i.dn{color:var(--down)}
-.rc-v{font:600 9px/1.2 var(--ui);letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
-.rc-v.up{color:var(--up)} .rc-v.dn{color:var(--down)} .rc-v.warn{color:var(--warn)}
-.rc-b{display:block;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
-.rc-b i{display:block;height:100%;background:var(--accent);border-radius:2px}
-.rc-m{display:flex;align-items:center;gap:6px;margin-top:auto}
-.rc-m u{font:700 var(--t-4)/1 var(--mono);text-decoration:none;font-variant-numeric:tabular-nums;
+.rdc-t{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
+.rdc-t b{font:700 var(--t-4)/1 var(--disp);letter-spacing:var(--ls-snug);color:var(--text)}
+.rdc-t i{font:500 var(--t-1)/1 var(--mono);font-style:normal;font-variant-numeric:tabular-nums}
+.rdc-t i.up{color:var(--up)} .rdc-t i.dn{color:var(--down)}
+.rdc-v{font:600 9px/1.2 var(--ui);letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.rdc-v.up{color:var(--up)} .rdc-v.dn{color:var(--down)} .rdc-v.warn{color:var(--warn)}
+.rdc-b{display:block;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.rdc-b i{display:block;height:100%;background:var(--accent);border-radius:2px}
+.rdc-m{display:flex;align-items:center;gap:6px;margin-top:auto}
+.rdc-m u{font:700 var(--t-4)/1 var(--mono);text-decoration:none;font-variant-numeric:tabular-nums;
   color:var(--text)}
-.rc-sp{width:74px;height:22px;flex:none;display:block}
-.rc-spl{fill:none;stroke-width:1.4}
-.rc-sp.up .rc-spl{stroke:var(--up)} .rc-sp.dn .rc-spl{stroke:var(--down)}
-.rc-sp.up .rc-spa{fill:var(--up-soft)} .rc-sp.dn .rc-spa{fill:var(--down-soft)}
-.rc-nosp{font:400 9px/1 var(--ui);font-style:normal;color:var(--dim)}
-.rc-fii{font:600 10px/1 var(--mono);font-style:normal;margin-left:auto}
-.rc-fii.up{color:var(--up)} .rc-fii.dn{color:var(--down)}
+.rdc-sp{width:74px;height:22px;flex:none;display:block}
+.rdc-spl{fill:none;stroke-width:1.4}
+.rdc-sp.up .rdc-spl{stroke:var(--up)} .rdc-sp.dn .rdc-spl{stroke:var(--down)}
+.rdc-sp.up .rdc-spa{fill:var(--up-soft)} .rdc-sp.dn .rdc-spa{fill:var(--down-soft)}
+.rdc-nosp{font:400 9px/1 var(--ui);font-style:normal;color:var(--dim)}
+.rdc-fii{font:600 10px/1 var(--mono);font-style:normal;margin-left:auto}
+.rdc-fii.up{color:var(--up)} .rdc-fii.dn{color:var(--down)}
 
 /* min-width:0 is what makes the horizontal scroll actually contain itself.
    A flex/grid item defaults to min-width:auto — the width of its content — so

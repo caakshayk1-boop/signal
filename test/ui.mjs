@@ -847,6 +847,40 @@ try {
              docOverflow: de.scrollWidth - de.clientWidth };
   });
   ok("the signal universe strip is populated", stripBehaviour.cards > 8, stripBehaviour);
+
+  /* THE TICKER MUST BE VISIBLE. It was not: the card reused `rc-*`, which is
+   * already the return chart's namespace, so `.rc-t` inherited that chart's
+   * tooltip padding, the row inflated, its siblings overlapped it, and the
+   * stock NAME was pushed out of the card. Everything rendered; the names were
+   * simply gone. Checked by geometry, because "the element exists" was true
+   * the whole time it was invisible. */
+  const cardShape = await p.evaluate(() => {
+    const u = document.querySelector(".rd-u");
+    if (!u) return null;
+    const ub = u.getBoundingClientRect();
+    const b = u.querySelector(".rdc-t b");
+    const kids = [...u.children].map(c => c.getBoundingClientRect());
+    let overlap = 0;
+    for (let i = 0; i < kids.length - 1; i++)
+      if (kids[i].bottom > kids[i + 1].top + 0.5) overlap++;
+    return { ticker: b ? b.textContent.trim() : null,
+             inside: b ? (b.getBoundingClientRect().top >= ub.top - 0.5 &&
+                          b.getBoundingClientRect().bottom <= ub.bottom + 0.5) : false,
+             overlappingChildren: overlap };
+  });
+  if (cardShape) {
+    ok("the strip card shows a ticker", !!cardShape.ticker, cardShape);
+    ok("the ticker sits inside its card", cardShape.inside === true, cardShape);
+    ok("the card's rows do not overlap", cardShape.overlappingChildren === 0, cardShape);
+  }
+
+  /* Sparklines are filled after paint; a card that still says "no series"
+   * after the fetches means the fill selector missed. */
+  await p.waitForTimeout(6000);
+  const spark = await p.evaluate(() => ({
+    drawn: document.querySelectorAll(".rdc-sp").length,
+    pending: document.querySelectorAll(".rdc-nosp").length }));
+  ok("sparklines are drawn, not left pending", spark.drawn > 8 && spark.pending === 0, spark);
   ok("it scrolls inside itself", stripBehaviour.scrollsItself === true, stripBehaviour);
   ok("and does not push the document sideways", stripBehaviour.docOverflow <= 0, stripBehaviour);
 

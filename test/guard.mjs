@@ -171,6 +171,30 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("every template-literal comment terminator has an opener", orphans.length === 0, orphans);
 }
 
+/* ── 11. A COMPONENT OWNS ITS CLASS NAMESPACE ───────────────────────────────
+ * The incident: the radar's node card used `rc-t`, `rc-b`, `rc-m`. `rc-*` was
+ * ALREADY the return-chart component's namespace, so `.rc-t` picked up that
+ * chart's tooltip padding (9px 11px), which inflated the row, overlapped its
+ * siblings, and pushed the stock TICKER out of every card in the signal
+ * universe strip. The cards rendered. The tests passed. The names were gone.
+ *
+ * A whole-file "defined twice" rule is useless here — this stylesheet layers
+ * .bar, .tabs and .brand across it deliberately, and a rule that cries wolf
+ * gets ignored. So the check is narrow and true: every class the RADAR emits
+ * must live in the radar's own namespace (rd- / rdc-). A component that names
+ * its own parts cannot collide with one that already exists. */
+{
+  const seg = (JS.match(/const radarCardInner[\s\S]*?const wireRadar/) || [""])[0]
+            + (JS.match(/const radarSvg[\s\S]*?const radarCardInner/) || [""])[0];
+  const emitted = new Set();
+  for (const x of seg.matchAll(/class="([a-z0-9 _-]+)"/g)) {
+    for (const c of x[1].split(/\s+/)) if (c) emitted.add(c);
+  }
+  const OWN = /^(rd-|rdc-|is-|up$|dn$|warn$|flat$)/;
+  const foreign = [...emitted].filter(c => !OWN.test(c));
+  ok("the radar only emits classes in its own namespace", foreign.length === 0, foreign);
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);
