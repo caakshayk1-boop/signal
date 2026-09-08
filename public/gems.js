@@ -248,7 +248,72 @@
     const out = [];
     const nav = [];
     const add = (id, label, html) => { nav.push([id, label]); out.push(html); };
-    const nameOf = s => (rows.find(r => r.sym === s) || {}).name || '';
+    /* The ledger writes NIACL.NS and the screen keys on NIACL, so the join
+     * goes through a stripped symbol rather than the string it was handed. */
+    const bare = s => String(s || '').trim().toUpperCase().replace(/\.(NS|BO)$/, '');
+    const SCR_BY = new Map(rows.map(r => [bare(r.sym), r]));
+    const screenOf = s => SCR_BY.get(bare(s)) || null;
+    const nameOf = s => (screenOf(s) || {}).name || '';
+
+    /* ── THE YEAR'S RANGE, AND MOMENTUM ON A MONTHLY CLOCK ──────────────────
+     * A setup card carried entry, stop, targets and R:R and nothing about
+     * where the name sits in its own year or whether it is already extended.
+     * Both are on the screen row already — high52/low52, and rsi_m, which the
+     * screen computes by sampling closes every 21 trading days. 705 of the 750
+     * rows carry it; the rest say so rather than showing a blank. */
+    const rangeBlock = (sr, sym, market) => {
+      /* THREE CASES, AND EACH ONE SAYS WHICH IT IS.
+       *
+       * A row of em-dashes under "52W HIGH" reads as a bug. There are three
+       * distinct reasons this block can be empty and they are not the same
+       * fact, so the page names them instead of blanking:
+       *
+       *   1. The name is not on the 750-stock screen at all — six of the open
+       *      setups are US equities and COMEX commodities (COIN, DUOL, MRK,
+       *      NGAS, SMCI, XAUUSD), which that screen does not cover.
+       *   2. It is on the screen but has not traded a full year, so there is
+       *      no 52-week range to quote. JAINREC is one: listed recently, real
+       *      price, real daily RSI, no high52 and no monthly RSI, because the
+       *      screen requires 240 sessions for one and fifteen months for the
+       *      other.
+       *   3. It has both, and they are shown. */
+      if (!sr) {
+        return `<h4 class="xd-h">The year, and momentum</h4>
+          <p class="said"><b>${esc(sym || 'This name')}</b> is not on the 750-stock Indian
+            screen${market && market !== 'NSE' ? ` — it is ${esc(market)}` : ''}, so its
+            52-week range and monthly RSI are not measured here. The levels above are the
+            engine's own and stand on their own.</p>`;
+      }
+      const lo = num(sr.low52), hi = num(sr.high52), px = num(sr.price);
+      const rsiD = num(sr.rsi), rsiM = num(sr.rsi_m);
+      const hasRange = lo != null && hi != null && hi > lo && px != null;
+      const at = hasRange ? Math.max(0, Math.min(100, (px - lo) / (hi - lo) * 100)) : null;
+      const tone = v => v == null ? '' : v >= 70 ? 'dn' : v <= 35 ? 'up' : '';
+      const young = !hasRange;
+      return `<h4 class="xd-h">The year, and momentum</h4>
+        ${hasRange ? `<div class="yr" role="img"
+            aria-label="${inr(px)} sits ${at.toFixed(0)}% up a 52-week range of ${inr(lo)} to ${inr(hi)}">
+            <i style="left:${at.toFixed(1)}%"></i></div>
+          <div class="yr-l"><span>${inr(lo)}<em>52w low</em></span>
+            <span class="dim">${at.toFixed(0)}% up the range</span>
+            <span>${inr(hi)}<em>52w high</em></span></div>` : ''}
+        ${figs([
+          hasRange ? [num(sr.from_high) == null ? '—' : Number(sr.from_high).toFixed(1) + '%', 'off 52w high'] : null,
+          [rsiD == null ? '—' : Math.round(rsiD), 'RSI daily', tone(rsiD)],
+          [rsiM == null ? 'not measured' : Math.round(rsiM), 'RSI monthly', tone(rsiM)],
+          [num(sr.atr_pct) == null ? '—' : Number(sr.atr_pct).toFixed(1) + '%', 'a typical day'],
+        ].filter(Boolean))}
+        ${young ? `<p class="said"><b>No 52-week range, and no monthly RSI.</b>
+          ${esc(sr.sym)} has not traded long enough: the screen needs 240 sessions before it
+          will quote a year's high and low, and about fifteen months before a monthly RSI
+          means anything. Both are left unmeasured rather than computed off a short history
+          and presented as if they were the real thing.</p>` : ''}
+        ${!young && rsiM != null && rsiM >= 70 ? `<p class="said"><b>Monthly RSI is
+          ${Math.round(rsiM)}.</b> On a monthly clock that is stretched — the setup can still
+          work, but it is being taken late in a move rather than early in one.</p>` : ''}
+        ${!young && rsiM == null ? `<p class="said">Monthly RSI needs about fifteen months of
+          closes and this name does not have them, so it is shown as not measured.</p>` : ''}`;
+    };
 
     /* THE SCREEN IS PRICED AT ITS LAST BUILD, NOT AT THIS MOMENT.
      * Its own price_date is the only honest label for every figure derived
@@ -353,6 +418,17 @@
                                        && r.r_multiple != null);
     const openSince = since.filter(r => String(r.status || '').toUpperCase() === 'OPEN');
     const winSince = closedSince.filter(r => num(r.r_multiple) > 0).length;
+    /* The curve, drawn from this site's OWN closes in the order they closed.
+     * It used to render stats.equity_curve, which starts 2026-08-03 and is the
+     * pre-launch book. Below five points a line is noise with a trend through
+     * it, so it simply does not appear. */
+    const sinceCurve = (() => {
+      const cl = closedSince.slice().sort((a, b) =>
+        String(a.closed_at || a.date || '').localeCompare(String(b.closed_at || b.date || '')));
+      let cum = 0;
+      return cl.map((r, i) => ({ i: i + 1, date: String(r.closed_at || r.date || '').slice(0, 10),
+                                 r: num(r.r_multiple), cum_r: (cum += (num(r.r_multiple) || 0)) }));
+    })();
     const sumR = closedSince.reduce((a, r) => a + (num(r.r_multiple) || 0), 0);
     if (T && H) {
       const maxAbs = Math.max(...eng.map(e => Math.abs(num(e.avg_r) || 0)), 0.001);
@@ -372,49 +448,26 @@
           <div class="fig"><b>${closedSince.length}</b><span>closed and scored</span></div>
           <div class="fig"><b class="${closedSince.length ? dir(sumR) : ''}">${
             closedSince.length ? rr(sumR / closedSince.length) : '—'}</b><span>per trade</span></div>
-        </div>
-        <h3 class="sub">Before ${esc(LAUNCH)} · the earlier ledger</h3>
-        <p class="said">Published under an earlier configuration on a ledger that has been
-          re-graded twice. It is shown because deleting it would be the more flattering choice.
-          <b>It is not this site's record.</b></p>` +
-        (curve(stats.equity_curve) || '') +
-        figs([
-          [H.trades, 'closed before launch'],
-          [`${H.win_rate}%`, 'win rate then', dir(H.win_rate - 50)],
-          [rr(H.avg_r), 'per trade then', dir(H.avg_r)],
-          [num(H.profit_factor) == null ? '—' : Number(H.profit_factor).toFixed(2), 'profit factor',
-            H.profit_factor >= 1 ? 'up' : 'dn'],
-        ]) +
-        `<h3 class="sub">Every engine, on the earlier ledger</h3>
-         <p class="said">These are all-time figures from ${esc(T.first_date)}, not this site's
-           record — no engine has closed enough since ${LAUNCH} to have one.</p>
-         <div class="rows">${eng.slice().sort((x, y) => (num(y.avg_r) || 0) - (num(x.avg_r) || 0))
-           .map((e, i) => xr(
-             rowHead(i + 1, e.key, `${e.trades} closed · ${e.win_rate}% win`,
-               `<span class="${dir(e.avg_r)}">${rr(e.avg_r)}</span>`,
-               [`${rr(e.total_r)} total`, dir(e.total_r)],
-               e.trades >= 30 ? ['30+ sample', 'flat'] : ['Under sample', 'warn']),
-             `<div class="db-w">${divBar(e.avg_r, maxAbs)}</div>
-              ${figs([
-                [e.trades, 'closed'], [e.wins, 'wins', 'up'], [e.losses, 'losses', 'dn'],
-                [rr(e.total_r), 'total R', dir(e.total_r)],
-              ])}
-              <p class="said">${e.trades >= 30
-                ? `A ${e.trades}-trade sample is large enough to argue about. It is still
-                   <b>paper</b>: this book clears an engine for capital at 30 closed trades
-                   <i>and</i> t≥2, and this one has not cleared it.`
-                : `<b>${e.trades} closed trades is not a record.</b> At this sample the
-                   expectancy above is dominated by noise — it would take roughly
-                   ${Math.max(0, 30 - e.trades)} more closes before the number means anything,
-                   and it is shown so that nothing is hidden, not so that it can be used.`}</p>`
-           )).join('')}</div>` +
+        </div>` +
+        (closedSince.length >= 5 ? (curve(sinceCurve) || '') : '') +
         `<div class="call dnb"><h3>Read this before the setups below</h3>
-          <p>Everything here is <b>paper</b>. The bar is 30 closed trades at t≥2 and
-             <b>nothing has reached it</b>. The book's own expectancy across
-             ${H.trades} closes is <b class="dn">${rr(H.avg_r)}</b> per trade and its worst
-             drawdown <b class="dn">${rr(H.max_drawdown_r)}</b>. These are setups to
-             examine, not calls to take.</p></div>`,
-        `since ${LAUNCH} · earlier ledger from ${T.first_date}`));
+          <p>Everything here is <b>paper</b>. The bar is <b>30 closed trades at t&nbsp;≥&nbsp;2</b>
+             and nothing has reached it${closedSince.length
+               ? ` — this site has <b>${closedSince.length}</b> closed` : ''}. These are setups
+             to examine, not calls to take.</p></div>
+        ${/* ── THE PRE-LAUNCH LEDGER IS NOT ON THIS PAGE ────────────────────
+            * It was: 86 trades closed before launch, a -40.4R curve, and an
+            * all-time table of every engine. All of it true, none of it this
+            * site's, and it dominated the section by volume — a reader saw a
+            * long red line and four figures from a configuration that no
+            * longer exists before reaching the two trades that are actually
+            * this book's record.
+            *
+            * Removed on instruction, and the same call already made on
+            * /signals. It is not deleted from anywhere: the full history is in
+            * the ledger and on the full site's own record. It is simply not
+            * what a page headed "the record" should lead with. */''}`,
+        `since ${esc(LAUNCH)}`));
     }
 
     /* ── 4. TODAY'S SETUPS ─────────────────────────────────────────────────
@@ -444,6 +497,7 @@
               money(r.entry, r.currency), [`stop ${money(r.sl, r.currency)}`, 'dn'],
               num(r.rr) ? [`${Number(r.rr).toFixed(1)}R`, 'flat'] : null),
             ladder(r) +
+            rangeBlock(screenOf(r.symbol), r.symbol, r.market) +
             figs([
               [money(r.entry, r.currency), 'entry'],
               [money(r.sl, r.currency), 'stop', 'dn'],
@@ -757,8 +811,18 @@
     if (m) m.setAttribute('content', next === 'dark' ? '#0B0F14' : '#FFFFFF');
   });
 
-  build().catch(() => {
-    app.innerHTML = `<div class="empty">Today's page could not be built — the feeds did
-      not answer. Nothing here is stale data pretending to be current.</div>`;
+  build().catch((err) => {
+    /* THE ERROR USED TO BE DISCARDED.
+     * This caught and threw away the exception, so every failure — a feed that
+     * did not answer, and a genuine bug in the rendering — produced the same
+     * sentence about feeds. One of those is not the feeds' fault, and there
+     * was no way to tell them apart from the page. */
+    console.error('gems build failed:', err);
+    const msg = String((err && err.message) || err || 'unknown');
+    app.innerHTML = `<div class="empty">
+      <b>Today's page could not be built.</b>
+      <br>${esc(msg)}
+      <br><br>Nothing here is stale data pretending to be current — the page would rather
+      show nothing than show yesterday's numbers as today's.</div>`;
   });
 })();

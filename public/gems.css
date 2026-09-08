@@ -320,3 +320,14 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 .xd .rows .row{background:var(--raise)}
 .gpx-live{display:block;margin-top:2px;font:600 8.5px/1 var(--ui);letter-spacing:.1em;
   text-transform:uppercase;color:var(--acc);font-style:normal}
+
+/* ── the year's range, with the close marked on it ────────────────────────── */
+.yr{position:relative;height:5px;border-radius:999px;margin:12px 0 6px;
+  background:linear-gradient(90deg,var(--up-soft),var(--raise),var(--dn-soft))}
+.yr i{position:absolute;top:-4px;width:2px;height:13px;border-radius:2px;
+  background:var(--ink);transform:translateX(-1px)}
+.yr-l{display:flex;justify-content:space-between;gap:10px;margin-bottom:4px;
+  font:500 11px/1.3 var(--mono);font-variant-numeric:tabular-nums}
+.yr-l em{display:block;font:600 8.5px/1 var(--ui);letter-spacing:.09em;
+  text-transform:uppercase;color:var(--dim);font-style:normal;margin-top:2px}
+.yr-l span:last-child{text-align:right}

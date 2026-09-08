@@ -3535,6 +3535,54 @@
    * does rather than being a filter that happens to return true. */
   let scrQ = '', scrPresets = new Set(), scrSort = 'comp', scrPage = 0, SCRDIV = null;
 
+  /* ── A FILTERED SCREEN IS A PLACE, AND A PLACE NEEDS AN ADDRESS ───────────
+   *
+   * All of the state above lived only in these variables, so a reader who had
+   * narrowed 750 names down to nine could not send anyone the result, could
+   * not bookmark it, and lost it on reload. The screen's whole value is the
+   * filtering, and none of it survived the tab being closed.
+   *
+   * It goes in the query string, which is the part of a URL that is FOR this:
+   *   /screen?q=bank&p=debt-free,breaking-out&s=roce&fii=accumulating&pg=2
+   *
+   * replaceState, not pushState: typing in a search box should not fill the
+   * back button with a history entry per keystroke. The back button still
+   * leaves the route, which is what a reader means by "back" here.
+   *
+   * Reading is deliberately forgiving — an unknown preset or sort key is
+   * dropped rather than throwing, because a hand-edited or truncated link
+   * should degrade to a wider view, never to a broken page. */
+  const SCR_STATE = {
+    read() {
+      const q = new URLSearchParams(location.search);
+      scrQ = (q.get('q') || '').slice(0, 80);
+      scrSort = SORTS[q.get('s')] ? q.get('s') : 'comp';
+      scrPresets = new Set((q.get('p') || '').split(',')
+        .filter(k => k && PRESETS[k]));
+      const pg = parseInt(q.get('pg') || '0', 10);
+      scrPage = Number.isFinite(pg) && pg > 0 ? pg : 0;
+      const chip = q.get('fii') || '';
+      instiChip = INSTI_CHIPS[chip] ? chip : '';
+      const pre = q.get('fiip') || '';
+      instiPreset = INSTI_PRESETS[pre] ? pre : '';
+      const tr = parseInt(q.get('streak') || '0', 10);
+      instiTrend = Number.isFinite(tr) && tr > 0 ? Math.min(tr, 12) : 0;
+    },
+    write() {
+      const q = new URLSearchParams();
+      if (scrQ) q.set('q', scrQ);
+      if (scrPresets.size) q.set('p', [...scrPresets].join(','));
+      if (scrSort && scrSort !== 'comp') q.set('s', scrSort);
+      if (scrPage) q.set('pg', String(scrPage));
+      if (instiChip) q.set('fii', instiChip);
+      if (instiPreset) q.set('fiip', instiPreset);
+      if (instiTrend) q.set('streak', String(instiTrend));
+      const s = q.toString();
+      const url = location.pathname + (s ? '?' + s : '');
+      if (url !== location.pathname + location.search) history.replaceState({}, '', url);
+    },
+  };
+
   /* ── INSTITUTIONAL MOVEMENT ────────────────────────────────────────────────
    *
    * Who is buying a company is a different question from whether its chart is
@@ -4009,6 +4057,9 @@
   };
 
   R['/screen'] = async () => {
+    /* The URL is the source of truth on arrival: a shared link, a bookmark or
+     * a reload must land on the same nine names the sender was looking at. */
+    SCR_STATE.read();
     const screenSnap = rows => ((num) => snap([
       ['Universe', rows.length, 'names screened'],
       ['Above 200-day', rows.filter(r => num(r.price) && num(r.sma200) && num(r.price) > num(r.sma200)).length,
@@ -4037,6 +4088,8 @@
 
     let shownRows = [];          // the page the live quote call must ask for
     const draw = () => {
+      // Every redraw is a state change worth being able to link to.
+      SCR_STATE.write();
       const q = scrQ.trim().toLowerCase();
       const rows = SCREEN
         .filter(r => [...scrPresets].every(k => PRESETS[k][1](r)))
@@ -10120,6 +10173,48 @@
         missing ? 'noindex,follow' : 'index,follow,max-image-preview:large');
     const can = document.querySelector('link[rel="canonical"]');
     if (can) { if (missing) can.removeAttribute('href'); else can.setAttribute('href', url); }
+
+    /* ── STRUCTURED DATA PER ROUTE, NOT ONE BLOCK FOR THE WHOLE SITE ────────
+     *
+     * index.html carries a WebSite and a Person and nothing else, so every one
+     * of eighteen routes described itself to a crawler as the front page. The
+     * ledger, the screen and the IPO board are different things and say so
+     * here: a WebPage with this route's own name, description and URL, inside
+     * the site graph that already exists.
+     *
+     * It is written into a SECOND script tag that this function owns, rather
+     * than editing the one in the HTML — that block is static, prerendered and
+     * correct, and rewriting it from JS would mean the served HTML and the
+     * hydrated page disagreed about the site's identity.
+     *
+     * A 404 gets none of it. Describing a page that does not exist to a
+     * crawler is the same claim the robots tag has just withdrawn. */
+    let ld = document.getElementById('ld-route');
+    if (missing) { if (ld) ld.remove(); return; }
+    if (!ld) {
+      ld = document.createElement('script');
+      ld.type = 'application/ld+json';
+      ld.id = 'ld-route';
+      document.head.appendChild(ld);
+    }
+    const SITE_ID = ORIGIN + '/#website';
+    ld.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      '@id': url + '#page',
+      url, name: title, description: desc,
+      inLanguage: 'en-IN',
+      isPartOf: { '@id': SITE_ID },
+      about: { '@id': ORIGIN + '/#akshay' },
+      breadcrumb: {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Signal', item: ORIGIN + '/' },
+        ].concat(route === '/' ? [] : [
+          { '@type': 'ListItem', position: 2, name: (WHERE[route] || title.split(' — ')[0]), item: url },
+        ]),
+      },
+    });
   };
 
   /* The route's own name, shown beside the brand. Empty on Today, because a

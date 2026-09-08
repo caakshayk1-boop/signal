@@ -3,3 +3,7 @@ node_modules/
 .dev.vars
 .DS_Store
 *.log
+
+# Scratch audit scripts from ad-hoc sessions. Not part of the build, not
+# reproducible, and not worth versioning — they are one-off probes.
+.audit/
