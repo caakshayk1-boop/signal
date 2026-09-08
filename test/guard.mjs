@@ -146,6 +146,31 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      absent.length === 0, absent);
 }
 
+/* ── 9. NO ORPHANED COMMENT FRAGMENT INSIDE A TEMPLATE LITERAL ──────────────
+ * The incident, and the worst one so far because readers saw it: editing the
+ * FIRST line of a `${/* ... *\/''}` block left the rest of the old comment
+ * behind. The orphan is no longer inside a comment — it is raw text in a
+ * template literal — so nine lines of source commentary rendered on the live
+ * brief page as body copy. It parsed, it deployed, and every existing check
+ * passed, because a string containing an asterisk is perfectly valid code.
+ *
+ * Every `*\/''}` terminator must be reachable from a `${/*` opener with no
+ * intervening `*\/`. Anything else is an orphan. */
+{
+  const orphans = [];
+  const lines = JS.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (!/\*\/''\}/.test(lines[i])) continue;
+    let open = false;
+    for (let j = i; j >= 0 && i - j < 60; j--) {
+      if (j < i && /\*\/''\}/.test(lines[j])) break;      // hit a previous terminator first
+      if (/\$\{\s*\/\*/.test(lines[j])) { open = true; break; }
+    }
+    if (!open) orphans.push(`signal.js:${i + 1}`);
+  }
+  ok("every template-literal comment terminator has an opener", orphans.length === 0, orphans);
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

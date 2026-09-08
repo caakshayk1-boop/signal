@@ -5905,26 +5905,19 @@
       ], 'No engine on this site has cleared 30 closed trades at t&nbsp;≥&nbsp;2, so this is a '
        + 'setup to examine rather than a call to take.')}
 
-      ${/* ── EVIDENCE, NOT "VERDICT" ───────────────────────────────────────────
-          * This block was headed EVIDENCE ON THE ENGINE and it is not one. A verdict is
-          * the call on the STOCK — Buy / Wait / Watch / Avoid — and the screen
-          * already publishes exactly that on every row from verdict.py. What
-          * this reports is how much the ENGINE has proved: closed trades
-          * against the 30-trade, t>=2 bar. Two different things under one word
-          * is the taxonomy collision this product cannot afford, and it made
-          * the brief read as though "research only" were the call on CGCL when
-          * it is a statement about BREACH's sample size.
-          * ─────────────────────────────────────────────────────────────────── */''}
-          * Twelve sections of evidence and the page never said what it added
-          * up to. Every number was there and the reader had to do the
-          * arithmetic that the site's own clearance rule already answers.
+      ${/* ── EVIDENCE ON THE ENGINE, NOT A VERDICT ────────────────────────────
+          * A verdict is the call on the STOCK — Buy / Wait / Watch / Avoid —
+          * and the screen already publishes exactly that on every row from
+          * verdict.py. What this block reports is how much the ENGINE has
+          * proved: its closed record against the 30-trade, t>=2 bar this site
+          * sets before an engine is trusted with capital. Two different things
+          * under one word made the brief read as though "research only" were
+          * the call on the stock, when it is a statement about the sample.
           *
-          * It is derived, not written: the engine's closed record against the
-          * 30-trade, t>=2 bar this site sets before an engine is trusted with
-          * capital. There is no path through this that prints "take it" —
-          * because on today's ledger no engine clears, and a verdict that
-          * cannot say no is not a verdict. If one ever clears, this reports
-          * that, by the same rule and with no edit. */''}
+          * It is derived, not written, and there is no path through it that
+          * prints "take it" — because on today's ledger no engine clears. If
+          * one ever does, this reports that by the same rule and with no edit.
+          */''}
       ${(() => {
         const n = H ? H.trades : 0;
         const cleared = n >= 30 && H && H.expectancy_r > 0;
