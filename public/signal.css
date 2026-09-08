@@ -14,6 +14,26 @@
  *     latin-ext for four families and pays ~100 KB for glyphs it never sets.
  */
 
+/* ── [hidden] MUST ACTUALLY HIDE ─────────────────────────────────────────────
+ *
+ * The browser's own rule is `[hidden]{display:none}` in the UA stylesheet, and
+ * ANY author rule that sets display beats it. This sheet sets display on every
+ * row primitive — .rank-r is grid, .row is flex — so `el.hidden = true` set the
+ * attribute, changed nothing on screen, and left the element occupying its full
+ * height.
+ *
+ * Measured on /ipo before this rule existed: 37 rows carried `hidden`, every
+ * one of them still computed `display:flex` and still took 224px. The
+ * up/below-issue filter chips had never visually removed a row — they set the
+ * property, the aria-pressed state flipped, and the table did not move. The
+ * page was 20,780px either way.
+ *
+ * !important because the whole point is that it must outrank a component's own
+ * display, which is the specific thing that broke it. This is the one rule in
+ * the file that is allowed to.
+ */
+[hidden] { display: none !important; }
+
 /* ── FACES ───────────────────────────────────────────────────────────────
    Manrope carries the whole interface, the way it does on the reference site —
    one family at 400/500/600/700 rather than a display face plus a UI face.

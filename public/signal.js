@@ -394,19 +394,47 @@
    * Keyboard: the row is a real button to the assistive tree, Enter and Space
    * toggle it, and aria-expanded/aria-controls carry the state. */
   let xrSeq = 0;
+  /* ── THE DETAIL IS PARKED IN A <template>, NOT IN THE DOCUMENT ────────────
+   *
+   * Measured on /signals: 8,712 DOM nodes, of which 6,982 — EIGHTY PER CENT —
+   * sat inside collapsed panels nobody had opened. /ipo was 40%. Every one of
+   * those nodes is parsed, styled, laid out and kept in memory so that a
+   * reader who opens two rows out of forty-one can see them instantly.
+   *
+   * A <template>'s content is an inert DocumentFragment: it is not in the
+   * document tree, never matched by selectors, never styled and never laid
+   * out. Cloning it on first open costs a fraction of a millisecond for the
+   * one row being opened, against laying out forty panels for every reader.
+   *
+   * Call sites are unchanged — detail is still a string, built the same way —
+   * because a refactor that touched all thirty of them to pass a thunk would
+   * risk far more than it saved. What changes is only where the string is put.
+   *
+   * The panel div stays in the document so `hidden`, aria-controls and the
+   * sibling-panel logic that filters and sorts depend on all keep working;
+   * it is simply empty until it is needed.
+   */
   const xrow = (summary, detail, opts = {}) => {
     if (!detail) return `<div class="rank-r ${opts.cls || ''}" ${opts.attrs || ''}>${summary}</div>`;
     const id = `xr${++xrSeq}`;
     return `<div class="rank-r ${opts.cls || ''} xr" data-xr="${id}" role="button"
         tabindex="0" aria-expanded="false" aria-controls="${id}" ${opts.attrs || ''}>${summary}
         <span class="xr-caret" aria-hidden="true"></span></div>
-      <div class="xd" id="${id}" role="region" hidden>${detail}</div>`;
+      <div class="xd" id="${id}" role="region" hidden
+        ><template class="xd-src">${detail}</template></div>`;
   };
 
   /* Bound once, at the document. Survives every repaint on every route. */
   const xrToggle = (row) => {
     const panel = document.getElementById(row.getAttribute('aria-controls'));
     if (!panel) return;
+    // First open: move the parked markup into the document. Once only — the
+    // template is removed, so a second open finds real nodes and does nothing.
+    const src = panel.querySelector(':scope > template.xd-src');
+    if (src) {
+      panel.appendChild(src.content.cloneNode(true));
+      src.remove();
+    }
     const open = panel.hidden;
     panel.hidden = !open;
     row.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -3338,7 +3366,10 @@
         // are on the row so neither has to re-render the table.
         attrs: `data-since="${Number(r.since_listing_pct) >= 0 ? 'up' : 'dn'}"`
              + ` data-ld="${esc(String(r.listing_date || ''))}"`
-             + ` data-mv="${Number(r.since_listing_pct) || 0}"` });
+             + ` data-mv="${Number(r.since_listing_pct) || 0}"`
+             // data-rank is the row's place in the CURRENT order, rewritten by
+             // the sort. The default view shows the first IPO_SHOW of them.
+             + ` data-rank="${i}"` });
     const ipoHead = `<div class="rank-r lvl-r rank-head">
       <span class="i">#</span><span class="s">Company</span>
       <span class="x">Listed</span><span class="x">Price band</span>
@@ -3369,6 +3400,16 @@
              </select></label>
          </div>
          <div class="rank" id="ipotbl">${ipoHead}${rec.map(ipoRow).join('')}</div>
+         ${/* ── TWENTY-FIVE SCREENS IS NOT A PAGE ────────────────────────────
+             * Measured on a 375x812 phone: /ipo was 20,780px, 25.6 screens.
+             * Sixty listing rows is the whole of it. The rows STAY in the DOM
+             * — sort and both filters read them, and slicing the array would
+             * mean sorting a subset and calling it the table — but the default
+             * view shows the first fifteen. A reader who wants the other
+             * forty-five asks for them, which is one tap against twenty-five
+             * screens of scrolling for everyone who does not. */''}
+         ${rec.length > IPO_SHOW ? `<button type="button" class="chip ipo-more" data-ipo-more>
+            Show all ${rec.length} listings</button>` : ''}
          ${(() => {
            /* THE TABLE CALLED ITSELF "RECENT" AND WAS NOT.
             * recent_listed runs 2024-09-16 to 2025-08-14 — its newest row was
@@ -3409,6 +3450,7 @@
     /* Filtering by attribute rather than re-rendering: the rows are already in
      * the DOM and re-running the map would drop the live figures fillIpoLive
      * writes into them a moment later. */
+      let ipoShowAll = false;
     /* SORT AND PERIOD, BY MOVING NODES RATHER THAN REBUILDING THE TABLE.
      * Each row is followed by its own expanded panel as a SIBLING, so a sort
      * that moved only the rows would leave every panel behind and attach each
@@ -3416,8 +3458,12 @@
      * or not at all. */
     const sortBar = main.querySelector('#iposort');
     const tbl = main.querySelector('#ipotbl');
-    if (sortBar && tbl) {
-      const applySort = () => {
+    /* Declared at the route's scope, not inside the guard: the chip handler and
+     * the show-all button below both call it, and a function defined inside an
+     * `if` is not in scope for either. */
+    const applySort = () => {
+      if (!sortBar || !tbl) return;
+      {
         const order = sortBar.querySelector('[data-ipos="order"]').value;
         const within = sortBar.querySelector('[data-ipos="within"]').value;
         const rows = [...tbl.querySelectorAll('.rank-r[data-ld]')];
@@ -3443,24 +3489,40 @@
         // than removes so the up/below-issue chips keep working over it.
         const cut = within === 'all' ? null
           : new Date(Date.now() - Number(within) * 86400000).toISOString().slice(0, 10);
+        /* ── ONE PLACE DECIDES VISIBILITY ─────────────────────────────────
+         * Three independent axes now — the up/below-issue chips, the period
+         * select, and the fifteen-row cap. Each was written to set row.hidden
+         * itself, and three writers of one property is how "Above issue"
+         * silently brought back rows the period filter had removed. They are
+         * predicates here; exactly one line assigns. */
+        let shownRank = 0;
         for (const row of rows) {
           const tooOld = cut != null && String(row.dataset.ld || '') < cut;
           row.dataset.period = tooOld ? 'out' : 'in';
-          if (tooOld) {
-            row.hidden = true;
+          const on = flt && flt.querySelector('.chip[aria-pressed="true"]');
+          const f = on ? on.dataset.f : 'all';
+          const wrongSide = f !== 'all' && row.dataset.since !== f;
+          const passes = !tooOld && !wrongSide;
+          // The cap counts only rows that already passed the filters, so
+          // "show 15" means fifteen VISIBLE rows rather than fifteen minus
+          // however many the filters happened to remove.
+          const capped = passes && !ipoShowAll && shownRank >= IPO_SHOW;
+          if (passes && !capped) shownRank++;
+          row.hidden = !passes || capped;
+          if (row.hidden) {
             const panel = row.nextElementSibling;
             if (panel && panel.classList.contains('xd')) {
               panel.hidden = true;
               row.setAttribute('aria-expanded', 'false');
               row.classList.remove('is-open');
             }
-          } else if (row.dataset.since && flt) {
-            const on = flt.querySelector('.chip[aria-pressed="true"]');
-            const f = on ? on.dataset.f : 'all';
-            row.hidden = f !== 'all' && row.dataset.since !== f;
-          } else {
-            row.hidden = false;
           }
+        }
+        const moreBtn = main.querySelector('[data-ipo-more]');
+        if (moreBtn) {
+          const hiddenByCap = rows.filter(r => r.hidden && r.dataset.period !== 'out').length;
+          moreBtn.hidden = ipoShowAll || hiddenByCap === 0;
+          moreBtn.textContent = `Show all ${shownRank + hiddenByCap} listings`;
         }
         const shown = rows.filter(r => !r.hidden).length;
         const n = main.querySelector('#ipotbl');
@@ -3484,41 +3546,22 @@
                is working; the data behind it stops there.`;
           msg.hidden = false;
         } else if (msg) { msg.hidden = true; }
-      };
-      sortBar.addEventListener('change', applySort);
-    }
+      }
+    };
+    if (sortBar) sortBar.addEventListener('change', applySort);
 
     const flt = main.querySelector('#ipoflt');
     if (flt) flt.addEventListener('click', e => {
       const b = e.target.closest('.chip[data-f]');
       if (!b) return;
-      const f = b.dataset.f;
       flt.querySelectorAll('.chip').forEach(c =>
         c.setAttribute('aria-pressed', String(c === b)));
-      main.querySelectorAll('#ipotbl .rank-r[data-since]').forEach(row => {
-        /* TWO INDEPENDENT AXES, AND A ROW HAS TO CLEAR BOTH.
-         * This read only data-since, so pressing "Above issue" brought back
-         * every row the "listed within 3 months" control had just removed —
-         * the second filter silently undid the first. */
-        const hide = (f !== 'all' && row.dataset.since !== f)
-                  || row.dataset.period === 'out';
-        row.hidden = hide;
-        /* THE PANEL IS A SIBLING, SO IT HAS TO BE HIDDEN TOO.
-         * Filtering only the row left its expanded detail behind — a block of
-         * figures under a heading whose row was no longer on screen. A filtered
-         * row is also collapsed, because reappearing already-open is a state
-         * the reader did not ask for. */
-        const panel = document.getElementById(row.getAttribute('aria-controls') || '');
-        if (panel) {
-          panel.hidden = hide || panel.hidden;
-          if (hide) {
-            panel.hidden = true;
-            row.setAttribute('aria-expanded', 'false');
-            row.classList.remove('is-open');
-          }
-        }
-      });
+      // Visibility is decided in ONE place; this only records the choice.
+      applySort();
     });
+    const moreBtn = main.querySelector('[data-ipo-more]');
+    if (moreBtn) moreBtn.addEventListener('click', () => { ipoShowAll = true; applySort(); });
+    applySort();
     fillIpoLive();   // upgrades the mirrored figures in place, after paint
   };
 
@@ -4959,6 +5002,13 @@
     // After the sheet exists: one 2-year request, cached per symbol.
     wireCardChart(r.sym);
   }
+
+  /* Fifteen rows is about four screens on a phone with the header and the
+   * controls above them — enough to see the shape of the table and decide
+   * whether the rest is worth asking for. Module scope, not route scope: the
+   * table's markup reads it while it is being BUILT, which is before anything
+   * declared inside the route body exists. */
+  const IPO_SHOW = 15;
 
   let sigFilter = 'all';
   /* The other three axes of the signals table. Status stays in `sigFilter`

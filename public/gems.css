@@ -331,3 +331,7 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 .yr-l em{display:block;font:600 8.5px/1 var(--ui);letter-spacing:.09em;
   text-transform:uppercase;color:var(--dim);font-style:normal;margin-top:2px}
 .yr-l span:last-child{text-align:right}
+
+/* Same reason as signal.css: this sheet sets display on .row and .fig, which
+   defeats the UA [hidden] rule. */
+[hidden] { display: none !important; }

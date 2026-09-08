@@ -286,6 +286,15 @@ try {
    * it protects is that a card, WHERE ONE EXISTS, offers the brief link — not
    * that the ledger is non-empty, which is not this check's business and is
    * covered by the empty-state assertion further down. */
+  /* THE DETAIL IS LAZY NOW, so counting cards or brief links before anything
+   * is open counts zero — the markup sits in a <template> until a row is
+   * first expanded. Opening one row is what a reader does and is what the
+   * assertions below are actually about. */
+  await p.evaluate(() => {
+    const r = document.querySelector('.xr[data-xr]');
+    if (r) r.click();
+  });
+  await p.waitForTimeout(SETTLE);
   const nCards = await p.locator("main article.card").count();
   const nLinks = await p.locator("a.brief-link").count();
   if (nCards === 0) {
