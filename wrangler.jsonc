@@ -26,7 +26,28 @@
     // full site was unreachable code — it read correctly and never ran. Only
     // the root needs intercepting: Gems is a one-page product, and every other
     // path on it is sent back to that page.
-    "run_worker_first": ["/api/*", "/"],
+    // A THIRD REASON, ADDED WITH THE SOFT-404 FIX: the Worker cannot return a
+    // 404 for a path the assets binding has already answered. With only
+    // ["/api/*", "/"] listed, every unknown page — /radarr, /signals/x, a
+    // mistyped share link — was served index.html with status 200, so the
+    // router painted "not found" while the response told crawlers and link
+    // checkers it was a real page. Google names that a soft 404 and discounts
+    // the whole site for it.
+    //
+    // So the Worker now runs first for anything that is not plainly a static
+    // FILE. The negations matter as much as the glob: without them every font,
+    // stylesheet and JSON feed would take a Worker invocation on its way to
+    // the same bytes, which is a cost paid on every request to save one on a
+    // typo. Extensions are listed rather than matched loosely because
+    // "/*.\w+" is not glob syntax here.
+    "run_worker_first": [
+      // "/api/*" is NOT listed: wrangler rejects it as redundant under "/*",
+      // which already covers it.
+      "/*",
+      "!/*.js", "!/*.css", "!/*.json", "!/*.svg", "!/*.png", "!/*.jpg",
+      "!/*.ico", "!/*.txt", "!/*.xml", "!/*.webmanifest",
+      "!/fonts/*"
+    ],
     // EVERY ROUTE IS A REAL PATH NOW, so the server has to answer for paths it
     // has no file for. /markets, /screen, /signals and /stock/RELIANCE all
     // return index.html and the router takes it from there.

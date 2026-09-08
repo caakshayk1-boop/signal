@@ -28,7 +28,12 @@ import { writeFileSync, readFileSync } from "node:fs";
 
 const RAW = "https://raw.githubusercontent.com/caakshayk1-boop/trading-dashboard/main/docs";
 const FEEDS = ["alerts", "conviction", "data-health", "edition", "ipo",
-               "mandate", "news", "pulse", "screen", "today"];
+               "mandate", "news", "pulse", "screen", "today",
+               // BUOY's forward scan. Written by scan_buoy.py in the
+               // trading-dashboard repo; absent until that job has run, and a
+               // missing feed leaves the committed copy alone rather than
+               // replacing it with a 404 page named buoy.json.
+               "buoy"];
 
 const stampOf = (o) => {
   if (!o || Array.isArray(o)) return null;

@@ -15,6 +15,8 @@ import { join } from "node:path";
 const JS = readFileSync("public/signal.js", "utf8");
 const CSS = readFileSync("public/signal.css", "utf8");
 const HTML = readFileSync("public/index.html", "utf8");
+const GEMS = readFileSync("public/gems.js", "utf8");
+const IDX = readFileSync("src/index.js", "utf8");
 
 let fails = 0, checks = 0;
 const ok = (name, cond, detail) => {
@@ -77,7 +79,10 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
     for (const x of src.matchAll(/go\('(\/[a-z0-9/-]*)'\)/g)) linked.add(x[1]);
     for (const x of src.matchAll(/\['(\/[a-z0-9/-]*)',\s*'/g)) linked.add(x[1]);   // CMD_ROUTES
   }
-  const orphans = routes.filter(r => !linked.has(r) && !r.includes(":"));
+  /* /404 is deliberately unlinked: it is what routeOf() falls back to when a
+   * path matches nothing, and a link TO it would be a link to a page that
+   * announces itself as missing. Reached by mistyping, never by clicking. */
+  const orphans = routes.filter(r => !linked.has(r) && !r.includes(":") && r !== "/404");
   ok("no route is unreachable from any link", orphans.length === 0, orphans);
 }
 
@@ -193,6 +198,74 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   const OWN = /^(rd-|rdc-|is-|up$|dn$|warn$|flat$)/;
   const foreign = [...emitted].filter(c => !OWN.test(c));
   ok("the radar only emits classes in its own namespace", foreign.length === 0, foreign);
+}
+
+/* ── 12. Number(null) IS 0, AND 0 IS FINITE ────────────────────────────────
+ * The incident: gems.js grew its own numeric coercion helper —
+ *     const num = v => { const n = Number(v); return Number.isFinite(n) ? n : null; }
+ * which looks exhaustive and is not. Number(null), Number('') and Number([])
+ * are all 0, and 0 passes isFinite — so every null numeric in every feed
+ * became a real zero. A signal whose target3 was null drew a price level at
+ * ₹0, which pulled the ladder's scale minimum to zero, squeezed the real
+ * levels into the right-hand third of the drawing, and printed "T3 is 18.7R"
+ * for a target that does not exist. It renders, it does not throw, and no
+ * test that checks a level is PRESENT can see it.
+ *
+ * signal.js already knew this — its own lvl() and price() guard null first,
+ * and price() carries the comment saying why. The bug arrived by writing a
+ * fresh helper in a new file rather than by forgetting the lesson.
+ *
+ * So the rule is aimed at exactly that: a HELPER whose whole job is "give me
+ * a number or null" must reject null/''/undefined before it coerces. It
+ * deliberately does not flag ordinary call sites, which carry their own
+ * context — a rule that fires twenty-one times on working code is a rule
+ * everyone learns to skip. */
+{
+  const bad = [];
+  for (const [file, code] of [["public/signal.js", JS], ["public/gems.js", GEMS]]) {
+    // Arrow-function bodies that both coerce with Number() and can return null:
+    // the "number or nothing" helper shape.
+    for (const m of code.matchAll(/=>\s*\{([\s\S]{0,320}?)\}/g)) {
+      const body = m[1];
+      if (!/Number\.isFinite\s*\(/.test(body)) continue;
+      if (!/\bnull\b/.test(body)) continue;                 // must be able to return null
+      if (!/Number\s*\(/.test(body)) continue;              // must coerce
+      const guards = /(==|===)\s*null|!=\s*null|!==\s*null|===\s*undefined|undefined\s*===|===\s*''|typeof\s+\w+\s*===/.test(body);
+      if (!guards) bad.push(`${file}:${lineOf(code, m.index)}`);
+    }
+  }
+  ok("a number-or-null helper rejects null before it coerces", bad.length === 0, bad);
+}
+
+/* ── 13. THE WORKER'S PAGE LIST MUST MATCH THE APP'S ROUTES ────────────────
+ * src/index.js now returns a real 404 for any path that is not a known page,
+ * which fixed the soft-404 (every typo answered 200 and told crawlers it was
+ * a page). The cost is a SECOND list of routes: the Worker cannot import the
+ * 500 KB client bundle to ask it, so PAGES is written out by hand.
+ *
+ * A list maintained in two places drifts, and this one drifts silently in the
+ * worst direction — add R['/foo'] to signal.js, forget PAGES, and /foo now
+ * 404s in production while working perfectly in every local test that loads
+ * the app directly. So the two are compared here. */
+{
+  const routes = new Set(
+    [...JS.matchAll(/R\['(\/[a-z0-9:/-]*)'\]\s*=/g)].map((m) => m[1])
+  );
+  const pages = new Set(
+    [...(IDX.match(/const PAGES = new Set\(\[([\s\S]*?)\]\)/) || ["", ""])[1]
+      .matchAll(/"([^"]+)"/g)].map((m) => m[1])
+  );
+  // /stock/:sym is handled by a prefix test in the Worker, not by the list.
+  const dynamic = (r) => r.includes(":");
+  /* /404 is the router's FALLBACK, not an address. It must never appear in
+   * PAGES — listing it would make /404 a page that returns 200, which is the
+   * soft-404 this whole fix exists to remove. */
+  const missing = [...routes].filter((r) => !dynamic(r) && r !== "/404" && !pages.has(r));
+  const extra = [...pages].filter((p) => p !== "/gems" && !routes.has(p));
+  ok("every app route is in the Worker's PAGES list (else it 404s live)",
+     missing.length === 0, missing);
+  ok("the Worker's PAGES list has no route the app cannot render",
+     extra.length === 0, extra);
 }
 
 console.log(fails

@@ -162,9 +162,161 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
   .row{grid-template-columns:auto 1fr auto auto;gap:var(--s4)}
 }
 
-/* A headline is not a ticker: it needs to wrap. The row's name cell truncates
-   to one line because a stock name should, and a story title must not — the
-   wire section overrides only that. */
-#wire .rn b{white-space:normal;font:600 14.5px/1.4 var(--ui)}
-#wire .rn span{white-space:normal}
-#wire .row{grid-template-columns:auto 1fr;align-items:start}
+/* The #wire overrides went with the wire section itself — nothing on this page
+   renders a headline any more, so nothing needs a name cell that wraps. */
+
+/* ── GEMS v2 — the working, in place ─────────────────────────────────────────
+ *
+ * Every widget below renders at its FINAL value and animates from a transform
+ * or a clip. If the animation never runs — a background tab, reduced motion,
+ * JS off — the resting state is already the correct one. Nothing here reads a
+ * number out of an animation frame, which is how animated counters end up
+ * frozen on zero in a tab the reader has not looked at yet.
+ * ─────────────────────────────────────────────────────────────────────────── */
+@keyframes gGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes gRise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes gDraw{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+
+/* The original row grid declared a fourth column at ≥700px while the markup
+   has only ever emitted three cells, so the value column stopped short of the
+   right edge instead of sitting on it. Three cells, three columns. */
+@media(min-width:700px){ .row{grid-template-columns:auto 1fr auto} }
+
+/* ── expanding row ──────────────────────────────────────────────────────── */
+.xr{border:1px solid var(--line);border-radius:var(--r2);background:var(--surf);
+  overflow:hidden;transition:border-color 160ms}
+.xr[open]{border-color:var(--line2)}
+.xr>summary.row{border:0;border-radius:0;background:none;list-style:none;
+  cursor:pointer;padding-right:34px;position:relative}
+.xr>summary::-webkit-details-marker{display:none}
+.xr>summary:focus-visible{outline:2px solid var(--acc);outline-offset:-2px}
+.xr-c{position:absolute;right:14px;top:50%;width:7px;height:7px;margin-top:-5px;
+  border-right:1.6px solid var(--dim);border-bottom:1.6px solid var(--dim);
+  transform:rotate(45deg);transition:transform 180ms,margin 180ms}
+.xr[open] .xr-c{transform:rotate(-135deg);margin-top:-2px}
+.xd{padding:2px 14px 15px;border-top:1px solid var(--line);
+  animation:gRise 220ms ease-out both}
+.xd .figs{margin:12px 0 10px}
+.xd .said{margin:10px 0 0;font-size:13.5px}
+.xd-q{margin:12px 0 0;font:400 15px/1.55 var(--serif);color:var(--ink)}
+.xd-h{margin:14px 0 6px;font:700 10px/1 var(--ui);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--dim)}
+.sub{margin:var(--s5) 0 var(--s3);font:700 10px/1 var(--ui);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--dim)}
+.flags{margin:0;padding:0;list-style:none;display:grid;gap:7px}
+.flags li{padding:9px 11px;border-radius:var(--r3);background:var(--warn-soft);
+  border-left:2px solid var(--warn)}
+.flags li b{display:block;font:600 13px/1.4 var(--ui);color:var(--ink)}
+.flags li span{display:block;margin-top:2px;font:500 11.5px/1.4 var(--mono);color:var(--mut)}
+.dim{color:var(--dim)}
+.wire-a .rn b{color:var(--ink)}
+
+/* ── advance / decline ──────────────────────────────────────────────────── */
+.sb{display:flex;height:12px;border-radius:999px;overflow:hidden;position:relative;
+  background:var(--raise);margin-bottom:7px}
+.sb-a,.sb-b{display:block;height:100%;transform-origin:left;
+  animation:gGrow 620ms cubic-bezier(.22,.7,.3,1) both}
+.sb-a{background:var(--up)} .sb-b{background:var(--dn);animation-delay:80ms}
+.sb-mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--bg);opacity:.85}
+.sb-l{display:flex;justify-content:space-between;gap:10px;margin-bottom:var(--s4);
+  font:500 11.5px/1 var(--mono);font-variant-numeric:tabular-nums}
+.sb-l .up{color:var(--up)} .sb-l .dn{color:var(--dn)}
+
+/* ── meters ─────────────────────────────────────────────────────────────── */
+.mts{display:grid;gap:9px;margin-bottom:var(--s4)}
+.mt{display:grid;grid-template-columns:112px 1fr 52px;gap:10px;align-items:center}
+.mt-l{font:500 11.5px/1.3 var(--ui);color:var(--mut)}
+.mt-t{position:relative;height:8px;border-radius:999px;background:var(--raise);overflow:hidden}
+.mt-t i{display:block;height:100%;border-radius:999px;transform-origin:left;
+  animation:gGrow 700ms cubic-bezier(.22,.7,.3,1) both}
+.mt-t i.up{background:var(--up)} .mt-t i.dn{background:var(--dn)}
+/* The halfway line. Half a market above its 200-day is the only threshold
+   here that means something without an opinion attached, so it is drawn. */
+.mt-t u{position:absolute;top:-1px;bottom:-1px;width:1px;background:var(--ink);opacity:.45}
+.mt-v{text-align:right;font:500 12.5px/1 var(--mono);font-variant-numeric:tabular-nums}
+.mt-v.up{color:var(--up)} .mt-v.dn{color:var(--dn)}
+
+/* ── diverging bar ──────────────────────────────────────────────────────── */
+.db-w{margin:12px 0 2px}
+.db{display:block;position:relative;height:10px;border-radius:3px;background:var(--raise)}
+.db i{position:absolute;top:0;bottom:0;border-radius:2px;transform-origin:inherit;
+  animation:gGrow 560ms cubic-bezier(.22,.7,.3,1) both}
+.db i.up{background:var(--up);transform-origin:left}
+.db i.dn{background:var(--dn);transform-origin:right}
+.db u{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--line2)}
+
+/* ── the cumulative-R curve ─────────────────────────────────────────────── */
+.cv-w{margin:0 0 var(--s4);border:1px solid var(--line);border-radius:var(--r2);
+  background:var(--surf);padding:var(--s3) var(--s3) 9px}
+.cv{display:block;width:100%;height:132px;animation:gDraw 900ms ease-out both}
+.cv-0{stroke:var(--line2);stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
+.cv-l{fill:none;stroke-width:1.6;vector-effect:non-scaling-stroke;
+  stroke-linejoin:round;stroke-linecap:round}
+.cv-l.up{stroke:var(--up)} .cv-l.dn{stroke:var(--dn)}
+.cv-x{display:flex;justify-content:space-between;gap:8px;margin-top:7px;
+  font:500 10.5px/1 var(--mono);color:var(--dim)}
+.cv-x .up{color:var(--up)} .cv-x .dn{color:var(--dn)}
+
+/* ── the ladder, to scale ───────────────────────────────────────────────── */
+.ld{position:relative;height:74px;margin:16px 0 0}
+.ld-t{position:absolute;left:0;right:0;top:30px;height:2px;background:var(--line2);
+  border-radius:2px}
+/* The risk leg is shaded so the distance a trade can lose is visible next to
+   the distance it can win, rather than inferred from two numbers. */
+.ld-risk{position:absolute;top:26px;height:10px;background:var(--dn-soft);
+  border-radius:3px;transform-origin:left;animation:gGrow 620ms cubic-bezier(.22,.7,.3,1) both}
+.ld-m{position:absolute;top:22px;width:2px;height:18px;border-radius:2px;
+  font-style:normal;transform:translateX(-1px)}
+.ld-m.dn{background:var(--dn)} .ld-m.ac{background:var(--acc)} .ld-m.up{background:var(--up)}
+.ld-m b{position:absolute;top:-16px;left:50%;transform:translateX(-50%);
+  font:700 9px/1 var(--ui);letter-spacing:.08em;color:var(--dim);white-space:nowrap}
+.ld-m em{position:absolute;top:22px;left:50%;transform:translateX(-50%);
+  font:500 10px/1 var(--mono);font-style:normal;color:var(--mut);white-space:nowrap}
+/* The first and last marks would otherwise hang off both ends of the track. */
+.ld-m:first-of-type b,.ld-m:first-of-type em{left:0;transform:none}
+.ld-m:last-of-type b,.ld-m:last-of-type em{left:auto;right:0;transform:none}
+.ld-n{margin:6px 0 0;font:500 11.5px/1.5 var(--mono);color:var(--dim)}
+.ld-n b{color:var(--up)}
+
+/* ── verdict distribution ───────────────────────────────────────────────── */
+.vd-bar{display:flex;height:30px;border-radius:var(--r3);overflow:hidden;
+  background:var(--raise);margin-bottom:9px}
+.vd-s{display:flex;align-items:center;justify-content:center;min-width:0;
+  transform-origin:left;animation:gGrow 640ms cubic-bezier(.22,.7,.3,1) both}
+.vd-s.up{background:var(--up)} .vd-s.dn{background:var(--dn)}
+.vd-s.warn{background:var(--warn)} .vd-s.flat{background:var(--line2)}
+.vd-s em{font:700 9.5px/1 var(--ui);letter-spacing:.1em;font-style:normal;color:var(--bg)}
+.vd-s.flat em{color:var(--ink)}
+.vd-k{display:flex;flex-wrap:wrap;gap:6px 16px;margin-bottom:var(--s4);
+  font:500 11.5px/1 var(--ui);color:var(--dim)}
+.vd-k span{display:inline-flex;align-items:center;gap:6px}
+.vd-k i{width:9px;height:9px;border-radius:2px;flex:none}
+.vd-k i.up{background:var(--up)} .vd-k i.dn{background:var(--dn)}
+.vd-k i.warn{background:var(--warn)} .vd-k i.flat{background:var(--line2)}
+.vd-k b{color:var(--ink);font-family:var(--mono);font-weight:500}
+
+@media(prefers-reduced-motion:reduce){
+  .sb-a,.sb-b,.mt-t i,.db i,.cv,.ld-risk,.vd-s,.xd{animation:none}
+}
+@media(max-width:520px){
+  /* Four figures in a three-up grid leaves the fourth alone in its own row
+     with two empty cells beside it. Two columns makes 4 a filled 2x2, which
+     is the shape every figure row on this page actually has. */
+  .figs{grid-template-columns:repeat(2,1fr)}
+  /* 96px wrapped "Above the 200-day" onto a second line, making one meter
+     taller than the two above it. */
+  .mt{grid-template-columns:112px 1fr 44px;gap:8px}
+  .ld-m em{font-size:9px}
+}
+.ld-warn{margin:9px 0 0;padding:10px 12px;border-radius:var(--r3);
+  background:var(--dn-soft);border-left:2px solid var(--dn);
+  font:500 12.5px/1.55 var(--ui);color:var(--mut)}
+.ld-warn b{color:var(--ink)}
+/* The second label row, used only where marks crowd (see ladder() in gems.js). */
+.ld-m.r1 em{top:36px}
+.ld{height:92px}
+/* The affirmative counterpart to .flags, which is styled as a warning. */
+.flags-ok li{background:var(--up-soft);border-left-color:var(--up)}
+.xd .rows .row{background:var(--raise)}
+.gpx-live{display:block;margin-top:2px;font:600 8.5px/1 var(--ui);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--acc);font-style:normal}

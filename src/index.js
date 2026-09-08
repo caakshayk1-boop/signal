@@ -258,6 +258,41 @@ export default {
       return env.ASSETS.fetch(new Request(gems.toString(), request));
     }
 
+    /* ── A TYPO IS NOT A PAGE ─────────────────────────────────────────────
+     *
+     * not_found_handling: single-page-application serves index.html for any
+     * path that is not a file, with status 200. That is right for /radar and
+     * wrong for /radarr: the router paints a "not found" panel while the
+     * response tells crawlers, link checkers and the browser's own history
+     * that a real page was delivered. Google calls this a soft 404 and treats
+     * the whole site as less trustworthy for it.
+     *
+     * The known routes are listed here rather than imported because the app
+     * bundle is a 500 KB client file the Worker never parses. That means this
+     * list has to be kept in step with R[...] in public/signal.js — a real
+     * cost, and cheaper than shipping 200 for every mistyped URL.
+     *
+     * /stock/:sym is deliberately permitted with any symbol: whether a ticker
+     * exists is a question about the screen's 750 rows, which live in a feed
+     * this Worker does not read, so the client answers it and says so. */
+    const PAGES = new Set(["/", "/brief", "/discover", "/engines", "/funds",
+      "/gems", "/ideas", "/ipo", "/join", "/markets", "/methodology", "/news",
+      "/privacy", "/radar", "/screen", "/signals", "/sources", "/terms", "/watch",
+      "/buoy"]);
+    const p = url.pathname.replace(/\/+$/, "") || "/";
+    const isPage = PAGES.has(p) || p.startsWith("/stock/");
+    // A request for a real file (/signal.js, /screen.json, /fonts/...) has an
+    // extension and is left entirely alone — the assets binding answers it,
+    // and a 404 from there is already a real 404.
+    const isFile = /\.[a-z0-9]+$/i.test(p);
+    if (!isPage && !isFile) {
+      const shell = await env.ASSETS.fetch(new Request(new URL("/", request.url), request));
+      return new Response(shell.body, {
+        status: 404,
+        headers: shell.headers,
+      });
+    }
+
     return env.ASSETS.fetch(request);
   },
 };

@@ -343,7 +343,15 @@
    * used /api/stats for this, which is all-time and cannot be filtered. */
   const recordOf = rows => {
     const closed = rows.filter(
-      r => Number.isFinite(Number(r.r_multiple)) && (r.badge || '') !== 'open');
+      /* r_multiple != null FIRST: Number(null) is 0 and 0 is finite, so an
+       * ungraded row would otherwise be counted as a closed trade booked at
+       * exactly 0R — in the trade count, the win rate and the expectancy this
+       * site publishes. Measured on the live feed the day this was found: 184
+       * rows carry a null grade and every one of them is also badge=open, so
+       * the clause below already excluded them and no published figure moves.
+       * It is the ordering that was load-bearing, and it was accidental. */
+      r => r.r_multiple != null && Number.isFinite(Number(r.r_multiple))
+        && (r.badge || '') !== 'open');
     if (!closed.length) return { trades: 0, wins: 0, losses: 0, win_rate: null, expectancy_r: null };
     const wins = closed.filter(r => Number(r.r_multiple) > 0).length;
     const sum = closed.reduce((a, r) => a + Number(r.r_multiple), 0);
@@ -918,6 +926,24 @@
   const ENGINES = new Set(Object.keys(ENGINE_REGISTRY));
   const eng = k => ENGINE_REGISTRY[String(k || '')] || null;
   const engName = k => (eng(k) || {}).name || String(k || '—');
+  /* ── A FILTER OPTION HAS TO NAME ONE THING ────────────────────────────────
+   * Two registry keys deliberately share a display name: `magic` and
+   * `magicmagic` are the same screen read at two depths off the 52-week high,
+   * so both render as TIDAL. On a card that is correct — the band is written
+   * out underneath it. In a dropdown it produced two options reading
+   * "TIDAL (12)" and "TIDAL (6)" with nothing to choose between them.
+   * Where a name is shared, the filter appends the band that separates them;
+   * where it is unique, the plain name is left alone. */
+  const ENG_SHARED = (() => {
+    const n = {};
+    for (const v of Object.values(ENGINE_REGISTRY)) n[v.name] = (n[v.name] || 0) + 1;
+    return n;
+  })();
+  const engLabel = (k) => {
+    const e = eng(k);
+    if (!e) return engName(k);
+    return (ENG_SHARED[e.name] > 1 && e.band) ? `${e.name} · ${e.band}` : e.name;
+  };
   /* The old map is kept as the fallback for a row whose engine has since been
    * retired: an unrecognised key renders as itself rather than as blank. */
   const ENGINE_LABEL = new Proxy({}, { get: (_, k) => engName(k) });
@@ -1686,7 +1712,12 @@
             Number.isFinite(adv) && Number.isFinite(counted) && counted
               ? ` · ${adv} of ${counted} screened names advancing` : ''}</span>
         </div>` : ''}
-        ${heroSensex ? `<div class="hero-q">
+        ${/* THE SAME DIRECTION CLASS AS NIFTY ABOVE.
+            * .hero-reg carried `dn` and tinted its value; .hero-q did not, so
+            * on a day both indices fell, Nifty's ₹23,635 was red and Sensex's
+            * ₹75,578 was plain black beside it — two different answers to
+            * "which way is the market" in one block. */''}
+        ${heroSensex ? `<div class="hero-q ${dir(heroSensex.change_pct)}">
           <span class="k">Sensex</span>
           <span class="v">${esc(heroSensex.price ?? '—')}</span>
           <span class="c ${dir(heroSensex.change_pct)}">${pct(heroSensex.change_pct)}</span>
@@ -2855,8 +2886,16 @@
   R['/ideas'] = async () => {
     paint(head('Ideas', 'Ranked names, and the orders a fully-sized book would place against them. Sizes are shown as a share of the book, so they scale to whatever you run.', 'Ranked ideas') +
       sec('Trade ideas', skel('sk-card', 3)));
-    const [t, mn, p, tk, lg] = await Promise.all(
-      [get('/today.json'), get('/mandate.json'), get('/pulse.json'), get('/api/ticker'), ledger()]);
+    const [t, mn, p, tk, lg, sc] = await Promise.all(
+      [get('/today.json'), get('/mandate.json'), get('/pulse.json'), get('/api/ticker'), ledger(),
+       /* Needed for the levels under each idea. Cached across routes, so this
+        * is free for anyone who has already opened /screen or /radar. */
+       SCREEN ? Promise.resolve({ ok: false }) : get('/screen.json')]);
+    if (sc && sc.ok && sc.data) {
+      noteLadder(sc);
+      SCREEN = SCREEN || (sc.data.rows || []).filter(x => x && x.sym);
+      SCREEN_DATE = SCREEN_DATE || sc.data.price_date || null;
+    }
     let out = head('Ideas', 'Ranked names, and the orders a fully-sized book would place against them. Sizes are shown as a share of the book, so they scale to whatever you run.', 'Ranked ideas');
     if (!t.ok) { paint(out + fail('Ideas', t.error)); return; }
     /* What is on this page, before the cards. A reader arriving here cannot
@@ -2918,6 +2957,13 @@
             ${up != null ? `<span><b>${pct(up)}</b> to target</span>` : ''}
             ${r.pick_date ? `<span class="mbc-d">picked ${esc(r.pick_date)}</span>` : ''}
           </div>
+          ${/* THE SAME FIGURES THE RADAR ROWS CARRY.
+              * These cards showed three prices and two percentages, and a
+              * reader still could not tell whether the name was extended, how
+              * far it sat off its own high, or what was above and below it —
+              * which is what decides whether "to target" is a short hop. One
+              * renderer, shared with the radar, so they cannot drift. */''}
+          ${(sr => sr ? factsStrip(sr) + bandLine(sr) + levelsBlock(sr) : '')(screenRow(r.name))}
         </article>`;
       }).join('')}</div>
       <p class="hint">The scan runs on a Saturday and this list is the newest run — it does not
@@ -3008,8 +3054,17 @@
 
           <div class="aic-lv">
             <span><i>Entry</i><b>₹${esc(fmtN(entry))}</b></span>
-            <span><i>Structure stop</i><b>₹${esc(fmtN(stop))}</b></span>
-            <span><i>Risk per share</i><b>₹${esc(fmtN(risk))}</b></span>
+            ${/* IT IS NOT A STRUCTURE STOP.
+                * Measured on the live ledger: of 21 ai_longterm rows, TWELVE
+                * sit at exactly 20.0% below entry and the rest run to 33.9% —
+                * that is a percentage floor with a cap, not a level read off
+                * the chart. "Structure stop" told the reader a swing low or a
+                * base had been located when nothing of the sort had happened.
+                * The label now says what the number is, and the row says so
+                * out loud when it is sitting exactly on the floor. */''}
+            <span><i>Stop</i><b>₹${esc(fmtN(stop))}</b></span>
+            <span><i>Risk per share</i><b>₹${esc(fmtN(risk))}</b>${
+              entry > 0 ? `<u class="aic-pc">${(risk / entry * 100).toFixed(1)}% of entry</u>` : ''}</span>
             ${Number.isFinite(Number(md.fund_score)) ? `<span><i>Fundamental</i><b>${Math.round(md.fund_score)}</b></span>` : ''}
             ${Number.isFinite(Number(md.tech_score)) ? `<span><i>Technical</i><b>${Math.round(md.tech_score)}</b></span>` : ''}
           </div>
@@ -3190,8 +3245,14 @@
      * It also had no header row at all: six columns of numbers with nothing
      * naming any of them. The labels are here now and they are sticky, so
      * they survive the scroll down twenty-four rows. */
+    /* NEWEST FIRST, NOT BEST FIRST.
+     * This sorted by since_listing_pct, so the table opened on a listing from
+     * September 2024 and the most recent IPO — the one a reader is actually
+     * deciding about — was twenty rows down. A table of listings is a
+     * chronology; performance is a way to READ it, which is what the sort
+     * control below is for. */
     const rec = (d.recent_listed || []).slice().sort((a, b) =>
-      (b.since_listing_pct ?? -1e9) - (a.since_listing_pct ?? -1e9));
+      String(b.listing_date || '').localeCompare(String(a.listing_date || '')));
     /* THE ROW SHOWS EIGHT COLUMNS AND STILL COULD NOT ANSWER THE QUESTION.
      * "How did it list?" needs the issue price beside the first close, and the
      * table never carried the band and the listing price in a form you could
@@ -3267,13 +3328,17 @@
         // The up/below-issue chips filter on this. Dropping it when the row
         // became expandable silently broke both chips — the rows stayed put
         // and nothing errored.
-        attrs: `data-since="${Number(r.since_listing_pct) >= 0 ? 'up' : 'dn'}"` });
+        // data-ld / data-mv are what the sort and period controls read; they
+        // are on the row so neither has to re-render the table.
+        attrs: `data-since="${Number(r.since_listing_pct) >= 0 ? 'up' : 'dn'}"`
+             + ` data-ld="${esc(String(r.listing_date || ''))}"`
+             + ` data-mv="${Number(r.since_listing_pct) || 0}"` });
     const ipoHead = `<div class="rank-r lvl-r rank-head">
       <span class="i">#</span><span class="s">Company</span>
       <span class="x">Listed</span><span class="x">Price band</span>
       <span class="x">Listed at</span><span class="x">Last</span>
       <span class="x">Range since</span>
-      <span class="x">Off high</span><span class="m">Since listing ↓</span></div>`;
+      <span class="x">Off high</span><span class="m">Since listing</span></div>`;
     const up = rec.filter(r => Number(r.since_listing_pct) >= 0).length;
     out += sec('How recent listings have done', rec.length
       ? `<div class="chips" id="ipoflt">
@@ -3281,8 +3346,50 @@
            <button type="button" class="chip" data-f="up" aria-pressed="false">Above issue ${up}</button>
            <button type="button" class="chip" data-f="dn" aria-pressed="false">Below issue ${rec.length - up}</button>
          </div>
+         <div class="sgf-bar" id="iposort">
+           <label class="sgf"><span>Sort</span>
+             <select data-ipos="order" aria-label="Sort listings">
+               <option value="new">Newest listed</option>
+               <option value="old">Oldest listed</option>
+               <option value="best">Best since listing</option>
+               <option value="worst">Worst since listing</option>
+             </select></label>
+           <label class="sgf"><span>Listed within</span>
+             <select data-ipos="within" aria-label="Filter by how recently it listed">
+               <option value="all">Any time</option>
+               <option value="90">3 months</option>
+               <option value="180">6 months</option>
+               <option value="365">1 year</option>
+             </select></label>
+         </div>
          <div class="rank" id="ipotbl">${ipoHead}${rec.map(ipoRow).join('')}</div>
-         <p class="hint">Two years of mainboard listings, sorted by move since listing.
+         ${(() => {
+           /* THE TABLE CALLED ITSELF "RECENT" AND WAS NOT.
+            * recent_listed runs 2024-09-16 to 2025-08-14 — its newest row was
+            * 390 days old on the day this was checked — while the same file's
+            * own counts claim listed_12m: 166 and listed_measured: 157. So the
+            * upstream build knows about far more listings than it carries, and
+            * every one it carries predates the last year entirely. That is a
+            * gap in the feed, not something this page can compute its way out
+            * of; the only honest thing it can do is say so on the table. */
+           const ds = rec.map(r => String(r.listing_date || '')).filter(Boolean).sort();
+           if (!ds.length) return '';
+           const newest = ds[ds.length - 1];
+           const ageD = Math.round((Date.now() - Date.parse(newest + 'T00:00:00Z')) / 86400000);
+           const claimed = Number(c.listed_12m);
+           return ageD > 60 || (Number.isFinite(claimed) && claimed > rec.length)
+             ? `<div class="note"><b>This table is not current, and it is labelled that way
+                  deliberately.</b> It carries <b>${rec.length}</b> listings from
+                  <b>${esc(ds[0])}</b> to <b>${esc(newest)}</b> — the newest is
+                  <b>${ageD} days</b> old.${Number.isFinite(claimed) && claimed > rec.length
+                    ? ` The feed's own counter says <b>${claimed}</b> mainboard listings in the
+                       last twelve months, so ${claimed - rec.length} of them are missing from
+                       what it hands this site.` : ''}
+                  The rows below are real and measured; the window they cover is stale, and
+                  filtering to a recent period will correctly return nothing.</div>`
+             : '';
+         })()}
+         <p class="hint">Mainboard listings, newest first.
            <b>Price band</b> is what the book was offered at. <b>Listed at</b> is the first
            traded close, not the issue price — NSE's issue-price data is not reliable and a
            listing gain computed off a guessed one is fabricated, so this site measures from
@@ -3296,6 +3403,85 @@
     /* Filtering by attribute rather than re-rendering: the rows are already in
      * the DOM and re-running the map would drop the live figures fillIpoLive
      * writes into them a moment later. */
+    /* SORT AND PERIOD, BY MOVING NODES RATHER THAN REBUILDING THE TABLE.
+     * Each row is followed by its own expanded panel as a SIBLING, so a sort
+     * that moved only the rows would leave every panel behind and attach each
+     * one to whichever row happened to land above it. The pair moves together
+     * or not at all. */
+    const sortBar = main.querySelector('#iposort');
+    const tbl = main.querySelector('#ipotbl');
+    if (sortBar && tbl) {
+      const applySort = () => {
+        const order = sortBar.querySelector('[data-ipos="order"]').value;
+        const within = sortBar.querySelector('[data-ipos="within"]').value;
+        const rows = [...tbl.querySelectorAll('.rank-r[data-ld]')];
+        const key = (el) => ({
+          new:   () => String(el.dataset.ld || ''),
+          old:   () => String(el.dataset.ld || ''),
+          best:  () => Number(el.dataset.mv) || 0,
+          worst: () => Number(el.dataset.mv) || 0,
+        })[order]();
+        const desc = order === 'new' || order === 'best';
+        rows.sort((a, b) => {
+          const ka = key(a), kb = key(b);
+          const c = typeof ka === 'string' ? ka.localeCompare(kb) : ka - kb;
+          return desc ? -c : c;
+        });
+        for (const row of rows) {
+          const panel = row.nextElementSibling &&
+            row.nextElementSibling.classList.contains('xd') ? row.nextElementSibling : null;
+          tbl.appendChild(row);
+          if (panel) tbl.appendChild(panel);
+        }
+        // The period filter is a second, independent axis; it hides rather
+        // than removes so the up/below-issue chips keep working over it.
+        const cut = within === 'all' ? null
+          : new Date(Date.now() - Number(within) * 86400000).toISOString().slice(0, 10);
+        for (const row of rows) {
+          const tooOld = cut != null && String(row.dataset.ld || '') < cut;
+          row.dataset.period = tooOld ? 'out' : 'in';
+          if (tooOld) {
+            row.hidden = true;
+            const panel = row.nextElementSibling;
+            if (panel && panel.classList.contains('xd')) {
+              panel.hidden = true;
+              row.setAttribute('aria-expanded', 'false');
+              row.classList.remove('is-open');
+            }
+          } else if (row.dataset.since && flt) {
+            const on = flt.querySelector('.chip[aria-pressed="true"]');
+            const f = on ? on.dataset.f : 'all';
+            row.hidden = f !== 'all' && row.dataset.since !== f;
+          } else {
+            row.hidden = false;
+          }
+        }
+        const shown = rows.filter(r => !r.hidden).length;
+        const n = main.querySelector('#ipotbl');
+        if (n) n.setAttribute('aria-label', `${shown} listings shown`);
+        /* A TABLE THAT GOES BLANK LOOKS BROKEN.
+         * "Listed within 3 months" legitimately matches nothing here, because
+         * the newest row in the feed is over a year old — so the empty result
+         * has to say which of those two it is. */
+        let msg = tbl.querySelector('.ipo-none');
+        if (!shown) {
+          if (!msg) {
+            msg = document.createElement('div');
+            msg.className = 'empty ipo-none';
+            tbl.appendChild(msg);
+          }
+          const newest = rows.map(r => r.dataset.ld).filter(Boolean).sort().pop();
+          msg.innerHTML = within === 'all'
+            ? 'No listing matches that filter.'
+            : `<b>Nothing listed in that window.</b> The newest listing this feed carries is
+               <b>${esc(newest || '—')}</b>, so a ${within}-day window is empty — the filter
+               is working; the data behind it stops there.`;
+          msg.hidden = false;
+        } else if (msg) { msg.hidden = true; }
+      };
+      sortBar.addEventListener('change', applySort);
+    }
+
     const flt = main.querySelector('#ipoflt');
     if (flt) flt.addEventListener('click', e => {
       const b = e.target.closest('.chip[data-f]');
@@ -3304,7 +3490,12 @@
       flt.querySelectorAll('.chip').forEach(c =>
         c.setAttribute('aria-pressed', String(c === b)));
       main.querySelectorAll('#ipotbl .rank-r[data-since]').forEach(row => {
-        const hide = f !== 'all' && row.dataset.since !== f;
+        /* TWO INDEPENDENT AXES, AND A ROW HAS TO CLEAR BOTH.
+         * This read only data-since, so pressing "Above issue" brought back
+         * every row the "listed within 3 months" control had just removed —
+         * the second filter silently undid the first. */
+        const hide = (f !== 'all' && row.dataset.since !== f)
+                  || row.dataset.period === 'out';
         row.hidden = hide;
         /* THE PANEL IS A SIBLING, SO IT HAS TO BE HIDDEN TOO.
          * Filtering only the row left its expanded detail behind — a block of
@@ -3369,6 +3560,7 @@
    * and every label on screen says "pp" so the two can never be read as one.  */
 
   let RADAR_BREADTH = null, RADAR_NODES = null, RADAR_CORE = null;
+  let RADAR_LIVE = null, SCREEN_DATE = null;
   const RADAR_SERIES = {};   // sym -> closes, filled after paint
   let INSTI = null;                    // sym → the precomputed row
   let INSTI_META = null;               // coverage and period, for the footnote
@@ -3826,7 +4018,8 @@
         const a = rows.map(r => num(r.atr_pct)).filter(x => x != null).sort((x, y) => x - y);
         return a.length ? a[Math.floor(a.length / 2)].toFixed(2) + '%' : null;
       })(), 'daily range'],
-    ]))(v => { const x = Number(v); return Number.isFinite(x) ? x : null; });
+    ]))(v => { if (v == null || v === '') return null;
+               const x = Number(v); return Number.isFinite(x) ? x : null; });
     const shell = body => head('Screen',
       'Every one of the 750 names, searchable. Tap any row for the full card.',
       'The full universe') + body;
@@ -4651,6 +4844,15 @@
    * universe used to report a string-format mismatch. This repo has already
    * been bitten by the same suffix in the sector cap and the dedupe guard.
    * Normalised once, here, so every caller agrees. */
+  /* The screen row behind a ledger symbol. The ledger writes NIACL.NS and the
+   * screen keys on NIACL, which is why this goes through bareSym rather than
+   * matching the string it was given. */
+  const screenRow = (sym) => {
+    if (!SCREEN) return null;
+    const k = bareSym(sym);
+    return SCREEN.find(x => bareSym(x.sym) === k) || null;
+  };
+
   const bareSym = (s) => String(s || '').trim().toUpperCase()
     .replace(/\.(NS|BO|BSE|NSE)$/i, '');
 
@@ -4700,6 +4902,10 @@
   }
 
   let sigFilter = 'all';
+  /* The other three axes of the signals table. Status stays in `sigFilter`
+   * because the chips that carry it also carry the counts. */
+  let SIGF = { eng: 'all', dir: 'all', tf: 'all' };
+  const sigDir = r => /SELL|SHORT/i.test(r.action || '') ? 'short' : 'long';
 
   /* ── WHICH ENGINES ARE ALLOWED TO PUBLISH ────────────────────────────────
    *
@@ -4731,10 +4937,9 @@
    * decides whether it publishes, drawn rather than left to arithmetic. */
   /* A heading INSIDE a section — the floor holds two blocks that need naming
    * without either becoming a section of its own in the page's rhythm. */
-  const sub = (label, body) => `<div class="subsec">
-    <h3 class="subsec-h">${esc(label)}</h3>${body}</div>`;
-
   function floorHtml(d, rows) {
+    // Still needed by each card's footer ("what this engine filed last"), which
+    // is not what the removed Latest-filings log did.
     const last = new Map();
     for (const r of (rows || [])) {
       const k = String(r.signal_type || '');
@@ -4783,7 +4988,11 @@
       // magic and magicmagic are one engine at two depths; the name heads the
       // first card and the second is labelled by its band alone.
       const dupe = seen.has(meta.name); seen.add(meta.name);
-      return `<article class="ag ag-${state}">
+      /* EXPANDABLE, because the card alone cannot answer "why that floor".
+       * <details> rather than a scripted toggle: it is keyboard-operable and
+       * screen-reader labelled without this file shipping an interaction for
+       * it, and it works before the JS that draws the rest of the page runs. */
+      return `<details class="ag ag-${state}"><summary class="ag-sum">
         <header class="ag-h">
           <span class="ag-n">${esc(meta.name)}${meta.band
             ? `<i>${esc(meta.band)}</i>` : ''}</span>
@@ -4797,51 +5006,64 @@
         </div>
         <div class="ag-m">
           <span><b>${floor}R</b>a setup must earn</span>
-          <span><b>${win == null ? '—' : win + '%'}</b>win rate</span>
-          <span><b>${trades}</b>closed</span>
+          <span><b>${win == null ? '—' : win + '%'}</b>win rate that set it</span>
+          ${/* NOT "closed". This is engines.json's sample — 107 trades for
+              * BREACH — which is the history the floor was computed from, and
+              * it stretches back long before this site's record began. Calling
+              * it "closed" put a four-figure-old number under a card on a page
+              * whose every other count starts at LAUNCH. */''}
+          <span><b>${trades}</b>trades behind it</span>
         </div>
         <footer class="ag-f">
           <span>${esc(meta.tf)}</span>
           <span>${L ? esc(String(L.symbol || '').replace('.NS', '')) + ' · '
                       + esc(String(L.date || '').slice(5, 10)) : 'nothing filed yet'}</span>
         </footer>
-      </article>`;
+        <span class="ag-c" aria-hidden="true"></span>
+      </summary>
+      <div class="ag-d">
+        <h4 class="ag-dh">What it hunts</h4>
+        <p class="ag-dp">${esc(meta.hunts)}</p>
+        ${(R2 => R2 ? `
+          ${Array.isArray(R2.triggers) && R2.triggers.length ? `<h4 class="ag-dh">When it fires</h4>
+            <ul class="ag-rules">${R2.triggers.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+          ${R2.stop ? `<h4 class="ag-dh">Where the stop comes from</h4>
+            <p class="ag-dp">${esc(R2.stop)}</p>` : ''}
+          ${R2.targets ? `<h4 class="ag-dh">Targets</h4><p class="ag-dp">${esc(R2.targets)}</p>` : ''}
+          ${R2.wrong ? `<h4 class="ag-dh">What would prove it wrong</h4>
+            <p class="ag-dp">${esc(R2.wrong)}</p>` : ''}
+          ${R2.fixed ? `<p class="ag-dp ag-fix"><b>Changed:</b> ${esc(R2.fixed)}</p>` : ''}
+        ` : '')(ENGINE_RULES[key])}
+        <h4 class="ag-dh">Why this floor</h4>
+        <p class="ag-dp">A setup must offer <b>${floor}R</b> before this engine may file it.
+          That is not a preference: break-even reward-to-risk at a
+          <b>${win == null ? 'n/a' : win + '%'}</b> win rate is (1−p)/p, plus a 15% margin.
+          ${trades ? `It is computed over <b>${trades}</b> closed trades stretching back before
+          this site's record began — so it is the bar this engine has earned, not a
+          statement about what it has done here.` : 'Below 25 closed trades the default 2.0R stands.'}
+          ${floor >= 6 ? ` At the 6R cap an engine cannot honestly produce a qualifying setup,
+          so it stops publishing — switched off by its own record.` : ''}</p>
+        ${ENGINE_BACKTEST[key] ? (b => `<h4 class="ag-dh">Backtest</h4>
+          <p class="ag-dp">${b.n} signals · <b class="${dir(b.exp)}">${b.exp > 0 ? '+' : ''}${b.exp.toFixed(3)}R</b>
+            · ${b.win.toFixed(0)}% win · t=${b.t.toFixed(2)} · ${esc(b.from)} → ${esc(b.to)}.
+            <b>Not a live record.</b></p>`)(ENGINE_BACKTEST[key]) : ''}
+        <p class="ag-dp"><a href="/engines">The full roster and every rule →</a></p>
+      </div>
+      </details>`;
     }).join('');
 
     const on = Object.entries(ENGINE_REGISTRY).filter(([k]) => {
       const v = (d.engines || {})[k] || {}; return v.status !== 'disabled';
     }).length;
 
-    /* ── THE ACTIVITY LOG ────────────────────────────────────────────────
-     * What the floor has actually DONE, newest first. The cards say what each
-     * engine is and what it must earn; none of them says what happened. This
-     * is the one strip on the page built from events rather than state, and
-     * it is the thing a reader checks first: is anything happening.
-     *
-     * Real rows only. Where nothing has been filed the strip says so rather
-     * than padding itself — an empty log is a true statement about a quiet
-     * week, and inventing rows to fill it would make the busiest-looking
-     * version of this page the least honest one. */
-    const feed = (rows || []).filter(r => ENGINES.has(String(r.signal_type || '')))
-      .slice(0, 12);
-    const logHtml = !feed.length
-      ? `<p class="hint">Nothing filed yet since ${esc(LAUNCH)}.</p>`
-      : `<ol class="alog">${feed.map(r => {
-          const m = eng(r.signal_type) || {};
-          const e = lvl(r.entry), sx = lvl(r.sl), t = lvl(r.target1);
-          const rr = (e && sx && t && e !== sx) ? Math.abs(t - e) / Math.abs(e - sx) : null;
-          const b = String(r.badge || '').toLowerCase();
-          return `<li class="alog-r">
-            <span class="alog-d">${esc(String(r.date || '').slice(5, 10))}</span>
-            <span class="alog-e">${esc(m.name || r.signal_type)}</span>
-            <span class="alog-s">${esc(String(r.symbol || '').replace('.NS', ''))}</span>
-            <span class="alog-x">${e ? price(e, r.currency || '₹') : '—'}</span>
-            <span class="alog-r2">${rr ? rr.toFixed(2) + 'R' : '—'}</span>
-            <span class="alog-b ${b === 'open' ? 'is-open' : 'is-done'}">${esc(b || 'filed')}</span>
-          </li>`; }).join('')}</ol>`;
-
+    /* "LATEST FILINGS" IS DELETED, NOT RESTYLED.
+     * It listed date, engine, symbol, entry, R:R and a badge for the last
+     * twelve signals — six columns with no headers, so a row read
+     * "₹1,037  3.24R  open" and the reader had to guess what each was. And it
+     * sat on the same page as the signals table, which carries the same rows
+     * with headers, filters and the full ladder under each. Two renderings of
+     * one dataset is not extra information; the weaker one was removed. */
     return sec('The floor', `<div class="floor">${cards}</div>
-      ${sub('Latest filings', logHtml)}
       <p class="hint">The bar is how far each engine's floor has been raised above the
         2R default, toward the 6R cap at which it stops publishing altogether. That floor
         comes from the engine's own win rate — break-even R:R is (1−p)/p — so an engine
@@ -4851,6 +5073,226 @@
       `${on} of ${Object.keys(ENGINE_REGISTRY).length} working`,
       'Who is on the floor, what each one hunts, and what it has to earn to file a trade.');
   }
+
+  /* ── THE SIGNALS TABLE ─────────────────────────────────────────────────────
+   *
+   * The ledger was thirty large cards in a two-column grid. Reading it meant
+   * scrolling past every signal to compare any two, and the only filter was
+   * the outcome badge — so "show me the weekly LEDGE longs" was a manual scan.
+   *
+   * This is the same data as rows: one line per signal, the six figures that
+   * decide whether it is worth opening, and the whole card underneath when it
+   * is. Filtering is on the four axes a signal actually varies along — engine,
+   * status, direction, timeframe — and each one is a native <select>, which on
+   * a phone opens the platform picker instead of a bespoke menu.
+   *
+   * Sorting is newest first and stays there: this is a chronological record,
+   * and a table that reorders itself loses the one ordering that is a fact
+   * about the data rather than a view of it. */
+  const sigOpts = (rows, key, label) => {
+    const seen = new Map();
+    for (const r of rows) {
+      const v = key(r); if (!v) continue;
+      seen.set(v, (seen.get(v) || 0) + 1);
+    }
+    return [...seen.entries()].sort((a, b) => b[1] - a[1])
+      .map(([v, n]) => [v, `${label(v)} (${n})`]);
+  };
+
+  const sigSelect = (id, name, cur, opts) =>
+    `<label class="sgf"><span>${esc(name)}</span>
+      <select data-sgf="${id}" aria-label="Filter by ${esc(name.toLowerCase())}">
+        <option value="all"${cur === 'all' ? ' selected' : ''}>All</option>
+        ${opts.map(([v, l]) => `<option value="${esc(v)}"${cur === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}
+      </select></label>`;
+
+  const sigPass = (r) => {
+    const b = (r.badge || '').toLowerCase();
+    if (sigFilter !== 'all' && b !== sigFilter) return false;
+    if (SIGF.eng !== 'all' && String(r.signal_type || '') !== SIGF.eng) return false;
+    if (SIGF.dir !== 'all' && sigDir(r) !== SIGF.dir) return false;
+    if (SIGF.tf !== 'all' && String(r.timeframe || '') !== SIGF.tf) return false;
+    return true;
+  };
+
+  const sigRow = (r, px, detail) => {
+    const cur = r.currency || '₹';
+    const b = (r.badge || '').toLowerCase();
+    const open = b === 'open';
+    const live = px[r.symbol];
+    const move = open ? (live ? pnlOf(r.entry, live.price, r.action) : null)
+                      : (r.pnl_pct == null ? null : Number(r.pnl_pct));
+    /* Same rule as the card: a flat move is flat, not a loss. */
+    const mcls = move == null ? 'pill-ac' : move > 0 ? 'pill-up' : move < 0 ? 'pill-dn' : 'pill-flat';
+    const e = lvl(r.entry), sx = lvl(r.sl);
+    const far = lvl(r.target3) || lvl(r.target2) || lvl(r.target1);
+    const which = lvl(r.target3) ? 'T3' : lvl(r.target2) ? 'T2' : 'T1';
+    const rr = (e && sx && far && e !== sx) ? Math.abs(far - e) / Math.abs(e - sx) : null;
+    const short = sigDir(r) === 'short';
+    const summary = `<span class="sg-d ${short ? 'dn' : 'up'}" title="${short ? 'Short' : 'Long'}"></span>
+      <span class="sg-id"><b>${esc(r.symbol || '')}</b>
+        <span>${esc(engName(r.signal_type))}${r.timeframe ? ' · ' + esc(r.timeframe) : ''}</span></span>
+      <span class="sg-n" title="Entry">${price(r.entry, cur)}</span>
+      <span class="sg-n dn" title="Stop">${price(r.sl, cur)}</span>
+      <span class="sg-n up" title="First target">${lvl(r.target1) == null ? '—' : price(r.target1, cur)}</span>
+      <span class="sg-n" title="Reward to risk, measured to ${which}">${rr == null ? '—' : rr.toFixed(2)}</span>
+      <span class="sg-r-out"><span class="pill ${mcls}">${
+        move == null ? (open ? 'no mark' : 'open') : pct(move) + (open ? ' live' : '')}</span>
+        <em>${esc(String(r.alert_date || r.date || '').slice(0, 10))}</em></span>`;
+    return xrow(summary, detail, { cls: 'sg-r', attrs: `data-sgsym="${esc(r.symbol || '')}"` });
+  };
+
+  R['/404'] = async () => {
+    /* The status was already sent by the Worker; this is the body that has to
+     * agree with it — including the robots tag, which setHead writes from the
+     * META table and which must not say index on a page that does not exist. */
+    paint(head('Not found', 'There is no page at this address.', '404') +
+      `<div class="empty" style="text-align:left;padding:26px 22px">
+        <b style="color:var(--text);font-size:var(--t-5)">There is no page at
+          <code>${esc((location.pathname || '').slice(0, 80))}</code>.</b>
+        <p style="margin:10px 0 0">This address does not match any section of the site. It was
+          either mistyped, or it is a link to something that has been renamed — the routes
+          changed from <code>#/name</code> to <code>/name</code>, so an old bookmark with a
+          <code>#</code> in it should still work, and anything else will not.</p>
+        <p style="margin:14px 0 0">Where you probably meant to go:</p>
+        <div class="chips" style="margin-top:10px">
+          <a class="chip" href="/">Today</a>
+          <a class="chip" href="/signals">The ledger</a>
+          <a class="chip" href="/screen">The 750-name screen</a>
+          <a class="chip" href="/radar">Radar</a>
+          <a class="chip" href="/ipo">IPO</a>
+          <a class="chip" href="/engines">The floor</a>
+        </div>
+      </div>`);
+  };
+
+  /* ── BUOY — an UNPROVEN engine, shown as one ─────────────────────────────
+   *
+   * The rule: a name at least 12% off its 52-week high closes a FOUR-HOUR
+   * candle back above its 200-PERIOD average, having been under it, with a
+   * bullish RSI divergence already behind it. 200 periods of 4H is about a
+   * hundred sessions, so it is the long-term line on that chart.
+   *
+   * An NSE session makes TWO 4H candles — 09:15-13:15 and 13:15-15:30 — which
+   * is the convention TradingView uses and the one the resampler reproduces.
+   *
+   * IT DOES NOT HAVE AN EDGE THAT ANYONE HAS MEASURED, and this page leads
+   * with that rather than burying it under ten tickers. Every figure below
+   * comes from backtest_buoy.py and the feed carries them so this surface
+   * cannot quietly drift from what was actually measured. */
+  R['/buoy'] = async () => {
+    const shell = body => head('BUOY',
+      'A fallen name closing a 4-hour candle back above its 200-period average, with momentum already turning. Measured, and the measurement says no edge.',
+      'Research engine') + body;
+    paint(shell(skel('sk-card', 3)));
+    const r = await get('/buoy.json');
+    if (!r.ok || !r.data) { paint(shell(fail('BUOY', r.error || 'no scan yet'))); return; }
+    const d = r.data, B = d.backtest || {}, top = d.top || [];
+
+    const warn = `<div class="note"><b>This engine has no measured edge, and the sample is now
+      large enough to say so.</b> The rule as specified — a 4-hour close back above the
+      200-period average <i>and</i> an RSI divergence — measured
+      <b>${B.exp == null ? '—' : (B.exp > 0 ? '+' : '') + B.exp.toFixed(3) + 'R'}</b> per trade
+      at <b>t&nbsp;=&nbsp;${(B.t ?? 0).toFixed(2)}</b> over <b>${B.n ?? '—'}</b> trades on
+      ${B.names ?? 188} liquid names.
+      <br><br>Run <b>without</b> the divergence filter the sample grows to
+      <b>${B.n_no_div ?? '—'}</b> and the answer barely moves:
+      <b>+${(B.exp_no_div ?? 0).toFixed(3)}R</b>, t&nbsp;=&nbsp;+${(B.t_no_div ?? 0).toFixed(2)},
+      <b>95% confidence interval ${B.ci_lo_no_div == null ? '—'
+        : `[${B.ci_lo_no_div.toFixed(3)}, +${B.ci_hi_no_div.toFixed(3)}]`}</b>.
+      <b>That interval is the finding.</b> This book clears an engine at t&nbsp;≥&nbsp;2, which
+      on that sample needs roughly +0.13R — the very top of the range. So this is no longer
+      "too few trades to tell": if the rule has an edge, it is smaller than the bar this site
+      requires. The filter discards ${(B.n_no_div && B.n) ? B.n_no_div - B.n : '—'} of
+      ${B.n_no_div ?? '—'} signals and buys ${B.exp != null && B.exp_no_div != null
+        ? (B.exp - B.exp_no_div).toFixed(3) + 'R' : 'almost nothing'} for it.
+      <br><br>The 200-<i>day</i> average was measured too, as the other reading of "MA 200",
+      and did worse — <b>${(B.exp_dma ?? 0).toFixed(3)}R at t=${(B.t_dma ?? 0).toFixed(2)}</b>
+      over ${B.n_dma ?? '—'} trades. What follows is a watchlist run forward to keep counting.
+      <b>It is not a signal and carries no capital.</b></div>`;
+
+    paint(shell(
+      snap([
+        ['Scanned', d.scanned ?? 0, `of ${d.universe ?? 0} names`],
+        ['Fired today', d.fired ?? 0, d.fired ? 'reclaims found' : 'nothing qualified'],
+        ['Shown', top.length, 'deepest falls first'],
+        ['Cleared for capital', 'No', 'research only', 'dn'],
+      ]) + warn +
+      sec('The watchlist', top.length
+        ? `<div class="sg-head" aria-hidden="true"><span></span><span>Name</span>
+             <span>Entry</span><span>Stop</span><span>Target 1</span><span>Risk</span><span>Off high</span></div>
+           <div class="rank sg-t">${top.map((x, i) => xrow(`
+             <span class="sg-d ${x.lane === 'strict' ? 'up' : 'ac'}"></span>
+             <span class="sg-id"><b>${esc(x.symbol)}</b>
+               <span>${x.lane === 'strict' ? 'reclaim + divergence' : 'reclaim only'}
+                 · crossed ${price(x.ma)}
+                 · ${x.bars_ago === 0 ? 'this candle' : `${x.bars_ago} candles ago`}</span></span>
+             <span class="sg-n">${price(x.entry)}</span>
+             <span class="sg-n dn">${price(x.sl)}</span>
+             <span class="sg-n up">${price(x.target1)}</span>
+             <span class="sg-n">${esc(String(x.risk_pct))}%</span>
+             <span class="sg-r-out"><span class="pill ${x.since_pct > 0 ? 'pill-up' : x.since_pct < 0 ? 'pill-dn' : 'pill-flat'}">${
+               x.since_pct == null ? '—' : pct(x.since_pct)}</span>
+               <em>${esc(String(x.from_high_pct))}% off high</em></span>`,
+             `<div class="yoy">
+                <div class="yy"><span>Entry — the 4H close that reclaimed it</span><b>${price(x.entry)}</b></div>
+                <div class="yy"><span>The 200-period average it crossed</span><b>${price(x.ma)}</b></div>
+                ${/* The reclaim-only lane has no divergence, so it has no divergence
+                    * low either — its stop sits under the lowest low of the last 60
+                    * bars. Labelling both lanes the same way described a level that
+                    * does not exist on more than half the rows. */''}
+                <div class="yy"><span>Stop — ${x.lane === 'strict'
+                  ? 'under the divergence low' : 'under the 30-candle low'}, floored at 1.41 ATR</span>
+                  <b class="dn">${price(x.sl)}</b></div>
+                <div class="yy"><span>${x.lane === 'strict'
+                  ? 'Structural low behind the divergence' : 'Lowest low of the last 30 candles'}</span>
+                  <b>${price(x.struct_low)}</b></div>
+                <div class="yy"><span>Risk per share</span><b>${price(x.entry - x.sl)} · ${esc(String(x.risk_pct))}% of entry</b></div>
+                <div class="yy"><span>Targets 1 / 2 / 3</span><b class="up">${price(x.target1)} · ${price(x.target2)} · ${price(x.target3)}</b></div>
+                <div class="yy"><span>How far it had fallen</span><b>${esc(String(x.from_high_pct))}% off its 52-week high</b></div>
+                <div class="yy"><span>RSI at the cross</span><b>${esc(String(x.rsi))}${
+                  x.rsi_lift != null ? ` · divergence lift +${esc(String(x.rsi_lift))}` : ''}</b></div>
+                <div class="yy"><span>Since it crossed</span><b class="${dir(x.since_pct)}">${
+                  pct(x.since_pct)} · now ${price(x.last)}</b></div>
+                <div class="yy"><span>Which rule caught it</span><b>${x.lane === 'strict'
+                  ? `Reclaim AND RSI divergence — ${B.n ?? 35} backtested trades, ${B.exp > 0 ? '+' : ''}${(B.exp ?? 0).toFixed(3)}R, t=${(B.t ?? 0).toFixed(2)}`
+                  : `Reclaim alone, no divergence — ${B.n_no_div ?? 348} backtested trades, +${(B.exp_no_div ?? 0).toFixed(3)}R, t=+${(B.t_no_div ?? 0).toFixed(2)}`}</b></div>
+                <div class="yy"><span>20-hour turnover</span><b>₹${esc(String(x.turnover_cr))} cr</b></div>
+              </div>
+              <p class="hint">The ladder is the house one — 1.6 / 2.5 / 3.3 R off a stop that is the
+                lower of the divergence low and 1.41 ATR. <b>No position is taken on this.</b></p>`,
+             { cls: 'sg-r' })).join('')}</div>`
+        : `<div class="empty"><b>Nothing reclaimed its 200-day average this scan.</b>
+             ${d.scanned ?? 0} names were checked and none met the rule. An empty list is the
+             normal state of a strict engine — over two years of 4-hour candles on
+             ${B.names ?? '—'} names it fired ${B.n ?? '—'} times in total.</div>`,
+        `${top.length} of ${d.fired ?? 0}`,
+        'Ranked by how far it fell before reclaiming — the deeper the fall, the more the line meant.') +
+      `<div class="note"><b>Two lanes, and the strict one is nearly always empty.</b>
+        The rule as specified fired <b>${B.n ?? 35} times in two years</b> across
+        ${B.names ?? 188} names — about seventeen a year, or one 4-hour candle in seven
+        thousand. A list refreshed every four hours off that alone would be blank essentially
+        every scan, so the same rule runs <b>without</b> the divergence filter, which fired
+        <b>${B.n_no_div ?? 348}</b> times over the same window and measured the same to
+        within a rounding error. Every row above says which lane caught it, and a name is
+        dropped the moment it closes back under the line.</div>` +
+      (d.history && d.history.length > 1
+        ? sec('Every scan so far', `<div class="rank">${d.history.slice().reverse().slice(0, 14)
+            .map(hh => `<div class="rank-r">
+              <span class="s"><b>${esc(String(hh.at).slice(0, 16).replace('T', ' '))}</b>
+                <span>${esc((hh.symbols || []).join(', ') || 'nothing fired')}</span></span>
+              <span class="x">${hh.fired} of ${hh.scanned}</span></div>`).join('')}</div>
+           <p class="hint">Kept so the forward sample can be counted rather than remembered.
+             ${esc(String(d.disclaimer || ''))}</p>`, `${d.history.length} scans`)
+        : '') +
+      (d.coverage_note ? `<p class="hint">${esc(d.coverage_note)}</p>` : '') +
+      (d.dma_as_of ? `<p class="hint">200-day average: ${esc(String(d.dma_as_of))}.
+        ${esc(String(d.dma_note || ''))}</p>` : '') +
+      `<p class="hint" style="margin-top:18px">Scan written
+        ${esc(String(d.generated_at || '').slice(0, 16).replace('T', ' '))} UTC${
+        d.errors ? ` · ${d.errors} names could not be read` : ''}${
+        d.throttled ? ` · ${d.throttled} throttled` : ''}.</p>`));
+  };
 
   R['/signals'] = async () => {
     const intro = 'Every alert this site has sent since it launched, with the levels it was sent at. Scored when it closes — losers included, which is the point of publishing it.';
@@ -4907,6 +5349,23 @@
 
     // One request for every open signal's mark, not one per card.
     const px = await quotes(opens.map(r => r.symbol));
+
+    /* THE SCREEN IS FETCHED WITHOUT BLOCKING THE TABLE.
+     * It is 260 KB and it is only needed for the support/resistance block
+     * inside an expanded row, so awaiting it before first paint would make
+     * every reader pay for a panel most of them will not open. It is loaded
+     * in the background and the table is drawn a second time when it lands —
+     * and if the user has already been to /screen or /radar this session,
+     * SCREEN is populated and no request is made at all. */
+    if (!SCREEN) {
+      get('/screen.json').then(sc => {
+        if (!sc.ok || !sc.data) return;
+        noteLadder(sc);
+        SCREEN = (sc.data.rows || []).filter(x => x && x.sym);
+        SCREEN_DATE = sc.data.price_date || SCREEN_DATE;
+        if (location.pathname === '/signals') draw();
+      });
+    }
 
     const chips = [['all', `All ${all.length}`], ['open', `Open ${opens.length}`],
                    ['win', `Winners ${wins}`], ['loss', `Losers ${losses}`],
@@ -4992,14 +5451,18 @@
           ${symLinks(r.symbol, r.tv)}
         </div>
         ${r.remarks ? `<div class="card-body">${esc(engineWords(String(r.remarks).slice(0, 180)))}</div>` : ''}
+        ${/* WHAT IS ABOVE AND BELOW THE ENTRY.
+            * The row carried entry, stop, targets and R:R and stopped there,
+            * so nothing on it said where the year's range or the moving
+            * averages sit — the levels that decide whether a target is a
+            * short hop or the other side of a wall. Same renderer as the
+            * radar panel, from the same screen row. */''}
+        ${(sr => sr ? levelsBlock(sr) : '')(screenRow(r.symbol))}
       </article>`;
     };
 
     const draw = () => {
-      const rows = all.filter(r => {
-        const b = (r.badge || '').toLowerCase();
-        return sigFilter === 'all' ? true : b === sigFilter;
-      }).slice(0, 30);
+      const rows = all.filter(sigPass);
       if (!all.length) {
         main.innerHTML = base + `<div class="note">
           <b>No signals yet — the record starts today.</b> This page counts only what the
@@ -5042,7 +5505,6 @@
                    it. The tiles below carry the record as it stands, and the line appears at five.`}
 
           </div>`, '', 'Every closed signal, in the order it closed.')) +
-        (ENG_TABLE ? floorHtml(ENG_TABLE, all) : '') +
         sec('The record', `<div class="grid">
           ${tile(all.length, 'Signals published', 'since ' + esc(LAUNCH), 'ac')}
           ${tile(opens.length, 'Still open', 'marked to live prices')}
@@ -5058,13 +5520,37 @@
 
         `<div class="chips" role="group" aria-label="Signal filter">${chips.map(([k, l]) =>
           `<button type="button" class="chip" data-s="${k}" aria-pressed="${sigFilter === k}">${esc(l)}</button>`).join('')}</div>` +
+        `<div class="sgf-bar">
+          ${sigSelect('eng', 'Engine', SIGF.eng, sigOpts(all, r => r.signal_type, engLabel))}
+          ${sigSelect('dir', 'Direction', SIGF.dir, sigOpts(all, sigDir, v => v === 'short' ? 'Short' : 'Long'))}
+          ${sigSelect('tf', 'Timeframe', SIGF.tf, sigOpts(all, r => r.timeframe, v => v))}
+          <button type="button" class="chip sgf-x" data-sgf-reset
+            ${sigFilter === 'all' && SIGF.eng === 'all' && SIGF.dir === 'all' && SIGF.tf === 'all' ? 'disabled' : ''}>Clear</button>
+        </div>` +
+        /* THE FLOOR SITS UNDER THE SIGNALS NOW, NOT OVER THEM.
+         * It is reference — who is on the roster and what each must earn —
+         * and it was the second thing on a page whose subject is the signals
+         * themselves, pushing the table below two screens of engine cards. */
         sec('Alerts', rows.length
-          ? `<div class="cards-2">${rows.map(card).join('')}</div>` + TRAIL_NOTE
-          : `<div class="empty">No signals with that state.</div>`, `${rows.length} shown`);
+          ? `<div class="sg-head" aria-hidden="true"><span></span><span>Signal</span>
+               <span>Entry</span><span>Stop</span><span>Target 1</span><span>R:R</span><span>Result</span></div>
+             <div class="rank sg-t">${rows.map(r => sigRow(r, px, card(r))).join('')}</div>
+             <p class="hint">Tap any row for its full ladder, trailing rule and brief.</p>` + TRAIL_NOTE
+          : `<div class="empty">No signal matches those filters.<br>
+               <button type="button" class="chip" data-sgf-reset style="margin-top:10px">Clear filters</button>
+             </div>`,
+          `${rows.length} of ${all.length}`) +
+        (ENG_TABLE ? floorHtml(ENG_TABLE, all) : '');
       if (CURVE) wireRCurve(CURVE);
       // Same reason as the Screen's: name the chips this handler owns.
       main.querySelectorAll('.chip[data-s]').forEach(b => b.addEventListener('click', () => {
         sigFilter = b.dataset.s; draw();
+      }));
+      main.querySelectorAll('select[data-sgf]').forEach(s => s.addEventListener('change', () => {
+        SIGF[s.dataset.sgf] = s.value; draw();
+      }));
+      main.querySelectorAll('[data-sgf-reset]').forEach(b => b.addEventListener('click', () => {
+        sigFilter = 'all'; SIGF = { eng: 'all', dir: 'all', tf: 'all' }; draw();
       }));
     };
     draw();
@@ -7912,7 +8398,7 @@
       'Engines') + body;
     paint(shell(`<div class="sk" style="height:340px"></div>`));
 
-    const [st, sg] = await Promise.all([get('/api/stats'), get('/api/signals?limit=400')]);
+    const [st, sg, ef] = await Promise.all([get('/api/stats'), get('/api/signals?limit=400'), get('/engines.json')]);
     const live = {};
     if (st.ok) for (const r of (st.data.by_signal_type || [])) live[r.key] = r;
     /* SINCE LAUNCH, LIKE EVERY OTHER SURFACE. THIRD TIME.
@@ -7922,11 +8408,28 @@
      * fault as the brief, same fix, and the reason it happened again is that
      * each surface still derives its own population instead of asking for one. */
     const openBy = {};
+    /* ── WHICH WINDOW IS THIS NUMBER FROM ─────────────────────────────────
+     * The card printed `live[k].trades` as "closed" with no window on it.
+     * For BREACH that read "27 closed" while the engine has closed exactly
+     * ZERO since this site's record began, and while engines.json — which is
+     * what actually sets its 3.24R floor — was computed over 107. Three
+     * different true numbers for one phrase, and the page showed the one
+     * nobody could act on.
+     *
+     * Every count on this page now says which window it belongs to. */
+    const pubBy = {}, closedBy = {};
     if (sg.ok) for (const r of (sg.data.rows || sg.data.signals || [])) {
       if (!sinceLaunch(r)) continue;
-      if (String(r.status || '').toUpperCase() === 'OPEN') openBy[r.signal_type] = (openBy[r.signal_type] || 0) + 1;
+      const k = r.signal_type;
+      pubBy[k] = (pubBy[k] || 0) + 1;
+      if (String(r.status || '').toUpperCase() === 'OPEN') openBy[k] = (openBy[k] || 0) + 1;
+      else if (r.r_multiple != null) closedBy[k] = (closedBy[k] || 0) + 1;
     }
 
+    /* engines.json is the file that SETS each floor, and it counts a longer
+     * history than /api/stats reports — 107 closed for breakout against 27.
+     * Naming its sample is the only way "3.24R" stops looking arbitrary. */
+    const ENG_FLOOR = (ef.ok && ef.data && ef.data.engines) || {};
     const keys = Object.keys(ENGINE_REGISTRY);
     const tierOrder = { LIVE: 0, PAPER: 1, RESEARCH: 2, BLOCKED: 3 };
     keys.sort((a, b) => (tierOrder[ENGINE_TIER[a]] ?? 9) - (tierOrder[ENGINE_TIER[b]] ?? 9)
@@ -7940,22 +8443,47 @@
       const e = ENGINE_REGISTRY[k], tier = ENGINE_TIER[k] || 'RESEARCH';
       const L = live[k], B = ENGINE_BACKTEST[k];
       const open = openBy[k] || 0;
-      const n = L?.trades || 0;
+      const pub = pubBy[k] || 0, shut = closedBy[k] || 0;
+      const n = L?.trades || 0;                    // EARLIER ledger, not this one
+      const floorN = (ENG_FLOOR[k] || {}).trades;  // what actually set the floor
+      /* THIS SITE'S OWN RECORD COMES FIRST, AND IT IS USUALLY EMPTY.
+       * That is the honest state of a record that restarted on LAUNCH, and
+       * saying so beats borrowing an older ledger's number to fill the space. */
+      const mine = `<div class="ef-win">
+        <span class="ef-wk">Since ${esc(LAUNCH)} · this site's record</span>
+        <div class="ef-rec">
+          <span class="ef-n"><b>${pub}</b><em>published</em></span>
+          <span class="ef-n"><b>${open}</b><em>still open</em></span>
+          <span class="ef-n"><b>${shut}</b><em>closed</em></span>
+        </div>
+        ${shut === 0
+          ? `<p class="ef-thin">Nothing has closed yet, so this engine has <b>no win rate
+             and no expectancy on this site</b>. It gets one when a position closes.</p>`
+          : `<p class="ef-thin">${shut} closed — far below the 30 this book requires before
+             a win rate is treated as evidence.</p>`}
+      </div>`;
       // THE SAMPLE GATE. Under 20 closed trades a win rate is a coin-flip
       // reading of a coin flipped a few times, and printing it as a percentage
       // is the single easiest way for this page to mislead.
       const measured = n >= 20;
-      const rec = measured
-        ? `<div class="ef-rec">
-             <span class="ef-n"><b class="${dir(L.avg_r)}">${L.avg_r > 0 ? '+' : ''}${Number(L.avg_r).toFixed(3)}</b><em>R per trade</em></span>
-             <span class="ef-n"><b>${Number(L.win_rate).toFixed(0)}%</b><em>win rate</em></span>
-             <span class="ef-n"><b>${n}</b><em>closed</em></span>
-           </div>
-           <div class="ef-bar" role="img" aria-label="${Number(L.win_rate).toFixed(0)}% of ${n} closed trades were wins">
-             <i style="width:${Math.max(2, Math.min(100, L.win_rate)).toFixed(0)}%"></i></div>`
-        : `<p class="ef-thin">${n ? `Only <b>${n}</b> closed trade${n === 1 ? '' : 's'}.` : 'No closed trades yet.'}
-             Not enough to measure — no win rate is shown, because one drawn from
-             ${n || 'nothing'} would read as evidence.</p>`;
+      const prior = n === 0 ? '' : `<div class="ef-win ef-prior">
+        <span class="ef-wk">Before ${esc(LAUNCH)} · the earlier ledger</span>
+        ${measured
+          ? `<div class="ef-rec">
+               <span class="ef-n"><b class="${dir(L.avg_r)}">${L.avg_r > 0 ? '+' : ''}${Number(L.avg_r).toFixed(3)}</b><em>R per trade</em></span>
+               <span class="ef-n"><b>${Number(L.win_rate).toFixed(0)}%</b><em>win rate</em></span>
+               <span class="ef-n"><b>${n}</b><em>closed</em></span>
+             </div>
+             <div class="ef-bar" role="img" aria-label="${Number(L.win_rate).toFixed(0)}% of ${n} closed trades were wins">
+               <i style="width:${Math.max(2, Math.min(100, L.win_rate)).toFixed(0)}%"></i></div>`
+          : `<p class="ef-thin">Only <b>${n}</b> closed trade${n === 1 ? '' : 's'} — not enough
+               to carry a win rate.</p>`}
+        <p class="ef-thin">Published under an earlier configuration, on a ledger that has been
+          re-graded twice. It is shown because deleting it would be the more flattering
+          choice${floorN ? `, and because the ${floorN} closed trades behind it are what set
+          this engine's floor` : ''} — it is <b>not</b> this site's record.</p>
+      </div>`;
+      const rec = mine + prior;
       const bt = B ? `<p class="ef-bt"><span class="ef-btk">BACKTEST</span>
              ${B.n} signals · <b class="${dir(B.exp)}">${B.exp > 0 ? '+' : ''}${B.exp.toFixed(3)}R</b>
              · ${B.win.toFixed(0)}% win · t=${B.t.toFixed(2)}
@@ -8185,6 +8713,13 @@
   /* Bounded 0–100 from a value's position in a range. Saturating, so one
    * outlier cannot own a component. */
   const band = (v, lo, hi) => {
+    /* NULL IS NOT ZERO, AND Number(null) IS 0 — the same trap price() names.
+     * radarParts calls band(r.r1m, …) and band(r.r3m, …) with no null guard of
+     * their own, so an unmeasured return coerced to 0 and landed at 46 out of
+     * 100: a mid-band momentum score for a stock with no measured momentum.
+     * The radar's own panel tells the reader that missing components are left
+     * out of the mean rather than scored, so this contradicted the page. */
+    if (v == null || v === '') return null;
     const n = Number(v);
     if (!Number.isFinite(n)) return null;
     return Math.max(0, Math.min(100, ((n - lo) / (hi - lo)) * 100));
@@ -8197,6 +8732,58 @@
   /* The four components. Each returns 0–100 or null; a missing one is dropped
    * from the mean rather than scored zero, which would push every thinly
    * covered name toward the middle and call that "neutral". */
+  /* ── WHAT IS ABOVE AND BELOW THE PRICE ─────────────────────────────────────
+   * The radar answered "how strong does this read" and never "at what price".
+   * Every level here is already on the screen row — the year's range and the
+   * three moving averages — so nothing is derived or forecast: they are
+   * sorted against the last price, and the ones under it are support and the
+   * ones over it are resistance, which is all those words mean.
+   *
+   * A level equal to the price within a tenth of a percent is neither, and is
+   * labelled as being AT the price rather than assigned to a side it is not
+   * really on. */
+  const levelsBlock = (r) => {
+    /* SORTED AGAINST THE LIVE PRICE, NOT THE BUILD'S.
+     * Using r.price put NIACL's "at price" marker at ₹229.90 — its 4 September
+     * close — while the stock traded at ₹209.80, which made every level below
+     * it read as support when ₹229.90 had become the nearest RESISTANCE. A
+     * support-and-resistance table sorted against a four-day-old price is
+     * worse than none: it is confidently the wrong way round. */
+    const live = RADAR_LIVE && RADAR_LIVE[r.sym] && lvl(RADAR_LIVE[r.sym].price);
+    const px = live || lvl(r.price);
+    const stale = !live && SCREEN_DATE ? SCREEN_DATE : null;
+    if (px == null) return '';
+    const raw = [
+      [lvl(r.high52), '52-week high'], [lvl(r.low52), '52-week low'],
+      [lvl(r.sma20), '20-day average'], [lvl(r.sma50), '50-day average'],
+      [lvl(r.sma200), '200-day average'],
+    ].filter(([v]) => v != null);
+    if (!raw.length) return '';
+    const rows = raw
+      .map(([v, l]) => {
+        const d = (v - px) / px * 100;
+        const side = Math.abs(d) < 0.1 ? 'at' : d > 0 ? 'res' : 'sup';
+        return { v, l, d, side };
+      })
+      .sort((a, b) => b.v - a.v)
+      .map(x => `<div class="lv-r ${x.side}">
+        <span class="lv-k">${x.side === 'at' ? 'At price' : x.side === 'res' ? 'Resistance' : 'Support'}</span>
+        <span class="lv-l">${esc(x.l)}</span>
+        <span class="lv-p">${price(x.v)}</span>
+        <span class="lv-d ${dir(x.d)}">${x.d > 0 ? '+' : ''}${x.d.toFixed(1)}%</span>
+      </div>`).join('');
+    return `<h4 class="sh">Support and resistance</h4>
+      <div class="lv">${rows}
+        <div class="lv-r now"><span class="lv-k">Last</span>
+          <span class="lv-l">${live ? 'live' : `close of ${esc(stale || '—')}`}</span>
+          <span class="lv-p">${price(px)}</span><span class="lv-d"></span></div>
+      </div>
+      <p class="hint" style="margin:8px 0 0">These are the year's range and the three moving
+        averages, sorted against the last price — not drawn trendlines and not opinions.
+        ${r.atr_pct != null ? `A typical day moves this name <b>${Number(r.atr_pct).toFixed(1)}%</b>,
+        so anything inside that is noise.` : ''}</p>`;
+  };
+
   const radarParts = (r) => {
     const x = instiOf(r.sym);
     const trend = avg([
@@ -8297,6 +8884,7 @@
       if (!r0.ok) { paint(shell(fail('The radar', r0.error))); return; }
       SCREEN = (r0.data.rows || []).filter(x => x && x.sym);
       RADAR_BREADTH = r0.data.breadth || null;
+      SCREEN_DATE = r0.data.price_date || null;
     }
     await loadInsti();
     const core = marketCore(RADAR_BREADTH);
@@ -8360,7 +8948,11 @@
        * its twenty rather than claiming a number the screen does not show. */
       sec('Top signals', `<div class="rd-feed">${nodes.map((n, i) => radarRow(n, i)).join('')}</div>`,
           `${nodes.length} shown`) +
-      `<p class="hint rd-foot"><b>The score is a model, not a measurement.</b> It weights
+      `<p class="hint rd-foot"><b>Prices are live; the score is not.</b> The four components
+        are computed from the screen's daily build${SCREEN_DATE ? `, priced ${esc(SCREEN_DATE)}` : ''},
+        so a name that moved sharply today is still scored on where it stood then —
+        <span id="rdLive">prices updating…</span>.
+        <br><b>The score is a model, not a measurement.</b> It weights
         momentum 30, trend 30, volume 20 and institutional flow 20, over the screen's own
         fields; a name missing a component is scored on the rest rather than penalised.
         The verdict beside it (Buy / Wait / Watch / Avoid) is the screen's own reading and is
@@ -8459,6 +9051,48 @@
       </span>`;
   };
 
+  /* ── THE FIGURES THE SCORE BARS THROW AWAY ─────────────────────────────────
+   * Trend/Momentum/Volume/Institutional are each normalised to 0-100, which
+   * strips them of their units — a reader cannot recover RSI, the month's
+   * return, or where the price sits in its 52-week band from a bar. These are
+   * the raw numbers, and they are ONE renderer because the radar and Ideas
+   * both show them and two copies would drift.
+   *
+   * from_high and the stop are stamped at the screen's build, so both carry a
+   * data attribute and are re-read against the live quote by the overlay in
+   * wireRadar. IFCI printed "off its high 0.0%" — true on 4 September, when it
+   * WAS the high — beside a live price 8.7% under it, and its published stop
+   * of ₹94.54 sat above the ₹92.61 it traded at, which is a broken trade the
+   * row said nothing about. */
+  const factsStrip = (r) => {
+    if (!r) return '';
+    return `<span class="rd-facts">
+      <span class="rd-f"><em>RSI 14</em><b class="${r.rsi >= 70 ? 'dn' : r.rsi <= 35 ? 'up' : ''}">${
+        r.rsi == null ? '—' : Math.round(r.rsi)}</b></span>
+      <span class="rd-f"><em>1 month</em><b class="${dir(r.r1m)}">${pct(r.r1m)}</b></span>
+      <span class="rd-f"><em>3 months</em><b class="${dir(r.r3m)}">${pct(r.r3m)}</b></span>
+      <span class="rd-f"><em>52w range</em><b>${r.low52 == null || r.high52 == null ? '—'
+        : `${price(r.low52)} – ${price(r.high52)}`}</b></span>
+      <span class="rd-f"><em>Off its high</em><b data-fhigh="${esc(String(r.high52 ?? ''))}"
+        class="${dir(r.from_high)}">${
+        r.from_high == null ? '—' : Number(r.from_high).toFixed(1) + '%'}</b></span>
+      ${r.lad && r.lad.s != null ? `<span class="rd-f"><em>Stop</em>
+          <b class="dn" data-stop="${esc(String(r.lad.s))}">${price(r.lad.s)}</b></span>
+        <span class="rd-f"><em>First target</em><b class="up">${
+          r.lad.t && r.lad.t[0] ? price(r.lad.t[0][0]) : '—'}</b></span>` : ''}
+    </span>`;
+  };
+
+  /* Where it sits in the year, drawn. A number between a low and a high is a
+   * position on a line before it is a percentage. */
+  const bandLine = (r) => {
+    if (!r || r.low52 == null || r.high52 == null || !(r.high52 > r.low52)) return '';
+    const at = Math.max(0, Math.min(100, (r.price - r.low52) / (r.high52 - r.low52) * 100));
+    return `<span class="rd-band" role="img"
+      aria-label="${price(r.price)} in a 52-week range of ${price(r.low52)} to ${price(r.high52)}">
+      <i style="left:${at.toFixed(1)}%"></i></span>`;
+  };
+
   const radarRow = (nd, i) => {
     const r = nd.r, x = instiOf(r.sym);
     const v = (r.vd && r.vd.c) || '';
@@ -8474,6 +9108,14 @@
       <span class="rd-px">${price(r.price)}<i class="${dir(r.r1d)}">${pct(r.r1d)}</i></span>
       <span class="rd-sc"><b>${nd.score}</b><em>${esc(strengthWord(nd.score))}</em></span>
       <span class="rd-parts">${bar('Trend', p.trend)}${bar('Momentum', p.momentum)}${bar('Volume', p.volume)}${bar('Institutional', p.institutional)}</span>
+      ${/* ── THE NUMBERS THE FOUR BARS DO NOT CARRY ────────────────────────
+          * Trend/Momentum/Volume/Institutional are the SCORE's components —
+          * each normalised to 0-100 and therefore stripped of its own unit.
+          * A reader cannot get RSI, the month's return or where the price
+          * sits in its 52-week band back out of them, and those are the
+          * three that decide whether a 90 is a fresh move or a spent one.
+          * They are printed raw, beside the bars that hide them. */''}
+      ${factsStrip(r)}${bandLine(r)}
       ${x && x.quality === 'complete' && x.signal !== 'neutral' && x.signal !== 'unknown'
         ? `<span class="rd-fii">FII ${ppFmt(x.fii_pp)} · DII ${ppFmt(x.dii_pp)}</span>` : ''}
     </article>`;
@@ -8488,7 +9130,12 @@
       core.classList.toggle('is-open', open);
     });
     const open = (sym) => {
-      const nd = (RADAR_NODES || []).find(n => n.r.sym === sym);
+      /* LOOK IN THE WHOLE RANKED SET, NOT JUST THE RING.
+       * This searched RADAR_NODES, which holds the eight on the ring — so the
+       * twelve strip cards below them did nothing at all when tapped, silently.
+       * The strip is drawn from `ranked`; the lookup has to be too. */
+      const nd = (ranked || []).find(n => n.r.sym === sym)
+              || (RADAR_NODES || []).find(n => n.r.sym === sym);
       if (!nd) return;
       const p = nd.parts, r = nd.r, x = instiOf(sym);
       const line = (l, w, val) => `<div class="isc-r"><span class="isc-w">${w}%</span>
@@ -8509,6 +9156,32 @@
              and daily turnover.</p>`}
         <h4 class="sh">The screen's own verdict</h4>
         <p class="ef-p">${esc((r.vd && r.vd.l) || 'Not rated')}${r.vd && r.vd.o ? ` — ${esc(r.vd.o)}` : ''}</p>
+        ${/* THE LEVELS, WHICH THIS PANEL USED TO OMIT ENTIRELY.
+            * It showed a score out of 100 and never the price the score was
+            * about — no entry, no stop, no target, nothing above or below.
+            * ladderBlock is the screen's own ladder renderer, reused rather
+            * than rebuilt: same entry, same 1.41xATR stop, same measured
+            * "reached" percentages and the same reason under each level. */''}
+        ${ladderBlock(r)}
+        ${(() => {
+          /* THE LADDER IS NOT RE-PRICED, AND THAT HAS TO BE SAID.
+           * Its entry and stop are what the screen published on its build, so
+           * rewriting them against today's price would falsify the plan the
+           * site actually issued. But a reader looking at an entry of ₹229.91
+           * on a stock trading at ₹209.80 needs to be told, not left to spot
+           * it. The levels stay; the gap is named. */
+          const L = r.lad, live = RADAR_LIVE && RADAR_LIVE[r.sym] && lvl(RADAR_LIVE[r.sym].price);
+          const e = L && lvl(L.e);
+          if (!e || !live) return '';
+          const gap = (live - e) / e * 100;
+          if (Math.abs(gap) < 1) return '';
+          return `<p class="hint" style="margin:8px 0 0"><b>The ladder above is the plan as
+            published${SCREEN_DATE ? ` on ${esc(SCREEN_DATE)}` : ''}, not a live one.</b>
+            It trades at ${price(live)} now — <b class="${dir(gap)}">${gap > 0 ? '+' : ''}${gap.toFixed(1)}%</b>
+            ${gap > 0 ? 'above' : 'below'} that entry, so the risk and the reward on it are no
+            longer the ones written in the table.</p>`;
+        })()}
+        ${levelsBlock(r)}
         ${x && x.quality === 'complete' ? `<h4 class="sh">Institutional flow</h4>
           <div class="yoy">
             <div class="yy"><span>FII, quarter on quarter</span><b class="${dir(x.fii_pp)}">${ppFmt(x.fii_pp)}</b></div>
@@ -8562,6 +9235,64 @@
         document.body.style.overflow = ''; if (fs) fs.textContent = 'Expand ⤢'; }
     });
 
+    /* LIVE PRICES, BECAUSE screen.json IS A DAILY ARTEFACT.
+     *
+     * The radar rendered r.price and r.r1d straight off the build. On the
+     * morning this was found that build carried price_date 2026-09-04 while
+     * the date was the 8th, so NIACL showed ₹229.91 and +17.70% against a live
+     * ₹204.60 and −11.5% — the site reported a stock up 18% while it was down
+     * 11%. Nothing was wrong with the data; it was four days old and presented
+     * as current, which is the one failure this whole site is built to avoid.
+     *
+     * The Screen route already solves this for its visible rows. The radar now
+     * does the same: one request for every symbol it shows, applied in place
+     * after paint, and the footnote says which figures are live and which are
+     * the build's. */
+    const liveSyms = [...new Set([...nodes, ...ranked.slice(0, 20)].map(n => n.r.sym))];
+    (async () => {
+      const q = await get(`/api/signals?px=${liveSyms.slice(0, 40).map(encodeURIComponent).join(',')}`);
+      if (!q.ok || !q.data || !q.data.quotes) return;
+      RADAR_LIVE = q.data.quotes;
+      for (const [sym, v] of Object.entries(q.data.quotes)) {
+        if (v == null || v.price == null) continue;
+        main.querySelectorAll(`[data-rsym="${CSS.escape(sym)}"]`).forEach(el => {
+          const px = el.querySelector('.rdc-t i, .rd-px');
+          if (!px) return;
+          const cp = v.change_pct;
+          if (el.classList.contains('rd-row')) {
+            el.querySelector('.rd-px').innerHTML =
+              `${price(v.price)}<i class="${dir(cp)}">${pct(cp)}</i>`;
+          } else {
+            const i = el.querySelector('.rdc-t i');
+            if (i) { i.textContent = pct(cp); i.className = dir(cp); }
+            const b = el.querySelector('.rdc-t b');
+            if (b) b.title = `${sym} · ${price(v.price)} live`;
+          }
+          // Re-read the two build-stamped facts against the live price.
+          const fh = el.querySelector('[data-fhigh]');
+          if (fh) {
+            const hi = Number(fh.getAttribute('data-fhigh'));
+            if (Number.isFinite(hi) && hi > 0) {
+              const d = (v.price - hi) / hi * 100;
+              fh.textContent = d.toFixed(1) + '%';
+              fh.className = dir(d);
+            }
+          }
+          const st = el.querySelector('[data-stop]');
+          if (st) {
+            const s = Number(st.getAttribute('data-stop'));
+            if (Number.isFinite(s)) {
+              const hit = v.price <= s;
+              st.textContent = price(s) + (hit ? ' · breached' : '');
+              st.className = hit ? 'dn is-hit' : 'dn';
+            }
+          }
+        });
+      }
+      const stamp = document.getElementById('rdLive');
+      if (stamp) stamp.textContent = 'prices live';
+    })();
+
     /* SERIES AFTER PAINT, never before it. Twenty symbols is twenty requests;
      * awaiting them would hold the whole page for a 74px line. They fill in,
      * and a card with no series says so rather than drawing a flat one. */
@@ -8598,6 +9329,8 @@
   const DISCOVER = [
     ['/radar',   'Signal radar',  'The market score, and the eight names carrying it',
                  'Breadth over 750 names, with every term of the score printed.'],
+    ['/buoy',    'BUOY',          'A research engine, run in the open',
+                 'A 4-hour close back above the 200-period average — measured, and the measurement says no edge.'],
     ['/screen',  'Screen',        'All 750 names, filterable',
                  'Price, trend, quality, value — and FII/DII holding quarter on quarter.'],
     ['/ideas',   'Ideas',         'Ranked names and the orders behind them',
@@ -8675,8 +9408,19 @@
 
       <h3>The signals</h3>
       <p>Signals come from seven named engines. Each publishes an entry, a stop and one or
-        two targets at the moment it fires, and those levels are never edited afterwards. A
-        signal is a thesis with a defined invalidation. It is not a forecast.</p>
+        two targets at the moment it fires. A signal is a thesis with a defined invalidation.
+        It is not a forecast.</p>
+      <p><b>A published level is never revised — but some rows were published with no levels
+        at all.</b> Before <code>scanner.magic_levels()</code> landed, the TIDAL screen wrote
+        every candidate to the ledger as a watch row with the stop and all three targets
+        <b>null</b>: the levels existed in the Telegram alert and never reached the database.
+        <code>backfill_magic_levels.py</code> filled those rows in afterwards, reconstructing
+        each one from the 52-week high and ATR <b>as of that row's own date</b> rather than
+        today's, so the recovery is not priced with information the original screen never had.
+        It touches only rows where every level was null; it cannot overwrite a level that was
+        published. Four rows in the current ledger still carry no stop and no target.
+        Saying the levels are simply "never edited" would have been the tidier sentence and
+        the wrong one.</p>
       <div class="roster">
         ${Object.entries(ENGINE_REGISTRY).map(([k, v]) => `<div class="roster-r">
           <div class="roster-h"><b>${esc(v.name)}</b><span>${esc(v.role)}</span>
@@ -9113,7 +9857,9 @@
         const val = x => {
           const r = rowOf(x);
           if (watchSort === 'sym') return null;             // handled below
-          const n = Number(r[watchSort]);
+          const v = r[watchSort];
+          if (v == null || v === '') return -Infinity;      // Number(null) is 0, not last
+          const n = Number(v);
           return Number.isFinite(n) ? n : -Infinity;        // unmeasured sorts last
         };
         /* TRIAGE ORDERS THE LIST UNLESS THE READER ASKED FOR SOMETHING ELSE.
@@ -9270,7 +10016,14 @@
     // /stock/RELIANCE and friends resolve to their pattern.
     const seg = p.split('/').filter(Boolean);
     if (seg.length === 2 && R['/' + seg[0] + '/:id']) return '/' + seg[0] + '/:id';
-    return '/';
+    /* AN UNKNOWN PATH IS NOT THE HOME PAGE.
+     * This returned '/', so /radarr rendered the full front page — headline,
+     * record, everything — under a URL that does not exist, with the home
+     * page's title and an index,follow robots tag. The Worker had just been
+     * taught to send 404 for those paths, and the body it sent was still
+     * claiming to be a real page. A 404 status with the front page in it is
+     * the same lie told twice. */
+    return '/404';
   };
   /* The parameter of a pattern route, e.g. RELIANCE from /stock/RELIANCE. */
   const routeParam = () => {
@@ -9336,6 +10089,10 @@
     '/terms':       ['Terms', 'Terms of use for signal.askakshay.com.'],
     '/privacy':     ['Privacy', 'What this site stores, and what it does not.'],
     '/join':        ['The brief — every morning', 'One setup a day, in full, by email.'],
+    '/buoy':        ['BUOY — the 200-period average, reclaimed on the 4-hour',
+                     'A fallen name closing a 4-hour candle back above its 200-period average, with momentum already turning. Measured over two years, and the measurement says no edge.'],
+    '/404':         ['Not found — signal.askakshay.com',
+                     'There is no page at this address.'],
   };
   const ORIGIN = 'https://signal.askakshay.com';
   const setHead = (route) => {
@@ -9353,13 +10110,23 @@
     set('meta[property="og:url"]', 'content', url);
     set('meta[name="twitter:title"]', 'content', title);
     set('meta[name="twitter:description"]', 'content', desc);
+    /* A 404 MUST NOT ASK TO BE INDEXED, AND MUST NOT CLAIM A CANONICAL.
+     * The tag is written once in index.html as index,follow and was never
+     * touched again, so a mistyped URL served a noindex-worthy page with an
+     * explicit invitation to index it — and a canonical pointing at the bad
+     * path, which asks the crawler to treat that URL as the preferred one. */
+    const missing = route === '/404';
+    set('meta[name="robots"]', 'content',
+        missing ? 'noindex,follow' : 'index,follow,max-image-preview:large');
+    const can = document.querySelector('link[rel="canonical"]');
+    if (can) { if (missing) can.removeAttribute('href'); else can.setAttribute('href', url); }
   };
 
   /* The route's own name, shown beside the brand. Empty on Today, because a
    * breadcrumb reading "Today" while you are looking at Today is noise. */
   const WHERE = { '/': '', '/markets': 'Markets', '/ideas': 'Ideas', '/ipo': 'IPO',
                   '/screen': 'Screen', '/signals': 'Signals', '/brief': 'Brief', '/watch': 'Watchlist',
-                  '/engines': 'The floor', '/radar': 'Radar', '/discover': 'Discover',
+                  '/engines': 'The floor', '/radar': 'Radar', '/discover': 'Discover', '/buoy': 'BUOY',
                   '/join': 'The brief', '/methodology': 'Methodology',
                   '/sources': 'Data sources', '/terms': 'Terms', '/privacy': 'Privacy' };
 
