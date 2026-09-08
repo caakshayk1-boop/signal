@@ -4156,3 +4156,92 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   .rd-p{grid-template-columns:70px 1fr 24px}
 }
 @media(prefers-reduced-motion:reduce){.rd-node circle{transition:none}}
+
+/* ── RADAR: CARDS, STRIP, SELECTION, FULL SCREEN ─────────────────────────────
+ * The ring, the strip and the list are three views of ONE set. A selection has
+ * to land on all three, or a reader loses the name they just tapped. */
+.rd-stage{position:relative}
+.rd-full{position:absolute;top:10px;right:10px;z-index:2;
+  font:600 var(--t-2)/1 var(--ui);padding:9px 12px;min-height:38px;
+  border:1px solid var(--line2);border-radius:var(--r-pill);
+  background:var(--surface);color:var(--muted);cursor:pointer}
+.rd-full:hover{color:var(--text);border-color:var(--line2)}
+.rd-stage.is-full{position:fixed;inset:0;z-index:80;background:var(--bg);
+  display:grid;place-items:center;padding:14px;margin:0;overflow:auto}
+.rd-stage.is-full .rd-svg{max-height:92vh}
+
+.rd-glow{pointer-events:none}
+.rd-dot{fill:var(--line2)}
+.rd-n.is-up .rd-dot{fill:var(--up)} .rd-n.is-dn .rd-dot{fill:var(--down)}
+.rd-n.is-mid .rd-dot{fill:var(--warn)}
+.rd-n.is-up .rd-link{stroke:var(--up)} .rd-n.is-dn .rd-link{stroke:var(--down)}
+.rd-n.is-mid .rd-link{stroke:var(--warn)}
+.rd-hub{fill:var(--raised);stroke:var(--accent);stroke-width:1.5}
+.rd-hubc{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:80px;gap:1px;font-family:var(--ui)}
+.rd-hubc span{font:600 9px/1 var(--ui);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.rd-hubc b{font:700 30px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.rd-hubc em{font:600 10px/1 var(--ui);font-style:normal;color:var(--muted)}
+
+/* One card component, on the ring and in the strip. */
+.rd-card,.rd-u{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left;
+  padding:9px 10px;border:1px solid var(--line2);border-radius:var(--r-3);
+  background:var(--surface);cursor:pointer;font-family:var(--ui);
+  transition:border-color 180ms var(--ease),transform 180ms var(--ease),opacity 180ms var(--ease)}
+.rd-card{height:92px;box-shadow:0 3px 14px rgba(0,0,0,.07)}
+.rd-card:hover,.rd-u:hover{border-color:var(--accent);transform:translateY(-1px)}
+.rd-card:focus-visible,.rd-u:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rd-u{flex:0 0 156px;scroll-snap-align:start}
+.rc-t{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
+.rc-t b{font:700 var(--t-4)/1 var(--disp);letter-spacing:var(--ls-snug);color:var(--text)}
+.rc-t i{font:500 var(--t-1)/1 var(--mono);font-style:normal;font-variant-numeric:tabular-nums}
+.rc-t i.up{color:var(--up)} .rc-t i.dn{color:var(--down)}
+.rc-v{font:600 9px/1.2 var(--ui);letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.rc-v.up{color:var(--up)} .rc-v.dn{color:var(--down)} .rc-v.warn{color:var(--warn)}
+.rc-b{display:block;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.rc-b i{display:block;height:100%;background:var(--accent);border-radius:2px}
+.rc-m{display:flex;align-items:center;gap:6px;margin-top:auto}
+.rc-m u{font:700 var(--t-4)/1 var(--mono);text-decoration:none;font-variant-numeric:tabular-nums;
+  color:var(--text)}
+.rc-sp{width:74px;height:22px;flex:none;display:block}
+.rc-spl{fill:none;stroke-width:1.4}
+.rc-sp.up .rc-spl{stroke:var(--up)} .rc-sp.dn .rc-spl{stroke:var(--down)}
+.rc-sp.up .rc-spa{fill:var(--up-soft)} .rc-sp.dn .rc-spa{fill:var(--down-soft)}
+.rc-nosp{font:400 9px/1 var(--ui);font-style:normal;color:var(--dim)}
+.rc-fii{font:600 10px/1 var(--mono);font-style:normal;margin-left:auto}
+.rc-fii.up{color:var(--up)} .rc-fii.dn{color:var(--down)}
+
+/* min-width:0 is what makes the horizontal scroll actually contain itself.
+   A flex/grid item defaults to min-width:auto — the width of its content — so
+   twenty 156px cards pushed the DOCUMENT 2040px wide instead of scrolling
+   inside their own strip. */
+.rd-strip{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 10px;
+  min-width:0;max-width:100%;
+  /* contain:paint stops the scroller's 3,300px of content from propagating
+     into every ancestor's scrollWidth. Without it the document reported
+     scrollWidth 3320 against a 1280 viewport while body{overflow-x:hidden}
+     quietly prevented the scroll — so the page LOOKED fine and every
+     sideways-scroll check read it as broken. A masked overflow is worse than
+     a visible one: it fails the test that exists to catch it. */
+  contain:paint;
+  scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.sec{min-width:0}
+.rd-strip::-webkit-scrollbar{height:6px}
+.rd-strip::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+
+/* Selection: everything not chosen steps back. Opacity only — nothing moves,
+   because a layout that shifts on select loses the thing you just aimed at. */
+.rd-picked .rd-n,.rd-picked .rd-u,.rd-picked .rd-row{opacity:.34}
+.rd-picked .rd-n.is-sel,.rd-picked .rd-u.is-sel,.rd-picked .rd-row.is-sel{opacity:1}
+.rd-picked .rd-u.is-sel,.rd-picked .rd-row.is-sel{border-color:var(--accent)}
+.rd-picked .rd-n.is-sel .rd-link{stroke-opacity:1}
+
+.rd-risk{margin:0 0 6px;padding:0;list-style:none;display:grid;gap:6px}
+.rd-risk li{position:relative;padding-left:20px;font:400 var(--t-4)/1.5 var(--ui);color:var(--text)}
+.rd-risk li::before{content:"!";position:absolute;left:4px;top:0;
+  font:700 var(--t-3)/1.6 var(--mono);color:var(--warn)}
+
+@media(prefers-reduced-motion:reduce){
+  .rd-card,.rd-u{transition:none}
+  .rd-card:hover,.rd-u:hover{transform:none}
+}

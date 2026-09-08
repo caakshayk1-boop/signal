@@ -820,11 +820,53 @@ try {
   ok("the ring renders on desktop", ringByWidth.wide === "block", ringByWidth);
   ok("the ring is not rendered at phone width", ringByWidth.narrow === "none", ringByWidth);
 
+  /* The ring is cards, not dots — and cards on a circle collide unless the
+   * minimum radius respects 2*r*sin(pi/n) > cardWidth. Two of eight overlapped
+   * at r=168 before the band was widened. */
+  const ringGeom = await p.evaluate(() => {
+    const c = [...document.querySelectorAll(".rd-card")];
+    const b = c.map(x => x.getBoundingClientRect());
+    let ov = 0;
+    for (let i = 0; i < b.length; i++) for (let j = i + 1; j < b.length; j++)
+      if (b[i].left < b[j].right && b[j].left < b[i].right &&
+          b[i].top < b[j].bottom && b[j].top < b[i].bottom) ov++;
+    return { cards: c.length, overlaps: ov };
+  });
+  ok("the ring renders a card per node", ringGeom.cards >= 6, ringGeom);
+  ok("no two ring cards overlap", ringGeom.overlaps === 0, ringGeom);
+
+  /* The universe strip scrolls sideways ON ITS OWN. Without contain:paint its
+   * 3,300px of content propagated into the document's scrollWidth while
+   * body{overflow-x:hidden} hid the effect — the page looked fine and every
+   * sideways-scroll check read it as broken. */
+  const stripBehaviour = await p.evaluate(() => {
+    const s = document.querySelector(".rd-strip");
+    const de = document.documentElement;
+    return { cards: document.querySelectorAll(".rd-u").length,
+             scrollsItself: s.scrollWidth > s.clientWidth,
+             docOverflow: de.scrollWidth - de.clientWidth };
+  });
+  ok("the signal universe strip is populated", stripBehaviour.cards > 8, stripBehaviour);
+  ok("it scrolls inside itself", stripBehaviour.scrollsItself === true, stripBehaviour);
+  ok("and does not push the document sideways", stripBehaviour.docOverflow <= 0, stripBehaviour);
+
+  // Selecting a name has to dim the rest, across all three views of the set.
+  await p.locator(".rd-u").first().click();
+  await p.waitForTimeout(500);
+  const sel = await p.evaluate(() => ({
+    dimming: document.querySelector("main").classList.contains("rd-picked"),
+    selected: document.querySelectorAll(".is-sel").length }));
+  ok("selecting a name dims the rest", sel.dimming === true, sel);
+  ok("the selection lands on every view of that name", sel.selected >= 2, sel);
+  await p.keyboard.press("Escape");
+  await p.waitForTimeout(300);
+
   // Clicking a row opens the radar's panel, not the company card.
   await p.locator(".rd-row").first().click();
   await p.waitForTimeout(700);
   const panel = await p.locator("dialog#sheet").innerText();
   ok("a row opens the radar panel with its weights", /RADAR SCORE/i.test(panel));
+  ok("the panel states risk flags either way", /Risk flags/i.test(panel));
   ok("the panel links on to the full company card", /full company card/i.test(panel));
   await p.keyboard.press("Escape");
   await p.waitForTimeout(300);

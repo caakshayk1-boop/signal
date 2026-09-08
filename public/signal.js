@@ -3368,7 +3368,8 @@
    * PERCENTAGE POINTS, ALWAYS. FII 10% → 12% is +2.00 pp. It is never +20%,
    * and every label on screen says "pp" so the two can never be read as one.  */
 
-  let RADAR_BREADTH = null, RADAR_NODES = null;
+  let RADAR_BREADTH = null, RADAR_NODES = null, RADAR_CORE = null;
+  const RADAR_SERIES = {};   // sym -> closes, filled after paint
   let INSTI = null;                    // sym → the precomputed row
   let INSTI_META = null;               // coverage and period, for the footnote
   let instiChip = '';                  // one of INSTI_CHIPS, or none
@@ -4144,7 +4145,8 @@
   // table already uses, delegating rather than holding a second copy.
   const fmtN = v => price(v, '');
 
-  /* THE VERDICT.
+  /* THE VERDICT — the call on the STOCK, and the only thing on this site
+   * entitled to that word. Buy / Wait / Watch / Avoid, from verdict.py.
    * One call per name, computed in verdict.py at build time and published on
    * the row as `vd`. Rendered here rather than derived in the browser so the
    * page, the Telegram bot and the tests cannot disagree about what a stock
@@ -5903,7 +5905,16 @@
       ], 'No engine on this site has cleared 30 closed trades at t&nbsp;≥&nbsp;2, so this is a '
        + 'setup to examine rather than a call to take.')}
 
-      ${/* ── THE VERDICT ──────────────────────────────────────────────────────
+      ${/* ── EVIDENCE, NOT "VERDICT" ───────────────────────────────────────────
+          * This block was headed EVIDENCE ON THE ENGINE and it is not one. A verdict is
+          * the call on the STOCK — Buy / Wait / Watch / Avoid — and the screen
+          * already publishes exactly that on every row from verdict.py. What
+          * this reports is how much the ENGINE has proved: closed trades
+          * against the 30-trade, t>=2 bar. Two different things under one word
+          * is the taxonomy collision this product cannot afford, and it made
+          * the brief read as though "research only" were the call on CGCL when
+          * it is a statement about BREACH's sample size.
+          * ─────────────────────────────────────────────────────────────────── */''}
           * Twelve sections of evidence and the page never said what it added
           * up to. Every number was there and the reader had to do the
           * arithmetic that the site's own clearance rule already answers.
@@ -5918,9 +5929,9 @@
         const n = H ? H.trades : 0;
         const cleared = n >= 30 && H && H.expectancy_r > 0;
         const cls = cleared ? 'ok' : n >= 8 && H && H.expectancy_r < 0 ? 'no' : 'thin';
-        const head = cleared ? 'Cleared for capital'
-          : (n >= 8 && H && H.expectancy_r < 0) ? 'Research only — this engine is losing'
-          : 'Research only — not enough evidence';
+        const head = cleared ? 'This engine is cleared for capital'
+          : (n >= 8 && H && H.expectancy_r < 0) ? 'This engine is losing money so far'
+          : 'This engine has not proved itself yet';
         const body = cleared
           ? `${esc(ENGINE_LABEL[sig.signal_type] || sig.signal_type)} has ${n} closed trades at
              ${H.expectancy_r > 0 ? '+' : ''}${H.expectancy_r}R. It clears the bar this site sets.`
@@ -5933,7 +5944,7 @@
              the 30 this site requires before an engine is trusted with capital. Nothing below
              changes that.`;
         return `<div class="b-verdict is-${cls}">
-          <div class="b-vk">The verdict</div>
+          <div class="b-vk">How much this engine has proved</div>
           <h2>${head}</h2><p>${body}</p>
           <p class="b-vs">The bar is 30 closed trades at a t-statistic of 2 or better.
             <a href="/signals">See the record</a>.</p>
@@ -8209,6 +8220,44 @@
     return { trend, momentum, volume, institutional };
   };
   const RADAR_W = { momentum: 0.30, trend: 0.30, volume: 0.20, institutional: 0.20 };
+
+  /* PRIORITY IS NOT THE SCORE. The score says how strong the setup reads;
+   * priority says how much it deserves the middle of the screen. Liquidity and
+   * freshness belong in one and not the other — a stale signal on a thin name
+   * can still be a strong reading, it just should not be the first thing you
+   * look at. */
+  const radarPriority = (r, score, parts) => {
+    const liq = band(Math.log10(Math.max(1, r.turnover_cr || 1)), 0.7, 3.2) ?? 0;
+    const conf = Object.values(parts).filter(v => v != null).length / 4 * 100;
+    return score * 0.62 + liq * 0.18 + conf * 0.20;
+  };
+
+  /* RISK IS STATED, NOT IMPLIED BY A COLOUR. Distance above the 200-day and
+   * daily range are the two things that make a strong reading fragile. */
+  const radarRisk = (r) => {
+    const ext = r.sma200 && r.price ? (r.price - r.sma200) / r.sma200 * 100 : null;
+    const vol = r.atr_pct;
+    const flags = [];
+    if (ext != null && ext > 35) flags.push(`Extended — ${Math.round(ext)}% above its 200-day`);
+    if (vol != null && vol > 4) flags.push(`Daily range ${Number(vol).toFixed(1)}% — volatile`);
+    if (r.from_high != null && r.from_high > -3) flags.push('At the top of its 52-week range');
+    if ((r.turnover_cr ?? 0) < 25) flags.push(`Thin — ₹${Math.round(r.turnover_cr || 0)} cr a day`);
+    const level = flags.length >= 2 ? 'HIGH' : flags.length === 1 ? 'MEDIUM' : 'LOW';
+    return { level, flags };
+  };
+
+  /* A 24-point sparkline path. No library: it is nine numbers of arithmetic and
+   * a heavy charting dependency for a 60px line is the definition of cost
+   * without benefit. Returns null when there is nothing real to draw — an
+   * invented flat line would read as "no movement", which is a claim. */
+  const sparkPath = (pts, w = 74, h = 22) => {
+    const v = (pts || []).filter(x => Number.isFinite(x));
+    if (v.length < 4) return null;
+    const lo = Math.min(...v), hi = Math.max(...v), rng = (hi - lo) || 1;
+    const step = w / (v.length - 1);
+    const d = v.map((x, i) => `${i ? 'L' : 'M'}${(i * step).toFixed(1)},${(h - ((x - lo) / rng) * h).toFixed(1)}`).join('');
+    return { d, up: v[v.length - 1] >= v[0], area: `${d}L${w},${h}L0,${h}Z` };
+  };
   const radarScore = (parts) => {
     const live = Object.entries(parts).filter(([, v]) => v != null);
     if (live.length < 2) return null;             // two components is not a score
@@ -8257,14 +8306,20 @@
     }
     await loadInsti();
     const core = marketCore(RADAR_BREADTH);
+    RADAR_CORE = core;
 
     /* RANKED, NOT SAMPLED. Liquidity is a gate rather than a term: a name that
      * cannot be bought does not become interesting because its score is high. */
     const ranked = SCREEN
       .filter(r => (r.turnover_cr ?? 0) >= 5)
-      .map(r => { const parts = radarParts(r); return { r, parts, score: radarScore(parts) }; })
-      .filter(n => n.score != null)
-      .sort((a, b) => b.score - a.score);
+      .map(r => {
+        const parts = radarParts(r);
+        const score = radarScore(parts);
+        return score == null ? null
+          : { r, parts, score, priority: radarPriority(r, score, parts), risk: radarRisk(r) };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.priority - a.priority);
 
     if (!ranked.length) {
       paint(shell(`<div class="empty">No name has enough measured components to score today.
@@ -8293,7 +8348,18 @@
             and it is a <b>model</b> — every term and weight is above.</p>
         </div>
       </section>` : '') +
-      `<div class="rd-stage">${radarSvg(nodes)}</div>` +
+      `<div class="rd-stage" id="rdStage">${radarSvg(nodes)}
+         <button type="button" class="rd-full" id="rdFull" aria-label="Expand the radar">Expand ⤢</button>
+       </div>` +
+      /* THE UNIVERSE STRIP. The ring shows eight; this shows the next tier
+       * without making anyone open another page. Horizontal on a phone because
+       * a strip of small cards is the one thing sideways scrolling is actually
+       * good at. */
+      sec('Signal universe', `<div class="rd-strip" role="list">${
+        ranked.slice(0, 20).map(nd => `<button type="button" class="rd-u" role="listitem"
+          data-rsym="${esc(nd.r.sym)}" aria-label="${esc(nd.r.sym)}, score ${nd.score} of 100">
+          ${radarCardInner(nd)}</button>`).join('')
+      }</div>`, `top 20 of ${ranked.length}`) +
       sec('Top signals', `<div class="rd-feed">${nodes.map((n, i) => radarRow(n, i)).join('')}</div>`,
           `${nodes.length} of ${ranked.length} scored`) +
       `<p class="hint rd-foot"><b>The score is a model, not a measurement.</b> It weights
@@ -8303,37 +8369,93 @@
         not derived from this score. Names under ₹5 cr of daily turnover are excluded.
         <a href="/methodology">How every number here is made →</a></p>`
     ));
-    wireRadar();
+    wireRadar(nodes, ranked);
   };
 
-  /* The ring. SVG, laid out from the node count so nothing overlaps, and hidden
-   * on a phone by CSS in favour of the list below it. */
+  /* THE RING.
+   *
+   * Node position is not decoration: ANGLE spreads the set evenly so nothing
+   * collides, RADIUS carries priority — the names that most deserve attention
+   * sit closest to the core. Card size is fixed so eight of them tile without
+   * overlap; the ring radius is derived from that, not guessed.
+   *
+   * Cards are foreignObject, so they are real HTML — the same type scale,
+   * tokens and tabular numerals as everything else, rather than SVG <text>
+   * that has to reimplement all of it and still wraps badly.
+   *
+   * Line weight and opacity carry signal strength. A weakening reading fades
+   * rather than changing hue, so strength and direction stay separable. */
+  const CARD_W = 148, CARD_H = 92;
   const radarSvg = (nodes) => {
-    const W = 680, H = 420, cx = W / 2, cy = H / 2;
+    const W = 940, H = 620, cx = W / 2, cy = H / 2;
     const n = nodes.length;
+    const maxP = Math.max(...nodes.map(x => x.priority)), minP = Math.min(...nodes.map(x => x.priority));
+    const spanP = (maxP - minP) || 1;
     return `<svg class="rd-svg" viewBox="0 0 ${W} ${H}" role="img"
-      aria-label="Signal radar: ${nodes.map(x => `${x.r.sym} scores ${x.score}`).join(', ')}">
-      <circle cx="${cx}" cy="${cy}" r="150" class="rd-ring"/>
-      <circle cx="${cx}" cy="${cy}" r="100" class="rd-ring"/>
+      aria-label="Signal radar. ${nodes.map(x => `${x.r.sym} ${x.score} of 100`).join('. ')}.">
+      <defs>
+        <radialGradient id="rdGlow"><stop offset="0%" stop-color="var(--accent)" stop-opacity=".16"/>
+          <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></radialGradient>
+      </defs>
+      <circle cx="${cx}" cy="${cy}" r="196" class="rd-ring"/>
+      <circle cx="${cx}" cy="${cy}" r="140" class="rd-ring"/>
+      <circle cx="${cx}" cy="${cy}" r="112" class="rd-glow" fill="url(#rdGlow)"/>
       ${nodes.map((nd, i) => {
         const a = (i / n) * Math.PI * 2 - Math.PI / 2;
-        // Stronger signals sit closer in. Distance carries meaning.
-        const rad = 96 + (100 - nd.score) * 0.75;
+        /* THE MINIMUM RADIUS IS GEOMETRY, NOT TASTE.
+         * Two adjacent cards on a ring of n are 2·r·sin(π/n) apart. At n=8
+         * that is 0.765·r, so a 148px card with a 16px gap needs r > 214 or
+         * neighbours overlap — which two of them did at r=168. The band is
+         * therefore 218–272: still enough travel for priority to read as
+         * distance, and no collision at any ranking. */
+        const R_IN = 218, R_OUT = 272;
+        const rad = R_OUT - ((nd.priority - minP) / spanP) * (R_OUT - R_IN);
         const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
-        const w = 0.6 + (nd.score / 100) * 2.2;
-        const cls = nd.score >= 60 ? 'is-up' : nd.score < 40 ? 'is-dn' : '';
-        return `<line class="rd-link ${cls}" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"
-                  stroke-width="${w.toFixed(2)}"/>
-                <g class="rd-node ${cls}" data-rsym="${esc(nd.r.sym)}" tabindex="0" role="button"
-                   aria-label="${esc(nd.r.sym)}, score ${nd.score}">
-                  <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(9 + nd.score / 14).toFixed(1)}"/>
-                  <text x="${x.toFixed(1)}" y="${(y - 18).toFixed(1)}">${esc(nd.r.sym)}</text>
-                  <text class="rd-ns" x="${x.toFixed(1)}" y="${(y + 26).toFixed(1)}">${nd.score}</text>
-                </g>`;
+        const edgeX = cx + Math.cos(a) * 104, edgeY = cy + Math.sin(a) * 104;
+        const s = nd.score;
+        const cls = s >= 65 ? 'is-up' : s < 42 ? 'is-dn' : 'is-mid';
+        const wgt = (0.7 + (s / 100) * 2.4).toFixed(2);
+        const op = (0.30 + (s / 100) * 0.55).toFixed(2);
+        return `<g class="rd-n ${cls}" data-rsym="${esc(nd.r.sym)}">
+          <line class="rd-link" x1="${edgeX.toFixed(1)}" y1="${edgeY.toFixed(1)}"
+                x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"
+                stroke-width="${wgt}" stroke-opacity="${op}"/>
+          <circle class="rd-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"/>
+          <foreignObject x="${(x - CARD_W / 2).toFixed(1)}" y="${(y - CARD_H / 2).toFixed(1)}"
+                         width="${CARD_W}" height="${CARD_H}">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="rd-card" role="button" tabindex="0"
+                 data-rsym="${esc(nd.r.sym)}">${radarCardInner(nd)}</div>
+          </foreignObject>
+        </g>`;
       }).join('')}
-      <circle cx="${cx}" cy="${cy}" r="40" class="rd-hub"/>
-      <text class="rd-hubt" x="${cx}" y="${cy + 5}">SIGNAL</text>
+      <circle cx="${cx}" cy="${cy}" r="62" class="rd-hub"/>
+      <foreignObject x="${cx - 58}" y="${cy - 40}" width="116" height="80">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="rd-hubc">
+          <span>Market</span><b id="rdHubN">${RADAR_CORE ? RADAR_CORE.score : '—'}</b>
+          <em>${RADAR_CORE ? esc(RADAR_CORE.state[0]) : ''}</em>
+        </div>
+      </foreignObject>
     </svg>`;
+  };
+
+  /* The card that sits on a node, and the same markup reused by the strip
+   * below the ring — one component, two placements. */
+  const radarCardInner = (nd) => {
+    const r = nd.r, x = instiOf(r.sym);
+    const sp = sparkPath(RADAR_SERIES[r.sym]);
+    const v = (r.vd && r.vd.c) || '';
+    const [vcls, vlabel] = VERDICT_LOOK[v] || ['', 'Not rated'];
+    return `<span class="rc-t"><b>${esc(r.sym)}</b>
+        <i class="${dir(r.r1d)}">${pct(r.r1d)}</i></span>
+      <span class="rc-v ${vcls}">${esc(vlabel)}</span>
+      <span class="rc-b"><i style="width:${nd.score}%"></i></span>
+      <span class="rc-m"><u>${nd.score}</u>
+        ${sp ? `<svg class="rc-sp ${sp.up ? 'up' : 'dn'}" viewBox="0 0 74 22" aria-hidden="true">
+                  <path class="rc-spa" d="${sp.area}"/><path class="rc-spl" d="${sp.d}"/></svg>`
+             : `<em class="rc-nosp">no series</em>`}
+        ${x && x.quality === 'complete' && x.insti_pp != null
+          ? `<em class="rc-fii ${dir(x.insti_pp)}">${x.insti_pp > 0 ? '▲' : x.insti_pp < 0 ? '▼' : '·'}</em>` : ''}
+      </span>`;
   };
 
   const radarRow = (nd, i) => {
@@ -8356,7 +8478,7 @@
     </article>`;
   };
 
-  const wireRadar = () => {
+  const wireRadar = (nodes, ranked) => {
     const core = document.getElementById('rdCore');
     if (core) core.addEventListener('click', () => {
       const d = document.getElementById('rdCoreD');
@@ -8379,6 +8501,11 @@
           ${line('Volume', 20, p.volume)}${line('Institutional flow', 20, p.institutional)}
           <p class="isc-n2">Components missing for this name are left out of the mean rather than
             scored zero. The score ranks names; it does not value them.</p></div>
+        ${nd.risk && nd.risk.flags.length ? `<h4 class="sh">Risk flags</h4>
+          <ul class="rd-risk">${nd.risk.flags.map(f => `<li>${esc(f)}</li>`).join('')}</ul>`
+          : `<h4 class="sh">Risk flags</h4><p class="ef-p">None of the four checked —
+             extension above the 200-day, daily range, position in the 52-week band,
+             and daily turnover.</p>`}
         <h4 class="sh">The screen's own verdict</h4>
         <p class="ef-p">${esc((r.vd && r.vd.l) || 'Not rated')}${r.vd && r.vd.o ? ` — ${esc(r.vd.o)}` : ''}</p>
         ${x && x.quality === 'complete' ? `<h4 class="sh">Institutional flow</h4>
@@ -8396,13 +8523,66 @@
      * fired and the card won — the score decomposition this screen exists to
      * show was unreachable. One attribute, one owner; the panel links to the
      * full card for anyone who wants it. */
-    document.querySelectorAll('.rd-row, .rd-node').forEach(el => {
+    /* SELECTING A NAME DIMS THE REST.
+     * The ring, the strip and the list are three views of one set, so a
+     * selection has to land on all three or the reader has to re-find the name
+     * they just clicked. One class on the container, everything else in CSS. */
+    let picked = null;
+    const select = (sym) => {
+      picked = picked === sym ? null : sym;
+      main.classList.toggle('rd-picked', !!picked);
+      main.querySelectorAll('[data-rsym]').forEach(el => {
+        el.classList.toggle('is-sel', !!picked && el.getAttribute('data-rsym') === picked);
+      });
+    };
+    main.querySelectorAll('[data-rsym]').forEach(el => {
       const sym = el.getAttribute('data-rsym');
-      el.addEventListener('click', () => open(sym));
+      el.addEventListener('click', (ev) => { ev.stopPropagation(); select(sym); open(sym); });
       el.addEventListener('keydown', ev => {
-        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(sym); }
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); select(sym); open(sym); }
       });
     });
+
+    /* FULL-SCREEN RADAR. On a phone the ring is not rendered inline — eight
+     * labelled cards on a circle at 375px is unreadable — so this is how the
+     * visual gets seen there at all, without the list paying for it. */
+    const fs = document.getElementById('rdFull');
+    if (fs) fs.addEventListener('click', () => {
+      const st = document.getElementById('rdStage');
+      const on = st.classList.toggle('is-full');
+      document.body.style.overflow = on ? 'hidden' : '';
+      fs.textContent = on ? 'Close ✕' : 'Expand ⤢';
+      fs.setAttribute('aria-label', on ? 'Close the radar' : 'Expand the radar');
+    });
+    addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Escape') return;
+      const st = document.getElementById('rdStage');
+      if (st && st.classList.contains('is-full')) { st.classList.remove('is-full');
+        document.body.style.overflow = ''; if (fs) fs.textContent = 'Expand ⤢'; }
+    });
+
+    /* SERIES AFTER PAINT, never before it. Twenty symbols is twenty requests;
+     * awaiting them would hold the whole page for a 74px line. They fill in,
+     * and a card with no series says so rather than drawing a flat one. */
+    const want = [...new Set([...nodes, ...ranked.slice(0, 20)].map(n => n.r.sym))];
+    (async () => {
+      for (const sym of want) {
+        if (RADAR_SERIES[sym]) continue;
+        const res = await get(`/api/signals?series=${encodeURIComponent(sym)}`);
+        if (!res.ok || !res.data || !Array.isArray(res.data.points)) continue;
+        RADAR_SERIES[sym] = res.data.points.slice(-40).map(p => Number(p.c)).filter(Number.isFinite);
+        const sp = sparkPath(RADAR_SERIES[sym]);
+        if (!sp) continue;
+        main.querySelectorAll(`[data-rsym="${CSS.escape(sym)}"] .rc-nosp`).forEach(ph => {
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('class', `rc-sp ${sp.up ? 'up' : 'dn'}`);
+          svg.setAttribute('viewBox', '0 0 74 22');
+          svg.setAttribute('aria-hidden', 'true');
+          svg.innerHTML = `<path class="rc-spa" d="${sp.area}"/><path class="rc-spl" d="${sp.d}"/>`;
+          ph.replaceWith(svg);
+        });
+      }
+    })();
   };
 
   R['/methodology'] = async () => {
