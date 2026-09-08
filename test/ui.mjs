@@ -298,6 +298,20 @@ try {
   if (nLinks > 1) {
     const link = p.locator("a.brief-link").nth(1);   // deliberately not the default pick
     const wanted = await link.evaluate(a => a.dataset.brief);
+    /* The signals ledger is a table now: every card sits inside a collapsed
+     * xrow panel, so its brief link is present in the DOM and not visible
+     * until the row is opened. Expanding the row that OWNS this link is the
+     * new interaction — clicking a hidden link is not a thing a reader can
+     * do, so the test does what a reader does. */
+    await p.evaluate(() => {
+      const a = document.querySelectorAll("a.brief-link")[1];
+      const panel = a && a.closest(".xd");
+      if (!panel) return;
+      const row = document.querySelector(`.xr[aria-controls="${panel.id}"]`);
+      if (row) row.click();
+    });
+    await p.waitForTimeout(SETTLE);
+    ok("a collapsed row reveals its brief link when opened", await link.isVisible());
     await link.click();
     await p.waitForTimeout(SETTLE + 1500);
     const opened = (await p.locator(".b-hero h1").innerText()).split(" ")[0];

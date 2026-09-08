@@ -40,6 +40,10 @@
      Body text uses the system stack on purpose: it needs no download, so the
      first paint carries no webfont dependency and no reflow. The 0.303 CLS on
      the current page comes from exactly that reflow. -->
+<!-- The BODY face first. This preloaded the mono and the serif and not Manrope,
+     which sets almost every word on the page — so the one face whose swap the
+     reader actually notices was the one left to be discovered in the CSS. -->
+<link rel="preload" href="/fonts/Manrope-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/JetBrainsMono-500-latin.woff2" as="font" type="font/woff2" crossorigin>
 <!-- Newsreader carries every headline on the site now, not just the brief's.
      Preloaded for the same reason as the other two: font-display:swap without
@@ -181,18 +185,18 @@
 <main id="main" tabindex="-1">
 <!--PRERENDER-->
 <section class="pre">
-  <p class="pre-k">Signal · Monday, September 07 2026</p>
+  <p class="pre-k">Signal · Tuesday, September 08 2026</p>
   <h1 class="pre-h">Every signal, graded. The record is public.</h1>
-  <p class="pre-s"><b>29</b> published since 2026-09-02, none closed yet. The screen below is
-         research until they settle.</p>
+  <p class="pre-s">Every call is logged when it is made and graded against the bars that follow, win or lose.
+         The full ledger is on the live page.</p>
   <p class="pre-m">Every session, <b>750 names</b> re-screened and the wire read
     for what touches them.</p>
   <p class="pre-m"><b>268</b> of <b>750</b>
     screened names advanced and <b>469</b> declined — broad decline.
     <b>24</b> sit at a 52-week high.</p>
   <p class="pre-m"><b>5</b> candidates cleared the screen this week — ranked, not recommended.</p>
-  <ul class="pre-l"><li><b>Economic Times</b> — Dollar gets little lift from boost in Fed hike expectations</li><li><b>ET Economy</b> — RBI&#39;s liquidity test may set future course</li><li><b>Livemint</b> — How Asian markets, crude will impact Sensex, Nifty: What GIFT Nifty, Nikkei, Kospi, Taiwan index signals for India</li><li><b>BusinessLine</b> — Sensex today | Stock Market LIVE: Stocks to watch today: TCS, Tata Motors, RVNL, Lupin, Mazagon Dock, NMDC among key names</li></ul>
-  <p class="pre-n">This is the snapshot published with the build on Monday, September 07 2026.
+  <ul class="pre-l"><li><b>Economic Times</b> — RBI easing drives Indian companies’ $7.70 billion overseas borrowing</li><li><b>ET Economy</b> — New GDP series reflects better data, methods: MoSPI</li><li><b>Livemint</b> — Gold Steadies as Traders Weigh Mideast Tensions and Dollar Moves</li><li><b>BusinessLine</b> — FTSE-BSE inclusion could open global index route for NSE shares</li></ul>
+  <p class="pre-n">This is the snapshot published with the build on Tuesday, September 08 2026.
     The live page replaces it with current prices as soon as it loads.</p>
 </section>
 <!--/PRERENDER-->

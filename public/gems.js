@@ -1,34 +1,70 @@
 /* ── GEMS — the daily crux ────────────────────────────────────────────────────
  *
- * ONE PAGE. Every section answers one question in a headline and three or four
- * figures, and then hands off to signal.askakshay.com for the working. There is
- * deliberately no router, no deep page and no tab bar: the product IS that you
- * can read the whole thing in one scroll before the market opens.
+ * ONE PAGE, AND IT ENDS HERE. The first version was a set of summaries that
+ * each handed off to signal.askakshay.com for the actual working, which made it
+ * a table of contents rather than a product: every section was three figures
+ * and a link out. Those links are gone. Anything worth knowing about a row is
+ * now UNDER the row — the verdict and its evidence, the ladder drawn to scale,
+ * the engine's own record — so the page is read to its end rather than left.
  *
  * IT READS THE SAME FEEDS AS THE FULL SITE. Not a copy, not a snapshot — the
  * same /api routes and the same JSON. A digest that could disagree with the
  * site it summarises would be worse than no digest, and this repo has already
- * had two surfaces drift until one had to be frozen.
+ * had two surfaces drift until one had to be frozen. For the same reason
+ * NOTHING HERE RE-IMPLEMENTS A MODEL: the verdicts are the screen's own calls
+ * and the R multiples are the ledger's own grades. A second scoring function
+ * living here would be a second answer to the same question.
  *
  * WHAT IT WILL NOT DO: invent a number to fill a section. Every section renders
  * from what its feed actually returned, says so when that is nothing, and never
- * substitutes a plausible figure for a missing one.
+ * substitutes a plausible figure for a missing one. Where a feed is older than
+ * today — the screen is priced at its last build, not live — the page says so
+ * on the section rather than letting the figure pass as current.
+ *
+ * DISCLOSURE IS NOT DECORATION. The record section leads with a losing number
+ * because that is the number. A digest that buries its own expectancy under
+ * five setups is an advertisement.
  * ───────────────────────────────────────────────────────────────────────────── */
 (() => {
   'use strict';
 
   const app = document.getElementById('app');
   const jump = document.getElementById('jump');
-  const SITE = 'https://signal.askakshay.com';
   const LAUNCH = '2026-09-02';
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const num = v => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+  /* Number(null) IS 0, AND 0 IS FINITE.
+   * This read `Number.isFinite(Number(v)) ? … : null`, so every null numeric
+   * in every feed became a real zero. A signal with target3:null drew a level
+   * at ₹0 on its ladder, which pulled the scale's minimum to zero, squeezed
+   * the real levels into the right-hand third, and printed "T3 is 18.7R" for
+   * a target that does not exist. Number('') and Number([]) are 0 too.
+   * Only an actual number, or a string that is one, is a number here. */
+  const num = v => {
+    if (v == null || v === '') return null;
+    const n = typeof v === 'number' ? v : (typeof v === 'string' ? Number(v.trim()) : NaN);
+    return Number.isFinite(n) ? n : null;
+  };
   const pct = v => { const n = num(v); return n == null ? '—' : `${n > 0 ? '+' : ''}${n.toFixed(2)}%`; };
+  const pp = v => { const n = num(v); return n == null ? '—' : `${n > 0 ? '+' : ''}${n.toFixed(2)} pp`; };
+  const rr = v => { const n = num(v); return n == null ? '—' : `${n > 0 ? '+' : ''}${n.toFixed(3)}R`; };
   const inr = v => { const n = num(v); return n == null ? '—' : '₹' + n.toLocaleString('en-IN',
     { maximumFractionDigits: n >= 1000 ? 0 : 2 }); };
+  /* SIX OF THE FORTY-FIVE OPEN SIGNALS ARE NOT IN RUPEES.
+   * The ledger carries US equities and COMEX commodities alongside the NSE
+   * book and labels each row's own `currency`. Hardcoding ₹ printed DUOL, a
+   * dollar-priced US listing, at "₹154.46" — the same currency hole that once
+   * sized a US name to ₹2.9 crore, this time on the page instead of in the
+   * position. Money is formatted in the currency the row says it is. */
+  const money = (v, cur) => {
+    const n = num(v); if (n == null) return '—';
+    const c = cur || '₹';
+    return c === '₹' ? inr(n)
+      : c + n.toLocaleString('en-US', { maximumFractionDigits: n >= 1000 ? 0 : 2 });
+  };
   const dir = v => { const n = num(v); return n > 0 ? 'up' : n < 0 ? 'dn' : ''; };
+  const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
   /* NaN is not JSON, and this book's feed has historically carried bare NaN
      tokens that stop JSON.parse dead. Stripped on the way in rather than
@@ -41,33 +77,165 @@
     } catch { return null; }
   };
 
-  const sec = (id, kicker, crux, body, note, href, linkText) => `
+  const sec = (id, kicker, crux, body, note) => `
     <section class="sec" id="${id}">
       <div class="sec-h"><span class="sec-k">${esc(kicker)}</span>
         ${note ? `<span class="sec-n">${esc(note)}</span>` : ''}</div>
       <p class="crux">${crux}</p>
       ${body}
-      ${href ? `<a class="more" href="${href}">${esc(linkText || 'The full working')} →</a>` : ''}
     </section>`;
 
   const figs = (items) => `<div class="figs">${items.filter(Boolean).map(([v, l, c]) =>
     `<div class="fig"><b class="${c || ''}">${v}</b><span>${esc(l)}</span></div>`).join('')}</div>`;
 
-  const row = (href, rank, name, sub, val, sub2, tag) => `
-    <a class="row" href="${href}">
-      <span class="rk">${rank}</span>
-      <span class="rn"><b>${esc(name)}</b><span>${esc(sub)}</span>
-        ${tag ? `<span class="tag ${tag[1]}">${esc(tag[0])}</span>` : ''}</span>
-      <span class="rv">${val}${sub2 ? `<i class="${sub2[1]}">${sub2[0]}</i>` : ''}</span>
-    </a>`;
+  /* ── THE EXPANDING ROW ────────────────────────────────────────────────────
+   * <details>, not a JS toggle. It is keyboard-operable, screen-reader
+   * labelled and open-able with JS disabled for free, and this page has no
+   * other reason to ship an interaction layer. */
+  const xr = (summary, detail) => detail
+    ? `<details class="xr"><summary class="row">${summary}<span class="xr-c" aria-hidden="true"></span></summary>
+         <div class="xd">${detail}</div></details>`
+    : `<div class="row">${summary}</div>`;
 
-  const stock = sym => `${SITE}/stock/${encodeURIComponent(sym)}`;
+  const rowHead = (rank, name, sub, val, sub2, tag, sym) => `
+    <span class="rk">${rank}</span>
+    <span class="rn"><b>${esc(name)}</b><span>${esc(sub)}</span>
+      ${tag ? `<span class="tag ${tag[1]}">${esc(tag[0])}</span>` : ''}</span>
+    <span class="rv"${sym ? ` data-gpx="${esc(sym)}"` : ''}>${val}${
+      sub2 ? `<i class="${sub2[1]}">${sub2[0]}</i>` : ''}</span>`;
+
+  /* ── WIDGETS ──────────────────────────────────────────────────────────────
+   * Every one of these renders at its FINAL value and animates from a
+   * transform, so the resting state is correct even when the animation never
+   * runs — which is the normal case in a background tab, where rAF and CSS
+   * animation are both throttled or stopped. Nothing here reads a value out
+   * of an animation frame. */
+
+  /* A proportion, drawn. Two segments and a hairline at the midpoint, because
+     "268 advanced, 469 fell" is a shape before it is a pair of numbers. */
+  const splitBar = (a, b, la, lb) => {
+    const t = a + b; if (!t) return '';
+    const ap = a / t * 100;
+    return `<div class="sb" role="img" aria-label="${a} ${la}, ${b} ${lb}">
+      <span class="sb-a" style="width:${ap.toFixed(2)}%"></span>
+      <span class="sb-b" style="width:${(100 - ap).toFixed(2)}%"></span>
+      <em class="sb-mid" aria-hidden="true"></em>
+    </div>
+    <div class="sb-l"><span class="up">${a} ${esc(la)}</span>
+      <span class="dim">${ap.toFixed(0)}% / ${(100 - ap).toFixed(0)}%</span>
+      <span class="dn">${b} ${esc(lb)}</span></div>`;
+  };
+
+  /* A 0–100 meter with its own midpoint marked, so 44% reads as "under half"
+     without the reader doing arithmetic. */
+  const meter = (label, v, good = 50) => {
+    const n = num(v); if (n == null) return '';
+    return `<div class="mt"><span class="mt-l">${esc(label)}</span>
+      <span class="mt-t"><i class="${n >= good ? 'up' : 'dn'}" style="width:${clamp(n, 0, 100)}%"></i>
+        <u style="left:${good}%" aria-hidden="true"></u></span>
+      <span class="mt-v ${n >= good ? 'up' : 'dn'}">${n.toFixed(1)}%</span></div>`;
+  };
+
+  /* A diverging bar for a signed quantity, zero in the middle. Reading a
+     negative as "a shorter positive bar" is the classic chart lie. */
+  const divBar = (v, max) => {
+    const n = num(v); if (n == null || !max) return '';
+    const w = clamp(Math.abs(n) / max * 50, 0, 50);
+    return `<span class="db" role="img" aria-label="${pp(n)}">
+      <i class="${n < 0 ? 'dn' : 'up'}" style="${n < 0 ? `right:50%` : `left:50%`};width:${w}%"></i>
+      <u aria-hidden="true"></u></span>`;
+  };
+
+  /* The cumulative-R curve. Drawn from the ledger's own graded multiples — no
+     re-grading here, and the zero line is always in frame so a curve that
+     never crosses it cannot be cropped into looking like one that does. */
+  const curve = (pts) => {
+    if (!pts || pts.length < 5) return null;
+    const W = 700, H = 150, P = 4;
+    const ys = pts.map(p => p.cum_r);
+    const lo = Math.min(0, ...ys), hi = Math.max(0, ...ys);
+    const span = (hi - lo) || 1;
+    const x = i => P + i / (pts.length - 1) * (W - P * 2);
+    const y = v => P + (hi - v) / span * (H - P * 2);
+    const d = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.cum_r).toFixed(1)}`).join('');
+    const zero = y(0);
+    const end = pts[pts.length - 1].cum_r;
+    return `<div class="cv-w">
+      <svg class="cv" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+           aria-label="Cumulative R over ${pts.length} closed trades, ending ${rr(end)}">
+        <line class="cv-0" x1="0" y1="${zero.toFixed(1)}" x2="${W}" y2="${zero.toFixed(1)}"/>
+        <path class="cv-l ${end >= 0 ? 'up' : 'dn'}" d="${d}"/>
+      </svg>
+      <div class="cv-x"><span>${esc(pts[0].date)}</span>
+        <span class="${end >= 0 ? 'up' : 'dn'}">${rr(end)} cumulative</span>
+        <span>${esc(pts[pts.length - 1].date)}</span></div>
+    </div>`;
+  };
+
+  /* The ladder, to scale. Stop, entry and every target on one axis, so a
+     target three times further away than the stop LOOKS three times further
+     away. This is the whole reason the section stopped linking out. */
+  const ladder = (r) => {
+    const cur = r.currency || '₹';
+    const e = num(r.entry), s = num(r.sl);
+    /* > 0, not just non-null: a level of zero is a missing level however it
+     * arrived, and one of them rescales the entire drawing. */
+    const ts = [num(r.target1), num(r.target2), num(r.target3)].filter(v => v != null && v > 0);
+    if (e == null || s == null || !ts.length) return '';
+    const lo = Math.min(e, s, ...ts), hi = Math.max(e, s, ...ts);
+    const span = (hi - lo) || 1;
+    const at = v => ((v - lo) / span * 100).toFixed(2);
+    const risk = Math.abs(e - s);
+    /* MARKS ARE EMITTED IN POSITION ORDER AND STAGGERED WHEN THEY CROWD.
+     *
+     * Stop and entry are one risk-unit apart, and on a ladder whose full span
+     * is ten risk-units that is a tenth of the width — so their price labels
+     * overlapped and printed as a single illegible string on half the setups
+     * measured. A second row is used only when the previous label is close
+     * enough to collide, so a well-spread ladder still reads on one line.
+     *
+     * Emitting them sorted also makes the first/last edge-clamping in the CSS
+     * correct: those rules exist to stop the outermost labels hanging off the
+     * track, and they can only find the outermost marks if the outermost
+     * marks are the first and last in the DOM. */
+    const marks = [{ v: s, cls: 'dn', lab: 'Stop' }, { v: e, cls: 'ac', lab: 'Entry' }]
+      .concat(ts.map((v, i) => ({ v, cls: 'up', lab: 'T' + (i + 1) })))
+      .sort((a, b2) => a.v - b2.v);
+    let lastPos = -99, lastRow = 1;
+    const drawn = marks.map(m => {
+      const pos = Number(at(m.v));
+      const row = (pos - lastPos) < 14 ? (lastRow ? 0 : 1) : 0;
+      lastPos = pos; lastRow = row;
+      return `<i class="ld-m ${m.cls}${row ? ' r1' : ''}" style="left:${pos.toFixed(2)}%">
+        <b>${esc(m.lab)}</b><em>${money(m.v, cur)}</em></i>`;
+    }).join('');
+    return `<div class="ld" role="img" aria-label="Levels from ${money(lo, cur)} to ${money(hi, cur)}">
+        <span class="ld-t"></span>
+        <span class="ld-risk" style="left:${at(Math.min(e, s))}%;width:${(Math.abs(e - s) / span * 100).toFixed(2)}%"></span>
+        ${drawn}
+      </div>
+      <div class="ld-n">Risk ${money(risk, cur)} a share. ${ts.map((t, i) =>
+        `<b>T${i + 1}</b> is ${(Math.abs(t - e) / risk).toFixed(1)}R`).join(' · ')}.</div>
+      ${(Math.abs(ts[ts.length - 1] - e) / risk) > 10 ? `<p class="ld-warn">
+        <b>These levels look wrong, and they are shown as filed.</b> The furthest target sits
+        more than ten times the risk away. The best move this book has ever measured on a
+        closed trade is <b>4.43R</b>, and the 90th percentile of open profit is 2.28R — a
+        target at this distance is not a target, it is an artefact of a stop set too close
+        to the entry.</p>` : ''}`;
+  };
 
   /* ── the page ───────────────────────────────────────────────────────────── */
   async function build() {
-    const [screen, stats, sigs, insti, ipo, news] = await Promise.all([
+    const [screen, stats, sigs, insti, ipo, ipoLive] = await Promise.all([
       get('/screen.json'), get('/api/stats'), get('/api/signals?limit=400'),
-      get('/institutional.json'), get('/ipo.json'), get('/news.json'),
+      get('/institutional.json'), get('/ipo.json'),
+      /* THE SUBSCRIPTION BOOK HAS TO BE LIVE OR IT IS WORTHLESS.
+       * ipo.json is built once, around midnight, so its subscription_x was
+       * up to a full day stale — and a book moves fastest on its final day,
+       * which is exactly when someone is deciding. /api/ipo-live reads NSE's
+       * current-issue endpoint behind a 15-minute edge cache; the full site
+       * already used it and this page did not. */
+      get('/api/ipo-live'),
     ]);
 
     const d = new Date();
@@ -75,11 +243,20 @@
       d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }).toUpperCase();
 
     const rows = (screen && screen.rows) || [];
-    const ledger = (sigs && (sigs.rows || sigs.signals)) || [];
+    const ledger = (sigs && (sigs.signals || sigs.rows)) || [];
     const since = ledger.filter(r => String(r.date || '').slice(0, 10) >= LAUNCH);
     const out = [];
     const nav = [];
     const add = (id, label, html) => { nav.push([id, label]); out.push(html); };
+    const nameOf = s => (rows.find(r => r.sym === s) || {}).name || '';
+
+    /* THE SCREEN IS PRICED AT ITS LAST BUILD, NOT AT THIS MOMENT.
+     * Its own price_date is the only honest label for every figure derived
+     * from it, and on a Monday morning that is Friday's close. The radar on
+     * the full site shipped a stock at +17.70% for four days on exactly this
+     * mistake. Every screen-derived section carries the date. */
+    const asOf = (screen && screen.price_date) || (screen && screen.built_on) || '';
+    const stale = asOf ? `screen priced ${asOf}` : '';
 
     /* ── 1. THE MARKET ─────────────────────────────────────────────────────
      * Breadth over 750 names, not an index level. An index says what fifty
@@ -93,138 +270,431 @@
       add('market', 'Market', sec('market', 'The market',
         `<b>${b.advancing}</b> of ${b.counted} names advanced and <b>${b.declining}</b> fell —
          <span class="${tone}">${word}</span>. <b>${b.above200}%</b> hold their 200-day.`,
+        splitBar(b.advancing, b.declining, 'advancing', 'declining') +
+        `<div class="mts">
+          ${meter('Above the 20-day', b.above20)}
+          ${meter('Above the 50-day', b.above50)}
+          ${meter('Above the 200-day', b.above200)}
+        </div>` +
         figs([
-          [`${b.above50}%`, 'above 50-day', b.above50 >= 50 ? 'up' : 'dn'],
-          [`${b.above200}%`, 'above 200-day', b.above200 >= 50 ? 'up' : 'dn'],
           [`${b.at_52w_high}`, 'at 52w high'],
+          [pct(b.median_1m), 'median 1M', dir(b.median_1m)],
           [pct(b.nifty_1m), 'Nifty 1M', dir(b.nifty_1m)],
-        ]),
-        b.as_of ? `breadth as of ${b.as_of}` : '', `${SITE}/radar`, 'Signal radar'));
-    }
-
-    /* ── 2. THE RECORD, before any idea ────────────────────────────────────
-     * Deliberately above the setups. A digest that leads with picks and buries
-     * the record is an advert. */
-    const T = stats && stats.totals;
-    const eng = (stats && stats.by_signal_type) || [];
-    const measured = eng.filter(e => e.trades >= 20);
-    const worst = measured.slice().sort((a, b2) => a.avg_r - b2.avg_r)[0];
-    if (T) {
-      add('record', 'Record', sec('record', 'The record',
-        measured.length
-          ? `No engine is cleared for capital. The largest sample, <b>${esc(worst.key)}</b>,
-             has closed <b>${worst.trades}</b> trades at
-             <span class="dn">${worst.avg_r > 0 ? '+' : ''}${Number(worst.avg_r).toFixed(3)}R</span> each.`
-          : `<b>${T.closed}</b> closed trades on record. No engine has reached the
-             30-trade bar this book sets before capital.`,
-        figs([
-          [T.closed, 'closed'],
-          [T.open, 'open'],
-          ['0', 'cleared for capital', 'dn'],
-          [T.first_date ? String(T.first_date).slice(5) : '—', 'since'],
+          [esc(b.label || '—'), 'breadth reading'],
         ]) +
-        `<div class="call dnb"><h3>Read this before the setups below</h3>
-          <p>Everything here is <b>paper</b>. The bar is 30 closed trades at t≥2 and nothing
-             has reached it. These are setups to examine, not calls to take.</p></div>`,
-        '', `${SITE}/engines`, 'Every engine and its record'));
+        `<p class="said">The meters mark the halfway line, not a target. More than half a
+          market above its 200-day is an uptrend by the only definition that does not
+          require an opinion; below it, the average name is in a downtrend whatever the
+          index says.</p>`,
+        b.as_of ? `breadth as of ${b.as_of}` : stale));
     }
 
-    /* ── 3. TODAY'S SETUPS ────────────────────────────────────────────────── */
+    /* ── 2. THE SCREEN'S OWN CALL ──────────────────────────────────────────
+     * One verdict per stock, already computed on the full site. This section
+     * DOES NOT re-derive it: it counts the calls and shows the reasoning the
+     * screen attached, including the flags that argue against each name. */
+    const vds = rows.map(r => r.vd && r.vd.c).filter(Boolean);
+    if (vds.length) {
+      const cnt = k => vds.filter(v => v === k).length;
+      const order = [['BUY', 'up'], ['WATCH', 'flat'], ['WAIT', 'warn'], ['AVOID', 'dn']];
+      const buys = rows.filter(r => r.vd && r.vd.c === 'BUY' && (r.turnover_cr ?? 0) >= 5)
+        .sort((x, y) => (num(y.rs3m) ?? -1e9) - (num(x.rs3m) ?? -1e9)).slice(0, 6);
+      add('verdicts', 'Verdicts', sec('verdicts', 'The call on 750 names',
+        `<b>${cnt('BUY')}</b> rate a buy, <b>${cnt('WATCH')}</b> a watch,
+         <b class="dn">${cnt('AVOID')}</b> an avoid. Most of a market is
+         <span class="dim">neither</span> at any moment, and a screen that says otherwise
+         is not screening.`,
+        `<div class="vd-bar" role="img" aria-label="${order.map(([k]) => `${cnt(k)} ${k}`).join(', ')}">
+          ${order.map(([k, c]) => {
+            const w = cnt(k) / vds.length * 100;
+            return w < 0.5 ? '' : `<span class="vd-s ${c}" style="width:${w.toFixed(2)}%"
+              title="${k} ${cnt(k)}"><em>${w >= 8 ? esc(k) : ''}</em></span>`;
+          }).join('')}
+        </div>
+        <div class="vd-k">${order.map(([k, c]) =>
+          `<span><i class="${c}"></i>${esc(k)} <b>${cnt(k)}</b></span>`).join('')}</div>` +
+        (buys.length ? `<h3 class="sub">Buy-rated, strongest relative strength</h3>
+          <div class="rows">${buys.map((r, i) => xr(
+            rowHead(i + 1, r.sym, `${esc(r.sector || r.ind || '')}${r.vd.l ? ' · ' + esc(r.vd.l) : ''}`,
+              inr(r.price), [pct(r.r1m) + ' 1M', dir(r.r1m)], ['Buy', 'up'], r.sym),
+            `<p class="xd-q">${esc(r.vd.o || '')}</p>
+             ${figs([
+               [pct(r.r1w), '1 week', dir(r.r1w)],
+               [pct(r.r3m), '3 months', dir(r.r3m)],
+               [num(r.from_high) == null ? '—' : `${Number(r.from_high).toFixed(1)}%`, 'off 52w high'],
+               [num(r.rsi) == null ? '—' : Number(r.rsi).toFixed(0), 'RSI'],
+             ])}
+             ${(r.vd.f && r.vd.f.length) ? `<h4 class="xd-h">What argues against it</h4>
+               <ul class="flags">${r.vd.f.map(f =>
+                 `<li><b>${esc(f.w)}</b>${f.e ? `<span>${esc(f.e)}</span>` : ''}</li>`).join('')}</ul>`
+               : `<p class="said">The screen attached no warning flags to this name.</p>`}
+             <p class="said">Conviction <b>${esc(r.vd.k || '—')}</b>. A verdict is the screen's
+               reading of price and statements — not a recommendation, and not a position.</p>`
+          )).join('')}</div>` : '') +
+        `<p class="said">Every call above is the screen's, computed on the same run that
+          priced this page. Nothing on this page re-scores a stock.</p>`,
+        stale));
+    }
+
+    /* ── 3. THE RECORD, above any idea ─────────────────────────────────────
+     * A digest that leads with picks and buries the record is an advert. */
+    const T = stats && stats.totals;
+    const H = stats && stats.headline;
+    const eng = (stats && stats.by_signal_type) || [];
+    /* ── WHICH LEDGER IS THIS? ─────────────────────────────────────────────
+     * /api/stats is ALL TIME — it opens at 2026-08-03, weeks before this site
+     * started keeping its own record. The headline therefore read "85 closed
+     * trades, 14.1% winners, −0.516R" on a page whose every other section
+     * counts from LAUNCH, where TWO have closed. Both numbers are true and
+     * only one of them is this site's, so the crux now leads with the one it
+     * is accountable for and the older ledger is shown underneath, labelled.
+     * Same fault, and same fix, as the engine cards on /engines. */
+    const closedSince = since.filter(r => String(r.status || '').toUpperCase() !== 'OPEN'
+                                       && r.r_multiple != null);
+    const openSince = since.filter(r => String(r.status || '').toUpperCase() === 'OPEN');
+    const winSince = closedSince.filter(r => num(r.r_multiple) > 0).length;
+    const sumR = closedSince.reduce((a, r) => a + (num(r.r_multiple) || 0), 0);
+    if (T && H) {
+      const maxAbs = Math.max(...eng.map(e => Math.abs(num(e.avg_r) || 0)), 0.001);
+      add('record', 'Record', sec('record', 'The record',
+        closedSince.length === 0
+          ? `<b>${since.length}</b> signals published since ${LAUNCH} and
+             <b>${openSince.length}</b> are still open — <b>none has closed</b>. This site has
+             <span class="dim">no win rate and no expectancy of its own yet</span>, and it will
+             not invent one from the older ledger below.`
+          : `<b>${closedSince.length}</b> closed since ${LAUNCH},
+             <b>${winSince}</b> of them winners, <b class="${dir(sumR)}">${rr(sumR / closedSince.length)}</b>
+             each. At ${closedSince.length} closed that is <span class="dim">far too few to mean
+             anything</span>. <b>No engine is cleared for capital.</b>`,
+        `<div class="figs">
+          <div class="fig"><b>${since.length}</b><span>published since ${esc(LAUNCH)}</span></div>
+          <div class="fig"><b>${openSince.length}</b><span>still open</span></div>
+          <div class="fig"><b>${closedSince.length}</b><span>closed and scored</span></div>
+          <div class="fig"><b class="${closedSince.length ? dir(sumR) : ''}">${
+            closedSince.length ? rr(sumR / closedSince.length) : '—'}</b><span>per trade</span></div>
+        </div>
+        <h3 class="sub">Before ${esc(LAUNCH)} · the earlier ledger</h3>
+        <p class="said">Published under an earlier configuration on a ledger that has been
+          re-graded twice. It is shown because deleting it would be the more flattering choice.
+          <b>It is not this site's record.</b></p>` +
+        (curve(stats.equity_curve) || '') +
+        figs([
+          [H.trades, 'closed before launch'],
+          [`${H.win_rate}%`, 'win rate then', dir(H.win_rate - 50)],
+          [rr(H.avg_r), 'per trade then', dir(H.avg_r)],
+          [num(H.profit_factor) == null ? '—' : Number(H.profit_factor).toFixed(2), 'profit factor',
+            H.profit_factor >= 1 ? 'up' : 'dn'],
+        ]) +
+        `<h3 class="sub">Every engine, on the earlier ledger</h3>
+         <p class="said">These are all-time figures from ${esc(T.first_date)}, not this site's
+           record — no engine has closed enough since ${LAUNCH} to have one.</p>
+         <div class="rows">${eng.slice().sort((x, y) => (num(y.avg_r) || 0) - (num(x.avg_r) || 0))
+           .map((e, i) => xr(
+             rowHead(i + 1, e.key, `${e.trades} closed · ${e.win_rate}% win`,
+               `<span class="${dir(e.avg_r)}">${rr(e.avg_r)}</span>`,
+               [`${rr(e.total_r)} total`, dir(e.total_r)],
+               e.trades >= 30 ? ['30+ sample', 'flat'] : ['Under sample', 'warn']),
+             `<div class="db-w">${divBar(e.avg_r, maxAbs)}</div>
+              ${figs([
+                [e.trades, 'closed'], [e.wins, 'wins', 'up'], [e.losses, 'losses', 'dn'],
+                [rr(e.total_r), 'total R', dir(e.total_r)],
+              ])}
+              <p class="said">${e.trades >= 30
+                ? `A ${e.trades}-trade sample is large enough to argue about. It is still
+                   <b>paper</b>: this book clears an engine for capital at 30 closed trades
+                   <i>and</i> t≥2, and this one has not cleared it.`
+                : `<b>${e.trades} closed trades is not a record.</b> At this sample the
+                   expectancy above is dominated by noise — it would take roughly
+                   ${Math.max(0, 30 - e.trades)} more closes before the number means anything,
+                   and it is shown so that nothing is hidden, not so that it can be used.`}</p>`
+           )).join('')}</div>` +
+        `<div class="call dnb"><h3>Read this before the setups below</h3>
+          <p>Everything here is <b>paper</b>. The bar is 30 closed trades at t≥2 and
+             <b>nothing has reached it</b>. The book's own expectancy across
+             ${H.trades} closes is <b class="dn">${rr(H.avg_r)}</b> per trade and its worst
+             drawdown <b class="dn">${rr(H.max_drawdown_r)}</b>. These are setups to
+             examine, not calls to take.</p></div>`,
+        `since ${LAUNCH} · earlier ledger from ${T.first_date}`));
+    }
+
+    /* ── 4. TODAY'S SETUPS ─────────────────────────────────────────────────
+     * Open signals since launch, each opening onto its own ladder. */
     const open = since.filter(r => String(r.status || '').toUpperCase() === 'OPEN'
                                && r.entry && r.sl && r.target1);
     const seen = new Set();
     const picks = open.filter(r => {
       const k = String(r.symbol || '').toUpperCase();
       if (seen.has(k)) return false; seen.add(k); return true;
-    }).sort((a, b2) => (num(b2.rr) || 0) - (num(a.rr) || 0)).slice(0, 5);
+    /* NOT SORTED BY REWARD:RISK.
+     * That ranking put the widest ratio first, and the widest ratio is
+     * produced by the tightest stop rather than the best setup — so the six
+     * it chose were the six with the most questionable levels, led by a 38R
+     * target. Newest first: this is a daily page, and the useful ordering is
+     * what the engines published most recently. */
+    }).sort((a, b2) => String(b2.date || '').localeCompare(String(a.date || ''))).slice(0, 6);
     add('setups', 'Setups', sec('setups', 'Open setups',
       picks.length
-        ? `<b>${open.length}</b> open since ${LAUNCH}. These five carry the widest
-           reward against their own risk.`
+        ? `<b>${open.length}</b> open since ${LAUNCH}. These are the ${picks.length} most
+           recently published — <span class="dim">an order of arrival, not of merit</span>.`
         : 'Nothing is open. An empty list is a result — the engines publish when a setup clears their floors, and not otherwise.',
       picks.length
-        ? `<div class="rows">${picks.map((r, i) => row(stock(r.symbol), i + 1,
-            r.symbol, `${esc(r.signal_type || '')} · ${esc(r.timeframe || '')}`,
-            inr(r.entry), [`stop ${inr(r.sl)}`, 'dn'],
-            num(r.rr) ? [`${Number(r.rr).toFixed(1)}R to target`, 'flat'] : null)).join('')}</div>`
+        ? `<div class="rows">${picks.map((r, i) => xr(
+            rowHead(i + 1, r.symbol, `${esc(r.signal_type || '')} · ${esc(r.timeframe || '')}${
+                r.market && r.market !== 'NSE' ? ' · ' + esc(r.market) : ''}`,
+              money(r.entry, r.currency), [`stop ${money(r.sl, r.currency)}`, 'dn'],
+              num(r.rr) ? [`${Number(r.rr).toFixed(1)}R`, 'flat'] : null),
+            ladder(r) +
+            figs([
+              [money(r.entry, r.currency), 'entry'],
+              [money(r.sl, r.currency), 'stop', 'dn'],
+              [money(r.target1, r.currency), 'first target', 'up'],
+              [num(r.rr) ? Number(r.rr).toFixed(2) + 'R' : '—', 'reward:risk'],
+            ]) +
+            (nameOf(r.symbol) ? `<p class="said"><b>${esc(nameOf(r.symbol))}</b></p>` : '') +
+            (r.remarks ? `<p class="xd-q">${esc(String(r.remarks).slice(0, 240))}</p>` : '') +
+            `<p class="said">Published ${esc(String(r.date || '').slice(0, 10))} by
+              <b>${esc(r.signal_type || 'an engine')}</b>, which is on <b>paper</b>. The levels
+              are the engine's; the outcome is recorded whichever way it goes.</p>`
+          )).join('')}</div>`
         : `<div class="empty">No open setup carries complete levels today.</div>`,
-      `${open.length} open`, `${SITE}/signals`, 'The public ledger'));
+      `${open.length} open since launch`));
 
-    /* ── 4. INSTITUTIONAL FLOW — the distinctive one ───────────────────────
+    /* ── 5. INSTITUTIONAL FLOW — the distinctive one ───────────────────────
      * The only section here that no free Indian markets page carries: FII and
      * DII holding quarter on quarter, from the companies' own filings. */
     if (insti && insti.rows) {
       const iv = Object.entries(insti.rows).filter(([, x]) => x.quality === 'complete');
       const accum = iv.filter(([, x]) => x.signal === 'strong_accumulation')
-        .sort((a, b2) => (b2[1].insti_pp || 0) - (a[1].insti_pp || 0)).slice(0, 5);
+        .sort((a, b2) => (b2[1].insti_pp || 0) - (a[1].insti_pp || 0)).slice(0, 6);
+      const nAcc = iv.filter(([, x]) => x.signal === 'strong_accumulation').length;
       const dist = iv.filter(([, x]) => x.signal === 'distribution').length;
-      const nameOf = s => (rows.find(r => r.sym === s) || {}).name || '';
+      const maxPp = Math.max(...iv.map(([, x]) => Math.abs(num(x.insti_pp) || 0)), 0.001);
       add('flow', 'Flow', sec('flow', 'Institutional flow',
-        accum.length
-          ? `<b>${accum.length ? iv.filter(([, x]) => x.signal === 'strong_accumulation').length : 0}</b>
-             companies had both foreign and domestic institutions add last quarter;
-             <b>${dist}</b> had both cut.`
+        nAcc
+          ? `<b>${nAcc}</b> companies had both foreign and domestic institutions add last
+             quarter; <b class="dn">${dist}</b> had both cut. Measured on
+             <b>${iv.length}</b> of the ${Object.keys(insti.rows).length} screened.`
           : `No company had both foreign and domestic institutions add materially last quarter.`,
         figs([
           [iv.length, 'measured'],
-          [iv.filter(([, x]) => x.signal === 'strong_accumulation').length, 'both adding', 'up'],
+          [nAcc, 'both adding', 'up'],
           [dist, 'both cutting', 'dn'],
           [iv.filter(([, x]) => x.insti_streak >= 3).length, '3Q+ streak'],
         ]) +
-        (accum.length ? `<div class="rows">${accum.map(([sym, x], i) => row(stock(sym), i + 1,
-            sym, nameOf(sym) || x.period,
-            `${x.insti_pp > 0 ? '+' : ''}${Number(x.insti_pp).toFixed(2)} pp`,
-            [`FII ${x.fii_pp > 0 ? '+' : ''}${Number(x.fii_pp).toFixed(1)} · DII ${x.dii_pp > 0 ? '+' : ''}${Number(x.dii_pp).toFixed(1)}`, dir(x.insti_pp)],
-            ['Both adding', 'up'])).join('')}</div>` : '') +
+        (accum.length ? `<div class="rows">${accum.map(([sym, x], i) => xr(
+            rowHead(i + 1, sym, nameOf(sym) || x.period, pp(x.insti_pp),
+              [`FII ${pp(x.fii_pp)}`, dir(x.fii_pp)], ['Both adding', 'up']),
+            `<div class="db-w">${divBar(x.insti_pp, maxPp)}</div>
+             ${figs([
+               [pp(x.fii_pp), 'FII quarter', dir(x.fii_pp)],
+               [pp(x.dii_pp), 'DII quarter', dir(x.dii_pp)],
+               [x.insti_streak == null ? '—' : x.insti_streak + 'Q', 'adding streak'],
+               [esc(x.period || '—'), 'period'],
+             ])}
+             <p class="said">${esc(x.signal_label || 'Both institution types added.')}
+               A quarter-on-quarter change is measured only across <b>consecutive</b> filed
+               quarters — a gap is left unmeasured rather than filled with a zero.</p>`
+          )).join('')}</div>` : '') +
         `<p class="said">Filed quarterly, within 21 days of the quarter end — this is
           <b>weeks to months old by design</b>. It says who owned the company at a past
           date, not who is buying today.</p>`,
-        insti.latest_period_end ? `latest ${insti.latest_period_end}` : '',
-        `${SITE}/screen`, 'Screen by institutional flow'));
+        insti.latest_period_end ? `latest ${insti.latest_period_end}` : ''));
     }
 
-    /* ── 5. IPO ────────────────────────────────────────────────────────────── */
+    /* ── 6. IPO ────────────────────────────────────────────────────────────── */
     const openIpo = (ipo && ipo.open) || [];
     const upcoming = (ipo && ipo.upcoming) || [];
+    /* The live book, keyed by symbol, so a row can prefer it over the mirror. */
+    const liveBook = new Map(((ipoLive && ipoLive.issues) || []).map(i => [i.symbol, i]));
+    const cr = v => { const n = num(v); return n == null ? '—' : '₹' + Math.round(n).toLocaleString('en-IN') + ' cr'; };
+    const xfmt = v => { const n = num(v); return n == null ? null : `${n.toFixed(2)}x`; };
     if (openIpo.length || upcoming.length) {
+      const anyLive = [...liveBook.values()].length;
       add('ipo', 'IPO', sec('ipo', 'Primary market',
         openIpo.length
           ? `<b>${openIpo.length}</b> book${openIpo.length === 1 ? '' : 's'} open now,
-             <b>${upcoming.length}</b> coming.`
+             <b>${upcoming.length}</b> coming.${anyLive
+               ? ` Subscription is read <b>live from NSE</b>, not from this morning's build.` : ''}`
           : `No book is open. <b>${upcoming.length}</b> upcoming.`,
-        `<div class="rows">${[...openIpo, ...upcoming].slice(0, 4).map((x, i) => row(
-            `${SITE}/ipo`, i + 1, x.symbol || '—', x.company || '',
-            x.price_band ? esc(String(x.price_band).replace(/Rs\./g, '₹')) : '—',
-            x.gmp_text ? [`GMP ${esc(x.gmp_text)}`, ''] : null,
-            x.phase === 'open' ? ['Open now', 'up'] : ['Upcoming', 'flat'])).join('')}</div>`,
-        '', `${SITE}/ipo`, 'Valuation, peers and last year’s listings'));
+        `<div class="rows">${[...openIpo, ...upcoming].slice(0, 8).map((x, i) => {
+          const L = liveBook.get(x.symbol);
+          const subLive = L ? num(L.total_x) : null;
+          const subMirror = num(x.subscription_x);
+          const sub = subLive != null ? subLive : subMirror;
+          const subSrc = subLive != null ? 'live' : subMirror != null ? "today's build" : null;
+          const pe = num(x.pe_post_issue), ppe = num(x.peer_pe);
+          return xr(
+            rowHead(i + 1, x.symbol || '—', `${esc(x.company || '')}${x.sector ? ' · ' + esc(x.sector) : ''}`,
+              x.price_band ? esc(String(x.price_band).replace(/Rs\./g, '₹')) : '—',
+              sub != null ? [`${xfmt(sub)} subscribed`, sub >= 1 ? 'up' : 'dn'] : null,
+              x.phase === 'open' ? ['Open now', 'up'] : ['Upcoming', 'flat']),
+            figs([
+              [cr(x.issue_size_cr), 'issue size'],
+              [num(x.lot_size) == null ? '—' : String(Math.round(x.lot_size)), 'shares a lot'],
+              [num(x.min_investment) == null ? '—' : inr(x.min_investment), 'minimum'],
+              [x.gmp_text ? esc(x.gmp_text) : 'not measured', 'grey market'],
+            ]) +
+            (L && L.categories && L.categories.length
+              ? `<h4 class="xd-h">The book right now</h4>
+                 <div class="rows">${L.categories.map(c => `<div class="row">
+                   ${rowHead('', c.cat, `${(num(c.bid) || 0).toLocaleString('en-IN')} of ${(num(c.offered) || 0).toLocaleString('en-IN')} shares`,
+                     `<span class="${num(c.x) >= 1 ? 'up' : 'dn'}">${xfmt(c.x) || '—'}</span>`, null, null)}
+                 </div>`).join('')}</div>
+                 <p class="said">Read from NSE at
+                   <b>${esc(String(ipoLive.at || '').slice(11, 16))} UTC</b>, cached fifteen
+                   minutes. Retail, NII and QIB are the headline categories; the sub-totals
+                   underneath them are not repeated.</p>`
+              : sub != null
+                ? `<p class="said">Subscribed <b>${xfmt(sub)}</b>, from ${esc(subSrc)}.
+                   ${subLive == null ? 'NSE did not answer for this issue, so this is the figure from the overnight build and may be well behind the book.' : ''}</p>`
+                : `<p class="said">No subscription figure — the book has not opened.</p>`) +
+            `<h4 class="xd-h">What it earns, and what it costs</h4>` +
+            figs([
+              [cr(x.revenue_cr), 'revenue'],
+              [cr(x.pat_cr), 'profit after tax'],
+              [pe == null ? 'not measured' : pe.toFixed(1), 'P/E post issue'],
+              [ppe == null ? 'not measured' : ppe.toFixed(1),
+                x.peer_pe_n ? `peer median (${x.peer_pe_n})` : 'peer median'],
+            ]) +
+            (pe != null && ppe != null ? `<p class="said">Priced at
+              <b>${pe.toFixed(1)}</b> against a peer median of <b>${ppe.toFixed(1)}</b> —
+              <b class="${pe <= ppe ? 'up' : 'dn'}">${pe <= ppe
+                ? `${((1 - pe / ppe) * 100).toFixed(0)}% below its peers`
+                : `${((pe / ppe - 1) * 100).toFixed(0)}% above its peers`}</b>.
+              ${num(x.roce_pct) != null ? `ROCE ${Number(x.roce_pct).toFixed(1)}%.` : ''}</p>` : '') +
+            ((x.reads_for && x.reads_for.length) ? `<h4 class="xd-h">Reads for</h4>
+              <ul class="flags flags-ok">${x.reads_for.map(f =>
+                `<li><b>${esc(typeof f === 'string' ? f : (f.t || f.w || ''))}</b>${
+                  (f && f.k) ? `<span>${esc(f.k)}</span>` : ''}</li>`).join('')}</ul>` : '') +
+            ((x.reads_against && x.reads_against.length) ? `<h4 class="xd-h">Reads against</h4>
+              <ul class="flags">${x.reads_against.map(f =>
+                `<li><b>${esc(typeof f === 'string' ? f : (f.t || f.w || ''))}</b>${
+                  (f && f.k) ? `<span>${esc(f.k)}</span>` : ''}</li>`).join('')}</ul>` : '') +
+            `<p class="said">Grey-market prices are unofficial, unregulated and not a
+              forecast. Everything else here is from the prospectus and NSE.</p>`
+          );
+        }).join('')}</div>`,
+        `${openIpo.length} open · ${upcoming.length} upcoming`));
     }
 
-    /* ── 6. THE WIRE ───────────────────────────────────────────────────────── */
-    /* news.json is a bare ARRAY, not an object with an items key. Reading it
-     * as `news.items || news.rows` returned undefined and the whole section
-     * silently disappeared — the honest failure mode, but a failure. */
-    const wire = Array.isArray(news) ? news
-      : (news && (news.items || news.stories || news.rows)) || [];
-    if (wire.length) {
-      add('wire', 'Wire', sec('wire', 'What moved the tape',
-        `The three stories most likely to touch names on the screen.`,
-        `<div class="rows">${wire.slice(0, 3).map((w, i) => row(
-            w.link || `${SITE}/news`, i + 1,
-            String(w.title || w.headline || ''),
-            w.source || '', '', null, null)).join('')}</div>`,
-        `${wire.length} on the wire`, `${SITE}/news`, 'The full wire'));
-    }
+    /* ── 7. AT A LEVEL ─────────────────────────────────────────────────────
+     *
+     * THE WIRE IS GONE. It read /news.json, which this repo pulls from the
+     * trading-dashboard build — the same feed that makes news.askakshay.com.
+     * A digest of the signal desk that closed on somebody else's headlines was
+     * borrowing its last section, and it was the one section here whose source
+     * was not this site's own measurement.
+     *
+     * What replaced it is the question the rest of the page sets up and never
+     * answers: which names are actually AT a level right now. Everything here
+     * is from the screen — the year's range and the moving averages — and a
+     * name qualifies by arithmetic, not by selection. */
+    const near = rows
+      .filter(r => (r.turnover_cr ?? 0) >= 5 && num(r.price) && num(r.high52) && num(r.sma200))
+      .map(r => {
+        const px = num(r.price);
+        const cands = [
+          [num(r.high52), '52-week high'], [num(r.low52), '52-week low'],
+          [num(r.sma50), '50-day average'], [num(r.sma200), '200-day average'],
+        ].filter(([v]) => v);
+        let best = null;
+        for (const [v, l] of cands) {
+          const d = Math.abs(px - v) / px * 100;
+          if (best == null || d < best.d) best = { d, v, l };
+        }
+        if (!best || best.d > 2) return null;
+        /* A LEVEL'S SIDE IS NOT DECIDED BY A ROUNDING TIE.
+         * This set `above: v > px`, so a stock sitting exactly ON its 52-week
+         * high failed that test by a fraction of a rupee and was labelled
+         * "on support" — under a sentence reading "trades 0.0% above its
+         * 52-week high". A year's high is resistance until it is cleared, and
+         * a year's low is support until it breaks; only the moving averages
+         * take their side from where the price happens to be. */
+        const AT = 0.15;                       // inside this, it is simply AT the level
+        const at = best.d < AT;
+        const isHigh = /high/.test(best.l), isLow = /low/.test(best.l);
+        const side = isHigh ? (px > best.v ? 'sup' : 'res')
+                   : isLow  ? (px < best.v ? 'res' : 'sup')
+                   : best.v > px ? 'res' : 'sup';
+        return { r, ...best, at, side };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 8);
+
+    add('levels', 'Levels', sec('levels', 'At a level',
+      near.length
+        ? `<b>${near.length}</b> liquid names sit within <b>2%</b> of a level that matters —
+           the year's high or low, or the average that defines their trend. A level is only
+           interesting while price is at it.`
+        : `No liquid name is within 2% of its 52-week range or a defining average today.`,
+      near.length
+        ? `<div class="rows">${near.map((x, i) => xr(
+            rowHead(i + 1, x.r.sym, `${esc(x.r.name || '')}`,
+              inr(x.r.price), [x.at ? 'at the level' : `${x.d.toFixed(1)}% away`,
+                x.side === 'res' ? 'dn' : 'up'],
+              [x.at ? `At its ${x.l.replace('-week', 'w')}` : x.side === 'res' ? 'Under resistance' : 'On support',
+               x.at ? 'warn' : x.side === 'res' ? 'warn' : 'up'], x.r.sym),
+            `<p class="xd-q">${esc(x.r.sym)} trades ${x.at
+               ? `right at its <b>${esc(x.l)}</b> of ${inr(x.v)}`
+               : `${x.d.toFixed(1)}% ${x.v > num(x.r.price) ? 'below' : 'above'}
+                  its <b>${esc(x.l)}</b> at ${inr(x.v)}`}.</p>
+             ${figs([
+               [pct(x.r.r1m), '1 month', dir(x.r.r1m)],
+               [num(x.r.rsi) == null ? '—' : Math.round(x.r.rsi), 'RSI 14'],
+               [num(x.r.from_high) == null ? '—' : Number(x.r.from_high).toFixed(1) + '%', 'off 52w high'],
+               [num(x.r.atr_pct) == null ? '—' : Number(x.r.atr_pct).toFixed(1) + '%', 'a typical day'],
+             ])}
+             ${x.r.lad && x.r.lad.s != null ? `<h4 class="xd-h">If it were traded</h4>
+               ${figs([
+                 [inr(x.r.lad.e), 'entry'],
+                 [inr(x.r.lad.s), 'stop', 'dn'],
+                 [x.r.lad.t && x.r.lad.t[0] ? inr(x.r.lad.t[0][0]) : '—', 'first target', 'up'],
+                 [num(x.r.lad.rr) == null ? '—' : Number(x.r.lad.rr).toFixed(2) + 'R', 'reward:risk'],
+               ])}` : ''}
+             <p class="said">${x.r.vd && x.r.vd.o ? esc(x.r.vd.o) + ' ' : ''}A level being NEAR
+               is not a signal — it is where a decision gets made. Nothing here is a call.</p>`
+          )).join('')}</div>`
+        : `<div class="empty">Nothing is at a level worth naming today.</div>`,
+      stale));
 
     app.innerHTML = out.join('');
     jump.innerHTML = nav.map(([id, label]) =>
       `<button type="button" data-to="${id}">${esc(label)}</button>`).join('');
     wire_up(nav);
+
+    /* ── LIVE PRICES OVER THE SCREEN'S BUILD ──────────────────────────────
+     * Every price in the Verdicts and Levels sections comes from screen.json,
+     * which is priced at its last build — on a Monday morning that is Friday's
+     * close. The full site's radar shipped a stock at +17.70% for four days on
+     * exactly that, so this page does not repeat it: one request for the names
+     * it actually shows, applied after paint, and the row says "live" once it
+     * has landed. Nothing here waits on it — a page that renders is worth more
+     * than a page that is a fraction more current. */
+    const syms = [...new Set([...app.querySelectorAll('[data-gpx]')]
+      .map(el => el.getAttribute('data-gpx')).filter(Boolean))].slice(0, 40);
+    if (syms.length) {
+      const q = await get(`/api/signals?px=${syms.map(encodeURIComponent).join(',')}`);
+      const quotes = q && q.quotes;
+      if (quotes) {
+        for (const el of app.querySelectorAll('[data-gpx]')) {
+          const v = quotes[el.getAttribute('data-gpx')];
+          if (!v || v.price == null) continue;
+          const sub = el.querySelector('i');
+          el.textContent = inr(v.price);
+          if (sub) el.appendChild(sub);
+          const tag = document.createElement('em');
+          tag.className = 'gpx-live';
+          tag.textContent = 'live';
+          el.appendChild(tag);
+        }
+        for (const s of app.querySelectorAll('.sec-n')) {
+          if (/screen priced/.test(s.textContent)) s.textContent += ' · prices live';
+        }
+      }
+    }
   }
 
-  /* Jump nav + scrollspy. IntersectionObserver drives the current-section
-     state; a scroll listener would run on every frame for a label that changes
-     six times a page. */
   function wire_up(nav) {
     jump.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
       const el = document.getElementById(btn.dataset.to);
@@ -289,7 +759,6 @@
 
   build().catch(() => {
     app.innerHTML = `<div class="empty">Today's page could not be built — the feeds did
-      not answer. Nothing here is stale data pretending to be current.
-      <a href="${SITE}/">The full site</a> reads the same sources directly.</div>`;
+      not answer. Nothing here is stale data pretending to be current.</div>`;
   });
 })();
