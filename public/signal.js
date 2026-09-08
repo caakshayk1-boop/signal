@@ -5168,11 +5168,13 @@
 
   /* ── BUOY — an UNPROVEN engine, shown as one ─────────────────────────────
    *
-   * The rule: a name at least 12% off its 52-week high closes back above its
-   * 200-DAY average on the HOURLY chart, having been under it, with a bullish
-   * RSI divergence already behind it. Two clocks on purpose — the average is
-   * the daily line the market uses to call a downtrend, the trigger is the
-   * first hour that call stops being true.
+   * The rule: a name at least 12% off its 52-week high closes a FOUR-HOUR
+   * candle back above its 200-PERIOD average, having been under it, with a
+   * bullish RSI divergence already behind it. 200 periods of 4H is about a
+   * hundred sessions, so it is the long-term line on that chart.
+   *
+   * An NSE session makes TWO 4H candles — 09:15-13:15 and 13:15-15:30 — which
+   * is the convention TradingView uses and the one the resampler reproduces.
    *
    * IT DOES NOT HAVE AN EDGE THAT ANYONE HAS MEASURED, and this page leads
    * with that rather than burying it under ten tickers. Every figure below
@@ -5180,24 +5182,34 @@
    * cannot quietly drift from what was actually measured. */
   R['/buoy'] = async () => {
     const shell = body => head('BUOY',
-      'A fallen name reclaiming its 200-day average on the hourly chart, with momentum already turning. Unproven, and run forward to find out.',
+      'A fallen name closing a 4-hour candle back above its 200-period average, with momentum already turning. Measured, and the measurement says no edge.',
       'Research engine') + body;
     paint(shell(skel('sk-card', 3)));
     const r = await get('/buoy.json');
     if (!r.ok || !r.data) { paint(shell(fail('BUOY', r.error || 'no scan yet'))); return; }
     const d = r.data, B = d.backtest || {}, top = d.top || [];
 
-    const warn = `<div class="note"><b>This engine is unproven, and the numbers say so.</b>
-      Over <b>${B.n ?? '—'}</b> backtested trades on ${B.names ?? '—'} liquid names it measured
-      <b>${B.exp == null ? '—' : (B.exp > 0 ? '+' : '') + B.exp.toFixed(3) + 'R'}</b> per trade at
-      <b>t&nbsp;=&nbsp;${B.t == null ? '—' : (B.t > 0 ? '+' : '') + B.t.toFixed(2)}</b>.
-      Run without its RSI-divergence filter the sample grows to <b>${B.n_no_div ?? '—'}</b> and the
-      result barely moves — <b>${B.exp_no_div == null ? '—' : (B.exp_no_div > 0 ? '+' : '') + B.exp_no_div.toFixed(3) + 'R'}</b>
-      at t&nbsp;=&nbsp;${B.t_no_div == null ? '—' : '+' + B.t_no_div.toFixed(2)} — so the filter
-      discards <b>${(B.n_no_div && B.n) ? B.n_no_div - B.n : '—'}</b> of ${B.n_no_div ?? '—'} trades
-      and buys almost nothing for it. This book clears an engine for capital at 30 closed trades
-      and t&nbsp;≥&nbsp;2. <b>Neither number here is distinguishable from zero.</b>
-      What follows is a watchlist being run forward to grow a sample. It is not a signal.</div>`;
+    const warn = `<div class="note"><b>This engine has no measured edge, and the sample is now
+      large enough to say so.</b> The rule as specified — a 4-hour close back above the
+      200-period average <i>and</i> an RSI divergence — measured
+      <b>${B.exp == null ? '—' : (B.exp > 0 ? '+' : '') + B.exp.toFixed(3) + 'R'}</b> per trade
+      at <b>t&nbsp;=&nbsp;${(B.t ?? 0).toFixed(2)}</b> over <b>${B.n ?? '—'}</b> trades on
+      ${B.names ?? 188} liquid names.
+      <br><br>Run <b>without</b> the divergence filter the sample grows to
+      <b>${B.n_no_div ?? '—'}</b> and the answer barely moves:
+      <b>+${(B.exp_no_div ?? 0).toFixed(3)}R</b>, t&nbsp;=&nbsp;+${(B.t_no_div ?? 0).toFixed(2)},
+      <b>95% confidence interval ${B.ci_lo_no_div == null ? '—'
+        : `[${B.ci_lo_no_div.toFixed(3)}, +${B.ci_hi_no_div.toFixed(3)}]`}</b>.
+      <b>That interval is the finding.</b> This book clears an engine at t&nbsp;≥&nbsp;2, which
+      on that sample needs roughly +0.13R — the very top of the range. So this is no longer
+      "too few trades to tell": if the rule has an edge, it is smaller than the bar this site
+      requires. The filter discards ${(B.n_no_div && B.n) ? B.n_no_div - B.n : '—'} of
+      ${B.n_no_div ?? '—'} signals and buys ${B.exp != null && B.exp_no_div != null
+        ? (B.exp - B.exp_no_div).toFixed(3) + 'R' : 'almost nothing'} for it.
+      <br><br>The 200-<i>day</i> average was measured too, as the other reading of "MA 200",
+      and did worse — <b>${(B.exp_dma ?? 0).toFixed(3)}R at t=${(B.t_dma ?? 0).toFixed(2)}</b>
+      over ${B.n_dma ?? '—'} trades. What follows is a watchlist run forward to keep counting.
+      <b>It is not a signal and carries no capital.</b></div>`;
 
     paint(shell(
       snap([
@@ -5213,8 +5225,8 @@
              <span class="sg-d ${x.lane === 'strict' ? 'up' : 'ac'}"></span>
              <span class="sg-id"><b>${esc(x.symbol)}</b>
                <span>${x.lane === 'strict' ? 'reclaim + divergence' : 'reclaim only'}
-                 · crossed ₹${esc(String(x.dma))}
-                 · ${x.hours_ago === 0 ? 'this hour' : `${x.hours_ago}h ago`}</span></span>
+                 · crossed ${price(x.ma)}
+                 · ${x.bars_ago === 0 ? 'this candle' : `${x.bars_ago} candles ago`}</span></span>
              <span class="sg-n">${price(x.entry)}</span>
              <span class="sg-n dn">${price(x.sl)}</span>
              <span class="sg-n up">${price(x.target1)}</span>
@@ -5223,17 +5235,17 @@
                x.since_pct == null ? '—' : pct(x.since_pct)}</span>
                <em>${esc(String(x.from_high_pct))}% off high</em></span>`,
              `<div class="yoy">
-                <div class="yy"><span>Entry, the hourly close that reclaimed it</span><b>${price(x.entry)}</b></div>
-                <div class="yy"><span>The 200-day average it crossed</span><b>${price(x.dma)}</b></div>
+                <div class="yy"><span>Entry — the 4H close that reclaimed it</span><b>${price(x.entry)}</b></div>
+                <div class="yy"><span>The 200-period average it crossed</span><b>${price(x.ma)}</b></div>
                 ${/* The reclaim-only lane has no divergence, so it has no divergence
                     * low either — its stop sits under the lowest low of the last 60
                     * bars. Labelling both lanes the same way described a level that
                     * does not exist on more than half the rows. */''}
                 <div class="yy"><span>Stop — ${x.lane === 'strict'
-                  ? 'under the divergence low' : 'under the 60-bar low'}, floored at 1.41 ATR</span>
+                  ? 'under the divergence low' : 'under the 30-candle low'}, floored at 1.41 ATR</span>
                   <b class="dn">${price(x.sl)}</b></div>
                 <div class="yy"><span>${x.lane === 'strict'
-                  ? 'Structural low behind the divergence' : 'Lowest low of the last 60 bars'}</span>
+                  ? 'Structural low behind the divergence' : 'Lowest low of the last 30 candles'}</span>
                   <b>${price(x.struct_low)}</b></div>
                 <div class="yy"><span>Risk per share</span><b>${price(x.entry - x.sl)} · ${esc(String(x.risk_pct))}% of entry</b></div>
                 <div class="yy"><span>Targets 1 / 2 / 3</span><b class="up">${price(x.target1)} · ${price(x.target2)} · ${price(x.target3)}</b></div>
@@ -5243,8 +5255,8 @@
                 <div class="yy"><span>Since it crossed</span><b class="${dir(x.since_pct)}">${
                   pct(x.since_pct)} · now ${price(x.last)}</b></div>
                 <div class="yy"><span>Which rule caught it</span><b>${x.lane === 'strict'
-                  ? 'Reclaim AND RSI divergence — 18 backtested trades, +0.074R, t=+0.23'
-                  : 'Reclaim alone, no divergence — 217 backtested trades, +0.065R, t=+0.77'}</b></div>
+                  ? `Reclaim AND RSI divergence — ${B.n ?? 35} backtested trades, ${B.exp > 0 ? '+' : ''}${(B.exp ?? 0).toFixed(3)}R, t=${(B.t ?? 0).toFixed(2)}`
+                  : `Reclaim alone, no divergence — ${B.n_no_div ?? 348} backtested trades, +${(B.exp_no_div ?? 0).toFixed(3)}R, t=+${(B.t_no_div ?? 0).toFixed(2)}`}</b></div>
                 <div class="yy"><span>20-hour turnover</span><b>₹${esc(String(x.turnover_cr))} cr</b></div>
               </div>
               <p class="hint">The ladder is the house one — 1.6 / 2.5 / 3.3 R off a stop that is the
@@ -5252,19 +5264,18 @@
              { cls: 'sg-r' })).join('')}</div>`
         : `<div class="empty"><b>Nothing reclaimed its 200-day average this scan.</b>
              ${d.scanned ?? 0} names were checked and none met the rule. An empty list is the
-             normal state of a strict engine — over two years of hourly bars on
+             normal state of a strict engine — over two years of 4-hour candles on
              ${B.names ?? '—'} names it fired ${B.n ?? '—'} times in total.</div>`,
         `${top.length} of ${d.fired ?? 0}`,
         'Ranked by how far it fell before reclaiming — the deeper the fall, the more the line meant.') +
       `<div class="note"><b>Two lanes, and the strict one is nearly always empty.</b>
-        The rule as specified — a 200-day reclaim <i>and</i> an RSI divergence — fired
-        <b>18 times in two years</b> across ${B.names ?? 188} names, about nine a year. A
-        list refreshed hourly off that alone would be blank essentially every hour, so the
-        scan also runs the same rule <b>without</b> the divergence filter, which fired
-        <b>${B.n_no_div ?? 217}</b> times over the same window and measured slightly
-        <i>better</i> — t=+${B.t_no_div?.toFixed(2) ?? '0.77'} against
-        +${B.t?.toFixed(2) ?? '0.23'}. Every row above says which lane caught it.
-        A name is dropped the moment it closes back under the line.</div>` +
+        The rule as specified fired <b>${B.n ?? 35} times in two years</b> across
+        ${B.names ?? 188} names — about seventeen a year, or one 4-hour candle in seven
+        thousand. A list refreshed every four hours off that alone would be blank essentially
+        every scan, so the same rule runs <b>without</b> the divergence filter, which fired
+        <b>${B.n_no_div ?? 348}</b> times over the same window and measured the same to
+        within a rounding error. Every row above says which lane caught it, and a name is
+        dropped the moment it closes back under the line.</div>` +
       (d.history && d.history.length > 1
         ? sec('Every scan so far', `<div class="rank">${d.history.slice().reverse().slice(0, 14)
             .map(hh => `<div class="rank-r">
@@ -9319,7 +9330,7 @@
     ['/radar',   'Signal radar',  'The market score, and the eight names carrying it',
                  'Breadth over 750 names, with every term of the score printed.'],
     ['/buoy',    'BUOY',          'A research engine, run in the open',
-                 'The 200-day average reclaimed on the hourly chart — unproven, and published with its own null result.'],
+                 'A 4-hour close back above the 200-period average — measured, and the measurement says no edge.'],
     ['/screen',  'Screen',        'All 750 names, filterable',
                  'Price, trend, quality, value — and FII/DII holding quarter on quarter.'],
     ['/ideas',   'Ideas',         'Ranked names and the orders behind them',
@@ -10078,8 +10089,8 @@
     '/terms':       ['Terms', 'Terms of use for signal.askakshay.com.'],
     '/privacy':     ['Privacy', 'What this site stores, and what it does not.'],
     '/join':        ['The brief — every morning', 'One setup a day, in full, by email.'],
-    '/buoy':        ['BUOY — the 200-day average, reclaimed on the hour',
-                     'A fallen name closing back above its 200-day average on the hourly chart, with momentum already turning. Unproven, and shown as unproven.'],
+    '/buoy':        ['BUOY — the 200-period average, reclaimed on the 4-hour',
+                     'A fallen name closing a 4-hour candle back above its 200-period average, with momentum already turning. Measured over two years, and the measurement says no edge.'],
     '/404':         ['Not found — signal.askakshay.com',
                      'There is no page at this address.'],
   };
