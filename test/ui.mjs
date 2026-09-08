@@ -829,6 +829,25 @@ try {
   await p.keyboard.press("Escape");
   await p.waitForTimeout(300);
 
+
+  /* ── ONE IDEA PER NAME ──────────────────────────────────────────────────
+   * ai_longterm re-files weekly and nothing supersedes the old row, so every
+   * filing stayed OPEN and Ideas rendered all of them: SHRIRAMFIN appeared
+   * four times at four entries, which reads as four ideas about one company. */
+  console.log("\n  ideas");
+  await p.goto(SITE + "/ideas", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE + 6000);
+  const ideaSyms = await p.evaluate(() =>
+    [...document.querySelectorAll(".aic .aic-s")].map(x => x.textContent.trim()));
+  if (ideaSyms.length) {
+    ok("no company appears twice in the ideas list",
+       new Set(ideaSyms).size === ideaSyms.length,
+       ideaSyms.filter((s, i) => ideaSyms.indexOf(s) !== i));
+    const txt = await p.locator("main").innerText();
+    ok("if rows were folded away, the page says how many",
+       !/folded away/.test(txt) || /\d+ earlier open row/.test(txt));
+  }
+
   await p.goto(SITE + "/watch", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 4000);
   ok("the watchlist shows the starred name",

@@ -2951,8 +2951,31 @@
      * the stages are shown as stages, the fixed ladder is disclosed once, and
      * the analysis that IS specific to the name is given the room.
      */
-    const aiRows = (lg.ok ? lg.rows : []).filter(r =>
+    /* ONE ROW PER NAME — THE LATEST.
+     *
+     * ai_longterm re-runs weekly and files the same names again; nothing closes
+     * or supersedes the previous row, so every filing stays OPEN and this page
+     * rendered all of them. SHRIRAMFIN appeared FOUR times (05 Aug, 15 Aug,
+     * 22 Aug, 05 Sep) at four different entries — 1122.40, 1122, 1130, 1041 —
+     * which reads as four separate ideas on one company. It is one idea,
+     * restated. 21 open rows collapse to 13 names.
+     *
+     * The newest filing wins because it is the one whose levels were computed
+     * against the price the reader is looking at. The others are not deleted
+     * from the ledger — they are the record, and the record is not edited — they
+     * are simply not presented as separate ideas. The count of what was folded
+     * away is stated, because silently showing 13 of 21 rows is the kind of
+     * quiet filtering this site is supposed to make visible. */
+    const aiAll = (lg.ok ? lg.rows : []).filter(r =>
       String(r.signal_type) === 'ai_longterm' && String(r.status) === 'OPEN');
+    const aiLatest = new Map();
+    for (const r of aiAll) {
+      const k = String(r.symbol || '').toUpperCase();
+      const prev = aiLatest.get(k);
+      if (!prev || String(r.date || '') > String(prev.date || '')) aiLatest.set(k, r);
+    }
+    const aiRows = [...aiLatest.values()].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const aiSuperseded = aiAll.length - aiRows.length;
 
     const STAGES = [
       ['target1', 'First objective', 'the move that says the thesis is working'],
@@ -2962,7 +2985,12 @@
 
     if (aiRows.length) {
       const horizon = ((aiRows[0].metadata || {}).horizon) || 'multi-year';
-      out += sec('AI long-term ideas', `<div class="aig">${aiRows.map(r => {
+      out += sec('AI long-term ideas', (aiSuperseded ? `<p class="hint" style="margin:-4px 0 14px">
+        Showing the <b>latest</b> filing for each name. The engine re-runs weekly and
+        re-files names it still likes, so <b>${aiSuperseded}</b> earlier open row${aiSuperseded === 1 ? '' : 's'}
+        for these same companies ${aiSuperseded === 1 ? 'is' : 'are'} folded away here.
+        They remain in <a href="/signals">the ledger</a> — the record is not edited.</p>` : '') +
+        `<div class="aig">${aiRows.map(r => {
         const md = r.metadata || {};
         const facts = md.facts || {};
         const entry = Number(r.entry), stop = Number(r.sl);
