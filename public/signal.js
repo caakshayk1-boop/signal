@@ -6961,6 +6961,7 @@
     ['/news', 'News', 'The full wire, and the screened names each story touches'],
     ['/signals', 'Signals', 'The public ledger — wins and losses'],
     ['/brief', 'Brief', 'Today’s setup, in full'],
+    ['/discover', 'Discover', 'Every way into the 750 names'],
     ['/radar', 'Signal radar', 'What the market is doing, and which names carry it'],
     ['/engines', 'The floor', 'Every engine — what fires it, and what it has done'],
     ['/methodology', 'Methodology', 'How every number on this site is made'],
@@ -8578,6 +8579,80 @@
     })();
   };
 
+  /* ── DISCOVER ─────────────────────────────────────────────────────────────
+   * The seven pages that used to live inside a dropdown. A menu hides what it
+   * holds behind a tap and a guess; a page shows what each one is FOR, which
+   * is the thing a reader needs to choose between them. Ordered by how often
+   * they answer a question rather than alphabetically. */
+  const DISCOVER = [
+    ['/radar',   'Signal radar',  'The market score, and the eight names carrying it',
+                 'Breadth over 750 names, with every term of the score printed.'],
+    ['/screen',  'Screen',        'All 750 names, filterable',
+                 'Price, trend, quality, value — and FII/DII holding quarter on quarter.'],
+    ['/ideas',   'Ideas',         'Ranked names and the orders behind them',
+                 'Entry, stop and a three-stage ladder, sized as a share of the book.'],
+    ['/markets', 'Markets',       'The board — 71 instruments',
+                 'Each against its own 52-week range, not against each other.'],
+    ['/ipo',     'IPO',           'Books open now, and how last year listed',
+                 'Demand, valuation and peers — plus 60 listings measured from issue price.'],
+    ['/news',    'News',          'The wire, filtered to names you screen',
+                 'Every story carries the screened companies it touches.'],
+    ['/funds',   'Funds',         'SIP screen over AMFI NAV',
+                 'Return against worst fall and volatility. Direct plans only.'],
+  ];
+  /* ── MORE ─────────────────────────────────────────────────────────────────
+   * A sheet, not a route, because it is a jumping-off point rather than a
+   * place to be. The pages here are reference and trust material — you visit
+   * them to check something and leave. Nothing critical lives only here: the
+   * floor and the brief are also linked from the pages that cite them. */
+  const MORE = [
+    ['Track', [
+      ['/brief',   'Today’s brief',  'One setup, in full'],
+      ['/engines', 'The floor',      'Every engine, what fires it, what it has done'],
+    ]],
+    ['How this works', [
+      ['/methodology', 'Methodology', 'How every number here is made'],
+      ['/sources',     'Data sources', 'Where each figure comes from, and how fresh'],
+    ]],
+    ['Legal', [
+      ['/terms',   'Terms',   ''],
+      ['/privacy', 'Privacy', ''],
+    ]],
+  ];
+  const openMore = () => {
+    sheet('More', `<div class="more">${MORE.map(([grp, items]) => `
+      <div class="more-g"><h4>${esc(grp)}</h4>
+        ${items.map(([href, name, sub]) => `<a class="more-i" href="${esc(href)}">
+          <b>${esc(name)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}
+        </a>`).join('')}</div>`).join('')}
+      <div class="more-g"><h4>Display</h4>
+        <button type="button" class="more-i" id="moreTheme"><b>Switch theme</b>
+          <span>Light and dark are both designed, not inverted</span></button>
+        <button type="button" class="more-i" id="moreDens"><b>Row density</b>
+          <span>Comfortable or compact tables</span></button>
+      </div>`);
+    // The sheet is rebuilt each open, so these bind here rather than once.
+    const th = document.getElementById('moreTheme');
+    if (th) th.addEventListener('click', () => document.getElementById('themeBtn')?.click());
+    const dn = document.getElementById('moreDens');
+    if (dn) dn.addEventListener('click', () => document.getElementById('densBtn')?.click());
+    // A link inside the sheet must close it, or the route changes behind a drawer.
+    document.querySelectorAll('.more-i[href]').forEach(a =>
+      a.addEventListener('click', () => document.getElementById('sheet')?.close()));
+  };
+
+  R['/discover'] = async () => {
+    paint(head('Discover', 'Seven ways into the same 750 names. Each answers a different question.',
+               'Discover') +
+      `<div class="disc">${DISCOVER.map(([href, name, sub, why]) => `
+        <a class="disc-c" href="${esc(href)}">
+          <span class="disc-n">${esc(name)}</span>
+          <span class="disc-s">${esc(sub)}</span>
+          <span class="disc-w">${esc(why)}</span>
+          <span class="disc-go" aria-hidden="true">→</span>
+        </a>`).join('')}</div>`);
+  };
+
   R['/methodology'] = async () => {
     paint(prose('How this works', 'Every number, and where it comes from.',
       'No figure on this site is produced by a model that cannot be re-run. This page is how each one is made.', `
@@ -9225,6 +9300,8 @@
                      'Every name in the universe on price, trend, quality, value and institutional flow. FII and DII holding quarter on quarter, from the company’s own filings.'],
     '/signals':     ['Signals — the public ledger, wins and losses both',
                      'Every call this book has published, open and closed, with the entry, stop and targets it was sent with and what it actually did.'],
+    '/discover':    ['Discover — seven ways into the 750 names',
+                     'Radar, screen, ideas, markets, IPO, news and funds — what each one answers.'],
     '/radar':       ['Signal radar — the market, and the names carrying it',
                      'A breadth-based market score with every term printed, and the eight highest-scoring names ranked on trend, momentum, volume and institutional flow.'],
     '/engines':     ['The floor — every engine, what fires it, what it has done',
@@ -9271,7 +9348,7 @@
    * breadcrumb reading "Today" while you are looking at Today is noise. */
   const WHERE = { '/': '', '/markets': 'Markets', '/ideas': 'Ideas', '/ipo': 'IPO',
                   '/screen': 'Screen', '/signals': 'Signals', '/brief': 'Brief', '/watch': 'Watchlist',
-                  '/engines': 'The floor', '/radar': 'Radar',
+                  '/engines': 'The floor', '/radar': 'Radar', '/discover': 'Discover',
                   '/join': 'The brief', '/methodology': 'Methodology',
                   '/sources': 'Data sources', '/terms': 'Terms', '/privacy': 'Privacy' };
 
@@ -9388,6 +9465,9 @@
 
   /* A pushState fires nothing, so navigation is driven by two things: the
    * click interceptor below, and the back/forward button. */
+  const moreBtn = document.getElementById('moreBtn');
+  if (moreBtn) moreBtn.addEventListener('click', openMore);
+
   window.addEventListener('popstate', render);
 
   /* INTERNAL LINKS ARE INTERCEPTED, EXTERNAL ONES ARE NOT.

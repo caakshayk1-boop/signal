@@ -890,6 +890,48 @@ try {
        !/folded away/.test(txt) || /\d+ earlier open row/.test(txt));
   }
 
+
+  /* ── THE APP SHELL ──────────────────────────────────────────────────────
+   * The bar was four items, two of which opened <details> menus, so the ledger
+   * cost two taps and a guess. Five flat destinations, and nothing that lived
+   * in those menus may become unreachable. */
+  console.log("\n  app shell");
+  await p.goto(SITE + "/", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(SETTLE + 3000);
+  const shell = await p.evaluate(() => {
+    const tabs = [...document.querySelectorAll(".tabs a, .tabs button")];
+    return { count: tabs.length,
+             labels: tabs.map(t => t.querySelector("span")?.textContent),
+             icons: tabs.filter(t => t.querySelector("svg")).length,
+             dropdowns: document.querySelectorAll(".tabs details").length,
+             minTap: Math.min(...tabs.map(t => Math.round(t.getBoundingClientRect().height))) };
+  });
+  ok("the bar has five destinations", shell.count === 5, shell);
+  ok("none of them is a dropdown", shell.dropdowns === 0, shell);
+  ok("every destination has an icon", shell.icons === 5, shell);
+  ok("tap targets clear 44px", shell.minTap >= 44, shell.minTap);
+
+  /* Every route must still be reachable from the bar, Discover or More. A
+   * flattened nav that strands a page is worse than the menu it replaced. */
+  const reachable = await p.evaluate(async () => {
+    const seen = new Set(["/", "/signals", "/discover", "/watch"]);
+    const go = document.createElement("a"); go.href = "/discover";
+    document.body.appendChild(go); go.click(); go.remove();
+    await new Promise(r => setTimeout(r, 2500));
+    document.querySelectorAll(".disc-c").forEach(c => seen.add(c.getAttribute("href")));
+    document.getElementById("moreBtn").click();
+    await new Promise(r => setTimeout(r, 600));
+    document.querySelectorAll(".more-i[href]").forEach(x => seen.add(x.getAttribute("href")));
+    document.getElementById("sheet")?.close();
+    return [...seen];
+  });
+  const mustReach = ["/markets", "/screen", "/ideas", "/ipo", "/news", "/funds",
+                     "/radar", "/engines", "/brief", "/methodology", "/sources"];
+  const stranded = mustReach.filter(r => !reachable.includes(r));
+  ok("no page is stranded by the flattened nav", stranded.length === 0, stranded);
+  ok("Discover lists the discovery pages",
+     (await p.locator(".disc-c").count()) >= 6);
+
   await p.goto(SITE + "/watch", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 4000);
   ok("the watchlist shows the starred name",
