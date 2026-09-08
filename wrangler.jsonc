@@ -19,7 +19,14 @@
     "binding": "ASSETS",
     // The Worker runs FIRST and falls through to assets, which is what lets
     // /api/* be claimed before a static file of the same name could shadow it.
-    "run_worker_first": ["/api/*"],
+    // "/" IS HERE BECAUSE gems.askakshay.com IS DECIDED IN THE WORKER.
+    //
+    // The assets binding answers before the Worker unless a path is listed
+    // here, so the hostname check that serves the Gems digest instead of the
+    // full site was unreachable code — it read correctly and never ran. Only
+    // the root needs intercepting: Gems is a one-page product, and every other
+    // path on it is sent back to that page.
+    "run_worker_first": ["/api/*", "/"],
     // EVERY ROUTE IS A REAL PATH NOW, so the server has to answer for paths it
     // has no file for. /markets, /screen, /signals and /stock/RELIANCE all
     // return index.html and the router takes it from there.

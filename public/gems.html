@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gems — today's Indian market in one page</title>
+<meta name="description" content="One page, refreshed every morning: market state, the one setup worth reading, where institutions are moving, IPO books open now, and the honest record. The crux of signal.askakshay.com.">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<link rel="canonical" href="https://gems.askakshay.com/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://gems.askakshay.com/">
+<meta property="og:site_name" content="Gems">
+<meta property="og:title" content="Gems — today's Indian market in one page">
+<meta property="og:description" content="Market state, the one setup worth reading, institutional flow, IPO books and the honest record. One page, every morning.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Gems — today's Indian market in one page">
+<meta name="theme-color" content="#0B0F14">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gems">
+<link rel="preload" href="/fonts/JetBrainsMono-500-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/gems.css">
+<script>
+/* Theme before first paint. Gems is dark-first — it is read at 6am on a phone
+   — but an explicit light choice still wins, and it shares the key with the
+   main site so a reader's preference travels between the two. */
+(function(){try{
+  var c=localStorage.getItem('sig:theme');
+  if(c!=='dark'&&c!=='light') c='dark';
+  document.documentElement.setAttribute('data-theme',c);
+}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();
+</script>
+</head>
+<body>
+<a class="skip" href="#m">Skip to today</a>
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="/"><span class="dot"></span>GEMS</a>
+    <span class="top-d" id="topDate">—</span>
+    <div class="top-r">
+      <button type="button" class="ic" id="theme" aria-label="Switch theme">◐</button>
+      <a class="full" href="https://signal.askakshay.com/">Full site →</a>
+    </div>
+  </div>
+  <!-- Jump nav. This is a ONE-PAGE product, so navigation is movement within
+       the page, not between pages. It tracks the section you are in. -->
+  <nav class="jump" id="jump" aria-label="Sections"></nav>
+</header>
+
+<main id="m">
+  <p class="lede" id="lede">
+    One page, rebuilt every morning. Each section is the crux — the full working
+    is a tap away on <a href="https://signal.askakshay.com/">signal.askakshay.com</a>.
+  </p>
+  <div id="app"><div class="sk" style="height:180px"></div><div class="sk" style="height:240px"></div></div>
+</main>
+
+<footer class="foot">
+  <p><b>Gems</b> is the daily crux of <a href="https://signal.askakshay.com/">signal.askakshay.com</a>
+     — same data, same ledger, one page.</p>
+  <p>Built by Akshay Kothari · CA · FP&amp;A. A public record, wins <i>and</i> losses.
+     Not investment advice.</p>
+</footer>
+
+<script src="/gems.js" defer></script>
+</body>
+</html>

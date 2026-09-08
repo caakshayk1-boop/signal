@@ -66,10 +66,20 @@ function mirrorEnv(env) {
 /* A health endpoint that does NOT touch the database. Its job is to answer
  * "is the Worker up" separately from "is Turso up", because when the site is
  * broken those are the two different answers you need to tell apart. */
-function health(env) {
+function health(env, request) {
+  const u = request ? new URL(request.url) : null;
   return Response.json({
     ok: true,
     service: "signal",
+    /* WHICH PRODUCT THIS REQUEST RESOLVED TO, and the two inputs that decided
+     * it. Added while chasing a hostname route that read correctly and never
+     * ran: url.hostname is the bound address under `wrangler dev`, the Host
+     * header is what the client asked for, and only one of them is useful.
+     * Guessing which cost three deploys; reporting both costs one line. */
+    host_header: request ? request.headers.get("host") : null,
+    url_hostname: u ? u.hostname : null,
+    serves: (((request && request.headers.get("host")) || (u && u.hostname) || "")
+             .toLowerCase().startsWith("gems.")) ? "gems" : "signal",
     turso_configured: Boolean(env.TURSO_URL && env.TURSO_TOKEN),
     // The Data Sources page reads this rather than hardcoding a provider name,
     // so the page cannot claim a feed the Worker is not actually using.
@@ -171,7 +181,7 @@ export default {
     mirrorEnv(env);
     const url = new URL(request.url);
 
-    if (url.pathname === "/api/health") return health(env);
+    if (url.pathname === "/api/health") return health(env, request);
     // Read-only on purpose: a status endpoint that starts builds because
     // someone looked at it is a trap. The cron below is what acts.
     if (url.pathname === "/api/pipeline") {
@@ -218,6 +228,34 @@ export default {
     // and sends you looking in the wrong file.
     if (url.pathname.startsWith("/api/")) {
       return Response.json({ ok: false, error: `no route ${url.pathname}` }, { status: 404 });
+    }
+
+    /* ── TWO PRODUCTS, ONE WORKER ─────────────────────────────────────────
+     *
+     * gems.askakshay.com is not this site under another name. It is a ONE-PAGE
+     * daily digest: the crux of each section, refreshed daily, with every
+     * "full" link pointing back into signal.askakshay.com for the depth.
+     *
+     * Serving it by hostname rather than as a route keeps that promise
+     * structural — there is no way to reach a deep page ON gems, because gems
+     * has exactly one page. It also means both products share one repo, one
+     * test suite, one deploy and the SAME FEEDS, so the digest can never
+     * disagree with the site it summarises. That is the whole reason this is
+     * not a second codebase: the last pair drifted until one had to be frozen.
+     *
+     * Assets (/gems.css, /gems.js, the JSON feeds) fall through untouched. */
+    /* The HOST HEADER, not url.hostname. Behind `wrangler dev` the request URL
+     * is http://127.0.0.1:8787/ whatever host was asked for, so routing on
+     * url.hostname worked in production and silently did nothing locally —
+     * which is the worst combination, because it cannot be tested before it
+     * ships. The header is what the client actually asked for, in both. */
+    const host = (request.headers.get("host") || url.hostname || "").toLowerCase();
+    if (host.startsWith("gems.") && url.pathname === "/") {
+      const gems = new URL(request.url);
+      // Extensionless: the assets binding 307s /gems.html -> /gems, and a
+      // redirect served as the response body is not a page.
+      gems.pathname = "/gems";
+      return env.ASSETS.fetch(new Request(gems.toString(), request));
     }
 
     return env.ASSETS.fetch(request);
