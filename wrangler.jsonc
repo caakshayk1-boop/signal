@@ -44,7 +44,14 @@
       // "/api/*" is NOT listed: wrangler rejects it as redundant under "/*",
       // which already covers it.
       "/*",
-      "!/*.js", "!/*.css", "!/*.json", "!/*.svg", "!/*.png", "!/*.jpg",
+      // "!/*.json" is NOT here, deliberately. Every feed on this site is read
+      // with JSON.parse, and the assets binding answers a MISSING .json with
+      // the SPA shell — 200, content-type text/html. The client survives that
+      // (get() catches the parse and reports a failed feed), but anything else
+      // reading these feeds — a monitor, curl, another consumer — is told a
+      // file exists when it does not. A handful of feed requests per page load
+      // is worth one Worker invocation each to answer that honestly.
+      "!/*.js", "!/*.css", "!/*.svg", "!/*.png", "!/*.jpg",
       "!/*.ico", "!/*.txt", "!/*.xml", "!/*.webmanifest",
       "!/fonts/*"
     ],

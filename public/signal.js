@@ -109,6 +109,12 @@
     try {
       const r = await fetch(url, { signal: ctl.signal });
       if (!r.ok) throw new Error('HTTP ' + r.status);
+      /* NAME THE FAILURE WHEN A FEED IS NOT A FEED.
+       * A missing .json used to come back as the SPA shell — 200, text/html —
+       * and r.json() then failed with a parser message about an unexpected
+       * "<", which describes the symptom and not the cause. */
+      const ct = r.headers.get('content-type') || '';
+      if (ct.includes('text/html')) throw new Error('not JSON — got an HTML page');
       const j = await r.json();
       // Content, not timestamps: two fetches a minute apart with identical
       // bodies are the same edition and must not trigger a repaint.
@@ -5443,6 +5449,15 @@
 
     // One request for every open signal's mark, not one per card.
     const px = await quotes(opens.map(r => r.symbol));
+    /* THE LEVELS RENDERER READS ONE LIVE-PRICE STORE, AND THIS ROUTE HAS TO
+     * FILL IT. levelsBlock sorts support and resistance against RADAR_LIVE,
+     * which only /radar was populating — so on /signals the "Now" row read
+     * "close of 2026-09-04" beside a price four days old, which is exactly the
+     * stale-as-live fault the block exists to avoid. Same quotes, one store. */
+    RADAR_LIVE = RADAR_LIVE || {};
+    for (const [sym, q] of Object.entries(px || {})) {
+      if (q && q.price != null) RADAR_LIVE[bareSym(sym)] = q;
+    }
 
     /* THE SCREEN IS FETCHED WITHOUT BLOCKING THE TABLE.
      * It is 260 KB and it is only needed for the support/resistance block
@@ -5551,7 +5566,17 @@
             * averages sit — the levels that decide whether a target is a
             * short hop or the other side of a wall. Same renderer as the
             * radar panel, from the same screen row. */''}
-        ${(sr => sr ? levelsBlock(sr) : '')(screenRow(r.symbol))}
+        ${/* THE YEAR'S RANGE AND THE SCREEN'S OWN FIGURES, ON THE LEDGER ROW.
+            * The card carried entry, stop, three targets and R:R — the trade —
+            * and nothing about the name it is on. Where it sits in its own
+            * year, and how stretched it is on a daily and a MONTHLY clock, are
+            * what decide whether that ladder is a short hop or the far side of
+            * a wall. Both come off the screen row this symbol already has. */''}
+        ${(sr => sr ? factsStrip(sr) + bandLine(sr) + levelsBlock(sr) : `
+          <p class="hint">${esc(bareSym(r.symbol))} is not on the 750-name Indian screen${
+            r.market && r.market !== 'NSE' ? ` — it is ${esc(r.market)}` : ''}, so its
+            52-week range, moving averages and support levels are not measured here. The
+            ladder above is the engine's own.</p>`)(screenRow(r.symbol))}
       </article>`;
     };
 
@@ -8836,46 +8861,100 @@
    * A level equal to the price within a tenth of a percent is neither, and is
    * labelled as being AT the price rather than assigned to a side it is not
    * really on. */
+  /* ── SUPPORT 1 & 2, RESISTANCE 1 & 2 — AND WHY EACH ONE IS A LEVEL ───────
+   *
+   * The first version listed the year's range and the three moving averages,
+   * sorted, labelled "support" or "resistance". That says WHERE but never WHY,
+   * and "why" is the whole difference between a level and a horizontal line: a
+   * 200-day average matters because a great many people act on it; a prior
+   * swing high matters because it is where sellers actually appeared, and how
+   * many times they appeared there is a measurable fact the screen already
+   * carries in its ladder basis.
+   *
+   * So every candidate arrives with a reason attached, they are sorted by
+   * distance from the LIVE price, and the nearest two on each side are named
+   * S1/S2 and R1/R2. Anything further out is still listed underneath, because
+   * the third level up is not nothing — it is just not the one that decides
+   * the next move.
+   *
+   * SORTED AGAINST THE LIVE PRICE, NOT THE BUILD'S. Using r.price put NIACL's
+   * marker at ₹229.90 — its 4 September close — while it traded at ₹209.80,
+   * which made every level below read as support when ₹229.90 had become the
+   * nearest resistance. A support table sorted against a four-day-old price is
+   * worse than none: it is confidently the wrong way round.
+   */
   const levelsBlock = (r) => {
-    /* SORTED AGAINST THE LIVE PRICE, NOT THE BUILD'S.
-     * Using r.price put NIACL's "at price" marker at ₹229.90 — its 4 September
-     * close — while the stock traded at ₹209.80, which made every level below
-     * it read as support when ₹229.90 had become the nearest RESISTANCE. A
-     * support-and-resistance table sorted against a four-day-old price is
-     * worse than none: it is confidently the wrong way round. */
-    const live = RADAR_LIVE && RADAR_LIVE[r.sym] && lvl(RADAR_LIVE[r.sym].price);
+    const lq = RADAR_LIVE && (RADAR_LIVE[r.sym] || RADAR_LIVE[bareSym(r.sym)]);
+    const live = lq && lvl(lq.price);
     const px = live || lvl(r.price);
     const stale = !live && SCREEN_DATE ? SCREEN_DATE : null;
     if (px == null) return '';
-    const raw = [
-      [lvl(r.high52), '52-week high'], [lvl(r.low52), '52-week low'],
-      [lvl(r.sma20), '20-day average'], [lvl(r.sma50), '50-day average'],
-      [lvl(r.sma200), '200-day average'],
-    ].filter(([v]) => v != null);
-    if (!raw.length) return '';
-    const rows = raw
-      .map(([v, l]) => {
-        const d = (v - px) / px * 100;
-        const side = Math.abs(d) < 0.1 ? 'at' : d > 0 ? 'res' : 'sup';
-        return { v, l, d, side };
-      })
-      .sort((a, b) => b.v - a.v)
-      .map(x => `<div class="lv-r ${x.side}">
-        <span class="lv-k">${x.side === 'at' ? 'At price' : x.side === 'res' ? 'Resistance' : 'Support'}</span>
-        <span class="lv-l">${esc(x.l)}</span>
-        <span class="lv-p">${price(x.v)}</span>
-        <span class="lv-d ${dir(x.d)}">${x.d > 0 ? '+' : ''}${x.d.toFixed(1)}%</span>
-      </div>`).join('');
-    return `<h4 class="sh">Support and resistance</h4>
-      <div class="lv">${rows}
-        <div class="lv-r now"><span class="lv-k">Last</span>
-          <span class="lv-l">${live ? 'live' : `close of ${esc(stale || '—')}`}</span>
-          <span class="lv-p">${price(px)}</span><span class="lv-d"></span></div>
+
+    const L = r.lad || {};
+    const cand = [];
+    const add = (v, name, why) => {
+      const n = lvl(v);
+      if (n != null && why) cand.push({ v: n, name, why });
+    };
+    add(r.high52, "The year's high", 'the highest it has traded in 52 weeks — the level every holder from the last year is above water below');
+    add(r.low52,  "The year's low",  'the lowest it has traded in 52 weeks — where the last round of selling stopped');
+    add(r.sma20,  '20-day average',  'the short-term trend line; a great many systematic traders act on it');
+    add(r.sma50,  '50-day average',  'the medium-term trend line, and the level the screen most often finds price testing');
+    add(r.sma200, '200-day average', 'the line the market itself uses to call a trend up or down');
+    /* The ladder's own levels carry a MEASURED reason — "prior swing high,
+     * tested 6x" — which is the strongest kind available here, so they are
+     * added last and win the de-duplication below. */
+    if (Array.isArray(L.t)) {
+      L.t.forEach(([p, , reach, b], k) => add(p, `Target ${k + 1}`,
+        `${basisText(b) || 'a level the ladder targets'}${reach != null ? ` · reached by ${reach}% of closed trades` : ''}`));
+    }
+    if (Array.isArray(L.w)) add(L.w[0], 'In the way',
+      `${basisText(L.w[2]) || 'a level between price and the first target'} — the trade has to clear it`);
+    if (L.s != null) add(L.s, "The screen's ladder stop",
+      'where the SCREEN would place a stop on this name — not the stop the engine '
+      + 'published for this signal, which is in the levels above');
+
+    if (!cand.length) return '';
+    // Two levels within 0.4% of each other are one level. The later entry wins
+    // because the ladder's reasons are measured and the averages' are generic.
+    const uniq = [];
+    for (const c of cand) {
+      const hit = uniq.findIndex(u => Math.abs(u.v - c.v) / Math.max(u.v, c.v) < 0.004);
+      if (hit >= 0) uniq[hit] = c; else uniq.push(c);
+    }
+    const below = uniq.filter(x => x.v < px).sort((a, b) => b.v - a.v);
+    const above = uniq.filter(x => x.v > px).sort((a, b) => a.v - b.v);
+    const at = uniq.filter(x => Math.abs(x.v - px) / px < 0.001);
+
+    const row = (x, tag, cls) => `<div class="lv-r ${cls}">
+      <span class="lv-k">${esc(tag)}</span>
+      <span class="lv-p">${price(x.v)}</span>
+      <span class="lv-d ${dir((x.v - px) / px * 100)}">${((x.v - px) / px * 100) > 0 ? '+' : ''}${((x.v - px) / px * 100).toFixed(1)}%</span>
+      <span class="lv-w"><b>${esc(x.name)}</b><em>${esc(x.why)}</em></span>
+    </div>`;
+
+    const rest = [...above.slice(2).map(x => [x, 'Above', 'res']),
+                  ...below.slice(2).map(x => [x, 'Below', 'sup'])]
+      .sort((a, b) => b[0].v - a[0].v);
+
+    return `<h4 class="sh">Support and resistance, and why</h4>
+      <div class="lv">
+        ${above.slice(0, 2).reverse().map((x, i) =>
+          row(x, `R${above.slice(0, 2).length - i}`, 'res')).join('')}
+        ${at.map(x => row(x, 'At price', 'at')).join('')}
+        <div class="lv-r now"><span class="lv-k">Now</span>
+          <span class="lv-p">${price(px)}</span>
+          <span class="lv-d"></span>
+          <span class="lv-w"><b>${live ? 'Live' : `Close of ${esc(stale || '—')}`}</b>
+            <em>${live ? 'every distance above and below is measured from here'
+                       : 'the screen has not been rebuilt since; distances move with the price'}</em></span></div>
+        ${below.slice(0, 2).map((x, i) => row(x, `S${i + 1}`, 'sup')).join('')}
+        ${rest.map(([x, tag, cls]) => row(x, tag, cls)).join('')}
       </div>
-      <p class="hint" style="margin:8px 0 0">These are the year's range and the three moving
-        averages, sorted against the last price — not drawn trendlines and not opinions.
+      <p class="hint" style="margin:8px 0 0">Levels are the year's range, the three moving
+        averages and the screen's own ladder — nothing is drawn by hand.
         ${r.atr_pct != null ? `A typical day moves this name <b>${Number(r.atr_pct).toFixed(1)}%</b>,
-        so anything inside that is noise.` : ''}</p>`;
+        so anything inside that is noise rather than a test of a level.` : ''}</p>`;
   };
 
   const radarParts = (r) => {
@@ -9161,8 +9240,13 @@
   const factsStrip = (r) => {
     if (!r) return '';
     return `<span class="rd-facts">
-      <span class="rd-f"><em>RSI 14</em><b class="${r.rsi >= 70 ? 'dn' : r.rsi <= 35 ? 'up' : ''}">${
+      <span class="rd-f"><em>RSI daily</em><b class="${r.rsi >= 70 ? 'dn' : r.rsi <= 35 ? 'up' : ''}">${
         r.rsi == null ? '—' : Math.round(r.rsi)}</b></span>
+      ${/* The screen carries a MONTHLY RSI for 705 of the 750 names, sampled
+          * every 21 sessions. On a swing ladder it answers a question the daily
+          * one cannot: whether the move is early or already long in the tooth. */''}
+      <span class="rd-f"><em>RSI monthly</em><b class="${r.rsi_m >= 70 ? 'dn' : r.rsi_m <= 35 ? 'up' : ''}">${
+        r.rsi_m == null ? 'n/m' : Math.round(r.rsi_m)}</b></span>
       <span class="rd-f"><em>1 month</em><b class="${dir(r.r1m)}">${pct(r.r1m)}</b></span>
       <span class="rd-f"><em>3 months</em><b class="${dir(r.r3m)}">${pct(r.r3m)}</b></span>
       <span class="rd-f"><em>52w range</em><b>${r.low52 == null || r.high52 == null ? '—'

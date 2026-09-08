@@ -293,6 +293,36 @@ export default {
       });
     }
 
-    return env.ASSETS.fetch(request);
+    /* ── A MISSING FILE IS A 404, NOT THE HOME PAGE WEARING ITS NAME ──────
+     *
+     * not_found_handling: single-page-application serves index.html for
+     * anything the assets binding cannot find — including /bedrock.json, which
+     * came back 200 with content-type text/html. Every feed on this site is
+     * read with get() and JSON.parse, so a feed that does not exist did not
+     * announce itself as missing: it announced itself as present and then blew
+     * up inside a parser, which is the failure this repo already has a note
+     * about ("shipping a 404 page named screen.json is a broken site").
+     *
+     * The SPA fallback is right for ROUTES and wrong for FILES. If a path with
+     * an extension comes back as HTML, the fallback fired and the file is not
+     * there — unless HTML is what was asked for. */
+    const res = await env.ASSETS.fetch(request);
+    /* !isPage MATTERS AS MUCH AS isFile.
+     * A ticker is not a file extension. /stock/PAYTM.NS ends in ".NS", which
+     * the extension test matches, so the missing-file rule fired on a real
+     * page and served a JSON 404 where the app should have been. The UI suite
+     * caught it on the one assertion written for exactly this — that a .NS
+     * symbol resolves to its bare form. Routes are decided first; the file
+     * rule only applies to paths that are not routes. */
+    if (isFile && !isPage && !/\.(html?)$/i.test(p) && res.status === 200) {
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("text/html")) {
+        return Response.json(
+          { ok: false, error: `no such file: ${p}` },
+          { status: 404 },
+        );
+      }
+    }
+    return res;
   },
 };
