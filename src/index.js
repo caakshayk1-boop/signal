@@ -278,7 +278,7 @@ export default {
     const PAGES = new Set(["/", "/brief", "/discover", "/engines", "/funds",
       "/gems", "/ideas", "/ipo", "/join", "/markets", "/methodology", "/news",
       "/privacy", "/radar", "/screen", "/signals", "/sources", "/terms", "/watch",
-      "/buoy"]);
+      "/buoy", "/research"]);
     const p = url.pathname.replace(/\/+$/, "") || "/";
     const isPage = PAGES.has(p) || p.startsWith("/stock/");
     // A request for a real file (/signal.js, /screen.json, /fonts/...) has an

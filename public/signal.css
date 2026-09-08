@@ -4422,3 +4422,13 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
    someone found on the chart. */
 .aic-pc{display:block;margin-top:2px;font:400 var(--t-1)/1 var(--mono);
   color:var(--dim);font-style:normal;text-decoration:none}
+
+/* ── the research floor ───────────────────────────────────────────────────── */
+.rs-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.rs-tf{font:600 var(--t-1)/1 var(--sans);letter-spacing:.08em;
+  text-transform:uppercase;color:var(--dim)}
+.rs-hunt{margin:0 0 12px;font-size:var(--t-3);line-height:1.6;color:var(--muted);
+  max-width:62ch}
+/* A rejected engine's note is not the same object as a caution. It gets the
+   down colour on its edge so the difference is visible before it is read. */
+.note-dn{border-left:3px solid var(--dn)}

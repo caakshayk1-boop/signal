@@ -82,7 +82,13 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   /* /404 is deliberately unlinked: it is what routeOf() falls back to when a
    * path matches nothing, and a link TO it would be a link to a page that
    * announces itself as missing. Reached by mistyping, never by clicking. */
-  const orphans = routes.filter(r => !linked.has(r) && !r.includes(":") && r !== "/404");
+  /* Two routes are deliberately unlinked and both are aliases rather than
+   * destinations: /404 is what routeOf() falls back to when a path matches
+   * nothing, and /buoy is a legacy address kept working for links shared
+   * before /research existed. Linking to either would be linking to a
+   * redirect. */
+  const ALIAS = new Set(["/404", "/buoy"]);
+  const orphans = routes.filter(r => !linked.has(r) && !r.includes(":") && !ALIAS.has(r));
   ok("no route is unreachable from any link", orphans.length === 0, orphans);
 }
 

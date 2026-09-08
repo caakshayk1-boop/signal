@@ -5239,160 +5239,160 @@
    * with that rather than burying it under ten tickers. Every figure below
    * comes from backtest_buoy.py and the feed carries them so this surface
    * cannot quietly drift from what was actually measured. */
-  R['/buoy'] = async () => {
-    const shell = body => head('BUOY',
-      'A fallen name closing a 4-hour candle back above its 200-period average, with momentum already turning. Measured, and the measurement says no edge.',
-      'Research engine') + body;
-    paint(shell(skel('sk-card', 3)));
-    const [r, lg] = await Promise.all([get('/buoy.json'), get('/alerts_log.json')]);
-    if (!r.ok || !r.data) { paint(shell(fail('BUOY', r.error || 'no scan yet'))); return; }
-    const d = r.data, B = d.backtest || {}, top = d.top || [];
-    /* The DURABLE record, as against buoy.json which is overwritten each run. */
-    const LOG = (lg.ok && lg.data && Array.isArray(lg.data.rows)) ? lg.data : null;
+  /* ── THE RESEARCH FLOOR ──────────────────────────────────────────────────
+   *
+   * Three engines that have NOT earned capital, published on instruction, and
+   * published in the only way that is defensible: every one of them leads with
+   * its own measured record, and no watchlist row can be read without the
+   * numbers that argue against it being on the same screen.
+   *
+   * The distinction this page has to hold is between an unproven engine shown
+   * WITH its null result and an unproven engine shown as a list of tickers.
+   * The second is what a tip sheet is. So the verdict comes before the names,
+   * a REJECTED engine says so in its own heading, and the feed itself refuses
+   * to carry a symbol without the engine's status and sample beside it.
+   */
+  const STATUS_LOOK = {
+    RESEARCH: ['warn', 'Research — no measured edge'],
+    REJECTED: ['dn', 'Rejected on measurement'],
+    PAPER:    ['warn', 'Paper'],
+    LIVE:     ['up', 'Cleared'],
+  };
 
-    const warn = `<div class="note"><b>This engine has no measured edge, and the sample is now
-      large enough to say so.</b> The rule as specified — a 4-hour close back above the
-      200-period average <i>and</i> an RSI divergence — measured
-      <b>${B.exp == null ? '—' : (B.exp > 0 ? '+' : '') + B.exp.toFixed(3) + 'R'}</b> per trade
-      at <b>t&nbsp;=&nbsp;${(B.t ?? 0).toFixed(2)}</b> over <b>${B.n ?? '—'}</b> trades on
-      ${B.names ?? 188} liquid names.
-      <br><br>Run <b>without</b> the divergence filter the sample grows to
-      <b>${B.n_no_div ?? '—'}</b> and the answer barely moves:
-      <b>+${(B.exp_no_div ?? 0).toFixed(3)}R</b>, t&nbsp;=&nbsp;+${(B.t_no_div ?? 0).toFixed(2)},
-      <b>95% confidence interval ${B.ci_lo_no_div == null ? '—'
-        : `[${B.ci_lo_no_div.toFixed(3)}, +${B.ci_hi_no_div.toFixed(3)}]`}</b>.
-      <b>That interval is the finding.</b> This book clears an engine at t&nbsp;≥&nbsp;2, which
-      on that sample needs roughly +0.13R — the very top of the range. So this is no longer
-      "too few trades to tell": if the rule has an edge, it is smaller than the bar this site
-      requires. The filter discards ${(B.n_no_div && B.n) ? B.n_no_div - B.n : '—'} of
-      ${B.n_no_div ?? '—'} signals and buys ${B.exp != null && B.exp_no_div != null
-        ? (B.exp - B.exp_no_div).toFixed(3) + 'R' : 'almost nothing'} for it.
-      <br><br>The 200-<i>day</i> average was measured too, as the other reading of "MA 200",
-      and did worse — <b>${(B.exp_dma ?? 0).toFixed(3)}R at t=${(B.t_dma ?? 0).toFixed(2)}</b>
-      over ${B.n_dma ?? '—'} trades. What follows is a watchlist run forward to keep counting.
-      <b>It is not a signal and carries no capital.</b></div>`;
+  const researchEngine = (e) => {
+    const B = e.backtest || {};
+    const [cls, label] = STATUS_LOOK[e.status] || ['', e.status || ''];
+    const rows = e.top || [];
+    const fig = (v, l, c) => `<div class="fig"><b class="${c || ''}">${v}</b><span>${esc(l)}</span></div>`;
+    const rr3 = v => v == null ? '—' : `${v > 0 ? '+' : ''}${Number(v).toFixed(3)}R`;
+    /* The sample and expectancy a reader should judge this engine on. Where an
+     * engine has two lanes the WIDER one is the honest headline — it is the
+     * larger sample, and on both engines that carry one it measured the same
+     * to within a rounding error. */
+    const n = B.n_no_div ?? B.n;
+    const exp = B.exp_no_div ?? B.exp;
+    const tt = B.t_no_div ?? B.t;
+    const lo = B.ci_lo_no_div ?? B.ci_lo, hi = B.ci_hi_no_div ?? B.ci_hi;
+    return sec(esc(e.name), `
+      <div class="rs-h">
+        <span class="pill pill-${cls === 'dn' ? 'dn' : cls === 'up' ? 'up' : 'wn'}">${esc(label)}</span>
+        <span class="rs-tf">${esc(e.timeframe || '')}</span>
+      </div>
+      <p class="rs-hunt">${esc(e.hunts || '')}</p>
+      <div class="note ${e.status === 'REJECTED' ? 'note-dn' : ''}">
+        <b>${e.status === 'REJECTED' ? 'This engine was rejected, and is shown anyway.'
+                                     : 'This engine has no measured edge.'}</b>
+        ${esc(e.verdict || '')}</div>
+      <div class="figs">
+        ${fig(n ?? '—', 'backtested trades')}
+        ${fig(rr3(exp), 'per trade', exp > 0 ? 'up' : exp < 0 ? 'dn' : '')}
+        ${fig(tt == null ? '—' : `${tt > 0 ? '+' : ''}${Number(tt).toFixed(2)}`, 't-statistic',
+              Math.abs(tt ?? 0) >= 2 ? '' : 'dn')}
+        ${fig(lo == null ? '—' : `${lo.toFixed(2)} to ${hi > 0 ? '+' : ''}${hi.toFixed(2)}`,
+              '95% interval, R')}
+      </div>
+      ${rows.length ? `
+        <div class="sg-head" aria-hidden="true"><span></span><span>Name</span>
+          <span>Entry</span><span>Stop</span><span>Target 1</span><span>Risk</span><span>Since</span></div>
+        <div class="rank sg-t">${rows.map(x => xrow(`
+          <span class="sg-d ${x.lane === 'reclaim' ? 'ac' : 'up'}"></span>
+          <span class="sg-id"><b>${esc(x.symbol)}</b>
+            <span>${x.lane ? esc(x.lane) + ' · ' : ''}${x.bars_ago === 0 ? 'this bar'
+              : `${x.bars_ago} bars ago`}${x.touches ? ` · floor held ${x.touches}x` : ''}</span></span>
+          <span class="sg-n">${price(x.entry)}</span>
+          <span class="sg-n dn">${price(x.sl)}</span>
+          <span class="sg-n up">${price(x.target1)}</span>
+          <span class="sg-n">${x.risk_pct == null ? '—' : x.risk_pct + '%'}</span>
+          <span class="sg-r-out"><span class="pill ${x.since_pct > 0 ? 'pill-up' : x.since_pct < 0 ? 'pill-dn' : 'pill-flat'}">${
+            pct(x.since_pct)}</span><em>${price(x.last)}</em></span>`,
+          `<div class="yoy">
+             <div class="yy"><span>Entry, at the bar that fired</span><b>${price(x.entry)}</b></div>
+             ${x.ma != null ? `<div class="yy"><span>The 200-period average it crossed</span><b>${price(x.ma)}</b></div>` : ''}
+             ${x.floor != null ? `<div class="yy"><span>The floor it is standing on</span><b>${price(x.floor)}${
+               x.touches ? ` · held ${x.touches} separate times` : ''}</b></div>` : ''}
+             <div class="yy"><span>Stop</span><b class="dn">${price(x.sl)} · ${esc(String(x.risk_pct))}% of entry${
+               x.risk_atr ? ` · ${esc(String(x.risk_atr))}x ATR` : ''}</b></div>
+             <div class="yy"><span>Targets 1 / 2 / 3</span><b class="up">${price(x.target1)} · ${price(x.target2)} · ${price(x.target3)}</b></div>
+             ${x.from_high_pct != null ? `<div class="yy"><span>Off its 52-week high</span><b>${esc(String(x.from_high_pct))}%</b></div>` : ''}
+             ${x.above_floor_pct != null ? `<div class="yy"><span>Above the floor at entry</span><b>${esc(String(x.above_floor_pct))}%</b></div>` : ''}
+             ${x.rsi != null ? `<div class="yy"><span>RSI when it fired</span><b>${esc(String(x.rsi))}</b></div>` : ''}
+             <div class="yy"><span>Since it fired</span><b class="${dir(x.since_pct)}">${pct(x.since_pct)} · now ${price(x.last)}</b></div>
+           </div>
+           <p class="hint"><b>${esc(e.name)} is ${esc(e.status.toLowerCase())}.</b>
+             ${esc(e.verdict || '')} No position is taken on this.</p>`,
+          { cls: 'sg-r' })).join('')}</div>`
+        : `<div class="empty">${e.status === 'REJECTED'
+             ? `Nothing fired. ${esc(e.name)} is strict and was rejected on its record; an empty list is its normal state.`
+             : `Nothing fired this scan. ${esc(e.scanned)} names were checked and none met the rule.`}</div>`}`,
+      `${rows.length} of ${e.fired} · ${e.scanned} scanned`,
+      esc(e.hunts || ''));
+  };
+
+  R['/research'] = async () => {
+    const shell = body => head('The research floor',
+      'Three engines that have not earned capital, each published with the record that says so.',
+      'Research') + body;
+    paint(shell(skel('sk-card', 3)));
+    const [r, lg] = await Promise.all([get('/research.json'), get('/alerts_log.json')]);
+    if (!r.ok || !r.data) { paint(shell(fail('The research floor', r.error || 'no scan yet')));  return; }
+    const d = r.data, engines = d.engines || [];
+    const LOG = (lg.ok && lg.data && Array.isArray(lg.data.rows)) ? lg.data : null;
+    const fired = engines.reduce((s, e) => s + (e.fired || 0), 0);
 
     paint(shell(
       snap([
-        ['Scanned', d.scanned ?? 0, `of ${d.universe ?? 0} names`],
-        ['Fired today', d.fired ?? 0, d.fired ? 'reclaims found' : 'nothing qualified'],
-        ['Shown', top.length, 'deepest falls first'],
-        ['Cleared for capital', 'No', 'research only', 'dn'],
-      ]) + warn +
-      sec('The watchlist', top.length
-        ? `<div class="sg-head" aria-hidden="true"><span></span><span>Name</span>
-             <span>Entry</span><span>Stop</span><span>Target 1</span><span>Risk</span><span>Off high</span></div>
-           <div class="rank sg-t">${top.map((x, i) => xrow(`
-             <span class="sg-d ${x.lane === 'strict' ? 'up' : 'ac'}"></span>
-             <span class="sg-id"><b>${esc(x.symbol)}</b>
-               <span>${x.lane === 'strict' ? 'reclaim + divergence' : 'reclaim only'}
-                 · crossed ${price(x.ma)}
-                 · ${x.bars_ago === 0 ? 'this candle' : `${x.bars_ago} candles ago`}</span></span>
-             <span class="sg-n">${price(x.entry)}</span>
-             <span class="sg-n dn">${price(x.sl)}</span>
-             <span class="sg-n up">${price(x.target1)}</span>
-             <span class="sg-n">${esc(String(x.risk_pct))}%</span>
-             <span class="sg-r-out"><span class="pill ${x.since_pct > 0 ? 'pill-up' : x.since_pct < 0 ? 'pill-dn' : 'pill-flat'}">${
-               x.since_pct == null ? '—' : pct(x.since_pct)}</span>
-               <em>${esc(String(x.from_high_pct))}% off high</em></span>`,
-             `<div class="yoy">
-                <div class="yy"><span>Entry — the 4H close that reclaimed it</span><b>${price(x.entry)}</b></div>
-                <div class="yy"><span>The 200-period average it crossed</span><b>${price(x.ma)}</b></div>
-                ${/* The reclaim-only lane has no divergence, so it has no divergence
-                    * low either — its stop sits under the lowest low of the last 60
-                    * bars. Labelling both lanes the same way described a level that
-                    * does not exist on more than half the rows. */''}
-                <div class="yy"><span>Stop — ${x.lane === 'strict'
-                  ? 'under the divergence low' : 'under the 30-candle low'}, floored at 1.41 ATR</span>
-                  <b class="dn">${price(x.sl)}</b></div>
-                <div class="yy"><span>${x.lane === 'strict'
-                  ? 'Structural low behind the divergence' : 'Lowest low of the last 30 candles'}</span>
-                  <b>${price(x.struct_low)}</b></div>
-                <div class="yy"><span>Risk per share</span><b>${price(x.entry - x.sl)} · ${esc(String(x.risk_pct))}% of entry</b></div>
-                <div class="yy"><span>Targets 1 / 2 / 3</span><b class="up">${price(x.target1)} · ${price(x.target2)} · ${price(x.target3)}</b></div>
-                <div class="yy"><span>How far it had fallen</span><b>${esc(String(x.from_high_pct))}% off its 52-week high</b></div>
-                <div class="yy"><span>RSI at the cross</span><b>${esc(String(x.rsi))}${
-                  x.rsi_lift != null ? ` · divergence lift +${esc(String(x.rsi_lift))}` : ''}</b></div>
-                <div class="yy"><span>Since it crossed</span><b class="${dir(x.since_pct)}">${
-                  pct(x.since_pct)} · now ${price(x.last)}</b></div>
-                <div class="yy"><span>Which rule caught it</span><b>${x.lane === 'strict'
-                  ? `Reclaim AND RSI divergence — ${B.n ?? 35} backtested trades, ${B.exp > 0 ? '+' : ''}${(B.exp ?? 0).toFixed(3)}R, t=${(B.t ?? 0).toFixed(2)}`
-                  : `Reclaim alone, no divergence — ${B.n_no_div ?? 348} backtested trades, +${(B.exp_no_div ?? 0).toFixed(3)}R, t=+${(B.t_no_div ?? 0).toFixed(2)}`}</b></div>
-                <div class="yy"><span>20-hour turnover</span><b>₹${esc(String(x.turnover_cr))} cr</b></div>
-              </div>
-              <p class="hint">The ladder is the house one — 1.6 / 2.5 / 3.3 R off a stop that is the
-                lower of the divergence low and 1.41 ATR. <b>No position is taken on this.</b></p>`,
-             { cls: 'sg-r' })).join('')}</div>`
-        : `<div class="empty"><b>Nothing reclaimed its 200-day average this scan.</b>
-             ${d.scanned ?? 0} names were checked and none met the rule. An empty list is the
-             normal state of a strict engine — over two years of 4-hour candles on
-             ${B.names ?? '—'} names it fired ${B.n ?? '—'} times in total.</div>`,
-        `${top.length} of ${d.fired ?? 0}`,
-        'Ranked by how far it fell before reclaiming — the deeper the fall, the more the line meant.') +
-      `<div class="note"><b>Two lanes, and the strict one is nearly always empty.</b>
-        The rule as specified fired <b>${B.n ?? 35} times in two years</b> across
-        ${B.names ?? 188} names — about seventeen a year, or one 4-hour candle in seven
-        thousand. A list refreshed every four hours off that alone would be blank essentially
-        every scan, so the same rule runs <b>without</b> the divergence filter, which fired
-        <b>${B.n_no_div ?? 348}</b> times over the same window and measured the same to
-        within a rounding error. Every row above says which lane caught it, and a name is
-        dropped the moment it closes back under the line.</div>` +
+        ['Engines here', engines.length, 'none cleared for capital', 'dn'],
+        ['Firing now', fired, fired ? 'setups on the list' : 'nothing qualified'],
+        ['Logged alerts', LOG ? (LOG.total ?? LOG.rows.length) : 0, 'deduplicated'],
+        ['Cleared for capital', 'No', 'not one of them', 'dn'],
+      ]) +
+      `<div class="note note-dn"><b>Nothing on this page is a signal.</b>
+        ${esc(String(d.disclaimer || ''))}</div>` +
+      engines.map(researchEngine).join('') +
       (LOG && LOG.rows.length
-        ? sec('The alert log', (() => {
-            const rows = LOG.rows.slice().reverse();
-            const repeats = rows.filter(x => x.repeat_of).length;
-            const held = rows.filter(x => (x.seen_count || 1) > 1).length;
-            return `<p class="hint" style="margin:0 0 12px">
-                <b>One row per distinct alert, not one per scan.</b> The scan runs at both
-                4-hour closes and a reclaim stays true for days, so an engine firing on the
-                same name at the same level in consecutive runs has found <b>one</b> setup.
-                Those increment a counter instead of adding a row —
-                <b>${held}</b> of these ${rows.length} have been seen more than once. A
-                re-alert more than <b>${LOG.dedupe_days ?? 10} days</b> later is a separate
-                event and gets its own row pointing back at the first
-                (<b>${repeats}</b> so far). Without that rule the forward sample would count
-                cron ticks rather than setups.</p>
-              <div class="sg-head" aria-hidden="true"><span></span><span>Alert</span>
-                <span>Entry</span><span>Stop</span><span>Target 1</span><span>Risk</span><span>Seen</span></div>
-              <div class="rank sg-t">${rows.slice(0, 60).map(x => xrow(`
-                <span class="sg-d ${x.lane === 'strict' ? 'up' : 'ac'}"></span>
-                <span class="sg-id"><b>${esc(x.symbol)}</b>
-                  <span>${esc(x.engine)} · ${esc(x.lane || '—')}
-                    · ${esc(String(x.at || '').slice(0, 16).replace('T', ' '))}</span></span>
-                <span class="sg-n">${x.entry == null ? '—' : price(x.entry)}</span>
-                <span class="sg-n dn">${x.sl == null ? '—' : price(x.sl)}</span>
-                <span class="sg-n up">${x.target1 == null ? '—' : price(x.target1)}</span>
-                <span class="sg-n">${x.risk_pct == null ? '—' : x.risk_pct + '%'}</span>
-                <span class="sg-r-out"><span class="pill ${(x.seen_count || 1) > 1 ? 'pill-ac' : 'pill-flat'}">${
-                  x.seen_count || 1}&times;</span>
-                  <em>${x.repeat_of ? 'repeat' : 'first'}</em></span>`,
-                `<div class="yoy">
-                   <div class="yy"><span>First raised</span><b>${esc(String(x.at || '').replace('T', ' '))}</b></div>
-                   <div class="yy"><span>Last seen in a scan</span><b>${esc(String(x.last_seen || x.at || '').replace('T', ' '))}</b></div>
-                   <div class="yy"><span>Scans it has appeared in</span><b>${x.seen_count || 1}</b></div>
-                   ${x.repeat_of ? `<div class="yy"><span>Repeat of</span><b>${esc(x.repeat_of)}</b></div>
-                     <div class="yy"><span>Days since that one</span><b>${esc(String(x.days_since_last ?? '—'))}</b></div>` : ''}
-                   <div class="yy"><span>Levels</span><b>${x.entry == null ? '—' : price(x.entry)} ·
-                     stop ${x.sl == null ? '—' : price(x.sl)} ·
-                     T1 ${x.target1 == null ? '—' : price(x.target1)}</b></div>
-                   ${x.rsi != null ? `<div class="yy"><span>RSI at the alert</span><b>${esc(String(x.rsi))}</b></div>` : ''}
-                   ${x.from_high_pct != null ? `<div class="yy"><span>Off its 52-week high</span><b>${esc(String(x.from_high_pct))}%</b></div>` : ''}
-                 </div>
-                 <p class="hint">This log records what the engine SAID. Whether it worked is
-                   the ledger's question — grading it here would create a second record that
-                   could disagree with the first.</p>`,
-                { cls: 'sg-r' })).join('')}</div>
-              ${rows.length > 60 ? `<p class="hint">Showing the newest 60 of ${rows.length}.</p>` : ''}`;
-          })(), `${LOG.total ?? LOG.rows.length} distinct`,
-          'Every alert this engine has raised, deduplicated. It grades nothing.')
-        : sec('The alert log', `<div class="empty">No alert has been logged yet. The log is
-            written by the scan and survives every run — unlike the watchlist above, which is
-            replaced each time.</div>`, '', 'Every alert this engine has raised.')) +
-      `<p class="hint" style="margin-top:18px">Scan written
-        ${esc(String(d.generated_at || '').slice(0, 16).replace('T', ' '))} UTC${
-        d.errors ? ` · ${d.errors} names could not be read` : ''}${
-        d.throttled ? ` · ${d.throttled} throttled` : ''}.</p>`));
+        ? sec('The alert log', `<p class="hint" style="margin:0 0 12px">
+            <b>One row per distinct alert, not one per scan.</b> A setup stays true for days
+            and the scan runs repeatedly, so the same name at the same level in consecutive
+            runs is one row with a counter — <b>${LOG.rows.filter(x => (x.seen_count || 1) > 1).length}</b>
+            of ${LOG.rows.length} have been seen more than once. A re-alert past
+            ${LOG.dedupe_days ?? 10} days is a separate event with its own row. Without that
+            rule the forward sample would count cron ticks rather than setups.</p>
+          <div class="sg-head" aria-hidden="true"><span></span><span>Alert</span>
+            <span>Entry</span><span>Stop</span><span>Target 1</span><span>Risk</span><span>Seen</span></div>
+          <div class="rank sg-t">${LOG.rows.slice().reverse().slice(0, 60).map(x => xrow(`
+            <span class="sg-d ${x.lane === 'reclaim' ? 'ac' : 'up'}"></span>
+            <span class="sg-id"><b>${esc(x.symbol)}</b>
+              <span>${esc(x.engine)}${x.lane ? ' · ' + esc(x.lane) : ''}
+                · ${esc(String(x.at || '').slice(0, 16).replace('T', ' '))}</span></span>
+            <span class="sg-n">${x.entry == null ? '—' : price(x.entry)}</span>
+            <span class="sg-n dn">${x.sl == null ? '—' : price(x.sl)}</span>
+            <span class="sg-n up">${x.target1 == null ? '—' : price(x.target1)}</span>
+            <span class="sg-n">${x.risk_pct == null ? '—' : x.risk_pct + '%'}</span>
+            <span class="sg-r-out"><span class="pill ${(x.seen_count || 1) > 1 ? 'pill-ac' : 'pill-flat'}">${
+              x.seen_count || 1}&times;</span><em>${x.repeat_of ? 'repeat' : 'first'}</em></span>`,
+            `<div class="yoy">
+               <div class="yy"><span>First raised</span><b>${esc(String(x.at || '').replace('T', ' '))}</b></div>
+               <div class="yy"><span>Last seen in a scan</span><b>${esc(String(x.last_seen || x.at || '').replace('T', ' '))}</b></div>
+               <div class="yy"><span>Scans it has appeared in</span><b>${x.seen_count || 1}</b></div>
+               ${x.repeat_of ? `<div class="yy"><span>Repeat of</span><b>${esc(x.repeat_of)}</b></div>
+                 <div class="yy"><span>Days since that one</span><b>${esc(String(x.days_since_last ?? '—'))}</b></div>` : ''}
+             </div>
+             <p class="hint">This log records what an engine SAID. Whether it worked is the
+               ledger's question — grading it here would create a second record that could
+               disagree with the first.</p>`,
+            { cls: 'sg-r' })).join('')}</div>
+          ${LOG.rows.length > 60 ? `<p class="hint">Showing the newest 60 of ${LOG.rows.length}.</p>` : ''}`,
+          `${LOG.total ?? LOG.rows.length} distinct`,
+          'Every alert these engines have raised, deduplicated. It grades nothing.')
+        : '') +
+      (d.coverage_note ? `<p class="hint">${esc(d.coverage_note)}</p>` : '') +
+      `<p class="hint">Scan written ${esc(String(d.generated_at || '').slice(0, 16).replace('T', ' '))} UTC.</p>`));
   };
+
+  /* /buoy predates the other two engines and was linked before this page
+   * existed. It is an alias, not a second copy — one page, one dataset. */
+  R['/buoy'] = async () => go('/research');
+
 
   R['/signals'] = async () => {
     const intro = 'Every alert this site has sent since it launched, with the levels it was sent at. Scored when it closes — losers included, which is the point of publishing it.';
@@ -9507,8 +9507,8 @@
   const DISCOVER = [
     ['/radar',   'Signal radar',  'The market score, and the eight names carrying it',
                  'Breadth over 750 names, with every term of the score printed.'],
-    ['/buoy',    'BUOY',          'A research engine, run in the open',
-                 'A 4-hour close back above the 200-period average — measured, and the measurement says no edge.'],
+    ['/research', 'The research floor', 'Three engines, none of them cleared',
+                 'BUOY, ANCHOR and BEDROCK — each published with the measurement that rejects it.'],
     ['/screen',  'Screen',        'All 750 names, filterable',
                  'Price, trend, quality, value — and FII/DII holding quarter on quarter.'],
     ['/ideas',   'Ideas',         'Ranked names and the orders behind them',
@@ -10267,6 +10267,8 @@
     '/terms':       ['Terms', 'Terms of use for signal.askakshay.com.'],
     '/privacy':     ['Privacy', 'What this site stores, and what it does not.'],
     '/join':        ['The brief — every morning', 'One setup a day, in full, by email.'],
+    '/research':    ['The research floor — three engines, and the record that rejects them',
+                     'BUOY, ANCHOR and BEDROCK: unproven engines published with their own measured null results beside every name.'],
     '/buoy':        ['BUOY — the 200-period average, reclaimed on the 4-hour',
                      'A fallen name closing a 4-hour candle back above its 200-period average, with momentum already turning. Measured over two years, and the measurement says no edge.'],
     '/404':         ['Not found — signal.askakshay.com',
@@ -10346,7 +10348,7 @@
    * breadcrumb reading "Today" while you are looking at Today is noise. */
   const WHERE = { '/': '', '/markets': 'Markets', '/ideas': 'Ideas', '/ipo': 'IPO',
                   '/screen': 'Screen', '/signals': 'Signals', '/brief': 'Brief', '/watch': 'Watchlist',
-                  '/engines': 'The floor', '/radar': 'Radar', '/discover': 'Discover', '/buoy': 'BUOY',
+                  '/engines': 'The floor', '/radar': 'Radar', '/discover': 'Discover', '/buoy': 'BUOY', '/research': 'Research',
                   '/join': 'The brief', '/methodology': 'Methodology',
                   '/sources': 'Data sources', '/terms': 'Terms', '/privacy': 'Privacy' };
 
