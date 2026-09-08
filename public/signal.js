@@ -99,10 +99,31 @@
     return { ok: false, ready: false, data: null, error: 'still loading' };
   };
 
+  /* ── TWO CALLERS, ONE REQUEST ─────────────────────────────────────────────
+   * The micro-cache below keys on a RESOLVED response, so it cannot see a
+   * request that is still in the air — and the duplicates on this site are all
+   * concurrent, not sequential. Measured on the front page: 24 requests for 18
+   * distinct URLs, with /api/wire, /api/ipo-live and /today.json each fetched
+   * twice because two sections asked for them in the same tick.
+   *
+   * INFLIGHT holds the PROMISE. A second caller for a URL already being
+   * fetched waits on the first instead of opening its own connection, and both
+   * get the same object. Cleared in a finally so a failed request is retried
+   * rather than a rejected promise being handed to every future caller. */
+  const INFLIGHT = new Map();
+
   async function get(url) {
     routeUrls.add(url);
     const micro = MICRO.get(url);
     if (micro && Date.now() - micro.at < MICRO_MS) return micro.res;
+    const flying = INFLIGHT.get(url);
+    if (flying) return flying;
+    const p = _get(url);
+    INFLIGHT.set(url, p);
+    try { return await p; } finally { INFLIGHT.delete(url); }
+  }
+
+  async function _get(url) {
     const key = CACHE + url;
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), TIMEOUT);
@@ -414,6 +435,42 @@
    * sibling-panel logic that filters and sorts depend on all keep working;
    * it is simply empty until it is needed.
    */
+  /* ── A LONG LIST IS CAPPED, NOT TRUNCATED ─────────────────────────────────
+   *
+   * Measured on a 375x812 phone: /ideas was 24.3 screens and "AI long-term
+   * ideas" alone was 12.1 of them — twelve cards at about 820px each. Nobody
+   * reaches the end of that, so the twelfth card is not information, it is
+   * weight.
+   *
+   * The tail is RENDERED and HIDDEN rather than dropped: everything stays on
+   * the page for search-in-page, for the reader who does want it, and for the
+   * counts printed above the list to keep matching what is under it. What
+   * changes is only what is laid out before someone asks.
+   *
+   * display:contents on the wrapper so the tail's children stay direct
+   * participants in a parent grid — wrapping them in a block would put twelve
+   * cards into one grid cell. When hidden, the [hidden] rule at the top of the
+   * stylesheet wins and the wrapper collapses entirely, which is the whole
+   * reason that rule had to exist.
+   */
+  let capSeq = 0;
+  const capList = (parts, n, noun = 'more') => {
+    if (!Array.isArray(parts) || parts.length <= n) return (parts || []).join('');
+    const id = `cap${++capSeq}`;
+    return parts.slice(0, n).join('')
+      + `<div class="cap-rest" id="${id}" hidden>${parts.slice(n).join('')}</div>`
+      + `<button type="button" class="chip cap-more" data-cap="${id}">`
+      + `Show the other ${parts.length - n} ${esc(noun)}</button>`;
+  };
+  /* Bound once at the document, like the row toggle — survives every repaint. */
+  document.addEventListener('click', (ev) => {
+    const b = ev.target.closest && ev.target.closest('button[data-cap]');
+    if (!b) return;
+    const rest = document.getElementById(b.getAttribute('data-cap'));
+    if (rest) rest.hidden = false;
+    b.remove();                      // one-way: nothing re-hides it
+  });
+
   const xrow = (summary, detail, opts = {}) => {
     if (!detail) return `<div class="rank-r ${opts.cls || ''}" ${opts.attrs || ''}>${summary}</div>`;
     const id = `xr${++xrSeq}`;
@@ -2006,7 +2063,7 @@
       return pinned.concat(rotating);
     })();
 
-    out += sec('The wire', wire.length ? `<div class="wire">${wireView.map(x => `
+    out += sec('The wire', wire.length ? `<div class="wire">${capList(wireView.map(x => `
         <a href="${esc(x.link || '#')}" ${x.link ? 'target="_blank" rel="noopener"' : ''}>
           <span class="ws">${esc(x.source || 'wire')}${
             // HOW MANY WIRES CARRIED IT. The closest thing this feed has to a
@@ -2018,7 +2075,7 @@
             x.at ? `<i class="w-at">${esc(storyAge(x.at))}</i>` : ''}</span>
           <span class="wt">${esc(x.title || '')}</span>
           ${x.summary ? `<span class="wd">${esc(String(x.summary).slice(0, 150))}</span>` : ''}
-        </a>`).join('')}</div>
+        </a>`), 5, 'stories')}</div>
         <p class="hint">${wireIsLive
           ? `Read live from <b>${liveWire.sources}</b> newswires, refreshed every fifteen minutes,
              newest first. The four touching the most screened names are pinned; the rest rotate.`
@@ -2048,7 +2105,7 @@
       // is what it is worth now.
       const cvpx = await quotes(c.picks.map(x => x.sym));
       c.picks.forEach(x => { x._live = cvpx[x.sym] || null; });
-      out += sec('Today’s conviction', `<div class="cards-2">${c.picks.map(convictionCard).join('')}</div>` +
+      out += sec('Today’s conviction', `<div class="cards-2">${capList(c.picks.map(convictionCard), 2, 'conviction picks')}</div>` +
         TRAIL_NOTE +
         `<details class="meth"><summary>How these five were chosen</summary>
            <p>${esc(c.method)}</p>
@@ -2997,7 +3054,16 @@
               * far it sat off its own high, or what was above and below it —
               * which is what decides whether "to target" is a short hop. One
               * renderer, shared with the radar, so they cannot drift. */''}
-          ${(sr => sr ? factsStrip(sr) + bandLine(sr) + levelsBlock(sr) : '')(screenRow(r.name))}
+          ${/* BEHIND DISCLOSURE, NOT INLINE.
+              * Adding the facts strip, the year's band and the full
+              * support/resistance table to every card made ONE multibagger
+              * card 2,501px tall — three screens on a phone for a single
+              * name, and the section 3.1 screens for one idea. The content is
+              * right; having it open by default was not. Same <details>
+              * pattern the rest of the site uses, so the card is a summary
+              * again and the working is one tap under it. */''}
+          ${(sr => sr ? `<details class="mbc-d"><summary>Levels, momentum and the year's range</summary>
+             <div class="mbc-dd">${factsStrip(sr)}${bandLine(sr)}${levelsBlock(sr)}</div></details>` : '')(screenRow(r.name))}
         </article>`;
       }).join('')}</div>
       <p class="hint">The scan runs on a Saturday and this list is the newest run — it does not
@@ -3070,7 +3136,7 @@
         re-files names it still likes, so <b>${aiSuperseded}</b> earlier open row${aiSuperseded === 1 ? '' : 's'}
         for these same companies ${aiSuperseded === 1 ? 'is' : 'are'} folded away here.
         They remain in <a href="/signals">the ledger</a> — the record is not edited.</p>` : '') +
-        `<div class="aig">${aiRows.map(r => {
+        `<div class="aig">${capList(aiRows.map(r => {
         const md = r.metadata || {};
         const facts = md.facts || {};
         const entry = Number(r.entry), stop = Number(r.sl);
@@ -3138,7 +3204,7 @@
           ${md.thesis ? `<p class="aic-t">${esc(String(md.thesis))}</p>` : ''}
           ${md.rationale ? `<p class="aic-r">${esc(String(md.rationale))}</p>` : ''}
         </article>`;
-      }).join('')}</div>
+      }), 4, 'long-term ideas')}</div>
       <p class="hint"><b>Three stages, one idea — not three calls.</b> Every one of these signals states
         a single horizon of <b>${esc(horizon)}</b>, and its three targets sit at a fixed
         <b>+35%</b>, <b>+75%</b> and <b>+150%</b> from entry on every name without exception. The
@@ -3172,7 +3238,7 @@
           ${tile(orders.length, 'Orders to place', 'nothing here is bought yet', 'ac')}
           ${tile(st.deployed_pct != null ? st.deployed_pct + '%' : '—', 'Would be deployed',
                  st.heat_pct != null ? st.heat_pct + '% at risk if every stop hits' : '')}
-        </div>` + (orders.length ? orders.map(o => {
+        </div>` + (orders.length ? capList(orders.map(o => {
           const live = px[o.symbol];
           const move = live ? pnlOf(o.entry, live.price, 'BUY') : null;
           const sh = shareOf(o.notional);
@@ -3206,7 +3272,7 @@
               <span class="mono" style="font-size:var(--t-2);color:var(--dim)">${sh != null ? 'sized at ' + sh.toFixed(1) + '% — scale to your own book' : ''}${o.hold_days ? ' · hold ' + esc(o.hold_days) : ''}</span>
               ${symLinks(o.symbol)}
             </div>
-          </article>`; }).join('') : `<div class="empty">No orders clear the mandate today.</div>`));
+          </article>`; }), 3, 'orders') : `<div class="empty">No orders clear the mandate today.</div>`));
     }
     paint(out);
     fillIdeaCharts(picks);   // six months of real closes on every idea, after paint
@@ -3333,6 +3399,19 @@
           ${line('Total from issue price', total == null ? null : pct(total), dir(total))}
           ${line('Issue closed', String(r.close_date || '').slice(0, 10) || null)}
           ${line('Sessions measured', r.sessions != null ? r.sessions : null)}
+          ${/* MOVED IN FROM THE ROW. On a phone the row rendered every column
+              * as a self-labelling chip, which is why a listing row was 224px
+              * tall — three and a half times the signals row and seven of them
+              * to a screen. The chips are collapsed on mobile now, so the four
+              * facts that lived only there have to live here or they are lost:
+              * the band, the last price, the range since, and how far off its
+              * own high it is. */''}
+          ${line('Price band', r.price_band ? String(r.price_band).replace(/Rs\./g, '₹') : null)}
+          ${line('Last', r.last_close != null ? price(r.last_close) : null)}
+          ${line('Range since listing', r.low != null && r.high != null
+            ? `${price(r.low)} – ${price(r.high)}` : null)}
+          ${line('Off its high since', r.from_high_pct != null ? pct(r.from_high_pct) : null,
+                 dir(r.from_high_pct))}
         </div>
         <p class="hint">${pop == null
           ? 'No price band was published for this listing, so no listing gain is shown rather than a guessed one.'

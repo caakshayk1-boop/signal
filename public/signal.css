@@ -4452,3 +4452,47 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 /* A rejected engine's note is not the same object as a caution. It gets the
    down colour on its edge so the difference is visible before it is read. */
 .note-dn{border-left:3px solid var(--dn)}
+
+/* The capped tail of a long list. display:contents so its children remain
+   direct participants in the parent grid; [hidden] at the top of this sheet
+   collapses it entirely when closed. */
+.cap-rest{display:contents}
+.cap-more{display:block;width:100%;margin-top:12px}
+
+/* An idea card's working, folded. Same contract as the xrow panels: the card
+   is a summary, the detail is one tap under it. */
+.mbc-d{margin-top:11px;border-top:1px solid var(--line);padding-top:9px}
+.mbc-d>summary{cursor:pointer;list-style:none;font:600 var(--t-2)/1.3 var(--sans);
+  color:var(--accent);padding:4px 0;min-height:32px;display:flex;align-items:center}
+.mbc-d>summary::-webkit-details-marker{display:none}
+.mbc-d>summary::after{content:'';margin-left:8px;width:6px;height:6px;
+  border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+  transform:rotate(45deg);transition:transform 180ms}
+.mbc-d[open]>summary::after{transform:rotate(-135deg)}
+.mbc-d>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mbc-dd{padding-top:6px}
+
+@media(max-width:720px){
+  /* ── AN EXPANDABLE ROW DOES NOT NEED TO BE A CARD ─────────────────────────
+   *
+   * The stacked-card treatment above turns every column into a self-labelling
+   * chip. That was the right call when a row was all a reader could get: the
+   * alternative was truncation, and truncation was eating the price band.
+   *
+   * These rows EXPAND now. Every chip's fact is in the panel one tap below —
+   * the four that were not have been moved there. So the chips are the same
+   * numbers rendered twice, and the second rendering costs 160px a row:
+   * measured, a listed IPO row was 224px against 63px for a signals row, and
+   * fifteen of them made 3,360px of a 13-screen page.
+   *
+   * Identity, the one figure the list is sorted by, and the caret. Everything
+   * else is a tap away, which is the same contract the rest of the site keeps.
+   */
+  .rank-r.lvl-r.xr > .x:not([data-l="Since listing"]),
+  .rank-r.lvl-r.xr > .m:not([data-l="Since listing"]){ display:none }
+  .rank-r.lvl-r.xr{ padding:12px 26px 12px 14px }
+  .rank-r.lvl-r.xr > .s b{ font-size:var(--t-4) }
+  .rank-r.lvl-r.xr > .s span{ font-size:var(--t-2);margin-top:2px }
+  .rank-r.lvl-r.xr > .m[data-l="Since listing"]{
+    order:2;flex:0 0 auto;margin:0;font-size:var(--t-4);text-align:right }
+}
