@@ -33,7 +33,7 @@ const FEEDS = ["alerts", "conviction", "data-health", "edition", "ipo",
                // trading-dashboard repo; absent until that job has run, and a
                // missing feed leaves the committed copy alone rather than
                // replacing it with a 404 page named buoy.json.
-               "buoy"];
+               "buoy", "alerts_log"];
 
 const stampOf = (o) => {
   if (!o || Array.isArray(o)) return null;

@@ -5238,9 +5238,11 @@
       'A fallen name closing a 4-hour candle back above its 200-period average, with momentum already turning. Measured, and the measurement says no edge.',
       'Research engine') + body;
     paint(shell(skel('sk-card', 3)));
-    const r = await get('/buoy.json');
+    const [r, lg] = await Promise.all([get('/buoy.json'), get('/alerts_log.json')]);
     if (!r.ok || !r.data) { paint(shell(fail('BUOY', r.error || 'no scan yet'))); return; }
     const d = r.data, B = d.backtest || {}, top = d.top || [];
+    /* The DURABLE record, as against buoy.json which is overwritten each run. */
+    const LOG = (lg.ok && lg.data && Array.isArray(lg.data.rows)) ? lg.data : null;
 
     const warn = `<div class="note"><b>This engine has no measured edge, and the sample is now
       large enough to say so.</b> The rule as specified — a 4-hour close back above the
@@ -5329,18 +5331,57 @@
         <b>${B.n_no_div ?? 348}</b> times over the same window and measured the same to
         within a rounding error. Every row above says which lane caught it, and a name is
         dropped the moment it closes back under the line.</div>` +
-      (d.history && d.history.length > 1
-        ? sec('Every scan so far', `<div class="rank">${d.history.slice().reverse().slice(0, 14)
-            .map(hh => `<div class="rank-r">
-              <span class="s"><b>${esc(String(hh.at).slice(0, 16).replace('T', ' '))}</b>
-                <span>${esc((hh.symbols || []).join(', ') || 'nothing fired')}</span></span>
-              <span class="x">${hh.fired} of ${hh.scanned}</span></div>`).join('')}</div>
-           <p class="hint">Kept so the forward sample can be counted rather than remembered.
-             ${esc(String(d.disclaimer || ''))}</p>`, `${d.history.length} scans`)
-        : '') +
-      (d.coverage_note ? `<p class="hint">${esc(d.coverage_note)}</p>` : '') +
-      (d.dma_as_of ? `<p class="hint">200-day average: ${esc(String(d.dma_as_of))}.
-        ${esc(String(d.dma_note || ''))}</p>` : '') +
+      (LOG && LOG.rows.length
+        ? sec('The alert log', (() => {
+            const rows = LOG.rows.slice().reverse();
+            const repeats = rows.filter(x => x.repeat_of).length;
+            const held = rows.filter(x => (x.seen_count || 1) > 1).length;
+            return `<p class="hint" style="margin:0 0 12px">
+                <b>One row per distinct alert, not one per scan.</b> The scan runs at both
+                4-hour closes and a reclaim stays true for days, so an engine firing on the
+                same name at the same level in consecutive runs has found <b>one</b> setup.
+                Those increment a counter instead of adding a row —
+                <b>${held}</b> of these ${rows.length} have been seen more than once. A
+                re-alert more than <b>${LOG.dedupe_days ?? 10} days</b> later is a separate
+                event and gets its own row pointing back at the first
+                (<b>${repeats}</b> so far). Without that rule the forward sample would count
+                cron ticks rather than setups.</p>
+              <div class="sg-head" aria-hidden="true"><span></span><span>Alert</span>
+                <span>Entry</span><span>Stop</span><span>Target 1</span><span>Risk</span><span>Seen</span></div>
+              <div class="rank sg-t">${rows.slice(0, 60).map(x => xrow(`
+                <span class="sg-d ${x.lane === 'strict' ? 'up' : 'ac'}"></span>
+                <span class="sg-id"><b>${esc(x.symbol)}</b>
+                  <span>${esc(x.engine)} · ${esc(x.lane || '—')}
+                    · ${esc(String(x.at || '').slice(0, 16).replace('T', ' '))}</span></span>
+                <span class="sg-n">${x.entry == null ? '—' : price(x.entry)}</span>
+                <span class="sg-n dn">${x.sl == null ? '—' : price(x.sl)}</span>
+                <span class="sg-n up">${x.target1 == null ? '—' : price(x.target1)}</span>
+                <span class="sg-n">${x.risk_pct == null ? '—' : x.risk_pct + '%'}</span>
+                <span class="sg-r-out"><span class="pill ${(x.seen_count || 1) > 1 ? 'pill-ac' : 'pill-flat'}">${
+                  x.seen_count || 1}&times;</span>
+                  <em>${x.repeat_of ? 'repeat' : 'first'}</em></span>`,
+                `<div class="yoy">
+                   <div class="yy"><span>First raised</span><b>${esc(String(x.at || '').replace('T', ' '))}</b></div>
+                   <div class="yy"><span>Last seen in a scan</span><b>${esc(String(x.last_seen || x.at || '').replace('T', ' '))}</b></div>
+                   <div class="yy"><span>Scans it has appeared in</span><b>${x.seen_count || 1}</b></div>
+                   ${x.repeat_of ? `<div class="yy"><span>Repeat of</span><b>${esc(x.repeat_of)}</b></div>
+                     <div class="yy"><span>Days since that one</span><b>${esc(String(x.days_since_last ?? '—'))}</b></div>` : ''}
+                   <div class="yy"><span>Levels</span><b>${x.entry == null ? '—' : price(x.entry)} ·
+                     stop ${x.sl == null ? '—' : price(x.sl)} ·
+                     T1 ${x.target1 == null ? '—' : price(x.target1)}</b></div>
+                   ${x.rsi != null ? `<div class="yy"><span>RSI at the alert</span><b>${esc(String(x.rsi))}</b></div>` : ''}
+                   ${x.from_high_pct != null ? `<div class="yy"><span>Off its 52-week high</span><b>${esc(String(x.from_high_pct))}%</b></div>` : ''}
+                 </div>
+                 <p class="hint">This log records what the engine SAID. Whether it worked is
+                   the ledger's question — grading it here would create a second record that
+                   could disagree with the first.</p>`,
+                { cls: 'sg-r' })).join('')}</div>
+              ${rows.length > 60 ? `<p class="hint">Showing the newest 60 of ${rows.length}.</p>` : ''}`;
+          })(), `${LOG.total ?? LOG.rows.length} distinct`,
+          'Every alert this engine has raised, deduplicated. It grades nothing.')
+        : sec('The alert log', `<div class="empty">No alert has been logged yet. The log is
+            written by the scan and survives every run — unlike the watchlist above, which is
+            replaced each time.</div>`, '', 'Every alert this engine has raised.')) +
       `<p class="hint" style="margin-top:18px">Scan written
         ${esc(String(d.generated_at || '').slice(0, 16).replace('T', ' '))} UTC${
         d.errors ? ` · ${d.errors} names could not be read` : ''}${
