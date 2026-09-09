@@ -458,8 +458,20 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   const litePath = "public/screen-lite.json";
   let lite = null;
   try { lite = JSON.parse(readFileSync(litePath, "utf8")); } catch { /* not synced yet */ }
-  ok("screen-lite.json is present and declares itself lite",
-     !!(lite && lite.is_lite === true && Array.isArray(lite.rows) && lite.rows.length));
+  /* The file is a build artefact that arrives via sync-data.yml, so on a fresh
+   * branch it is legitimately absent and this must not block a deploy. What is
+   * NOT optional is that it is on its way: if the feed list does not name it,
+   * it will never arrive and the nine routes 404 on every load. So the
+   * PIPELINE is asserted unconditionally and the CONTENT only when present. */
+  const SYNC = readFileSync(".github/workflows/sync-data.yml", "utf8");
+  ok("screen-lite is in the sync feed list, so it will arrive",
+     /FEEDS="[^"]*\bscreen-lite\b/.test(SYNC));
+  if (lite) {
+    ok("screen-lite.json declares itself lite and carries rows",
+       lite.is_lite === true && Array.isArray(lite.rows) && lite.rows.length > 0);
+  } else {
+    console.log("  note  screen-lite.json not synced into this checkout yet");
+  }
 
   if (lite && lite.rows) {
     const have = new Set();
@@ -547,6 +559,38 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("the provenance links moved to the Ledger rather than being dropped",
      /const provenance = \(\) => sec\(/.test(JS) && /provenance\(\);/.test(JS));
   ok("nothing still binds the removed #moreBtn", !/getElementById\('moreBtn'\)/.test(JS));
+}
+
+/* ── EVERY EXPLANATION MUST BE REACHABLE, AND THE BIG NUMBERS MUST HAVE ONE ──
+ * TIPS carried nine entries and covered the mechanics — the 52-week range, the
+ * session, R:R — while none of the four figures a reader actually decides on
+ * had a help mark. A "?" on `zone` and none on `win rate` explains the easy
+ * number and leaves the load-bearing one bare.
+ *
+ * `basis` was also defined and surfaced NOWHERE: an explanation written, paid
+ * for in bytes, and never once shown. */
+{
+  const block = (JS.match(/const TIPS = \{[\s\S]*?\n  \};/) || [""])[0];
+  const keys = [...block.matchAll(/^\s{4}(\w+):\s*\[/gm)].map((m) => m[1]);
+  ok("TIPS is readable", keys.length > 0);
+
+  // Two ways to surface one: tip('k') inline, or tile(..., 'k') on a label.
+  const used = new Set([
+    ...[...JS.matchAll(/\btip\('(\w+)'\)/g)].map((m) => m[1]),
+    ...[...JS.matchAll(/,\s*'(\w+)'\)\}/g)].map((m) => m[1]),
+  ]);
+  const orphan = keys.filter((k) => !used.has(k));
+  ok("every TIPS entry is surfaced somewhere", orphan.length === 0, orphan);
+
+  for (const k of ["winrate", "score", "call", "risk"]) {
+    ok(`the ${k} figure carries an explanation`, keys.includes(k) && used.has(k));
+  }
+
+  // The control goes on the LABEL, never on the value: answer first, reason
+  // second. tile() takes the key as its fifth argument and renders it inside
+  // the .k element, so this holds by construction — assert the construction.
+  ok("tile() renders its tip on the label, not the value",
+     /<div class="k">\$\{esc\(k\)\}\$\{tipKey \? ' ' \+ tip\(tipKey\) : ''\}<\/div>/.test(JS));
 }
 
 console.log(fails

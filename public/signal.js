@@ -576,8 +576,14 @@
    * Label, then figure, then the one line that qualifies it. The qualifier
    * sits on the floor of the tile so a row of tiles still shares one baseline
    * however far a label wraps. */
-  const tile = (v, k, sub, cls) =>
-    `<div class="tile"><div class="k">${esc(k)}</div><div class="v ${cls || ''}">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+  /* `tipKey` puts a "?" beside the LABEL, never beside the number.
+   *
+   * The disclosure order this site keeps is answer, then reason, then
+   * evidence, then method. A tile is the answer; its explanation must not
+   * compete with it for the eye, so the control sits on the small grey label
+   * and opens the same tip card every other help mark on the site uses. */
+  const tile = (v, k, sub, cls, tipKey) =>
+    `<div class="tile"><div class="k">${esc(k)}${tipKey ? ' ' + tip(tipKey) : ''}</div><div class="v ${cls || ''}">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
 
   /* ── ANIMATED NUMBER ─────────────────────────────────────────────────────
    * One implementation, used everywhere a figure is worth watching arrive.
@@ -689,6 +695,20 @@
    * gets two explanations on two pages.
    */
   const TIPS = {
+    /* ── THE DECISION NUMBERS ────────────────────────────────────────────
+     * TIPS covered nine mechanics — the 52-week range, the session, R:R —
+     * and none of the four figures a reader actually decides on. A help mark
+     * on "zone" and none on "win rate" explains the easy number and leaves
+     * the load-bearing one unexplained.
+     *
+     * Each of these states the rule this site already enforces in code, so
+     * the explanation cannot drift from the behaviour: the five-trade floor
+     * is real and is applied two lines below, the composite's weights are
+     * published in the payload, and a verdict carries its own reason string. */
+    winrate: ['Win rate', 'Closed signals that finished in profit, as a share of all closed signals. Under five closed trades this shows the raw count instead — a percentage off one win and one loss is a claim, not a rate. Expiries count as losses; time-stopped trades are excluded and reported separately, because a trade that exited on the clock neither won nor lost.'],
+    score: ['Composite score', 'A weighted blend of four separately-computed scores — quality, growth, valuation and technical. The weights are published with the payload rather than hidden here. Missing data scores nothing and leaves the denominator: a company that reports less gets a lower confidence, never a higher score. It is a MODEL, not a measurement.'],
+    call: ['The call', 'A rule applied to the screen\u2019s own numbers at build time, not a forecast and not advice. Each carries the reason it was reached. It is stamped when the screen is built — if the stop has since been breached the setup is void and the card says so, because the facts moved and the verdict did not.'],
+    risk: ['Risk flags', 'Conditions the screen found in the filings that argue against the name — cash not matching profit, leverage, dilution. They are reasons for caution that the score already carries; the flags are the working, not a second opinion. Open the company to read them in full.'],
     range52: ['52-week range', 'Where the current price sits between the lowest and highest price of the past year. 0% is the year’s low, 100% its high.'],
     session: ['Session', 'Whether the exchange is inside its regular trading hours right now, taken from the exchange’s own published session window — not from this page’s refresh.'],
     basis: ['Price basis', 'Which feed the number came from. “Spot” means the price is a spot quote while the 52-week range belongs to the futures contract, so the two are not from the same series.'],
@@ -2114,7 +2134,7 @@
                  LR.trades >= 5 ? `${LR.wins}W / ${LR.losses}L`
                    : LR.trades ? `${LR.trades} closed — too few to quote a rate`
                                : 'nothing closed yet',
-                 LR.trades >= 5 ? (LR.win_rate >= 50 ? 'up' : 'dn') : '')}
+                 LR.trades >= 5 ? (LR.win_rate >= 50 ? 'up' : 'dn') : '', 'winrate')}
           ${tile(LR.trades ? (LR.expectancy_r > 0 ? '+' : '') + LR.expectancy_r + 'R' : '—', 'Per trade',
                  'expectancy, closed only', LR.trades ? dir(LR.expectancy_r) : '')}
         </div>
@@ -3220,7 +3240,7 @@
         }).join('') +
         `<p class="sec-note"><b>Every row opens.</b> The line under each name is the past month of
           real daily closes; the bar beside it is where the price sits between its own 52-week low
-          and high ${tip('range52')}. Tap a row for the extremes, the day's range, volume, the exchange session ${tip('session')} and
+          and high ${tip('range52')}${tip('basis')}. Tap a row for the extremes, the day's range, volume, the exchange session ${tip('session')} and
           the exact time the quote was taken. A figure this site cannot measure says
           <b>Not measured</b> — it is never filled in.</p>`,
         `${tk.data.live ?? 0} of ${tk.data.total ?? 0} live`,
@@ -5107,7 +5127,7 @@
   const screenTable = (rows, offset) => `<div class="rank">
     <div class="rank-r rank-head scr-r scr-call">
       <span class="i">#</span><span class="s">Name</span>
-      <span class="x">Call</span>
+      <span class="x">Call ${tip('call')}</span>
       <span class="x">Price</span><span class="x">Today</span><span class="x">vs 50D</span>
       <span class="x">vs 200D</span><span class="x">RSI 14D</span><span class="m">1M</span>
     </div>
@@ -5433,7 +5453,8 @@
       ${cardLine}
       <div id="ccHost" class="cc"><div class="sk" style="height:150px"></div></div>
       <div class="tags">${(r.setup?.tags || []).map(t => `<span class="pill pill-ac">${esc(t)}</span>`).join('')}
-        ${r.risk?.level ? `<span class="pill ${r.risk.level === 'LOW' ? 'pill-up' : r.risk.level === 'HIGH' ? 'pill-dn' : 'pill-wn'}">RISK ${esc(r.risk.level)}</span>` : ''}</div>
+        ${r.risk?.level ? `<span class="pill ${r.risk.level === 'LOW' ? 'pill-up' : r.risk.level === 'HIGH' ? 'pill-dn' : 'pill-wn'}">RISK ${esc(r.risk.level)}</span>` + tip('risk') : ''}</div>
+      <div class="sec-h" style="margin-top:var(--s-4)"><h2>Scores ${tip('score')}</h2></div>
       <div class="scores">
         ${score('comp', 'Composite')}${score('q', 'Quality')}${score('g', 'Growth')}
         ${score('em', 'Earnings mom.')}${score('cf', 'Cash flow')}${score('v', 'Value')}${score('tech', 'Technical')}
@@ -6318,7 +6339,7 @@
                  wrShown ? `${wins}W / ${losses}L closed`
                          : scored ? `${scored} closed — too few to quote a rate`
                                   : 'nothing closed yet',
-                 wrShown ? (wr >= 50 ? 'up' : 'dn') : '')}
+                 wrShown ? (wr >= 50 ? 'up' : 'dn') : '', 'winrate')}
           ${tile(closed.length, 'Closed and scored', 'expiries counted as losses')}
         </div>` + (CURVE ? '' : curveNote)) +
         /* NO PRE-LAUNCH RECORD ON THIS PAGE. A second block used to sit here
