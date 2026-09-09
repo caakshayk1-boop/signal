@@ -1367,6 +1367,40 @@ body::before{display:none}
 .mk-foot{grid-column:1/-1;font-size:var(--t-3);line-height:1.55;color:var(--dim);
   padding-top:4px;border-top:1px solid var(--line)}
 
+/* A SECTION BODY BEHIND ONE LINE. The heading, its count and its standfirst
+   all still render above this — only the rows wait for a tap. Used where a
+   block belongs on the page but is not what the page is for. */
+.foldb{border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.foldb > summary{cursor:pointer;list-style:none;padding:14px 16px;position:relative;
+  padding-right:36px;font:500 var(--t-4)/1.45 var(--ui);color:var(--muted);min-height:44px;
+  display:flex;align-items:center}
+.foldb > summary::-webkit-details-marker{display:none}
+.foldb > summary::after{content:"";position:absolute;right:16px;top:calc(50% - 5px);
+  width:7px;height:7px;border-right:1.5px solid var(--dim);border-bottom:1.5px solid var(--dim);
+  transform:rotate(45deg);transition:transform var(--t-fast,.16s) ease}
+.foldb[open] > summary::after{transform:rotate(-135deg);top:calc(50% - 2px)}
+.foldb > summary:hover{color:var(--text);background:var(--raised)}
+.foldb > summary:focus-visible{outline:2px solid var(--live);outline-offset:-2px}
+.foldb[open] > summary{border-bottom:1px solid var(--line)}
+.foldb > *:not(summary){margin:14px 16px}
+
+/* THE SEGMENT AS A DISCLOSURE.
+   The header keeps every mark it had; it is now the control that opens the
+   segment, so it needs a pointer, a caret and a tap target that covers the
+   strip rather than the two words of the label. */
+.segd{margin:0}
+.segd > .segh{cursor:pointer;list-style:none;padding-right:20px;position:relative;
+  min-height:30px}
+.segd > .segh::-webkit-details-marker{display:none}
+.segd > .segh::after{content:"";position:absolute;right:2px;top:2px;width:6px;height:6px;
+  border-right:1.5px solid var(--dim);border-bottom:1.5px solid var(--dim);
+  transform:rotate(45deg);transition:transform var(--t-fast,.16s) ease}
+.segd[open] > .segh::after{transform:rotate(-135deg);top:5px}
+.segd > .segh:hover{color:var(--accent)}
+.segd > .segh:focus-visible{outline:2px solid var(--live);outline-offset:3px;border-radius:var(--r-2)}
+.segd + .segd{border-top:1px solid var(--line)}
+.segd[open] > .board{margin-bottom:14px}
+
 .segh{display:flex;align-items:baseline;gap:9px;margin:22px 0 9px;
   font:600 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-widest);text-transform:uppercase;color:var(--dim)}
 .segh .cnt{margin-left:auto;font-weight:400;letter-spacing:var(--ls-wide);text-transform:none;
@@ -1464,6 +1498,15 @@ body::before{display:none}
   transition:color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
 .b-qnav a:hover{color:var(--b-ink);background:var(--b-hi)}
 .b-qnav a[aria-current="true"]{color:var(--b-ink);background:var(--b-hi)}
+/* PROGRESS, ON THE NAV THAT IS ALSO THE CONTROL.
+   A separate six-node rail used to carry "which of these is behind you"; it
+   pointed at the same six anchors under different names, so it is gone and
+   its one real contribution is here. A section already read is legible but
+   settled; the current one is the only one lit. The key glyph carries it as
+   well as the colour, so the state is not colour alone. */
+.b-qnav a.done{color:var(--b-mut,var(--b-dim))}
+.b-qnav a.done .kb{opacity:.9;background:var(--b-hi);border-color:transparent}
+.b-qnav a[aria-current="true"] .kb{opacity:1;border-color:currentColor}
 .b-qnav a .kb{font-size:var(--t-1);opacity:.5;border:1px solid currentColor;border-radius:var(--r-1);
   padding:1px 3px;line-height:1}
 @media(max-width:759px){.b-qnav{top:var(--barh)}}
@@ -2297,6 +2340,43 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 
   /* A header for a card layout is meaningless — each card labels itself. */
   .scr-r.rank-head,.rank-r.lvl-r.rank-head,.rank-r.rank-head{display:none}
+
+  /* ═══ THE SCREEN ROW ON A PHONE, AT SCANNING HEIGHT ══════════════════════
+   * Measured at 390px: a row was 249px, so four names filled the screen and
+   * a 40-row page ran to 10,600px. A screener you cannot scan is a list.
+   *
+   * Three things were paying for it, and none of them is information:
+   *
+   *   94px  the identity block — company name wrapping to two lines with the
+   *         institutional badge dropped onto a third
+   *   73px  five metric chips in a ragged wrapping flex row, landing on three
+   *         lines at this width
+   *   30px  padding
+   *
+   * NOTHING IS HIDDEN — that rule is the whole reason this stack exists and
+   * it still holds. The name is clamped to one line because the TICKER above
+   * it already identifies the row and the full name is one tap away; the
+   * clamp is scoped to .scr-r so the IPO listings keep the wrap they were
+   * given deliberately (their sub-line carries the price band, which is the
+   * fact that was being cut). The badge joins the name's line. The chips
+   * become a fixed three-column grid, so five of them are always two tidy
+   * rows instead of three ragged ones. */
+  .scr-r > .s > span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    display:block;margin-top:2px}
+  /* The badge keeps the line of its own it was given deliberately at 560px,
+     "rather than squeeze the name to nothing on a 360px screen". Tried
+     inlining it here and it saved nothing measurable, so the earlier decision
+     stands. */
+  .scr-r{padding-top:12px;padding-bottom:12px;row-gap:0}
+  /* Three fixed columns, and each chip stacks its label over its figure.
+     Inline, "VS 200D +120.79%" is wider than a third of 390px and collided
+     with the column beside it; stacked, every chip fits its own third at any
+     width and the six of them are two even rows. */
+  .scr-r > .x:not([data-l="Price"]):not([data-l="Call"]),.scr-r > .m{
+    flex:0 0 33.33%;margin:8px 0 0;min-width:0;
+    flex-direction:column;align-items:flex-start;gap:2px}
+  .scr-r > .x:not([data-l="Price"]):not([data-l="Call"])::before,
+  .scr-r > .m::before{font-size:var(--t-1)}
 
   /* ── AND THE CONTAINER HAS TO LET THEM WRAP ────────────────────────────
    * The rows above became flex and were told to wrap, and they still did not:

@@ -471,6 +471,17 @@
     b.remove();                      // one-way: nothing re-hides it
   });
 
+  /* A SECTION THAT KEEPS ITS HEADING AND FOLDS ITS BODY.
+   *
+   * Used where a block is genuinely worth having on the page but is not what
+   * the page is FOR — the long-horizon research under a page whose top is
+   * today's orders, the books nobody is being told to apply to. The heading,
+   * the count in the section rail and the standfirst all still render, so the
+   * reader can see the block exists and what is in it; only the rows wait for
+   * a tap. Nothing is removed and nothing becomes unreachable. */
+  const foldBody = (summary, html) =>
+    `<details class="foldb"><summary>${esc(summary)}</summary>${html}</details>`;
+
   const xrow = (summary, detail, opts = {}) => {
     if (!detail) return `<div class="rank-r ${opts.cls || ''}" ${opts.attrs || ''}>${summary}</div>`;
     const id = `xr${++xrSeq}`;
@@ -3024,17 +3035,47 @@
     if (tk.ok) {
       const segs = (tk.data.segments || []).filter(sg => (sg.items || []).length);
       MKDATA = new Map();   // one map per paint; the route repaints every 60s
+      /* ELEVEN SEGMENTS, ALL OPEN, IS NOT A BOARD — IT IS A LIST.
+       *
+       * Forty-six instruments in eleven segments rendered expanded, so a
+       * reader who came for crypto scrolled past forty rows of Asia, India,
+       * the Nifty movers, Europe, the US, the US top ten, FX and commodities
+       * to reach three. On a phone that is the longest block on the site.
+       *
+       * Each segment is a disclosure now, and the summary carries what the
+       * segment header already carried — icon, name, how many instruments,
+       * how many of them are trading — plus how many are up, so the closed
+       * state still answers "is anything happening in there".
+       *
+       * INDIA stays open. This is a site about Indian markets and that
+       * segment is the reason most readers are on this page; folding it would
+       * be tidiness at the cost of the point. The Nifty gainers and losers
+       * open with it, because "which names moved" is the question the Indian
+       * indices immediately raise. */
+      const OPEN_SEGS = new Set(['india', 'gainers', 'losers']);
       out += sec('The board',
-        segs.map(sg => `<div class="segh">${esc(sg.icon || '')} ${esc(sg.label)}
-            ${segWhen(sg.items)}<span class="cnt">${sg.items.length}</span></div>
-          <div class="board">${sg.items.map(mkRow).join('')}</div>`).join('') +
+        segs.map(sg => {
+          const up = sg.items.filter(x => x.up).length;
+          return `<details class="segd"${OPEN_SEGS.has(sg.key) ? ' open' : ''}>
+            <summary class="segh">${esc(sg.icon || '')} ${esc(sg.label)}
+              ${segWhen(sg.items)}<span class="cnt">${up}/${sg.items.length} up</span></summary>
+            <div class="board">${sg.items.map(mkRow).join('')}</div>
+          </details>`;
+        }).join('') +
         `<p class="sec-note"><b>Every row opens.</b> The line under each name is the past month of
           real daily closes; the bar beside it is where the price sits between its own 52-week low
           and high ${tip('range52')}. Tap a row for the extremes, the day's range, volume, the exchange session ${tip('session')} and
           the exact time the quote was taken. A figure this site cannot measure says
           <b>Not measured</b> — it is never filled in.</p>`,
         `${tk.data.live ?? 0} of ${tk.data.total ?? 0} live`,
-        'Forty-six instruments, each with the year behind it.');
+        /* COUNTED, NOT SPELLED OUT. The lead read "Forty-six instruments"
+         * while the count beside it came from the feed, so the two could
+         * disagree the moment a segment was added or a symbol stopped
+         * resolving — a hardcoded number in a sentence about live data is a
+         * claim with no source. It is the same figure the rail already
+         * reports, in words. */
+        `${segs.reduce((n, sg) => n + sg.items.length, 0)} instruments across
+         ${segs.length} segments, each with the year behind it.`);
     } else { out += sec('The board', fail('The live board', tk.error)); }
 
     const movers = () =>
@@ -3124,7 +3165,10 @@
      * today's breakouts, this week's scan, this quarter's theses. The order
      * IS the answer to "which of these is for me". */
     const parts = {};
-    parts.mbg = sec('Multibaggers this week', mbRows.length ? `<div class="mbg">${mbRows.map(r => {
+    parts.mbg = sec('Multibaggers this week', mbRows.length ? foldBody(
+      `${mbRows.length} name${mbRows.length === 1 ? '' : 's'} from Saturday's scan${
+        picked.pick_date ? `, picked ${picked.pick_date}` : ''}`,
+      `<div class="mbg">${mbRows.map(r => {
         const since = r.pick_entry && Number.isFinite(Number(r.price_raw))
           ? (r.price_raw - r.pick_entry) / r.pick_entry * 100 : null;
         const up = r.pick_target && Number.isFinite(Number(r.price_raw))
@@ -3165,7 +3209,7 @@
       }).join('')}</div>
       <p class="hint">The scan runs on a Saturday and this list is the newest run — it does not
         change between runs, and the prices beside the names are live, which is what makes a
-        stalled-looking list look like a bug rather than the design.</p>`
+        stalled-looking list look like a bug rather than the design.</p>`)
       : `<div class="empty">The weekly scan has not written a list in the last month, so there is
          nothing current to show. Stale ideas presented as current would be worse.</div>`,
       mbRows.length ? `${mbRows.length} names${picked.pick_date ? ` · ${esc(picked.pick_date)}` : ''}` : '',
@@ -3228,7 +3272,9 @@
 
     if (aiRows.length) {
       const horizon = ((aiRows[0].metadata || {}).horizon) || 'multi-year';
-      parts.ai = sec('AI long-term ideas', (aiSuperseded ? `<p class="hint" style="margin:-4px 0 14px">
+      parts.ai = sec('AI long-term ideas', foldBody(
+        `${aiRows.length} open thesis${aiRows.length === 1 ? '' : 'es'} · ${horizon} · entry, stop and the three stages on each`,
+        (aiSuperseded ? `<p class="hint" style="margin:-4px 0 14px">
         Showing the <b>latest</b> filing for each name. The engine re-runs weekly and
         re-files names it still likes, so <b>${aiSuperseded}</b> earlier open row${aiSuperseded === 1 ? '' : 's'}
         for these same companies ${aiSuperseded === 1 ? 'is' : 'are'} folded away here.
@@ -3307,7 +3353,7 @@
         <b>+35%</b>, <b>+75%</b> and <b>+150%</b> from entry on every name without exception. The
         ladder is a rule, so the stages are milestones on one thesis rather than three separate
         pieces of research. What IS specific to each name is the entry, the structure stop, the two
-        scores and the written thesis — which is why those are what the card spends its room on.</p>`,
+        scores and the written thesis — which is why those are what the card spends its room on.</p>`),
         `${aiRows.length} open · ${esc(horizon)}`,
         'One thesis per name, and the three points at which it would have paid.');
     }
@@ -4424,7 +4470,17 @@
            * carry a live mark. What was wrong was that rows 41 to 750 were
            * simply unreachable: the header said "750 of 750" while the table
            * showed forty, which reads as a broken table rather than a page. */
-          const PER = 40;
+          /* FORTY ON A DESK, TWENTY ON A PHONE.
+           *
+           * Forty rows is one quote request and, at 72px a row on a desk,
+           * 2,900px — a table you can scan. The same forty on a phone are
+           * stacked cards at ~200px each: 8,000px, four names on screen at a
+           * time, and a "screen" that can only be scrolled rather than
+           * scanned. Twenty is still one request (the cap is 40 symbols), the
+           * pager is already there and already says which page of how many,
+           * and no row becomes unreachable — which was the whole point of
+           * paginating rather than capping in the first place. */
+          const PER = window.matchMedia('(max-width:700px)').matches ? 20 : 40;
           const pages = Math.max(1, Math.ceil(rows.length / PER));
           if (scrPage >= pages) scrPage = 0;          // a filter change shortens the list
           const from = scrPage * PER;
@@ -5470,13 +5526,21 @@
      * sat on the same page as the signals table, which carries the same rows
      * with headers, filters and the full ladder under each. Two renderings of
      * one dataset is not extra information; the weaker one was removed. */
-    return sec('The floor', `<div class="floor">${cards}</div>
+    /* REFERENCE, FOLDED. Nine engine cards ran to 2,073px on a phone — a
+     * third of this page — under a heading whose own note calls the block
+     * reference: who is on the roster and what each must earn. It is worth
+     * having and it is not what somebody opens the ledger to read, so the
+     * heading, the working count and the standfirst stay in the flow and the
+     * cards wait for a tap. */
+    return sec('The floor', foldBody(
+      `${Object.keys(ENGINE_REGISTRY).length} engines — what each hunts, what it must earn, and the record behind that bar`,
+      `<div class="floor">${cards}</div>
       <p class="hint">The bar is how far each engine's floor has been raised above the
         2R default, toward the 6R cap at which it stops publishing altogether. That floor
         comes from the engine's own win rate — break-even R:R is (1−p)/p — so an engine
         that wins less often has to earn more per trade before it is allowed to file one.
         A raised bar is not a fault; it is the system refusing trades that record says
-        lose money.</p>`,
+        lose money.</p>`),
       `${on} of ${Object.keys(ENGINE_REGISTRY).length} working`,
       'Who is on the floor, what each one hunts, and what it has to earn to file a trade.');
   }
@@ -6991,7 +7055,8 @@
         has none right now, so this is the best open setup instead, not a substitute for it.</div>` : ''}
 
       <nav class="b-qnav" id="qnav" aria-label="Sections of this brief">
-        ${SECTIONS.map(([id, lab, key]) => `<a href="#${id}" data-jump="${id}">
+        ${SECTIONS.map(([id, lab, key, node, sub]) => `<a href="#${id}" data-jump="${id}"
+            title="${esc(node)} — ${esc(sub)}">
           <span class="kb" aria-hidden="true">${key}</span>${esc(lab)}</a>`).join('')}
       </nav>
 
@@ -7017,6 +7082,10 @@
           <div class="b-m"><span class="k">R:R to T2</span><span class="v gold">${rrT2.toFixed(1)} : 1</span></div>
           <div class="b-m"><span class="k">Signal age</span><span class="v">${ageDays == null ? '—' : ageDays + 'd'}</span></div>
           <div class="b-m"><span class="k">Sector</span><span class="v" style="font-family:var(--ui);font-size:var(--t-5)">${esc(row.sector || 'Not on screen')}</span></div>
+          ${/* THE ONE FIELD THE DUPLICATE TABLE BELOW CARRIED AND THIS DID NOT.
+              * See the note on the section that used to follow this one. */''}
+          <div class="b-m"><span class="k">Setup</span><span class="v" style="font-family:var(--ui);font-size:var(--t-5)">${
+            esc((row.setup && (row.setup.tags || [])[0]) || sig.signal_type || 'Engine signal')}</span></div>
         </div>
       </section>
       <p class="b-p" style="margin-top:14px;font-size:var(--t-4)">${esc(stateChip[2])}
@@ -7027,29 +7096,46 @@
           published levels, so the arithmetic above is what this page shows and the ledger field is the
           one to distrust.</b>` : ''}</p>
 
-      <nav class="b-jr" id="journey" aria-label="Where you are in this brief">
-        ${SECTIONS.map(([id, , , node, sub]) => `<div class="b-jn" data-node="${id}">
-          <i aria-hidden="true"></i><b>${esc(node)}</b><span>${esc(sub)}</span></div>`).join('')}
-      </nav>
+      ${/* ONE NAVIGATION, NOT TWO.
+          *
+          * A six-item progress rail stood here, twelve lines below a six-item
+          * chip nav built from the SAME SECTIONS array and pointing at the
+          * same six anchors. Worse than a repeat: the two used different
+          * words for one destination — "Chart" in the chips, "Entry · where
+          * it starts" in the rail — so a reader had to learn that they were
+          * the same place before either was usable.
+          *
+          * The rail's actual contribution was PROGRESS: which sections are
+          * behind you and which one you are in. That moved into the chips,
+          * which were already tracking the active section for aria-current
+          * and were already the clickable one. The rail's plain-English node
+          * names ride along as each chip's title. */''}
 
+      ${/* THE SAME SIX NUMBERS, FOR THE THIRD TIME.
+          *
+          * A table headed "Everything that defines the position" sat here
+          * carrying Setup, Direction, Entry, Stop, Target 1, Target 2, R:R to
+          * T1 and Horizon. Five of those eight are in the metrics panel
+          * directly above it; Direction restates the panel's own "▲ LONG"
+          * headline and Horizon restates the pill beside it. Only Setup was
+          * new, and it has moved up into that panel.
+          *
+          * Counting the at-a-glance bar higher on the page, entry / stop /
+          * target 1 / target 2 / R:R were printed THREE times before the
+          * reader reached the chart — which then draws all four again as
+          * lines. On a page arguing one trade, that is the strongest version
+          * of the complaint this whole pass is about.
+          *
+          * The entry-state bar is the only thing here that was not a repeat,
+          * so it keeps the section and the section takes its name. */''}
       <section class="b-sec b-reveal">
-        <div class="b-lab">The trade in one view</div>
-        <h2 class="b-h2">Everything that defines the position.</h2>
-        <dl class="b-view">
-          <div class="b-vi"><dt>Setup</dt><dd class="txt">${esc((row.setup && (row.setup.tags || [])[0]) || sig.signal_type || 'Engine signal')}</dd></div>
-          <div class="b-vi"><dt>Direction</dt><dd class="txt">${isShort ? 'Short' : 'Long'}</dd></div>
-          <div class="b-vi"><dt>Entry</dt><dd>${f(entry)}</dd></div>
-          <div class="b-vi"><dt>Stop</dt><dd>${f(stop)}</dd></div>
-          <div class="b-vi"><dt>Target 1</dt><dd>${f(t1)}</dd></div>
-          <div class="b-vi"><dt>Target 2</dt><dd>${f(t2)}</dd></div>
-          <div class="b-vi"><dt>R:R to T1</dt><dd>${rrT1.toFixed(1)} : 1</dd></div>
-          <div class="b-vi"><dt>Horizon</dt><dd class="txt">${esc(sig.timeframe === '1D' ? 'Swing' : (sig.timeframe || 'Swing'))}</dd></div>
-        </dl>
+        <div class="b-lab">Entry state</div>
+        <h2 class="b-h2">Where price sits against the plan.</h2>
 
         <div class="b-zone">
           <div class="b-zone-h">
             <span class="b-zst ${zoneState[0]}">${esc(zoneState[1])}</span>
-            <span class="b-lab" style="letter-spacing:.16em">Entry state ${tip('zone')}</span>
+            <span class="b-lab" style="letter-spacing:.16em">${tip('zone')}</span>
           </div>
           <div class="b-zt">
             <span class="band" style="left:${Math.min(zAt(entry), zAt(t1)).toFixed(1)}%;width:${Math.abs(zAt(t1) - zAt(entry)).toFixed(1)}%"></span>
@@ -7716,7 +7802,6 @@
       window.scrollTo({ top, behavior: (REDUCED || far) ? 'auto' : 'smooth' });
     };
     const qlinks = [...main.querySelectorAll('#qnav a')];
-    const jnodes = [...main.querySelectorAll('.b-jn')];
     qlinks.forEach(a => a.addEventListener('click', ev => { ev.preventDefault(); jump(a.dataset.jump); }));
 
     // One scroll listener for the whole page, throttled to one frame. Reading
@@ -7730,12 +7815,13 @@
         const el = $(id); if (!el) continue;
         if (el.getBoundingClientRect().top <= stickyOffset() + 24) active = id;
       }
-      qlinks.forEach(a => a.setAttribute('aria-current', a.dataset.jump === active ? 'true' : 'false'));
+      // aria-current for assistive tech, `done` for the sighted progress cue.
+      // Both on the one nav that is also the clickable one.
       let seen = false;
-      jnodes.forEach(n => {
-        const isNow = n.dataset.node === active;
-        n.classList.toggle('on', isNow);
-        n.classList.toggle('done', !seen && !isNow);
+      qlinks.forEach(a => {
+        const isNow = a.dataset.jump === active;
+        a.setAttribute('aria-current', isNow ? 'true' : 'false');
+        a.classList.toggle('done', !seen && !isNow);
         if (isNow) seen = true;
       });
     };
