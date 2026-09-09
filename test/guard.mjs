@@ -444,6 +444,111 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      missing.length === 0, missing);
 }
 
+/* ── THE LITE TABLE MUST STILL CARRY EVERYTHING THE PAGE READS ───────────────
+ * screen-lite.json is screen.json with 29 unread fields and the per-company
+ * prose removed: 298 KB gzipped down to 207 KB, on the nine routes that LIST
+ * companies rather than examine one.
+ *
+ * Its keep-list lives in another repo (stock_screen.LITE_DROP_FIELDS) and the
+ * code that consumes it lives here, which is exactly the shape of coupling
+ * that rots. This check closes it from this side: every field signal.js reads
+ * must be present in the payload it reads it from, or the page renders an
+ * em dash and nobody hears about it. */
+{
+  const litePath = "public/screen-lite.json";
+  let lite = null;
+  try { lite = JSON.parse(readFileSync(litePath, "utf8")); } catch { /* not synced yet */ }
+  ok("screen-lite.json is present and declares itself lite",
+     !!(lite && lite.is_lite === true && Array.isArray(lite.rows) && lite.rows.length));
+
+  if (lite && lite.rows) {
+    const have = new Set();
+    for (const r of lite.rows.slice(0, 400)) for (const k of Object.keys(r)) have.add(k);
+    // Fields legitimately absent: they are the prose and the columns only the
+    // full-payload routes read, and the payload names them itself.
+    const dropped = new Set(lite.lite_dropped || []);
+    // The comparison is against screen.json ITSELF, not a list written here.
+    // A field the current build has not shipped yet (ahimsa, added the day this
+    // was written) is absent from both files and is not a projection bug; a
+    // field present in the full table and missing from the lite one is.
+    let full = null;
+    try { full = JSON.parse(readFileSync("public/screen.json", "utf8")); } catch { /* */ }
+    if (full && full.rows) {
+      const inFull = new Set();
+      for (const r of full.rows.slice(0, 400)) for (const k of Object.keys(r)) inFull.add(k);
+      const missing = [];
+      for (const m of JS.matchAll(/\br\.([a-z][a-z0-9_]{2,})\b/gi)) {
+        const f = m[1];
+        if (!inFull.has(f)) continue;          // not a screen column at all
+        if (have.has(f) || dropped.has(f)) continue;
+        missing.push(f);
+      }
+      ok("every screen column the page reads survives the lite projection",
+         missing.length === 0, [...new Set(missing)]);
+    }
+
+    // The prose is the point of the saving; if it comes back the saving is gone.
+    const withProse = lite.rows.filter(
+      (r) => (r.risk && r.risk.flags) || (r.vd && r.vd.f)).length;
+    ok("the per-company prose is NOT in the lite table", withProse === 0, withProse);
+  }
+}
+
+/* ── A LITE CACHE MUST NEVER SERVE A ROUTE THAT NEEDS THE PROSE ──────────────
+ * SCREEN is one module-level cache shared by every route. Without the variant
+ * flag, the first light route to load poisons /screen and /stock/:id: both
+ * open with `if (!SCREEN)`, find a full cache, and render a company page whose
+ * risk flags are silently absent. Not an error — an empty section, on the page
+ * whose entire job is to explain that company. */
+{
+  ok("the cache records which projection it holds", /let SCREEN_LITE = false/.test(JS));
+  ok("SCREEN is only ever set through setScreen",
+     !/\bSCREEN = \((?!.*setScreen)/.test(JS.replace(/let SCREEN = null;/, "")));
+  // Comment lines explain this guard and would otherwise be counted as uses
+  // of it — the same trap that made an earlier check match its own docstring.
+  const code = JS.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
+  const fullGuards = (code.match(/!SCREEN \|\| SCREEN_LITE/g) || []).length;
+  ok("all three full-payload call sites reject a lite cache", fullGuards === 3, fullGuards);
+  // And nothing may reach for the raw path any more.
+  ok("no route fetches '/screen.json' by literal — FULL_URL or LITE_URL",
+     !/get\(\s*['"]\/screen\.json['"]\s*\)/.test(JS));
+  const liteN = (JS.match(/get\(LITE_URL\)/g) || []).length;
+  ok("the light routes read the lite table", liteN >= 7, liteN);
+}
+
+/* ── FIVE SLOTS, FIVE ANSWERS ────────────────────────────────────────────────
+ * The bar was Home / Signals / Discover / Watch / More. Two faults:
+ *   - /markets — the one route that answers "what is happening?" — was
+ *     reachable from NO tab. It existed and was navigable only by search or a
+ *     link on Home.
+ *   - "More" is not a destination. In a five-slot bar one slot said nothing,
+ *     and everything in it a phone needs day to day (search, freshness, theme,
+ *     density) was already in the header.
+ * Every tab must be a real, renderable route — a bar entry pointing at a
+ * missing route is a dead end the router turns into a 404. */
+{
+  const nav = [...HTML.matchAll(/<a href="(\/[a-z/]*)" data-route="([^"]+)">[\s\S]*?<span>([^<]+)<\/span>/g)]
+    .map((m) => ({ href: m[1], route: m[2], label: m[3] }));
+  ok("the bar has five slots", nav.length === 5, nav.map((n) => n.label));
+  ok("href and data-route agree on every tab",
+     nav.every((n) => n.href === n.route), nav.filter((n) => n.href !== n.route));
+
+  const routes = new Set([...JS.matchAll(/R\['(\/[a-z0-9:/-]*)'\]\s*=/g)].map((m) => m[1]));
+  const dead = nav.filter((n) => !routes.has(n.route));
+  ok("every tab points at a route the app can render", dead.length === 0, dead);
+
+  ok("Markets is in the bar — it answers the first question the app exists for",
+     nav.some((n) => n.route === "/markets"));
+  ok("no slot is a junk drawer",
+     !nav.some((n) => /^(more|other|misc)$/i.test(n.label.trim())),
+     nav.map((n) => n.label));
+
+  // What "More" held that lives nowhere else must still be reachable.
+  ok("the provenance links moved to the Ledger rather than being dropped",
+     /const provenance = \(\) => sec\(/.test(JS) && /provenance\(\);/.test(JS));
+  ok("nothing still binds the removed #moreBtn", !/getElementById\('moreBtn'\)/.test(JS));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

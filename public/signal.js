@@ -1236,9 +1236,9 @@
   async function screenIndex() {
     if (window.__SCRIDX) return window.__SCRIDX;
     if (!SCREEN) {
-      const r = noteLadder(await get('/screen.json'));
+      const r = noteLadder(await get(LITE_URL));
       if (!r.ok) return null;
-      SCREEN = (r.data.rows || []).filter(x => x && x.sym);
+      setScreen((r.data.rows || []).filter(x => x && x.sym), true);
     }
     const idx = {};
     for (const r of SCREEN) idx[r.sym] = r;
@@ -1817,7 +1817,7 @@
      * away and back does try again — the guard stops a loop, not a retry. */
     if (!heavyTried && (!cl.ready || !sr.ready)) {
       heavyTried = true;
-      Promise.all([get('/api/calendar'), get('/screen.json').then(noteLadder)]).then(() => {
+      Promise.all([get('/api/calendar'), get(LITE_URL).then(noteLadder)]).then(() => {
         if (routeOf() === '/') R['/']();
       });
     }
@@ -3260,10 +3260,10 @@
       [get('/today.json'), get('/mandate.json'), get('/pulse.json'), get('/api/ticker'), ledger(),
        /* Needed for the levels under each idea. Cached across routes, so this
         * is free for anyone who has already opened /screen or /radar. */
-       SCREEN ? Promise.resolve({ ok: false }) : get('/screen.json')]);
+       SCREEN ? Promise.resolve({ ok: false }) : get(LITE_URL)]);
     if (sc && sc.ok && sc.data) {
       noteLadder(sc);
-      SCREEN = SCREEN || (sc.data.rows || []).filter(x => x && x.sym);
+      if (!SCREEN) setScreen((sc.data.rows || []).filter(x => x && x.sym), true);
       SCREEN_DATE = SCREEN_DATE || sc.data.price_date || null;
     }
     let out = head('Ideas', 'Ranked names, and the orders a fully-sized book would place against them. Sizes are shown as a share of the book, so they scale to whatever you run.', 'Ranked ideas');
@@ -4045,6 +4045,32 @@
    * which is the whole reason the digest exists and why both can coexist.
    */
   let SCREEN = null;
+  /* ── WHICH TABLE IS IN THE CACHE ─────────────────────────────────────────
+   *
+   * The screen table ships in two projections. screen-lite.json is what nine
+   * routes read: the same rows with 29 fields the frontend never touches
+   * removed, and the per-company PROSE — risk.flags, vd.f — moved to the
+   * detail payload. 298 KB gzipped becomes 206 KB, on every route that lists
+   * companies rather than examining one.
+   *
+   * SCREEN is a module-level cache shared by all of them, so without this flag
+   * the first light route to load would poison the two routes that need the
+   * prose: /screen and /stock/:id both open with `if (!SCREEN)`, would find a
+   * populated cache, and would render a company page with its risk flags
+   * silently absent. Not an error — an empty section, on the page whose entire
+   * job is to explain one company.
+   *
+   * So the two full-payload routes ask `!SCREEN || SCREEN_LITE` and re-fetch
+   * over the top. A reader who lands on Home and taps into a company pays for
+   * the full table once, at the moment it is actually needed; a reader who
+   * never opens one never pays for it at all. */
+  let SCREEN_LITE = false;
+  const LITE_URL = '/screen-lite.json', FULL_URL = '/screen.json';
+  /* The index is derived from SCREEN and must be dropped whenever SCREEN is,
+   * or it goes on answering from the projection that has been replaced. */
+  const setScreen = (rows, lite) => {
+    SCREEN = rows; SCREEN_LITE = !!lite; window.__SCRIDX = null;
+  };
   /* FILTERS COMBINE. They used to be radio buttons wearing the shape of
    * chips: picking "Debt-free" threw away "Breaking out", so the one question
    * a screen exists to answer — which names clear SEVERAL bars at once — was
@@ -4609,13 +4635,16 @@
     if (!SCREEN) paint(shell(`<div class="note">Loading the full universe — about 260 KB, once per session.</div>` +
       `<div class="sk" style="height:320px"></div>`));
 
-    if (!SCREEN) {
+    /* `|| SCREEN_LITE` — a cache filled by a light route is missing the
+     * per-company prose this surface exists to show, so it is re-fetched over
+     * the top rather than rendered with the sections silently empty. */
+    if (!SCREEN || SCREEN_LITE) {
       // In parallel, and institutional data is allowed to fail: it is one
       // section of one screen, and losing it must never cost the reader the
       // 750 rows they actually came for.
-      const [r] = await Promise.all([get('/screen.json').then(noteLadder), loadInsti()]);
+      const [r] = await Promise.all([get(FULL_URL).then(noteLadder), loadInsti()]);
       if (!r.ok) { paint(shell(fail('The screen', r.error))); return; }
-      SCREEN = (r.data.rows || []).filter(x => x && x.sym);
+      setScreen((r.data.rows || []).filter(x => x && x.sym), false);
     } else await loadInsti();
 
     let shownRows = [];          // the page the live quote call must ask for
@@ -5515,12 +5544,15 @@
 
   async function openStock(rawSym) {
     const sym = bareSym(rawSym);
-    if (!SCREEN) {
+    /* `|| SCREEN_LITE` — a cache filled by a light route is missing the
+     * per-company prose this surface exists to show, so it is re-fetched over
+     * the top rather than rendered with the sections silently empty. */
+    if (!SCREEN || SCREEN_LITE) {
       sheet(esc(sym), `<div class="sk" style="height:210px"></div>
-        <p class="hint">Loading the screen — about 260 KB, once per session.</p>`);
-      const r0 = noteLadder(await get('/screen.json'));
+        <p class="hint">Loading the full screen — about 300 KB, once per session.</p>`);
+      const r0 = noteLadder(await get(FULL_URL));
       if (!r0.ok) { sheet(esc(sym), fail('The company card', r0.error)); return; }
-      SCREEN = (r0.data.rows || []).filter(x => x && x.sym);
+      setScreen((r0.data.rows || []).filter(x => x && x.sym), false);
     }
     // The card can be opened from Today, Markets, Ideas or search, none of
     // which touch the Screen route, so the institutional feed is requested
@@ -6105,10 +6137,10 @@
      * and if the user has already been to /screen or /radar this session,
      * SCREEN is populated and no request is made at all. */
     if (!SCREEN) {
-      get('/screen.json').then(sc => {
+      get(LITE_URL).then(sc => {
         if (!sc.ok || !sc.data) return;
         noteLadder(sc);
-        SCREEN = (sc.data.rows || []).filter(x => x && x.sym);
+        setScreen((sc.data.rows || []).filter(x => x && x.sym), true);
         SCREEN_DATE = sc.data.price_date || SCREEN_DATE;
         if (location.pathname === '/signals') draw();
       });
@@ -6317,7 +6349,8 @@
                <button type="button" class="chip" data-sgf-reset style="margin-top:10px">Clear filters</button>
              </div>`,
           `${rows.length} of ${all.length}`) +
-        (ENG_TABLE ? floorHtml(ENG_TABLE, all) : '');
+        (ENG_TABLE ? floorHtml(ENG_TABLE, all) : '') +
+        provenance();
       if (CURVE) wireRCurve(CURVE);
       // Same reason as the Screen's: name the chips this handler owns.
       main.querySelectorAll('.chip[data-s]').forEach(b => b.addEventListener('click', () => {
@@ -6772,7 +6805,7 @@
       <div class="b-sk" style="height:300px;margin-top:26px"></div></div></div>`);
 
     const [a, sc, st] = await Promise.all(
-      [ledger(), get('/screen.json').then(noteLadder), get('/api/stats')]);
+      [ledger(), get(LITE_URL).then(noteLadder), get('/api/stats')]);
     if (!a.ok) { paint(fail('The signal brief', a.error)); return; }
     const rows = a.rows;
     /* SINCE LAUNCH, LIKE EVERY OTHER SURFACE ON THIS SITE.
@@ -6829,7 +6862,7 @@
     };
     const RANKED = !!(COL.r1m && COL.vol && COL.trend);
 
-    if (sc.ok) SCREEN = SCREEN || (sc.data.rows || []).filter(x => x && x.sym);
+    if (sc.ok && !SCREEN) setScreen((sc.data.rows || []).filter(x => x && x.sym), true);
     const inScreen = sym => (SCREEN || []).some(x => x.sym === sym);
     /* ── WHAT THE BRIEF PICKS, AND WHY IT USED TO PICK BADLY ──────────────
      *
@@ -9173,7 +9206,7 @@
 
   R['/news'] = async () => {
     const [n, sc, pu, ed, lw] = await Promise.all(
-      [get('/news.json'), get('/screen.json'), get('/pulse.json'), get('/edition.json'),
+      [get('/news.json'), get(LITE_URL), get('/pulse.json'), get('/edition.json'),
        get('/api/wire')]);
     const live = lw.ok && lw.data && lw.data.ok ? lw.data : null;
     /* Same reasoning as the front page: the wire carries no timestamp of its
@@ -9624,9 +9657,12 @@
     if (!sym) { go('/screen', { replace: true }); return; }
     paint(head(sym, 'Loading the card…', 'Company') + skel('sk-card', 3));
 
-    if (!SCREEN) {
-      const r0 = noteLadder(await get('/screen.json'));
-      if (r0.ok) SCREEN = (r0.data.rows || []).filter(x => x && x.sym);
+    /* `|| SCREEN_LITE` — a cache filled by a light route is missing the
+     * per-company prose this surface exists to show, so it is re-fetched over
+     * the top rather than rendered with the sections silently empty. */
+    if (!SCREEN || SCREEN_LITE) {
+      const r0 = noteLadder(await get(FULL_URL));
+      if (r0.ok) setScreen((r0.data.rows || []).filter(x => x && x.sym), false);
     }
     await loadInsti();
     const r = (SCREEN || []).find(x => x.sym === sym);
@@ -9930,9 +9966,9 @@
     paint(shell(`<div class="sk" style="height:420px"></div>`));
 
     if (!SCREEN) {
-      const r0 = noteLadder(await get('/screen.json'));
+      const r0 = noteLadder(await get(LITE_URL));
       if (!r0.ok) { paint(shell(fail('The radar', r0.error))); return; }
-      SCREEN = (r0.data.rows || []).filter(x => x && x.sym);
+      setScreen((r0.data.rows || []).filter(x => x && x.sym), true);
       RADAR_BREADTH = r0.data.breadth || null;
       SCREEN_DATE = r0.data.price_date || null;
     }
@@ -10507,27 +10543,30 @@
       ['/privacy', 'Privacy', ''],
     ]],
   ];
-  const openMore = () => {
-    sheet('More', `<div class="more">${MORE.map(([grp, items]) => `
+  /* ── PROVENANCE, AT THE FOOT OF THE RECORD ──────────────────────────────
+   *
+   * These links were behind a bottom-bar button labelled "More" — a junk
+   * drawer in a five-slot navigation, whose label told a reader nothing and
+   * whose most-used contents (theme, density, search, freshness) are in the
+   * header anyway. What was actually in there and nowhere else is provenance:
+   * how the numbers are made, where they come from, and the engine floor.
+   *
+   * Provenance belongs with the record it qualifies, not in a drawer, so it
+   * sits at the bottom of the Ledger. That is also the spec's own answer:
+   * methodology and sources are Ledger, not a sixth destination.
+   *
+   * It is LAST on the page deliberately. Methodology must never compete with
+   * the number it explains — the reader gets the record, then the evidence,
+   * then how it was made, in that order. */
+  const provenance = () => sec('How this record is made',
+    `<div class="more">${MORE.map(([grp, items]) => `
       <div class="more-g"><h4>${esc(grp)}</h4>
         ${items.map(([href, name, sub]) => `<a class="more-i" href="${esc(href)}">
           <b>${esc(name)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}
-        </a>`).join('')}</div>`).join('')}
-      <div class="more-g"><h4>Display</h4>
-        <button type="button" class="more-i" id="moreTheme"><b>Switch theme</b>
-          <span>Light and dark are both designed, not inverted</span></button>
-        <button type="button" class="more-i" id="moreDens"><b>Row density</b>
-          <span>Comfortable or compact tables</span></button>
-      </div>`);
-    // The sheet is rebuilt each open, so these bind here rather than once.
-    const th = document.getElementById('moreTheme');
-    if (th) th.addEventListener('click', () => document.getElementById('themeBtn')?.click());
-    const dn = document.getElementById('moreDens');
-    if (dn) dn.addEventListener('click', () => document.getElementById('densBtn')?.click());
-    // A link inside the sheet must close it, or the route changes behind a drawer.
-    document.querySelectorAll('.more-i[href]').forEach(a =>
-      a.addEventListener('click', () => document.getElementById('sheet')?.close()));
-  };
+        </a>`).join('')}</div>`).join('')}</div>`,
+    null,
+    'Every figure above is produced by a run that can be repeated. These say how.');
+
 
   R['/discover'] = async () => {
     paint(head('Discover', 'Seven ways into the same 750 names. Each answers a different question.',
@@ -11431,8 +11470,8 @@
 
   /* A pushState fires nothing, so navigation is driven by two things: the
    * click interceptor below, and the back/forward button. */
-  const moreBtn = document.getElementById('moreBtn');
-  if (moreBtn) moreBtn.addEventListener('click', openMore);
+  /* #moreBtn is gone from the bar — its slot is the Ledger and its contents
+     are the provenance block at the foot of that page. No binding to keep. */
 
   window.addEventListener('popstate', render);
 
