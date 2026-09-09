@@ -1256,9 +1256,9 @@
   async function screenIndex() {
     if (window.__SCRIDX) return window.__SCRIDX;
     if (!SCREEN) {
-      const r = noteLadder(await get(LITE_URL));
+      const g = await getScreen(false); const r = noteLadder(g.r);
       if (!r.ok) return null;
-      setScreen((r.data.rows || []).filter(x => x && x.sym), true);
+      setScreen((r.data.rows || []).filter(x => x && x.sym), g.lite);
     }
     const idx = {};
     for (const r of SCREEN) idx[r.sym] = r;
@@ -1837,7 +1837,7 @@
      * away and back does try again — the guard stops a loop, not a retry. */
     if (!heavyTried && (!cl.ready || !sr.ready)) {
       heavyTried = true;
-      Promise.all([get('/api/calendar'), get(LITE_URL).then(noteLadder)]).then(() => {
+      Promise.all([get('/api/calendar'), getScreen(false).then(g => noteLadder(g.r))]).then(() => {
         if (routeOf() === '/') R['/']();
       });
     }
@@ -3280,10 +3280,10 @@
       [get('/today.json'), get('/mandate.json'), get('/pulse.json'), get('/api/ticker'), ledger(),
        /* Needed for the levels under each idea. Cached across routes, so this
         * is free for anyone who has already opened /screen or /radar. */
-       SCREEN ? Promise.resolve({ ok: false }) : get(LITE_URL)]);
+       SCREEN ? Promise.resolve({ ok: false }) : getScreen(false).then(g => (LITE_GOT = g.lite, g.r))]);
     if (sc && sc.ok && sc.data) {
       noteLadder(sc);
-      if (!SCREEN) setScreen((sc.data.rows || []).filter(x => x && x.sym), true);
+      if (!SCREEN) setScreen((sc.data.rows || []).filter(x => x && x.sym), LITE_GOT);
       SCREEN_DATE = SCREEN_DATE || sc.data.price_date || null;
     }
     let out = head('Ideas', 'Ranked names, and the orders a fully-sized book would place against them. Sizes are shown as a share of the book, so they scale to whatever you run.', 'Ranked ideas');
@@ -4085,7 +4085,33 @@
    * the full table once, at the moment it is actually needed; a reader who
    * never opens one never pays for it at all. */
   let SCREEN_LITE = false;
+  /* Set by the light routes' fetch so their setScreen() cannot claim `lite`
+     when the fallback served the full table. */
+  let LITE_GOT = true;
   const LITE_URL = '/screen-lite.json', FULL_URL = '/screen.json';
+  /* ── AND IF THE LITE TABLE IS NOT THERE, USE THE FULL ONE ────────────────
+   *
+   * screen-lite.json is produced by the newspaper build and arrives here by
+   * sync. Those are two pipelines with two clocks, so there is a window —
+   * measured, on the deploy that shipped this — where the code asking for it
+   * is live and the file is not. On that deploy /radar fetched a 404 and
+   * rendered ZERO names, and the live UI check caught it.
+   *
+   * A missing projection is not a missing answer: the full table has every
+   * field the lite one does. Falling back costs ~100 KB and produces a correct
+   * page; not falling back produces an empty one. That is the same trade this
+   * site makes everywhere else — stale, or slower, is a state to handle; gone
+   * is not.
+   *
+   * It is deliberately NOT silent about which it got: `lite` comes back false
+   * on the fallback path, so the two routes that need the prose do not then
+   * re-fetch a table they already hold in full. */
+  const getScreen = async (wantFull) => {
+    if (wantFull) return { r: await get(FULL_URL), lite: false };
+    const r = await get(LITE_URL);
+    if (r.ok) return { r, lite: true };
+    return { r: await get(FULL_URL), lite: false };
+  };
   /* The index is derived from SCREEN and must be dropped whenever SCREEN is,
    * or it goes on answering from the projection that has been replaced. */
   const setScreen = (rows, lite) => {
@@ -6190,10 +6216,10 @@
      * and if the user has already been to /screen or /radar this session,
      * SCREEN is populated and no request is made at all. */
     if (!SCREEN) {
-      get(LITE_URL).then(sc => {
+      getScreen(false).then(g => (LITE_GOT = g.lite, g.r)).then(sc => {
         if (!sc.ok || !sc.data) return;
         noteLadder(sc);
-        setScreen((sc.data.rows || []).filter(x => x && x.sym), true);
+        setScreen((sc.data.rows || []).filter(x => x && x.sym), LITE_GOT);
         SCREEN_DATE = sc.data.price_date || SCREEN_DATE;
         if (location.pathname === '/signals') draw();
       });
@@ -6858,7 +6884,7 @@
       <div class="b-sk" style="height:300px;margin-top:26px"></div></div></div>`);
 
     const [a, sc, st] = await Promise.all(
-      [ledger(), get(LITE_URL).then(noteLadder), get('/api/stats')]);
+      [ledger(), getScreen(false).then(g => (LITE_GOT = g.lite, noteLadder(g.r))), get('/api/stats')]);
     if (!a.ok) { paint(fail('The signal brief', a.error)); return; }
     const rows = a.rows;
     /* SINCE LAUNCH, LIKE EVERY OTHER SURFACE ON THIS SITE.
@@ -6915,7 +6941,7 @@
     };
     const RANKED = !!(COL.r1m && COL.vol && COL.trend);
 
-    if (sc.ok && !SCREEN) setScreen((sc.data.rows || []).filter(x => x && x.sym), true);
+    if (sc.ok && !SCREEN) setScreen((sc.data.rows || []).filter(x => x && x.sym), LITE_GOT);
     const inScreen = sym => (SCREEN || []).some(x => x.sym === sym);
     /* ── WHAT THE BRIEF PICKS, AND WHY IT USED TO PICK BADLY ──────────────
      *
@@ -9259,7 +9285,7 @@
 
   R['/news'] = async () => {
     const [n, sc, pu, ed, lw] = await Promise.all(
-      [get('/news.json'), get(LITE_URL), get('/pulse.json'), get('/edition.json'),
+      [get('/news.json'), getScreen(false).then(g => g.r), get('/pulse.json'), get('/edition.json'),
        get('/api/wire')]);
     const live = lw.ok && lw.data && lw.data.ok ? lw.data : null;
     /* Same reasoning as the front page: the wire carries no timestamp of its
@@ -10016,9 +10042,9 @@
     paint(shell(`<div class="sk" style="height:420px"></div>`));
 
     if (!SCREEN) {
-      const r0 = noteLadder(await get(LITE_URL));
+      const g0 = await getScreen(false); const r0 = noteLadder(g0.r);
       if (!r0.ok) { paint(shell(fail('The radar', r0.error))); return; }
-      setScreen((r0.data.rows || []).filter(x => x && x.sym), true);
+      setScreen((r0.data.rows || []).filter(x => x && x.sym), g0.lite);
       RADAR_BREADTH = r0.data.breadth || null;
       SCREEN_DATE = r0.data.price_date || null;
     }
