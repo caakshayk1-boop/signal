@@ -593,6 +593,44 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      /<div class="k">\$\{esc\(k\)\}\$\{tipKey \? ' ' \+ tip\(tipKey\) : ''\}<\/div>/.test(JS));
 }
 
+/* ── ONE FIELD, ONE VOCABULARY ───────────────────────────────────────────────
+ * `vd.c` was rendered two ways depending on the page: the screen said Act and
+ * Ignore where the radar said Buy and Avoid. Same company, same build, same
+ * field, two answers — and "Act" is a stronger word than a site with no
+ * cleared engine is entitled to use.
+ *
+ * It survived because test/ui.mjs pins the vocabulary by sampling `.rd-v` on
+ * the radar, and nothing looked at the screen's tag. The map is single now;
+ * this asserts it stays single. */
+{
+  ok("there is exactly one verdict table", /const VERDICT = \{/.test(JS));
+  ok("VD_WORD is derived from it, not hand-kept",
+     /const VD_WORD = Object\.fromEntries\(/.test(JS));
+  ok("VERDICT_LOOK is derived from it, not hand-kept",
+     /const VERDICT_LOOK = VERDICT;/.test(JS));
+  /* THE REAL INVARIANT, not a list of banned words.
+   *
+   * Banning "Act" catches the spelling that happened; it does not catch the
+   * next one. What must hold is that the words this table produces are the
+   * words test/ui.mjs allows on the live page — so the two files are compared
+   * against each other rather than both against a guess. That is the check
+   * that would have caught the original drift on the day it landed. */
+  const vblock = (JS.match(/const VERDICT = \{[\s\S]*?\n  \};/) || [""])[0];
+  const words = [...vblock.matchAll(/\[\s*'[a-z]*',\s*'([^']+)'\s*\]/g)].map((m) => m[1]);
+  const UI = readFileSync("test/ui.mjs", "utf8");
+  const allowed = [...(UI.match(/const allowed = new Set\(\[([^\]]*)\]/) || ["", ""])[1]
+    .matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  ok("ui.mjs declares an allowed verdict set", allowed.length > 0);
+  const stray = words.filter((w) => !allowed.includes(w));
+  ok("every word the verdict table produces is one the live page allows",
+     stray.length === 0, stray);
+  ok("the two files agree on the whole set",
+     words.length === allowed.length, { words, allowed });
+  // UNRATED must be declared, not reached by falling off the end of the table.
+  ok("UNRATED is a declared verdict, not an accident of the default",
+     /UNRATED:\s*\[/.test(JS));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

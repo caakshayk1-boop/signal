@@ -5005,8 +5005,40 @@
    * horizon, and — for a WAIT — the level that would change it. */
   const VD_CLASS = { BUY: 'pill-up', WAIT: 'pill-wn', AVOID: 'pill-dn',
                      WATCH: 'pill-ac', UNRATED: 'pill-ac' };
-  const VD_WORD  = { BUY: 'Act', WAIT: 'Wait', AVOID: 'Ignore',
-                     WATCH: 'Watch', UNRATED: 'Not rated' };
+  /* ── ONE VERDICT VOCABULARY, BECAUSE THERE WERE TWO ──────────────────────
+   *
+   * `vd.c` is a single field with a single meaning, and this site rendered it
+   * two different ways depending on which page you were on:
+   *
+   *     vd.c        the screen said     the radar said
+   *     BUY         Act                 Buy
+   *     AVOID       Ignore              Avoid
+   *     WAIT        Wait                Wait for entry
+   *
+   * Same company, same build, same field, two answers. A reader moving from
+   * the screen to the radar had no way to know they were reading the same
+   * verdict — and "Act" is a stronger word than anything this site is entitled
+   * to say about an engine with no cleared record.
+   *
+   * VERDICT is now the one source. It is the radar's vocabulary because that
+   * is the set test/ui.mjs already pins against the live page — the screen's
+   * was the outlier, and it was the outlier precisely because no test looked
+   * at it. VD_WORD and VERDICT_LOOK are both derived from it so the two call
+   * shapes keep working without a third spelling appearing.
+   *
+   * UNRATED is here as well as being the fallback: the radar had no entry for
+   * it and reached the default by accident, which works right up until someone
+   * changes the default. */
+  const VERDICT = {
+    BUY:     ['up',   'Buy'],
+    WAIT:    ['warn', 'Wait for entry'],
+    WATCH:   ['',     'Watch'],
+    AVOID:   ['dn',   'Avoid'],
+    UNRATED: ['',     'Not rated'],
+  };
+  const verdictWord = c => (VERDICT[c] || VERDICT.UNRATED)[1];
+  const VD_WORD = Object.fromEntries(
+    Object.entries(VERDICT).map(([k, [, w]]) => [k, w]));
 
   const verdictBlock = r => {
     const v = r.vd;
@@ -9972,12 +10004,9 @@
     return { score, state, rows, wsum };
   };
 
-  const VERDICT_LOOK = {
-    BUY:   ['up',   'Buy'],
-    WAIT:  ['warn', 'Wait for entry'],
-    WATCH: ['',     'Watch'],
-    AVOID: ['dn',   'Avoid'],
-  };
+  /* Derived from VERDICT — see the note there. It was a second, hand-kept copy
+     of the same table and had drifted from the screen's on three of five. */
+  const VERDICT_LOOK = VERDICT;
   const strengthWord = (s) => s == null ? 'Not scored'
     : s >= 75 ? 'Strong' : s >= 60 ? 'Firm' : s >= 45 ? 'Moderate' : s >= 30 ? 'Soft' : 'Weak';
 
