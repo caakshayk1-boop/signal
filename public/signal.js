@@ -1058,6 +1058,62 @@
   };
   /* The old map is kept as the fallback for a row whose engine has since been
    * retired: an unrecognised key renders as itself rather than as blank. */
+  /* ── HOW MANY ENGINES ARE THERE? ONE ANSWER, NOT THREE ──────────────────
+   *
+   * Three pages counted this three different ways and none of them showed
+   * their working, so a reader moving between them met a contradiction:
+   *
+   *   /          8   the roster groups by DISPLAY NAME, and TIDAL runs two
+   *                  bands, so its two registry keys merge into one row
+   *   /signals   9   "9 of 9 working" — one card per registry KEY
+   *   /engines   9   the same nine keys
+   *   /research  3   BUOY, ANCHOR and BEDROCK, named on no other page
+   *
+   * Every one of those numbers is correct about a different thing, which is
+   * the worst kind of inconsistency: nothing to fix in the arithmetic, and a
+   * reader who cannot tell that. The research three are the sharper problem —
+   * the site publishes twelve engines and the two pages a reader would look
+   * at named nine of them, which is the omission /engines' own comment says
+   * this site exists not to make.
+   *
+   * So the counts come from here, both pages print the same sentence, and the
+   * sentence states the arithmetic instead of asserting a total. */
+  const ENGINE_KEYS = () => Object.keys(ENGINE_REGISTRY);
+  const ENGINE_NAMES = () => [...new Set(ENGINE_KEYS().map(k => ENGINE_REGISTRY[k].name))];
+  /* The research floor's own count, read from its feed rather than hardcoded —
+   * a fourth engine added there must not leave a "three" behind on two other
+   * pages. Null until /research.json has been fetched by any route this
+   * session, and the sentence simply omits the clause until it has. */
+  let RESEARCH_N = null;
+  /* Filled on demand, from the feed, at 9.7 KB — small enough that a page
+   * showing the tally can pay for it, and the only way the clause is true
+   * for a reader who never visits /research. get() de-duplicates concurrent
+   * callers and caches for the session, so asking from two routes costs one
+   * request. A failure leaves the count null and the sentence simply omits
+   * the clause rather than guessing a number. */
+  const loadResearchN = async () => {
+    if (RESEARCH_N != null) return RESEARCH_N;
+    const r = await get('/research.json');
+    if (r.ok && r.data && Array.isArray(r.data.engines)) RESEARCH_N = r.data.engines.length;
+    return RESEARCH_N;
+  };
+  const engineTally = () => {
+    const names = ENGINE_NAMES().length, keys = ENGINE_KEYS().length;
+    const bands = keys > names
+      ? ` — ${names} names over ${keys} configurations, because TIDAL runs two bands`
+      : '';
+    return { names, keys, research: RESEARCH_N, bands };
+  };
+  const engineTallyNote = () => {
+    const t = engineTally();
+    return `<b>${t.names} engine${t.names === 1 ? '' : 's'} publish here</b>${t.bands}.`
+      + (t.research
+         ? ` A further <b>${t.research}</b> are measured but <b>not cleared to publish</b> —
+            they sit on <a href="/research">the research floor</a> with the null results that
+            keep them there, and nothing they produce is filed as a signal.`
+         : '');
+  };
+
   const ENGINE_LABEL = new Proxy({}, { get: (_, k) => engName(k) });
   /* ── OLD NAMES IN STORED PROSE ───────────────────────────────────────────
    * The registry renames what the site RENDERS, but `remarks` is free text
@@ -1659,7 +1715,12 @@
     const [t, p, n, m, fl, ed, lw, sgx] = await Promise.all(
       [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets'),
        get('/api/flows'), get('/edition.json'), get('/api/wire'),
-       ledger()]);
+       ledger(),
+       /* The research count, so the roster below can name the engines that do
+        * NOT publish. In the same Promise.all rather than awaited separately:
+        * it must not add a round trip to first paint, and a reader who never
+        * opens /research is exactly the one who needs the sentence. */
+       loadResearchN()]);
     /* THE SITE'S OWN RECORD — THROUGH ledger(), NOT A SECOND COPY OF ITS RULES.
      *
      * The first attempt fetched /api/signals here and filtered it by hand. It
@@ -2038,8 +2099,10 @@
               ? (Math.round(r.wins / r.closed * 1000) / 10) + '%' : '—'}</span>` : ''}
           </a>`).join('')}
         </div>
-        <p class="hint">An engine is trusted with capital at 30 closed trades and t&nbsp;≥&nbsp;2.
-          None is there. <a href="/engines">What each engine fires on</a> ·
+        <p class="hint">${engineTallyNote()} This roster groups by name, so the two TIDAL bands
+          share a row; the floor on <a href="/signals">the ledger</a> lists them separately.
+          An engine is trusted with capital at 30 closed trades and t&nbsp;≥&nbsp;2, and none is
+          there. <a href="/engines">What each engine fires on</a> ·
           <a href="/methodology">How this is measured</a> ·
           <a href="/signals">Every trade, one by one</a></p>`,
         `${LR.published} published · ${LR.trades} closed`);
@@ -5597,15 +5660,18 @@
      * heading, the working count and the standfirst stay in the flow and the
      * cards wait for a tap. */
     return sec('The floor', foldBody(
-      `${Object.keys(ENGINE_REGISTRY).length} engines — what each hunts, what it must earn, and the record behind that bar`,
+      `${ENGINE_KEYS().length} configurations — what each hunts, what it must earn, and the record behind that bar`,
       `<div class="floor">${cards}</div>
       <p class="hint">The bar is how far each engine's floor has been raised above the
         2R default, toward the 6R cap at which it stops publishing altogether. That floor
         comes from the engine's own win rate — break-even R:R is (1−p)/p — so an engine
         that wins less often has to earn more per trade before it is allowed to file one.
         A raised bar is not a fault; it is the system refusing trades that record says
-        lose money.</p>`),
-      `${on} of ${Object.keys(ENGINE_REGISTRY).length} working`,
+        lose money.</p>
+      <p class="hint">${engineTallyNote()} This floor lists one card per <b>configuration</b>, so
+        TIDAL appears twice — once per band. The roster on <a href="/">the front page</a> groups
+        by name and shows ${ENGINE_NAMES().length} rows for the same set.</p>`),
+      `${on} of ${ENGINE_KEYS().length} working`,
       'Who is on the floor, what each one hunts, and what it has to earn to file a trade.');
   }
 
@@ -5816,6 +5882,7 @@
     const [r, lg] = await Promise.all([get('/research.json'), get('/alerts_log.json')]);
     if (!r.ok || !r.data) { paint(shell(fail('The research floor', r.error || 'no scan yet')));  return; }
     const d = r.data, engines = d.engines || [];
+    RESEARCH_N = engines.length;      // so the roster and the floor can name them
     const LOG = (lg.ok && lg.data && Array.isArray(lg.data.rows)) ? lg.data : null;
     const fired = engines.reduce((s, e) => s + (e.fired || 0), 0);
 
@@ -5877,7 +5944,7 @@
   R['/signals'] = async () => {
     const intro = 'Every alert this site has sent since it launched, with the levels it was sent at. Scored when it closes — losers included, which is the point of publishing it.';
     paint(head('Signals', intro, 'The public ledger') + skel('sk-card', 4));
-    const [a, engRes] = await Promise.all([ledger(), get('/engines.json')]);
+    const [a, engRes] = await Promise.all([ledger(), get('/engines.json'), loadResearchN()]);
     const ENG_TABLE = (engRes && engRes.ok && engRes.data && engRes.data.ok) ? engRes.data : null;
     const base = head('Signals', intro, 'The public ledger')
       + (a.live ? '' : `<div class="note"><b>Showing this morning's snapshot, not the live ledger.</b>
@@ -9265,8 +9332,25 @@
              </div>
              <div class="ef-bar" role="img" aria-label="${Number(L.win_rate).toFixed(0)}% of ${n} closed trades were wins">
                <i style="width:${Math.max(2, Math.min(100, L.win_rate)).toFixed(0)}%"></i></div>`
-          : `<p class="ef-thin">Only <b>${n}</b> closed trade${n === 1 ? '' : 's'} — not enough
-               to carry a win rate.</p>`}
+          /* A FIGURE, NOT A SENTENCE — the same shape as the measured case
+           * directly above, with the two cells it cannot fill left out
+           * rather than filled with dashes.
+           *
+           * It was a sentence: "Only 1 closed trade — not enough to carry a
+           * win rate", printed on every engine with a thin prior ledger. Two
+           * of them share a count and it became the same sentence twice,
+           * which the duplication check is right to call boilerplate — the
+           * only thing specific to either was the digit. Shortening it just
+           * moved it under the word threshold, which is gaming the rule
+           * rather than answering it.
+           *
+           * The count is the fact and it is already a figure in the measured
+           * case; the reason a small sample carries no rate is a property of
+           * the page and is stated once under the roster. So the two cases
+           * now render the same way and the prose is gone from both. */
+          : `<div class="ef-rec">
+               <span class="ef-n"><b>${n}</b><em>closed, too few to rate</em></span>
+             </div>`}
         ${/* The same two clauses appeared on all five engines carrying an
             * earlier ledger. What differs per engine is the trade count that
             * set its floor; the reason the block is published at all is a
