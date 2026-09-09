@@ -607,6 +607,19 @@ try {
   ok("the institutional filter group renders", await grp.count() === 1);
 
   if (instiFeed && instiFeed.measured > 0) {
+    /* THE PANEL IS A DISCLOSURE, CLOSED BY DEFAULT.
+     * It is roughly two phone screens of secondary filters and it sits above
+     * the rows the reader came for, so it opens on a tap instead of on every
+     * visit. Two things have to stay true and both are asserted here: it is
+     * shut when nothing is filtered, and it opens BY ITSELF the moment one of
+     * its filters is on — a closed panel that is silently narrowing the table
+     * would be the worst version of this. */
+    ok("the panel is closed until it is wanted",
+       await grp.evaluate(e => !e.open));
+    await grp.locator("> summary.insti-h").click();
+    await p.waitForTimeout(200);
+    ok("the panel opens on its summary", await grp.evaluate(e => e.open));
+
     ok("the five quick filters are offered",
        await p.locator('.insti-g .chip[data-ic]').count() === 6);   // 5 + "Any"
 
@@ -619,6 +632,9 @@ try {
       .map(r => r.dataset.sym));
     const wrong = shown.filter(s => instiFeed.rows[s]?.signal !== "strong_accumulation");
     ok("the accumulation filter returns only accumulating names", wrong.length === 0, wrong.slice(0, 3));
+    // A filter that is narrowing the table may never hide behind a shut panel.
+    ok("an active filter re-opens the panel",
+       await p.locator(".insti-g").evaluate(e => e.open));
     ok("every filtered row carries its badge",
        shown.length === 0 || await p.locator(".scr-r:not(.rank-head) .scr-ins").count() === shown.length);
 
