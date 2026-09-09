@@ -3306,7 +3306,7 @@
               * pattern the rest of the site uses, so the card is a summary
               * again and the working is one tap under it. */''}
           ${(sr => sr ? `<details class="mbc-d"><summary>Levels, momentum and the year's range</summary>
-             <div class="mbc-dd">${factsStrip(sr)}${bandLine(sr)}${levelsBlock(sr)}</div></details>` : '')(screenRow(r.name))}
+             <div class="mbc-dd">${factsStrip(sr, { noLadder: true })}${bandLine(sr)}${levelsBlock(sr)}</div></details>` : '')(screenRow(r.name))}
         </article>`;
       }).join('')}</div>
       <p class="hint">The scan runs on a Saturday and this list is the newest run — it does not
@@ -6119,7 +6119,7 @@
             * year, and how stretched it is on a daily and a MONTHLY clock, are
             * what decide whether that ladder is a short hop or the far side of
             * a wall. Both come off the screen row this symbol already has. */''}
-        ${(sr => sr ? factsStrip(sr) + bandLine(sr) + levelsBlock(sr) : `
+        ${(sr => sr ? factsStrip(sr, { noLadder: true }) + bandLine(sr) + levelsBlock(sr) : `
           <p class="hint">${esc(bareSym(r.symbol))} is not on the 750-name Indian screen${
             r.market && r.market !== 'NSE' ? ` — it is ${esc(r.market)}` : ''}, so its
             52-week range, moving averages and support levels are not measured here. The
@@ -10004,7 +10004,7 @@
    * WAS the high — beside a live price 8.7% under it, and its published stop
    * of ₹94.54 sat above the ₹92.61 it traded at, which is a broken trade the
    * row said nothing about. */
-  const factsStrip = (r) => {
+  const factsStrip = (r, opts) => {
     if (!r) return '';
     return `<span class="rd-facts">
       <span class="rd-f"><em>RSI daily</em><b class="${r.rsi >= 70 ? 'dn' : r.rsi <= 35 ? 'up' : ''}">${
@@ -10021,7 +10021,30 @@
       <span class="rd-f"><em>Off its high</em><b data-fhigh="${esc(String(r.high52 ?? ''))}"
         class="${dir(r.from_high)}">${
         r.from_high == null ? '—' : Number(r.from_high).toFixed(1) + '%'}</b></span>
-      ${r.lad && r.lad.s != null ? `<span class="rd-f"><em>Stop</em>
+      ${/* ── THE LADDER, AND ONLY WHERE THERE IS NOT ALREADY ONE ─────────
+          * A stop and a first target with NO ENTRY beside them cannot be
+          * read: R is measured from the entry, so without it neither number
+          * says how much is at risk. EDELWEISS carried "Stop ₹125.46 · First
+          * target ₹144.34" over an entry of ₹132.72 that was in the data and
+          * simply not rendered.
+          *
+          * AND THE WHOLE BLOCK IS SUPPRESSED WHERE THE CARD HAS ITS OWN.
+          * This strip is reused under the signals-page ledger card, which
+          * already prints the ENGINE's entry, stop and targets. Both were
+          * shown, unlabelled, and they are different numbers computed from
+          * different prices: SARDAEN on 2026-09-09 read "Entry ₹545.85 ·
+          * Stop ₹483.61 · Target 1 ₹594.82" from the LEDGE signal filed that
+          * morning, over "Stop ₹490.41 · First target ₹557.96" from a screen
+          * row built at ₹508.55 — a 7% different price, and a verdict of
+          * WATCH, "Nothing to act on", under a card headed BUY.
+          *
+          * The screen's context (the year's range, RSI, the returns) is what
+          * that card wanted. Its ladder is a second opinion nobody asked for. */''}
+      ${r.lad && r.lad.s != null && !(opts && opts.noLadder) ? `
+        <span class="rd-f"><em>Entry</em><b
+          title="The screen's reference price. The stop and targets are measured from here, so R means nothing without it."
+          >${r.lad.e != null ? price(r.lad.e) : '—'}</b></span>
+        <span class="rd-f"><em>Stop</em>
           <b class="dn" data-stop="${esc(String(r.lad.s))}">${price(r.lad.s)}</b></span>
         <span class="rd-f"><em>First target</em><b class="up">${
           r.lad.t && r.lad.t[0] ? price(r.lad.t[0][0]) : '—'}</b></span>` : ''}
