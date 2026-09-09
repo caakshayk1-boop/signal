@@ -1078,7 +1078,18 @@ try {
   ok("the Best 5-year figure is a number, not a dash",
      !!(best && /\d/.test(best[1])), best && best[1]);
 
-  await page.locator(".rank-r.fnd[data-fund]").first().click();
+  /* THE LEADERS' BOARD IS THE VISIBLE PATH NOW.
+   * Each category's own table sits inside a closed disclosure — twenty open
+   * tables was 11,844px on a phone — so the row this used to click is in the
+   * document but not on the page. The board above carries one row per
+   * category and opens the same sheet, so the primary path is asserted
+   * there; the folded table is opened and asserted straight after, because
+   * "the rows are still reachable" is the thing folding could break. */
+  const leadN = await page.locator(".rank-r.fld[data-fund]").count();
+  ok("the leaders' board carries one row per category",
+     leadN === (feed ? feed.categories.filter(c => (c.funds || []).length).length : 0), leadN);
+
+  await page.locator(".rank-r.fld[data-fund]").first().click();
   await page.waitForTimeout(900);
   const sheetTxt = await page.locator("#sheet .sheet-b").innerText();
   ok("clicking a fund opens its sheet", sheetTxt.length > 200, sheetTxt.length);
@@ -1089,7 +1100,7 @@ try {
 
   // Data-conditional from here: assert what THIS feed carries, so the suite
   // fails on a rendering bug and not on a screen that has not rerun yet.
-  const clicked = await page.locator(".rank-r.fnd[data-fund]").first()
+  const clicked = await page.locator(".rank-r.fld[data-fund]").first()
     .getAttribute("data-fund");
   const first = feed && feed.categories.flatMap(c => c.funds)
     .find(f => String(f.code) === clicked);
@@ -1115,6 +1126,31 @@ try {
        /Top holdings and sectors/i.test(sheetTxt));
   }
   await page.evaluate(() => document.getElementById("sheet")?.close());
+  await page.waitForTimeout(250);
+
+  /* AND THE FOLDED CATEGORIES STILL HAND OVER THEIR ROWS.
+   * Sixty of the sixty-three fund rows now live inside a disclosure. That
+   * they open, and that their rows are genuinely on the page when they do,
+   * is the thing folding could break — a row present in the DOM and never
+   * visible is exactly the failure this suite exists to catch. */
+  const cat = page.locator("details.fcat").first();
+  ok("each category is a disclosure, closed on arrival", await cat.evaluate(e => !e.open));
+  await cat.locator("summary").click();
+  await page.waitForTimeout(350);
+  ok("opening one shows its ranked funds",
+     await cat.locator(".rank-r.fnd[data-fund]").first().isVisible());
+
+  /* A ROW THAT SAYS role="button" HAS TO ANSWER A KEYBOARD.
+   * Every fund row carries role="button" and tabindex="0" and only the mouse
+   * path was wired, so Enter did nothing on any of them. A row that announces
+   * itself as operable and is not is worse than one that never claimed to be. */
+  await page.evaluate(() => document.getElementById("sheet")?.close());
+  await page.waitForTimeout(250);
+  await page.locator(".rank-r.fld[data-fund]").first().focus();
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(800);
+  ok("Enter on a fund row opens it, not just a click",
+     await page.locator("#sheet[open]").count() === 1);
   await fCtx.close();
 
   /* ── EVERY ROUTE, EVERY ERROR ────────────────────────────────────────
@@ -1210,7 +1246,8 @@ try {
   const colCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const colP = await colCtx.newPage();
   for (const route of ["/", "/signals", "/screen", "/ideas", "/markets", "/ipo",
-                       "/brief", "/watch", "/engines", "/radar", "/news", "/funds"]) {
+                       "/brief", "/watch", "/engines", "/radar", "/news", "/funds",
+                       "/research"]) {
     await colP.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await colP.waitForTimeout(SETTLE + 3000);
     const faults = await colP.evaluate(() => {
@@ -1266,7 +1303,8 @@ try {
   const dupCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const dupP = await dupCtx.newPage();
   for (const route of ["/", "/signals", "/screen", "/ideas", "/markets", "/ipo",
-                       "/brief", "/engines", "/radar", "/news", "/funds", "/watch"]) {
+                       "/brief", "/engines", "/radar", "/news", "/funds", "/watch",
+                       "/research"]) {
     await dupP.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await dupP.waitForTimeout(SETTLE + 3000);
     const found = await dupP.evaluate(() => {

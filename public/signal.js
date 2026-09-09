@@ -1291,7 +1291,13 @@
     if (!ev.target.closest) return;
     const t = ev.target.closest('.heat-t');
     if (t && t.dataset.sector) { openSector(t.dataset.sector); return; }
-    const fd = ev.target.closest('.rank-r.fnd[data-fund]');
+    /* ANY row carrying a fund code, not only .fnd. The leaders' board renders
+     * .fld rows with data-fund and role="button" — and with the selector
+     * pinned to .fnd they were twenty rows that looked clickable and did
+     * nothing, which is precisely the fault the comment above this handler
+     * exists to describe. Bind on the DATA the row carries, not on the class
+     * that happened to carry it first. */
+    const fd = ev.target.closest('[data-fund]');
     if (fd && fd.dataset.fund) { openFund(fd.dataset.fund); return; }
     const bl = ev.target.closest('[data-brief]');
     if (bl) { briefSym = bl.dataset.brief; return; }   // the href does the routing
@@ -1306,9 +1312,16 @@
   });
   document.addEventListener('keydown', ev => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
-    if (ev.target.closest && ev.target.closest('.wstar')) return;
-    const n = ev.target.closest && ev.target.closest('[data-sym]');
-    if (n && n.dataset.sym) { ev.preventDefault(); openStock(n.dataset.sym); }
+    if (!ev.target.closest || ev.target.closest('.wstar')) return;
+    const n = ev.target.closest('[data-sym]');
+    if (n && n.dataset.sym) { ev.preventDefault(); openStock(n.dataset.sym); return; }
+    /* FUND ROWS TOO. Every one of them carries role="button" and tabindex="0"
+     * — it says it is a button and takes focus — and Enter did nothing,
+     * because only the mouse path was ever wired. A row that announces itself
+     * to a screen reader as operable and then is not is worse than one that
+     * never claimed to be. */
+    const f = ev.target.closest('[data-fund]');
+    if (f && f.dataset.fund) { ev.preventDefault(); openFund(f.dataset.fund); }
   });
 
   function openSector(name) {
@@ -5741,7 +5754,11 @@
         <span class="pill pill-${cls === 'dn' ? 'dn' : cls === 'up' ? 'up' : 'wn'}">${esc(label)}</span>
         <span class="rs-tf">${esc(e.timeframe || '')}</span>
       </div>
-      <p class="rs-hunt">${esc(e.hunts || '')}</p>
+      ${/* `hunts` is already the section's standfirst — sec() renders it as the
+          * serif lead above this block, and it was printed again here as body
+          * text three lines down. Every one of the three engines carried the
+          * same sentence twice on the same screen. The lead keeps it; this
+          * copy goes. */''}
       <div class="note ${e.status === 'REJECTED' ? 'note-dn' : ''}">
         <b>${e.status === 'REJECTED' ? 'This engine was rejected, and is shown anyway.'
                                      : 'This engine has no measured edge.'}</b>
@@ -8632,16 +8649,21 @@
       <span class="i">${i + 1}</span>
       <span class="s"><b>${esc(f.name || '—')}</b>
         <span>${esc(f.category || '')}${f.nav != null ? ` · NAV ${price(f.nav)}` : ''}</span></span>
-      <span class="x ${dir(r3)} ${heatCell(r3, 25)}"><b>${Number.isFinite(r3) ? r3.toFixed(2) + '%' : '—'}</b></span>
-      <span class="x ${dir(r5)} ${heatCell(r5, 25)}">${Number.isFinite(r5) ? r5.toFixed(2) + '%' : '—'}</span>
-      <span class="x ${dir(r1)} ${heatCell(r1, 40)}">${Number.isFinite(r1) ? r1.toFixed(1) + '%' : '—'}</span>
+      ${/* data-l on every cell. On a phone .rank-r stacks and each metric
+          * labels itself from this attribute — the mechanism every other
+          * table on the site uses. Without it these rendered as three bare
+          * numbers under a header that is hidden at that width: "17.15%",
+          * "-23.7%", "18.6", with nothing saying which was which. */''}
+      <span class="x ${dir(r3)} ${heatCell(r3, 25)}" data-l="3-year"><b>${Number.isFinite(r3) ? r3.toFixed(2) + '%' : '—'}</b></span>
+      <span class="x ${dir(r5)} ${heatCell(r5, 25)}" data-l="5-year">${Number.isFinite(r5) ? r5.toFixed(2) + '%' : '—'}</span>
+      <span class="x ${dir(r1)} ${heatCell(r1, 40)}" data-l="1-year">${Number.isFinite(r1) ? r1.toFixed(1) + '%' : '—'}</span>
       <!-- A DEEPER FALL AND A HIGHER VOLATILITY ARE WORSE, so the heat is
            inverted: these two are the only columns where a bigger number is
            the bad one, and shading them on the same scale as the returns would
            have painted the riskiest funds green. -->
-      <span class="x ${heatCell(-Math.abs(dd), 30)}" title="Worst peak-to-trough fall over three years">${
+      <span class="x ${heatCell(-Math.abs(dd), 30)}" data-l="Worst fall" title="Worst peak-to-trough fall over three years">${
         Number.isFinite(dd) ? dd.toFixed(1) + '%' : '—'}</span>
-      <span class="x ${heatCell(-Math.abs(vol - 14), 12)}" title="Annualised volatility, three years — shaded against a 14% typical equity fund">${
+      <span class="x ${heatCell(-Math.abs(vol - 14), 12)}" data-l="Volatility" title="Annualised volatility, three years — shaded against a 14% typical equity fund">${
         Number.isFinite(vol) ? vol.toFixed(1) : '—'}</span>
     </div>`;
   };
@@ -8885,16 +8907,95 @@
      + 'series AMFI publishes, not taken from a fund house page.')
      + heatKey(25, 'Returns');
 
-    for (const c of cats) {
-      out += sec(c.label || c.key, `<div class="rank">
-        <div class="rank-r rank-head fnd" aria-hidden="false">
-          <span class="i">#</span><span class="s">Scheme</span>
-          <span class="x">3-year ↓</span><span class="x">5-year</span><span class="x">1-year</span>
-          <span class="x">Worst fall</span><span class="x">Volatility</span>
+    /* ── THE SHELF IN ONE TABLE, WHICH THIS PAGE NEVER HAD ─────────────────
+     *
+     * Twenty categories were rendered as twenty open tables, one under the
+     * next, 11,844px on a phone. Every one of them answers "which fund inside
+     * this category" and NOTHING on the page answered the question a reader
+     * actually arrives with, which is which category to be in at all. To
+     * compare Small Cap's drawdown against Balanced Advantage's you had to
+     * scroll four screens and remember a number.
+     *
+     * WHAT THIS DELIBERATELY IS NOT: a single ranked list of all sixty funds.
+     * That is the obvious build and it would be dishonest — a Gold fund and a
+     * Small Cap fund do not compete for the same money, and sorting them
+     * against each other on three-year return would put the riskiest thing on
+     * the shelf at the top with nothing beside it saying so. The feed's own
+     * basis says "ranked inside each category" for exactly that reason.
+     *
+     * One row per CATEGORY instead: its leader, and the risk columns next to
+     * the return columns so the comparison a reader has to make anyway is on
+     * one screen instead of in their head. Published order is kept because it
+     * is itself a structure — broad equity, then size, then tax, then index,
+     * then hybrid, then sector, then asset — and re-sorting it by return
+     * would bury that. */
+    const leaderRow = (c, i) => {
+      const best = c.funds[0] || {};
+      const r3 = Number(best.r3), r5 = Number(best.r5);
+      const dd = Number(best.dd3), vol = Number(best.volatility);
+      return `<div class="rank-r fld" data-fund="${esc(String(best.code ?? ''))}" role="button" tabindex="0">
+        <span class="i">${i + 1}</span>
+        <span class="s"><b>${esc(c.label || c.key)}</b>
+          <span>${esc(best.name || '—')}</span></span>
+        <span class="x ${dir(r3)} ${heatCell(r3, 25)}" data-l="3-year"><b>${Number.isFinite(r3) ? r3.toFixed(1) + '%' : '—'}</b></span>
+        <span class="x ${dir(r5)} ${heatCell(r5, 25)}" data-l="5-year">${Number.isFinite(r5) ? r5.toFixed(1) + '%' : '—'}</span>
+        <span class="x ${heatCell(-Math.abs(dd), 30)}" data-l="Worst fall" title="Worst peak-to-trough fall over three years">${
+          Number.isFinite(dd) ? dd.toFixed(1) + '%' : '—'}</span>
+        <span class="x ${heatCell(-Math.abs(vol - 14), 12)}" data-l="Volatility" title="Annualised volatility over three years">${
+          Number.isFinite(vol) ? vol.toFixed(1) : '—'}</span>
+        <span class="m" data-l="Funds" style="color:var(--dim)">${c.funds.length}</span>
+      </div>`;
+    };
+    out += sec('The shelf, one row per category', `<div class="rank">
+        <div class="rank-r rank-head fld">
+          <span class="i">#</span><span class="s">Category · its leader</span>
+          <span class="x">3-year</span><span class="x">5-year</span>
+          <span class="x">Worst fall</span><span class="x">Volatility</span><span class="m">Funds</span>
         </div>
-        ${c.funds.map(fundRow).join('')}
-      </div>`, `${c.funds.length} funds`, c.blurb || '');
-    }
+        ${cats.map(leaderRow).join('')}
+      </div>
+      <p class="hint"><b>Read the two right-hand columns with the two on the left.</b> A category
+        whose leader returned more almost always fell further doing it — that is the trade being
+        made, not a flaw in the fund. Categories are <b>not</b> ranked against each other here,
+        because a gold fund and a small-cap fund are not competing for the same money; the order is
+        the shelf's own, broad equity through to single assets. Tap any row for that fund's card.</p>`,
+      `${cats.length} categories · ${allN} funds`,
+      /* The lead described "the twenty tables below", which is what was below
+       * it before this edit and is not what is there now. A sentence that
+       * describes the previous layout is the same fault as a hardcoded count
+       * beside a live one. */
+      'Which shelf to be on, before which fund on it — the comparison the per-category tables cannot make one at a time.');
+
+    /* ONE SECTION HOLDING TWENTY FOLDS, NOT TWENTY SECTIONS.
+     *
+     * Each category had a section of its own: a rail, a count, and a serif
+     * standfirst, twenty times, ahead of three rows. Folding the rows still
+     * left twenty headings and twenty standfirsts — about 4,000px of chrome
+     * on a phone for sixty rows of data.
+     *
+     * The categories are all one thing, so they are one section. Every blurb
+     * survives, on the fold it belongs to, where it reads as the answer to
+     * "what is this category" at the moment somebody opens it. The leaders'
+     * board above already names all twenty, so nothing is lost by not
+     * repeating them as headings. */
+    out += sec('Every fund, by category', cats.map(c => {
+      const best = Number((c.funds[0] || {}).r3);
+      return `<details class="foldb fcat">
+        <summary><b>${esc(c.label || c.key)}</b>
+          <i>${c.funds.length} fund${c.funds.length === 1 ? '' : 's'}${
+            Number.isFinite(best) ? ` · best 3-year ${best.toFixed(1)}%` : ''}</i></summary>
+        ${c.blurb ? `<p class="hint fcat-b">${esc(c.blurb)}</p>` : ''}
+        <div class="rank">
+          <div class="rank-r rank-head fnd" aria-hidden="false">
+            <span class="i">#</span><span class="s">Scheme</span>
+            <span class="x">3-year ↓</span><span class="x">5-year</span><span class="x">1-year</span>
+            <span class="x">Worst fall</span><span class="x">Volatility</span>
+          </div>
+          ${c.funds.map(fundRow).join('')}
+        </div>
+      </details>`;
+    }).join(''), `${cats.length} categories · ${allN} funds`,
+      'The full shelf. Each opens to its ranked funds and what the category is for.');
 
     out += sec('What this screen knows, and what it does not', `
       <p class="sec-note"><b>Direct plans only, and that is the cost lever.</b> Per-scheme expense
@@ -8937,6 +9038,23 @@
         (!q || `${x.title} ${x.summary} ${x.source}`.toLowerCase().includes(q)));
       const sources = [...new Set(all.map(x => x.source).filter(Boolean))].sort();
       const linked = all.filter(x => universe.length && newsMatch(x, universe).length).length;
+
+      /* THE STORIES THAT TOUCH THE SCREEN COME FIRST.
+       *
+       * The tile above this list says "1 of 18 name a screened company" — and
+       * that one story sat eleventh, in feed order, ten headlines about US
+       * rents and Polish equities ahead of the only item on the page that
+       * names something this site tracks. The page already computes the
+       * match; it just was not allowed to decide anything.
+       *
+       * MORE names touched sorts higher, because that is measured. Nothing
+       * beyond that: within each group the wire's own order is kept, because
+       * grading a story's importance is precisely what the standfirst above
+       * says this feed carries no data to support — and inventing a ranking
+       * here would contradict it on the same screen. */
+      const touches = new Map(rows.map(x =>
+        [x, universe.length ? newsMatch(x, universe).length : 0]));
+      rows.sort((a, b) => (touches.get(b) || 0) - (touches.get(a) || 0));
 
       const body = rows.length ? `<div class="nwg">${rows.map(x => {
         const hits = universe.length ? newsMatch(x, universe) : [];
