@@ -24,6 +24,7 @@
  *     node test/ui.mjs https://signal.<sub>.workers.dev
  */
 import { chromium } from "playwright";
+import { readFileSync } from "node:fs";
 
 const BASE = (process.argv[2] || "http://127.0.0.1:8787").replace(/\/$/, "");
 const SITE = BASE;   // the site is served at the root here, not /next.html
@@ -850,11 +851,29 @@ try {
                 Math.abs(agree.total - agree.computed) <= 1, agree);
 
   // The radar must not invent a second signal vocabulary.
+  //
+  // VOID IS THE ONE ADDITION, AND IT IS NAMED RATHER THAN LISTED.
+  //
+  // A breached stop is not a rating — it is the absence of one. The overlay
+  // re-reads price, off-high and stop live, and used to leave the verdict
+  // stamped at the build: IFCI read "Buy · 89 Strong" over its own live
+  // "-13.1% off its high" and a breached stop, with the stated reason being
+  // "Broke its 52-week high". So the chip has to be able to say the setup is
+  // gone, and none of the five rating words can.
+  //
+  // Kept OUT of `allowed` deliberately. A check whose fix is always "add the
+  // new word" is not a check; a SECOND new verdict still fails this.
+  const VOID = "Setup void · stop breached";
   const verdicts = await p.evaluate(() =>
     [...document.querySelectorAll(".rd-v")].map(x => x.textContent.trim()));
   const allowed = new Set(["Buy", "Wait for entry", "Watch", "Avoid", "Not rated"]);
   ok("it uses the site's own verdict words, not a new taxonomy",
-     verdicts.every(v => allowed.has(v)), [...new Set(verdicts)]);
+     verdicts.every(v => allowed.has(v) || v === VOID), [...new Set(verdicts)]);
+
+  // The string is asserted against the source, so a reword in signal.js that
+  // forgets this file fails here rather than quietly widening the taxonomy.
+  ok("the void chip's wording is the one signal.js emits",
+     readFileSync("public/signal.js", "utf8").includes(`'${VOID}'`));
 
   /* The ring is desktop-only; the phone gets the list. This block runs in the
    * 1440px context, so the viewport has to be narrowed for the check — the
