@@ -889,6 +889,49 @@
                             + 'when price reclaims the level it lost.',
                        tf: 'Daily → weeks' },
   };
+
+  /* ── A LANE IS NOT A DATABASE KEY EITHER ──────────────────────────────────
+   *
+   * BUOY runs two lanes and the alert log printed the raw value: a row read
+   * "HINDCOPPER  buoy · reclaim" and nothing on the page said what "reclaim"
+   * meant. That is the same fault engine_names.py exists to prevent one level
+   * down — alerts print names, never keys — and it had simply been missed
+   * because a lane is a field on the row rather than the row's engine.
+   *
+   * It matters more than a wording nit here, because the two lanes are not two
+   * flavours of one result. They have SEPARATE measured records, and the
+   * bigger sample is the looser rule:
+   *
+   *   Strict   n=35   +0.002R  t=+0.01   the rule as specified
+   *   Reclaim  n=348  +0.010R  t=+0.16   the same rule minus the filter
+   *
+   * A reader told only "reclaim" cannot tell which of those they are looking
+   * at, and the larger n belongs to the lane that discards the filter — the
+   * opposite of the intuition. So the lane carries its own n wherever it is
+   * shown.
+   *
+   * `n` is read from the payload's own backtest block at render time, never
+   * typed here; these keys are the ones scan_research.py publishes. */
+  const LANES = {
+    strict:  { name: 'Strict',
+               what: 'the full rule — the 200-period reclaim WITH a bullish RSI '
+                   + 'divergence behind it',
+               nKey: 'n', expKey: 'exp', tKey: 't' },
+    reclaim: { name: 'Reclaim only',
+               what: 'the reclaim alone, with the divergence filter dropped — a '
+                   + 'looser rule, and the larger sample',
+               nKey: 'n_no_div', expKey: 'exp_no_div', tKey: 't_no_div' },
+  };
+  /** A lane rendered for a reader: "Reclaim only" rather than "reclaim". */
+  const laneName = k => (LANES[k] && LANES[k].name) || (k == null ? '' : String(k));
+  /** The lane's own measured record, read off the engine's backtest block. */
+  const laneStat = (k, bt) => {
+    const L = LANES[k];
+    if (!L || !bt) return null;
+    const n = bt[L.nKey], e = bt[L.expKey], t = bt[L.tKey];
+    return n == null ? null : { n, exp: e, t };
+  };
+
   /* ── WHAT EACH ENGINE ACTUALLY FIRES ON ───────────────────────────────────
    *
    * This exists because the honest answer to "why did this signal appear?" was
@@ -5863,7 +5906,7 @@
         <div class="rank sg-t">${rows.map(x => xrow(`
           <span class="sg-d ${x.lane === 'reclaim' ? 'ac' : 'up'}"></span>
           <span class="sg-id"><b>${esc(x.symbol)}</b>
-            <span>${x.lane ? esc(x.lane) + ' · ' : ''}${x.bars_ago === 0 ? 'this bar'
+            <span>${x.lane ? esc(laneName(x.lane)) + ' · ' : ''}${x.bars_ago === 0 ? 'this bar'
               : `${x.bars_ago} bars ago`}${x.touches ? ` · floor held ${x.touches}x` : ''}</span></span>
           <span class="sg-n">${price(x.entry)}</span>
           <span class="sg-n dn">${price(x.sl)}</span>
@@ -5923,13 +5966,17 @@
             runs is one row with a counter — <b>${LOG.rows.filter(x => (x.seen_count || 1) > 1).length}</b>
             of ${LOG.rows.length} have been seen more than once. A re-alert past
             ${LOG.dedupe_days ?? 10} days is a separate event with its own row. Without that
-            rule the forward sample would count cron ticks rather than setups.</p>
+            rule the forward sample would count cron ticks rather than setups.
+            <b>BUOY rows carry a lane.</b> ${esc(LANES.strict.name)} is ${esc(LANES.strict.what)};
+            ${esc(LANES.reclaim.name)} is ${esc(LANES.reclaim.what)}. They are measured
+            separately and the looser one has the larger sample — open a row for its
+            numbers.</p>
           <div class="sg-head" aria-hidden="true"><span></span><span>Alert</span>
             <span>Entry</span><span>Stop</span><span>Target 1</span><span>Risk</span><span>Seen</span></div>
           <div class="rank sg-t">${LOG.rows.slice().reverse().slice(0, 60).map(x => xrow(`
             <span class="sg-d ${x.lane === 'reclaim' ? 'ac' : 'up'}"></span>
             <span class="sg-id"><b>${esc(x.symbol)}</b>
-              <span>${esc(x.engine)}${x.lane ? ' · ' + esc(x.lane) : ''}
+              <span>${esc((eng(x.engine) && eng(x.engine).name) || x.engine)}${x.lane ? ' · ' + esc(laneName(x.lane)) : ''}
                 · ${esc(String(x.at || '').slice(0, 16).replace('T', ' '))}</span></span>
             <span class="sg-n">${x.entry == null ? '—' : price(x.entry)}</span>
             <span class="sg-n dn">${x.sl == null ? '—' : price(x.sl)}</span>
@@ -5941,6 +5988,19 @@
                <div class="yy"><span>First raised</span><b>${esc(String(x.at || '').replace('T', ' '))}</b></div>
                <div class="yy"><span>Last seen in a scan</span><b>${esc(String(x.last_seen || x.at || '').replace('T', ' '))}</b></div>
                <div class="yy"><span>Scans it has appeared in</span><b>${x.seen_count || 1}</b></div>
+             ${(() => {
+                /* The lane, spelled out. Its record is the ENGINE's own
+                 * backtest block for that lane — not the engine's headline
+                 * number, which belongs to the strict lane only. */
+                const L = LANES[x.lane]; if (!L) return '';
+                const bt = (engines.find(e => e.key === x.engine) || {}).backtest;
+                const st = laneStat(x.lane, bt);
+                return `<div class="yy"><span>Lane</span><b>${esc(L.name)}</b></div>
+                  <div class="yy"><span>What that means</span><b>${esc(L.what)}</b></div>` +
+                  (st ? `<div class="yy"><span>Measured on this lane</span><b>${
+                    st.exp > 0 ? '+' : ''}${Number(st.exp).toFixed(3)}R at t=${
+                    st.t > 0 ? '+' : ''}${Number(st.t).toFixed(2)} over ${st.n}</b></div>` : '');
+              })()}
                ${x.repeat_of ? `<div class="yy"><span>Repeat of</span><b>${esc(x.repeat_of)}</b></div>
                  <div class="yy"><span>Days since that one</span><b>${esc(String(x.days_since_last ?? '—'))}</b></div>` : ''}
              </div>

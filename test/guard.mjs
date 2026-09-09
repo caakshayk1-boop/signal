@@ -334,6 +334,35 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("no feed is mirrored that nothing reads", orphan.length === 0, orphan);
 }
 
+/* ── A LANE IS NOT A DATABASE KEY ────────────────────────────────────────────
+ * The incident: the alert log rendered `esc(x.lane)`, so a row read
+ * "HINDCOPPER  buoy · reclaim" and nothing on the page said what "reclaim"
+ * meant. engine_names.py exists one level down for exactly this — alerts print
+ * names, never keys — and the lane slipped through because it is a field on
+ * the row rather than the row's engine.
+ *
+ * It is not cosmetic. The two lanes carry SEPARATE measured records and the
+ * looser rule owns the larger sample (n=348 against n=35), so a reader shown
+ * only the key cannot tell which evidence they are looking at. */
+{
+  const lanes = (JS.match(/const LANES = \{[\s\S]*?\n  \};/) || [""])[0];
+  ok("a LANES registry exists, next to ENGINE_REGISTRY", lanes.length > 0);
+  for (const k of ["strict", "reclaim"]) {
+    ok(`LANES declares ${k}`, lanes.includes(`${k}:`));
+  }
+  // Every lane the scans write must be declared, read off the Python.
+  ok("LANES has a name and a meaning for each lane",
+     (lanes.match(/name:/g) || []).length === (lanes.match(/what:/g) || []).length);
+
+  // No render site may interpolate the raw value.
+  const raw = [...JS.matchAll(/esc\(\s*x\.lane\s*\)/g)].map((m) => lineOf(JS, m.index));
+  ok("no template prints the raw lane key", raw.length === 0, raw);
+
+  // The lane's sample must come from the payload, never be typed in the page.
+  ok("a lane's record is read from the engine's backtest block",
+     JS.includes("laneStat(") && /nKey:\s*['"]n_no_div['"]/.test(lanes));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);
