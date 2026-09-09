@@ -392,8 +392,19 @@
       <h1>${esc(title)}</h1>${sub ? `<p>${esc(sub)}</p>` : ''}</div>`;
   // `lead` is the serif line under the label: the label says what the block
   // IS, the lead says what it MEANS. Blocks with nothing to add omit it.
-  const sec = (label, body, n, lead) =>
-    `<section class="sec"><div class="sec-h"><h2>${esc(label)}</h2>${n ? `<span class="sec-n">${esc(n)}</span>` : ''}</div>${lead ? `<p class="sec-lead">${esc(lead)}</p>` : ''}${body}</section>`;
+  /* `opts.lead` marks the ONE block a route is actually about.
+   *
+   * Every section carried identical weight, so a page of nine offered no
+   * answer to "which of these am I meant to read" — the reader had to infer it
+   * from source order, which is not a hierarchy, it is a list. A newspaper
+   * answers that with SIZE.
+   *
+   * It is a flag rather than a position because the lead is not always first:
+   * /signals leads with the book, not with the filter bar above it. Exactly
+   * one per route — the CSS demotes any second one, because two leads is no
+   * lead. */
+  const sec = (label, body, n, lead, opts) =>
+    `<section class="sec${opts && opts.lead ? ' is-lead' : ''}"><div class="sec-h"><h2>${esc(label)}</h2>${n ? `<span class="sec-n">${esc(n)}</span>` : ''}</div>${lead ? `<p class="sec-lead">${esc(lead)}</p>` : ''}${body}</section>`;
   /* ── ONE EXPANDING ROW, USED EVERYWHERE ───────────────────────────────────
    *
    * Most tables on this site already answer a tap: the screen and the funds

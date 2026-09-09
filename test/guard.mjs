@@ -407,6 +407,43 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      !/ahimsa[_ ]?(score|quotient|pct|points)/i.test(JS));
 }
 
+/* ── A var() WITH NO DEFINITION IS A SILENTLY DELETED RULE ───────────────────
+ * The incident: the radar and signals surfaces were written against --sans and
+ * --dn. Neither token exists in this stylesheet — the names are --ui and
+ * --down. A var() that resolves to nothing is invalid at computed-value time,
+ * so the WHOLE declaration is discarded: no console error, no visual clue that
+ * a rule was ever written.
+ *
+ *   .rd-f b.dn{color:var(--dn)}  ->  every negative number in the facts strip
+ *                                    inherited body colour. "3 months -4.20%"
+ *                                    and "off its high -18.5%" rendered black.
+ *   font:600 var(--t-1)/1 var(--sans)  ->  the whole `font` SHORTHAND dropped,
+ *                                    so those labels lost size and weight too.
+ *
+ * 27 declarations across six names, live, for as long as those surfaces have
+ * existed. This is the cheapest possible check for the most invisible possible
+ * failure. */
+{
+  const defined = new Set(
+    [...CSS.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map((m) => m[1])
+  );
+  // Set at runtime rather than in the sheet: el.style.setProperty(...) in the
+  // app, or an inline style="--w:..." on an element it renders.
+  const runtime = new Set(
+    [...JS.matchAll(/setProperty\(\s*['"](--[a-z0-9-]+)['"]/gi)].map((m) => m[1])
+      .concat([...JS.matchAll(/(--[a-z0-9-]+)\s*:\s*\$\{/gi)].map((m) => m[1]))
+  );
+  const missing = [];
+  for (const m of CSS.matchAll(/var\(\s*(--[a-z0-9-]+)\s*([,)])/gi)) {
+    const [, name, next] = m;
+    if (next === ",") continue;            // has a fallback; degrades on purpose
+    if (defined.has(name) || runtime.has(name)) continue;
+    missing.push(`${name} (line ${lineOf(CSS, m.index)})`);
+  }
+  ok("every var() resolves — an undefined one deletes its whole declaration",
+     missing.length === 0, missing);
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);
