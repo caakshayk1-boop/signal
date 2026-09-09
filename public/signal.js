@@ -3474,10 +3474,30 @@
       `${picks.length} ranked`, 'A different engine, on a different clock — names that cleared every floor, and the levels that define each one.');
 
     const pu = p.ok ? p.data : {};
+    /* ── WHAT THE SCREEN FOUND, NOT WHAT IS TRUE NOW ────────────────────────
+     * These prices come off the overnight screen and are not live. The book
+     * section thirty lines below already fetches quotes "so the page shows
+     * what the idea is worth NOW rather than what it was worth at 6 AM";
+     * this table never did, and its subhead said "Today's screen output"
+     * while the price beside each name read as the current one.
+     *
+     * IFCI, 2026-09-09: listed here at ₹102.51, which is exactly where it
+     * printed its new high when the screen ran at 01:37. By 10:39 it was
+     * ₹89.08 — thirteen per cent lower and no longer near its high at all,
+     * with nothing on the row saying so.
+     *
+     * Quoting them live would be worse, not better: a row reading ₹89.08 in
+     * a list of names "printing a new one-year high" contradicts the list it
+     * is in. The list is a RECORD of what the screen found, so it says when
+     * it was taken and leaves the prices attributed to that moment. */
     parts.brk = sec('Breaking to 52-week highs',
       levelTable((pu.breakouts || []).slice(0, 12)),
       pu.breakouts ? `${pu.breakouts.length} names` : '',
-      'Today’s screen output — names printing a new one-year high, with where each sits against its own averages.');
+      'Names that printed a new one-year high when the screen last ran, with where each sits '
+      + 'against its own averages. '
+      + (pu.built_on
+         ? `Prices are the screen’s, from ${esc(pu.built_on)} — not live, and a name can fall away from its high during the day.`
+         : 'Prices are the screen’s, not live.'));
 
     if (mn.ok) {
       const d = mn.data, st = d.state || {}, orders = d.admitted || [];
