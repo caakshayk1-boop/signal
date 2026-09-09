@@ -46,6 +46,16 @@ on:
     - cron: "40 12 * * *"
   workflow_dispatch:
   push:
+    # ON MAIN ONLY. The branch filter was missing and the trigger fires on a
+    # PATH, so editing this file on a feature branch started a real sync: it
+    # fetched all fourteen feeds, reset the worktree to origin/main, and then
+    # tried `git push origin main` from a checkout whose only local branch is
+    # the feature one. "src refspec main does not match any", three times, then
+    # red — every time this file is touched anywhere but main.
+    #
+    # It cannot succeed off main and must not: the feeds belong on main, and a
+    # branch running this would race the scheduled sync for the same push.
+    branches: [main]
     paths: [".github/workflows/sync-data.yml"]
 
 permissions:
@@ -182,7 +192,11 @@ jobs:
               exit 0
             fi
             git commit -q -m "sync: feeds and frontend from trading-dashboard $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
-            if git push origin main; then
+            # HEAD:main, not main — the push does not depend on what the local branch
+            # happens to be called. The reset above has already made HEAD equal
+            # origin/main plus the feeds, so this is the same push, stated in a
+            # way that cannot fail on a ref name.
+            if git push origin HEAD:main; then
               echo "pushed on attempt $attempt"
               exit 0
             fi
