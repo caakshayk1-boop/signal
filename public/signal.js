@@ -4372,6 +4372,19 @@
     value:      ['Cheap',          r => (r.v ?? 0) >= 70],
     debtfree:   ['Debt-free',      r => (r.de ?? 9) <= 0.1],
     compounder: ['Compounders',    r => (r.roce ?? 0) >= 20 && (r.rev_cagr ?? 0) >= 12],
+    /* ── NIFTY500 AHIMSA ─────────────────────────────────────────────────
+     * NSE Indices launched it on 10 July 2026: the Nifty 500 filtered to
+     * companies not engaged in activities harmful to animals, 326 of the 500
+     * at launch. The flag was being PRINTED on a card and there was no way to
+     * act on it — a field you can read one company at a time is not a screen.
+     *
+     * `=== true` deliberately. The flag is three-state: true, false, and null
+     * when the build could not read NSE's constituent list. A truthy filter
+     * would silently include the unknowns in "not in the index", which is an
+     * ethics claim manufactured by a failed fetch — the same trap the card
+     * avoids by printing "not stated". A run with no list simply returns
+     * nothing here, and the empty state says the filter found none. */
+    ahimsa:     ['Nifty500 Ahimsa', r => r.ahimsa === true],
   };
   const SORTS = { comp: 'Composite', q: 'Quality', g: 'Growth', v: 'Value',
                   tech: 'Technical', r1m: '1M return', roce: 'ROCE', mcap_cr: 'Size',
@@ -10284,13 +10297,29 @@
           *
           * The screen's context (the year's range, RSI, the returns) is what
           * that card wanted. Its ladder is a second opinion nobody asked for. */''}
+      ${/* ── AND THEY ARE THE SCREEN'S LEVELS, SO THEY SAY SO ──────────────
+          * Suppressing the block where a card has its own was half the fix.
+          * The other half is that where it DOES show, it was labelled "Entry /
+          * Stop / First target" — the same three words the signal's own levels
+          * carry — so IFCI read Stop 95.56 and First target 113.64 on the
+          * radar against Stop 92.65 and Target 1 122.23 on the front page.
+          * Same company, same session, same words, different numbers, and
+          * nothing on either surface saying which was which.
+          *
+          * Neither is wrong. r.lad is where the daily SCREEN would place
+          * levels; the card carries what the ENGINE published when it filed.
+          * The support-and-resistance table was corrected this way already —
+          * this is the same three fields in a different component, and it was
+          * missed the first time. */''}
       ${r.lad && r.lad.s != null && !(opts && opts.noLadder) ? `
-        <span class="rd-f"><em>Entry</em><b
-          title="The screen's reference price. The stop and targets are measured from here, so R means nothing without it."
+        <span class="rd-f"><em>Screen entry</em><b
+          title="The screen's reference price — not the price this signal was filed at. The stop and targets below are measured from here, so R means nothing without it."
           >${r.lad.e != null ? price(r.lad.e) : '—'}</b></span>
-        <span class="rd-f"><em>Stop</em>
-          <b class="dn" data-stop="${esc(String(r.lad.s))}">${price(r.lad.s)}</b></span>
-        <span class="rd-f"><em>First target</em><b class="up">${
+        <span class="rd-f"><em>Screen stop</em>
+          <b class="dn" data-stop="${esc(String(r.lad.s))}"
+             title="Where the SCREEN would place a stop on this name — not the stop the engine published for this signal.">${price(r.lad.s)}</b></span>
+        <span class="rd-f"><em>Screen target</em><b class="up"
+          title="The screen's first target, not the signal's.">${
           r.lad.t && r.lad.t[0] ? price(r.lad.t[0][0]) : '—'}</b></span>` : ''}
     </span>`;
   };
