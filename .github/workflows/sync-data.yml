@@ -1,13 +1,13 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# sync-data.yml — pull the nine feeds from the newspaper repo into this one.
+# sync-data.yml — pull the feed files from the newspaper repo into this one.
 #
 # THIS IS THE FILE THAT DECOUPLES THE TWO PROJECTS.
 #
 # Moving the site to its own repo and its own Worker isolates the DEPLOY: a
 # broken build over there can no longer take this site down, and a thirteenth
 # serverless function can no longer break it silently. It does nothing for the
-# DATA, because nine of the feeds this site reads are build artefacts produced
-# by generate.py in trading-dashboard.
+# DATA, because most of the feeds this site reads are build artefacts produced
+# by generate.py and scan_research.py in trading-dashboard.
 #
 # The options were: recompute them here (two sources of truth for the same
 # numbers — the worst outcome), fetch them from news.askakshay.com at request
@@ -80,7 +80,7 @@ jobs:
       # twelve hours. That is a worse failure than drift — drift is visible in
       # a diff, this would look like the edits never happened.
       #
-      # The DATA still mirrors, below, because the twelve JSON feeds are genuinely
+      # The DATA still mirrors, below, because the fourteen JSON feeds are genuinely
       # build artefacts of generate.py upstream and are not authored here.
 
       - name: Fetch the data feeds
@@ -90,7 +90,20 @@ jobs:
           set -euo pipefail
           mkdir -p .incoming
           fail=0
-          for j in alerts conviction data-health edition engines funds ipo mandate news pulse screen today; do
+          # RESEARCH AND ALERTS_LOG WERE MISSING AND THE #research FLOOR WAS FROZEN.
+          #
+          # signal.js fetches /research.json and /alerts_log.json. Both files
+          # exist in public/ and neither was ever synced, so they were whatever
+          # somebody last committed by hand — 2026-09-08 for both, while
+          # research.yml upstream rewrites them twice a day.
+          #
+          # That was invisible while the upstream job was itself broken: it had
+          # never once completed, so there was nothing newer to miss. Fixing the
+          # harvest made the scan run and go nowhere.
+          FEEDS="alerts alerts_log conviction data-health edition engines funds ipo mandate news pulse research screen today"
+          # shellcheck disable=SC2086 -- word splitting is the point
+          set -- $FEEDS; total=$#
+          for j in $FEEDS; do
             if gh api "repos/$UPSTREAM/contents/docs/$j.json" \
                  -H "Accept: application/vnd.github.raw" > ".incoming/$j.json" 2>/dev/null \
                && [ -s ".incoming/$j.json" ]; then
@@ -111,9 +124,14 @@ jobs:
           # worktree to origin/main before copying them in, so a run that races
           # another can re-apply cleanly instead of pushing a stale parent.
           echo "failed=$fail" >> "$GITHUB_OUTPUT"
-          # Nine of nine failing means the upstream moved or the token died —
+          # EVERY feed failing means the upstream moved or the token died —
           # that is worth a red run. A few missing is a partial build upstream.
-          if [ "$fail" -ge 10 ]; then
+          #
+          # The threshold used to be the literal 10, written when the list held
+          # nine names. The list has grown twice since and the number did not
+          # move, so it had drifted from "all of them" to "most of them" and
+          # would have gone on drifting. It is counted now.
+          if [ "$fail" -ge "$total" ]; then
             echo "::error::every feed failed to fetch — check $UPSTREAM still publishes docs/*.json"
             exit 1
           fi

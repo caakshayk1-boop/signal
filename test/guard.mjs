@@ -279,6 +279,61 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      extra.length === 0, extra);
 }
 
+/* ── EVERY FEED THE APP FETCHES MUST BE MIRRORED ─────────────────────────────
+ * The incident: signal.js fetches /research.json and /alerts_log.json, and
+ * sync-data.yml's feed list contained neither. Both files existed in public/,
+ * so nothing 404'd and nothing looked broken — they were simply frozen at
+ * whatever was last committed by hand, 2026-09-08, while research.yml upstream
+ * rewrote them twice a day.
+ *
+ * A missing feed announces itself: the fetch fails and the page says so. A
+ * feed that is present but never refreshed is the worse failure, because the
+ * page renders normally and every number on it is a fact about last week.
+ *
+ * This is the same shape as docs/screen.json needing an allow-list entry in
+ * three separate files upstream. A payload is not published because it is
+ * written; it is published when every hop in front of it names it. */
+{
+  const SYNC = readFileSync(".github/workflows/sync-data.yml", "utf8");
+  const feeds = new Set(
+    ((SYNC.match(/^\s*FEEDS="([^"]+)"/m) || ["", ""])[1]).split(/\s+/).filter(Boolean)
+  );
+  ok("sync-data.yml declares a FEEDS list guard.mjs can read", feeds.size > 0);
+
+  // A feed is legitimately absent from FEEDS in exactly two cases: the Worker
+  // serves it from Turso at request time, or a workflow IN THIS REPO builds it
+  // (institutional.json is built by institutional.yml from exchange filings —
+  // mirroring it would give the same number two sources of truth).
+  //
+  // The second set is read off the workflows rather than listed here, so a new
+  // locally-built feed exempts itself and a new fetched-but-unproduced one
+  // still fails. A hand-maintained exemption list is how the FEEDS list got
+  // out of date in the first place.
+  const LIVE = new Set(["stats"]);          // /stats.json is an API route
+  const WF = readdirSync(".github/workflows")
+    .filter((f) => f.endsWith(".yml") && f !== "sync-data.yml")
+    .map((f) => readFileSync(join(".github/workflows", f), "utf8"))
+    .join("\n");
+  const builtHere = (f) => WF.includes(`public/${f}.json`);
+  const fetched = new Set(
+    [...JS.matchAll(/get\(\s*['"]\/([a-z0-9_-]+)\.json['"]/g)].map((m) => m[1])
+  );
+  const unmirrored = [...fetched].filter(
+    (f) => !LIVE.has(f) && !feeds.has(f) && !builtHere(f));
+  ok("every .json the app fetches is in sync-data.yml's FEEDS (else it freezes)",
+     unmirrored.length === 0, unmirrored);
+
+  // The reverse: a feed synced but read by nobody is dead weight in the repo
+  // and a file that will quietly rot into a wrong answer if it is ever wired up.
+  const OTHER = new Set(["edition", "screen"]);   // read by index.html / gems.js
+  const orphan = [...feeds].filter(
+    (f) => !fetched.has(f) && !OTHER.has(f) &&
+           !JS.includes(`${f}.json`) && !GEMS.includes(`${f}.json`) &&
+           !HTML.includes(`${f}.json`)
+  );
+  ok("no feed is mirrored that nothing reads", orphan.length === 0, orphan);
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

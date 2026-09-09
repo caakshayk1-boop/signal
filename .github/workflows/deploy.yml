@@ -28,6 +28,19 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "22", cache: npm }
 
+      # GUARD RAN NOWHERE.
+      #
+      # test/guard.mjs holds 17 static checks, every one written because the
+      # fault it catches shipped, and no workflow invoked it — so it only ever
+      # ran when somebody remembered to type it. It found a live fault the hour
+      # it was wired in (two feeds fetched by the app and mirrored by nothing).
+      #
+      # It is BEFORE the token gate deliberately: the checks are static and
+      # need no secret, so they must fail a push on a repo with no Cloudflare
+      # token rather than being skipped behind one.
+      - name: Static guards
+        run: node test/guard.mjs
+
       # The gate was added so the repo would not be permanently red before the
       # token existed. It outlived that purpose: the token still does not
       # exist, and the gate meant every push since 29 Aug reported a
