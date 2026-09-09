@@ -356,8 +356,10 @@ main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
   padding:14px 15px;min-height:96px;display:flex;flex-direction:column;gap:6px}
 .tile .v{font:500 clamp(var(--t-8),5vw,var(--t-10))/1.05 var(--mono);letter-spacing:var(--ls-tight);font-variant-numeric:tabular-nums}
-.tile .k{font:400 var(--t-2)/1.35 var(--mono);letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--dim);margin-top:auto}
-.tile .sub{font-size:var(--t-4);color:var(--muted);line-height:1.4}
+.tile .k{font:400 var(--t-2)/1.35 var(--mono);letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--dim)}
+/* The qualifier holds the floor, so four tiles in a row still share one
+   baseline for their figures however far a label wraps. */
+.tile .sub{font-size:var(--t-4);color:var(--muted);line-height:1.4;margin-top:auto}
 .up{color:var(--up)} .dn{color:var(--down)} .wn{color:var(--warn)} .ac{color:var(--accent)}
 
 /* ── CARD — a row of the ledger, an order, an idea ────────────────────────── */
@@ -404,6 +406,10 @@ main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh
   border-radius:0 var(--r) var(--r) 0;padding:13px 15px;font-size:var(--t-5);color:var(--muted)}
 .note b{color:var(--text)}
 .note.err{border-left-color:var(--down)}
+/* A note that explains an absence, not one that warns about a fault. The
+   amber rule is reserved for "something is wrong"; "there is not enough data
+   yet" is a normal state and must not wear the warning colour. */
+.note.note-quiet{border-left-color:var(--line2);margin-top:10px}
 .empty{padding:26px 16px;text-align:center;color:var(--dim);font-size:var(--t-5);
   border:1px dashed var(--line2);border-radius:var(--r)}
 
@@ -480,6 +486,10 @@ main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh
 .wire .wt{font:600 var(--t-5)/1.4 var(--ui);color:var(--text)}
 .wire .ws{font:400 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--accent)}
 .wire .wd{font-size:var(--t-4);color:var(--muted);line-height:1.5}
+/* Headlines only. The front page carries the wire as context under the
+   decisions, and a summary that restates its own headline is the length
+   without the information. /news keeps them. */
+.wire-tight a{padding-top:12px;padding-bottom:12px;gap:4px}
 
 /* ── IPO ──────────────────────────────────────────────────────────────────
    The verdict is the headline. A reader deciding whether to apply wants the
@@ -788,6 +798,23 @@ h4.sh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-tran
   font-size:var(--t-2);line-height:1.5;color:var(--dim)}
 .trail .tr-n b{color:var(--warn)}
 
+/* THE STOP PATH ON ONE LINE. Three prices and two arrows, in place of three
+   labelled steps whose labels were the same on every card on the site. The
+   `.trail span` rule above turns every span in this block into an uppercase
+   amber label, so both of these have to say otherwise explicitly. */
+.trail .tr-1{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.trail .tr-1 .tr-k{display:block;flex:none;font:600 var(--t-1)/1 var(--mono);
+  letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--warn);margin:0}
+.trail .tr-1 .tr-v{display:block;font:500 var(--t-3)/1.5 var(--mono);
+  font-variant-numeric:tabular-nums;letter-spacing:0;text-transform:none;
+  color:var(--text);margin:0}
+.trail .tr-1 .tr-v i{font-style:normal;color:var(--dim);padding:0 5px}
+/* What the ladder banks against what holding it all would. Two figures, no
+   paragraph — the paragraph is in TRAIL_NOTE, once for the whole page. */
+.tr-b{margin-top:7px;padding-top:7px;border-top:1px solid var(--line);
+  font:400 var(--t-2)/1.5 var(--mono);color:var(--dim)}
+.tr-b b{color:var(--text);font-weight:600}
+
 /* Level table — eight columns, so it scrolls sideways inside its own box
    rather than squeezing the name to nothing on a phone. */
 .rank{overflow-x:auto}
@@ -909,8 +936,8 @@ body{font-family:var(--ui);font-size:var(--t-6);line-height:1.5;letter-spacing:v
   box-shadow:none;border-radius:var(--r-3)}
 .tile{min-height:104px;padding:16px 18px}
 .tile .v{font:500 clamp(var(--t-9),2.6vw,var(--t-10))/1.1 var(--mono);letter-spacing:var(--ls-tight)}
-.tile .k{font:500 var(--t-3)/1.35 var(--ui);letter-spacing:0;text-transform:none;color:var(--dim);margin-top:auto}
-.tile .sub{font-size:var(--t-5);color:var(--dim)}
+.tile .k{font:500 var(--t-3)/1.35 var(--ui);letter-spacing:0;text-transform:none;color:var(--dim)}
+.tile .sub{font-size:var(--t-5);color:var(--dim);margin-top:auto}
 
 /* Buttons: black fill, 6px, weight 500 — theirs exactly. */
 .btn-cta{background:var(--ink-btn);color:var(--on-ink);border-radius:var(--r-2);
@@ -1340,6 +1367,40 @@ body::before{display:none}
 .mk-foot{grid-column:1/-1;font-size:var(--t-3);line-height:1.55;color:var(--dim);
   padding-top:4px;border-top:1px solid var(--line)}
 
+/* A SECTION BODY BEHIND ONE LINE. The heading, its count and its standfirst
+   all still render above this — only the rows wait for a tap. Used where a
+   block belongs on the page but is not what the page is for. */
+.foldb{border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.foldb > summary{cursor:pointer;list-style:none;padding:14px 16px;position:relative;
+  padding-right:36px;font:500 var(--t-4)/1.45 var(--ui);color:var(--muted);min-height:44px;
+  display:flex;align-items:center}
+.foldb > summary::-webkit-details-marker{display:none}
+.foldb > summary::after{content:"";position:absolute;right:16px;top:calc(50% - 5px);
+  width:7px;height:7px;border-right:1.5px solid var(--dim);border-bottom:1.5px solid var(--dim);
+  transform:rotate(45deg);transition:transform var(--t-fast,.16s) ease}
+.foldb[open] > summary::after{transform:rotate(-135deg);top:calc(50% - 2px)}
+.foldb > summary:hover{color:var(--text);background:var(--raised)}
+.foldb > summary:focus-visible{outline:2px solid var(--live);outline-offset:-2px}
+.foldb[open] > summary{border-bottom:1px solid var(--line)}
+.foldb > *:not(summary){margin:14px 16px}
+
+/* THE SEGMENT AS A DISCLOSURE.
+   The header keeps every mark it had; it is now the control that opens the
+   segment, so it needs a pointer, a caret and a tap target that covers the
+   strip rather than the two words of the label. */
+.segd{margin:0}
+.segd > .segh{cursor:pointer;list-style:none;padding-right:20px;position:relative;
+  min-height:30px}
+.segd > .segh::-webkit-details-marker{display:none}
+.segd > .segh::after{content:"";position:absolute;right:2px;top:2px;width:6px;height:6px;
+  border-right:1.5px solid var(--dim);border-bottom:1.5px solid var(--dim);
+  transform:rotate(45deg);transition:transform var(--t-fast,.16s) ease}
+.segd[open] > .segh::after{transform:rotate(-135deg);top:5px}
+.segd > .segh:hover{color:var(--accent)}
+.segd > .segh:focus-visible{outline:2px solid var(--live);outline-offset:3px;border-radius:var(--r-2)}
+.segd + .segd{border-top:1px solid var(--line)}
+.segd[open] > .board{margin-bottom:14px}
+
 .segh{display:flex;align-items:baseline;gap:9px;margin:22px 0 9px;
   font:600 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-widest);text-transform:uppercase;color:var(--dim)}
 .segh .cnt{margin-left:auto;font-weight:400;letter-spacing:var(--ls-wide);text-transform:none;
@@ -1437,6 +1498,15 @@ body::before{display:none}
   transition:color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
 .b-qnav a:hover{color:var(--b-ink);background:var(--b-hi)}
 .b-qnav a[aria-current="true"]{color:var(--b-ink);background:var(--b-hi)}
+/* PROGRESS, ON THE NAV THAT IS ALSO THE CONTROL.
+   A separate six-node rail used to carry "which of these is behind you"; it
+   pointed at the same six anchors under different names, so it is gone and
+   its one real contribution is here. A section already read is legible but
+   settled; the current one is the only one lit. The key glyph carries it as
+   well as the colour, so the state is not colour alone. */
+.b-qnav a.done{color:var(--b-mut,var(--b-dim))}
+.b-qnav a.done .kb{opacity:.9;background:var(--b-hi);border-color:transparent}
+.b-qnav a[aria-current="true"] .kb{opacity:1;border-color:currentColor}
 .b-qnav a .kb{font-size:var(--t-1);opacity:.5;border:1px solid currentColor;border-radius:var(--r-1);
   padding:1px 3px;line-height:1}
 @media(max-width:759px){.b-qnav{top:var(--barh)}}
@@ -2120,7 +2190,26 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
    FIXED TRACKS, identical for the header and every row. The widths are set
    from the widest real value each column carries: ₹1,431.20 at 11.5px mono is
    ~56px, +38.74% is ~48px. Tabular numerals mean those widths never move. */
-.scr-r,
+/* NINE TRACKS FOR NINE CELLS.
+   This declared EIGHT tracks while the markup emitted TEN. The two extra
+   cells wrapped onto a second grid line and sized themselves to tracks one
+   and two — 24px and 700px — so "52w low" rendered clipped under the rank
+   number and "52w high" under the company name, headers included. The count
+   has to be maintained with the markup; it is the same fault this block was
+   written to fix, reintroduced by adding cells and not tracks. */
+.scr-r{
+  grid-template-columns:24px minmax(0,1fr) 70px 62px 62px 62px 50px 66px;
+  gap:0 10px;
+  align-items:baseline;
+  padding:13px 16px;
+}
+/* The Screen's rows carry one more cell than the Watchlist's — the call — so
+   the extra track is scoped to them by class rather than added to every table
+   that reuses this row grammar. Cells and tracks are counted together in one
+   place, which is the only way the two stay in step. */
+.scr-r.scr-call{
+  grid-template-columns:24px minmax(0,1fr) 62px 70px 62px 62px 62px 50px 66px;
+}
 .rank-r.lvl-r{
   grid-template-columns:24px minmax(0,1fr) 70px 62px 62px 62px 50px 66px;
   gap:0 10px;
@@ -2152,6 +2241,29 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
 .scr-r.rank-head .x,.scr-r.rank-head .m,
 .rank-r.lvl-r.rank-head .x,.rank-r.lvl-r.rank-head .m{
   font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--dim)}
+
+/* THE CALL, AS A TAG. Four states, each in the colour this site already uses
+   for that meaning, and each carrying its own WORD — direction is never left
+   to colour alone here or anywhere else on the page. */
+.vtag{display:inline-block;font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);
+  text-transform:uppercase;padding:4px 6px;border-radius:var(--r-2);white-space:nowrap;
+  background:var(--raised);color:var(--dim)}
+.vtag.v-buy{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
+.vtag.v-wait{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.vtag.v-avoid{background:color-mix(in srgb,var(--down) 15%,transparent);color:var(--down)}
+.vtag.v-watch,.vtag.v-unrated{background:var(--raised);color:var(--muted)}
+
+/* The two ends of the 52-week line, named under the ends they belong to. The
+   bar used to run between two numbers the reader could not see. */
+.pl-ends{display:flex;justify-content:space-between;gap:12px;margin-top:4px;
+  font:500 var(--t-2)/1.3 var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+/* One line per end, not two: the label and its figure read as a phrase, and
+   forty rows do not each pay an extra line for it. */
+.pl-ends > span{display:inline-flex;align-items:baseline;gap:5px;min-width:0}
+.pl-ends > span:last-child{text-align:right}
+.pl-ends em{font:400 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);
+  text-transform:uppercase;color:var(--dim);font-style:normal;flex:none}
+.pl-ends .u52{font-style:normal}
 
 /* The price line gets the full row width under the data it belongs to, and a
    little more air than a hairline needs, so it reads as part of the row rather
@@ -2215,8 +2327,56 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
     content:attr(data-l);font:400 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);
     text-transform:uppercase;color:var(--dim);flex:none}
 
+  /* THE CALL LEADS THE STRIP, and carries no label.
+     It sat mid-strip between vs 50D and RSI, so a reader scanning for
+     something to do had to read past four measurements to reach the one word
+     that answers them. It also needs no "CALL" prefix — the tag is a word,
+     not a figure, and prefixing a word with its own column name is the kind
+     of label that only exists because the layout used to need one.
+     Declared after the rule above rather than before it, so the override is
+     source order and not a specificity coincidence. */
+  .scr-r > .x[data-l="Call"]{order:3;margin-right:14px}
+  .scr-r > .x[data-l="Call"]::before{content:none}
+
   /* A header for a card layout is meaningless — each card labels itself. */
   .scr-r.rank-head,.rank-r.lvl-r.rank-head,.rank-r.rank-head{display:none}
+
+  /* ═══ THE SCREEN ROW ON A PHONE, AT SCANNING HEIGHT ══════════════════════
+   * Measured at 390px: a row was 249px, so four names filled the screen and
+   * a 40-row page ran to 10,600px. A screener you cannot scan is a list.
+   *
+   * Three things were paying for it, and none of them is information:
+   *
+   *   94px  the identity block — company name wrapping to two lines with the
+   *         institutional badge dropped onto a third
+   *   73px  five metric chips in a ragged wrapping flex row, landing on three
+   *         lines at this width
+   *   30px  padding
+   *
+   * NOTHING IS HIDDEN — that rule is the whole reason this stack exists and
+   * it still holds. The name is clamped to one line because the TICKER above
+   * it already identifies the row and the full name is one tap away; the
+   * clamp is scoped to .scr-r so the IPO listings keep the wrap they were
+   * given deliberately (their sub-line carries the price band, which is the
+   * fact that was being cut). The badge joins the name's line. The chips
+   * become a fixed three-column grid, so five of them are always two tidy
+   * rows instead of three ragged ones. */
+  .scr-r > .s > span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    display:block;margin-top:2px}
+  /* The badge keeps the line of its own it was given deliberately at 560px,
+     "rather than squeeze the name to nothing on a 360px screen". Tried
+     inlining it here and it saved nothing measurable, so the earlier decision
+     stands. */
+  .scr-r{padding-top:12px;padding-bottom:12px;row-gap:0}
+  /* Three fixed columns, and each chip stacks its label over its figure.
+     Inline, "VS 200D +120.79%" is wider than a third of 390px and collided
+     with the column beside it; stacked, every chip fits its own third at any
+     width and the six of them are two even rows. */
+  .scr-r > .x:not([data-l="Price"]):not([data-l="Call"]),.scr-r > .m{
+    flex:0 0 33.33%;margin:8px 0 0;min-width:0;
+    flex-direction:column;align-items:flex-start;gap:2px}
+  .scr-r > .x:not([data-l="Price"]):not([data-l="Call"])::before,
+  .scr-r > .m::before{font-size:var(--t-1)}
 
   /* ── AND THE CONTAINER HAS TO LET THEM WRAP ────────────────────────────
    * The rows above became flex and were told to wrap, and they still did not:
@@ -3238,6 +3398,10 @@ html:has(dialog[open]){overflow:hidden}
  * columns cannot hold a name, two figures and a pill without one of them
  * being unreadable, and the verdict is the column worth keeping whole. */
 .rank-r.eng{grid-template-columns:minmax(0,1fr) 72px 84px 120px;gap:0 12px;align-items:center}
+/* Two cells, two tracks. When no engine has closed a trade the roster carries
+   only Engine and Published, and a four-track grid would strand them against
+   240px of empty columns whose headers are not there. */
+.rank-r.eng.eng-2{grid-template-columns:minmax(0,1fr) 72px}
 .rank-r.eng .s b{font:600 var(--t-4)/1.2 var(--mono);color:var(--text)}
 .rank-r.eng .x{font:500 var(--t-4)/1.3 var(--mono);font-variant-numeric:tabular-nums;text-align:right}
 .rank-r.eng .x .pill{font-style:normal;white-space:nowrap}
@@ -3360,8 +3524,17 @@ html:has(dialog[open]){overflow:hidden}
 /* The 2R default sits at zero width and the 6R cap fills it, so an empty bar
    reads correctly as "no extra bar to clear" rather than as missing data. */
 .ag-bar{background:var(--raised)}
-.ag-m{display:flex;flex-wrap:wrap;gap:2px 14px}
-.ag-m span{display:flex;flex-direction:column;font:400 var(--t-1)/1.3 var(--mono);
+/* THREE COLUMNS, NOT A WRAPPING ROW.
+   As a wrapping flex row the three figures fit two-up on a phone and the third
+   dropped to a line of its own — "2R / 31.8%" over an orphaned "22", so the
+   card read as a two-stat block with a stray number under it. They are one
+   sentence (this engine must earn 2R, because 22 closed trades put its win
+   rate at 31.8%), and a sentence must not break across a fold like that.
+   Equal columns keep the trio on one line at every width; a long label wraps
+   inside its own column, which is legible, instead of pushing its figure into
+   the next row, which is not. */
+.ag-m{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 12px;align-items:start}
+.ag-m span{display:flex;flex-direction:column;min-width:0;font:400 var(--t-1)/1.3 var(--mono);
   letter-spacing:var(--ls-wide);color:var(--dim);text-transform:uppercase}
 .ag-m b{font:600 var(--t-4)/1.1 var(--mono);font-variant-numeric:tabular-nums;
   color:var(--text);letter-spacing:var(--ls-0);text-transform:none;margin-bottom:2px}
@@ -3673,9 +3846,14 @@ html:has(dialog[open]){overflow:hidden}
 .rank-r.eng.eng-h .s,.rank-r.eng.eng-h .x{font:500 var(--t-1)/1 var(--mono);color:var(--dim);
   letter-spacing:.08em;text-transform:uppercase}
 @media (max-width:560px){
-  .rank-r.eng{grid-template-columns:minmax(0,1fr) 64px 72px;gap:6px 10px}
-  .rank-r.eng .x:last-child{grid-column:1/-1;text-align:left}
-  .rank-r.eng.eng-h .x:last-child{display:none}
+  /* Three tracks for four cells, on purpose: the win rate drops to its own
+     full-width line under the name. That only holds when the win-rate cell is
+     THERE — with the two-column roster, :last-child is Published, and moving
+     the published count to a line of its own would be nonsense. */
+  .rank-r.eng:not(.eng-2){grid-template-columns:minmax(0,1fr) 64px 72px;gap:6px 10px}
+  .rank-r.eng:not(.eng-2) .x:last-child{grid-column:1/-1;text-align:left}
+  .rank-r.eng:not(.eng-2).eng-h .x:last-child{display:none}
+  .rank-r.eng.eng-2{gap:6px 10px}
 }
 .rank-r.xtra .s b{display:block;font:600 var(--t-4)/1.2 var(--mono);color:var(--text)}
 .rank-r.xtra .s span{display:block;margin-top:2px;font:400 var(--t-3)/1.4 var(--ui);color:var(--dim)}
@@ -3815,10 +3993,26 @@ html:has(dialog[open]){overflow:hidden}
 /* ── the filter group ─────────────────────────────────────────────────────── */
 .insti-g{margin:4px 0 18px;padding:14px;border:1px solid var(--line);border-radius:var(--r-4);
          background:var(--surface)}
-.insti-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+/* The header is the disclosure's own summary now, so it has to look and
+   behave like a control: a pointer, a marker, and a tap target that covers
+   the whole strip rather than the two words of the heading. */
+.insti-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px;
+  cursor:pointer;list-style:none;padding-right:22px;position:relative;min-height:30px}
+.insti-h::-webkit-details-marker{display:none}
+.insti-h::after{content:"";position:absolute;right:4px;top:8px;width:7px;height:7px;
+  border-right:1.5px solid var(--dim);border-bottom:1.5px solid var(--dim);
+  transform:rotate(45deg);transition:transform var(--t-fast,.16s) ease}
+.insti-g[open] > .insti-h::after{transform:rotate(-135deg)}
+.insti-h:hover h3{color:var(--accent)}
+.insti-h:focus-visible{outline:2px solid var(--live);outline-offset:3px;border-radius:var(--r-2)}
+/* Says the panel is narrowing the table even while it is shut — a closed
+   filter that is still filtering has to announce itself. */
+.insti-on{flex:none;font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);
+  text-transform:uppercase;color:var(--accent);background:var(--raised);
+  padding:4px 6px;border-radius:var(--r-2)}
 .insti-h h3{font:600 var(--t-5)/1.2 var(--ui);letter-spacing:var(--ls-snug);margin:0;color:var(--text)}
 .insti-sub{font:400 var(--t-2)/1.35 var(--ui);color:var(--dim);flex:1 1 200px}
-.insti-clear{flex:none;background:none;border:0;padding:4px 2px;cursor:pointer;
+.insti-clear{display:block;margin-bottom:9px;background:none;border:0;padding:4px 2px;cursor:pointer;
              font:500 var(--t-2)/1 var(--ui);color:var(--accent);text-decoration:underline;
              text-underline-offset:2px;min-height:32px}
 .insti-g .chips{margin-bottom:8px}
@@ -4023,6 +4217,23 @@ html:has(dialog[open]){overflow:hidden}
 .xr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 /* A chevron, so a row that opens is distinguishable from one that does not
    before you tap it. Rotates rather than swapping glyphs, so nothing reflows. */
+/* The books that were not rated apply keep their full cards; they simply do
+   not open ten of them over the one that was. */
+.ipo-rest > .cards-2{padding:0 12px 12px}
+.ipo-rest[open] > summary{border-bottom:1px solid var(--line);margin-bottom:12px}
+
+/* THE LISTINGS TABLE ON /ipo — NINE COLUMNS, DECLARED.
+   It reuses .lvl-r, which declares eight tracks, and emits nine cells. The
+   ninth ("Since listing" — the whole point of the table) wrapped to a second
+   grid line and took track one's 24px, in the header and in every row, so the
+   column heading and its figures were in different places and both clipped.
+   The caret is absolutely positioned and out of flow, so nine is the count.
+   Right padding keeps the last figure clear of it. */
+.rank-r.lvl-r.ipo-lr{
+  grid-template-columns:24px minmax(0,1fr) 82px 96px 68px 68px 104px 62px 78px;
+  padding-right:28px}
+@media(max-width:700px){ .rank-r.lvl-r.ipo-lr{padding-right:22px} }
+
 .xr-caret{position:absolute;right:10px;top:50%;width:7px;height:7px;margin-top:-5px;
   border-right:1.6px solid var(--dim);border-bottom:1.6px solid var(--dim);
   transform:rotate(45deg);transition:transform var(--t-fast) var(--ease);pointer-events:none}

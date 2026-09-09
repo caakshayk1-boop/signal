@@ -607,6 +607,19 @@ try {
   ok("the institutional filter group renders", await grp.count() === 1);
 
   if (instiFeed && instiFeed.measured > 0) {
+    /* THE PANEL IS A DISCLOSURE, CLOSED BY DEFAULT.
+     * It is roughly two phone screens of secondary filters and it sits above
+     * the rows the reader came for, so it opens on a tap instead of on every
+     * visit. Two things have to stay true and both are asserted here: it is
+     * shut when nothing is filtered, and it opens BY ITSELF the moment one of
+     * its filters is on — a closed panel that is silently narrowing the table
+     * would be the worst version of this. */
+    ok("the panel is closed until it is wanted",
+       await grp.evaluate(e => !e.open));
+    await grp.locator("> summary.insti-h").click();
+    await p.waitForTimeout(200);
+    ok("the panel opens on its summary", await grp.evaluate(e => e.open));
+
     ok("the five quick filters are offered",
        await p.locator('.insti-g .chip[data-ic]').count() === 6);   // 5 + "Any"
 
@@ -619,6 +632,9 @@ try {
       .map(r => r.dataset.sym));
     const wrong = shown.filter(s => instiFeed.rows[s]?.signal !== "strong_accumulation");
     ok("the accumulation filter returns only accumulating names", wrong.length === 0, wrong.slice(0, 3));
+    // A filter that is narrowing the table may never hide behind a shut panel.
+    ok("an active filter re-opens the panel",
+       await p.locator(".insti-g").evaluate(e => e.open));
     ok("every filtered row carries its badge",
        shown.length === 0 || await p.locator(".scr-r:not(.rank-head) .scr-ins").count() === shown.length);
 
@@ -1174,6 +1190,115 @@ try {
   await swCtx.close();
 
   /* ── NARROW ──────────────────────────────────────────────────────────── */
+  /* ── EVERY TABLE'S COLUMNS MAP TO ITS HEADERS ───────────────────────────
+   *
+   * Two tables shipped with more cells than declared grid tracks, and CSS
+   * does not complain: the surplus cells wrap onto a second grid line and
+   * take the widths of the FIRST columns. On /screen "52w low" rendered
+   * clipped in a 24px box under the rank number while its heading sat 1,100px
+   * away; on /ipo "Since listing" — the entire point of the listings table —
+   * did the same in the header and in every row.
+   *
+   * Neither threw, neither failed a snapshot, and both were invisible to
+   * every existing assertion. The invariant is simple and worth holding: a
+   * header row and the row under it have the same number of in-flow cells,
+   * that number equals the declared track count, and each header sits at the
+   * same x as the cell beneath it. Cells that opt out of the columns on
+   * purpose (grid-column: 1 / -1, or absolutely positioned) are excluded. */
+  console.log("\n  table columns map to their headers");
+  // Its own page: by this point in the run the shared one has been closed.
+  const colCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const colP = await colCtx.newPage();
+  for (const route of ["/", "/signals", "/screen", "/ideas", "/markets", "/ipo",
+                       "/brief", "/watch", "/engines", "/radar", "/news", "/funds"]) {
+    await colP.goto(SITE + route, { waitUntil: "domcontentloaded" });
+    await colP.waitForTimeout(SETTLE + 3000);
+    const faults = await colP.evaluate(() => {
+      const inflow = el => [...el.children].filter(c => {
+        const k = getComputedStyle(c);
+        return k.display !== "none" && k.position !== "absolute"
+            && !/^1 ?\/ ?-1$/.test(k.gridColumn.trim());
+      });
+      const out = [];
+      for (const head of document.querySelectorAll("#main .rank-head")) {
+        let row = head.nextElementSibling;
+        while (row && !row.classList.contains("rank-r")) row = row.nextElementSibling;
+        if (!row) continue;
+        const hc = inflow(head), rc = inflow(row);
+        const tracks = getComputedStyle(head).gridTemplateColumns.split(" ").filter(Boolean).length;
+        const off = hc.length === rc.length && hc.findIndex((c, i) =>
+          Math.abs(c.getBoundingClientRect().x - rc[i].getBoundingClientRect().x) > 1);
+        if (hc.length !== rc.length || hc.length !== tracks || (off !== false && off > -1))
+          out.push({ cls: String(row.className).slice(0, 40), tracks,
+                     head: hc.length, row: rc.length, firstOffColumn: off });
+      }
+      return out;
+    });
+    ok(`${route} — every column sits under its own header`, faults.length === 0, faults);
+  }
+  await colCtx.close();
+
+  /* ── THE SAME FACT, TWICE ON ONE PAGE ───────────────────────────────────
+   *
+   * The complaint that started this pass was duplication, and it was found by
+   * reading pages one at a time. That does not survive the next feature, so
+   * it is measured here instead. Two hunts, both over the RENDERED text:
+   *
+   *   A. A clause of eight or more words appearing more than once. That is
+   *      boilerplate printed per card instead of once per page — the shape
+   *      that put the same 45-word trailing note on thirty signal rows, the
+   *      same chart caption on five idea cards, and the same sentence about
+   *      an empty record on nine engine cards.
+   *
+   *   B. The same formatted FIGURE three or more times inside one card or
+   *      section. Twice can be honest — a value and the axis it sits on.
+   *      Three times is a fact being restated: target 1 in the plan grid, in
+   *      the stop path and again as the first scale-out rung.
+   *
+   * Only figures carrying a unit are counted — a currency mark, a per cent,
+   * an ×, an R or an :1. A bare integer is usually a label ("200-day") or a
+   * share quantity that two ladder rungs may legitimately share, and counting
+   * those produces noise that trains people to ignore the check.
+   *
+   * Visible text only: anything inside a closed <details> is not on the page,
+   * so folding a block is not a way to pass this. */
+  console.log("\n  the same fact is not printed twice");
+  const dupCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const dupP = await dupCtx.newPage();
+  for (const route of ["/", "/signals", "/screen", "/ideas", "/markets", "/ipo",
+                       "/brief", "/engines", "/radar", "/news", "/funds", "/watch"]) {
+    await dupP.goto(SITE + route, { waitUntil: "domcontentloaded" });
+    await dupP.waitForTimeout(SETTLE + 3000);
+    const found = await dupP.evaluate(() => {
+      const txt = document.getElementById("main").innerText;
+      const seen = new Map();
+      for (const raw of txt.split(/(?<=[.!?])\s+|\n+/)) {
+        const t = raw.trim().replace(/\s+/g, " ");
+        if (t.split(" ").length < 8) continue;
+        seen.set(t, (seen.get(t) || 0) + 1);
+      }
+      const sentences = [...seen].filter(([, n]) => n > 1)
+        .map(([t, n]) => `x${n}: "${t.slice(0, 70)}"`);
+
+      // A figure only counts when it carries a unit.
+      const UNIT = /(?:₹|\$)[\d,]+(?:\.\d+)?|[\d,]+(?:\.\d+)?\s?(?:%|×|R\b|:\s?1)/g;
+      const figs = [];
+      for (const el of document.querySelectorAll("#main .card, #main .ipo, #main .b-sec, #main .aic, #main .ef-c")) {
+        const c = new Map();
+        for (const m of (el.innerText || "").match(UNIT) || []) {
+          const k = m.replace(/\s+/g, "");
+          c.set(k, (c.get(k) || 0) + 1);
+        }
+        const bad = [...c].filter(([, n]) => n >= 3).map(([v, n]) => `${v} x${n}`);
+        if (bad.length) figs.push(`${(el.innerText || "").split("\n")[0].slice(0, 14)}: ${bad.join(", ")}`);
+      }
+      return { sentences, figs };
+    });
+    ok(`${route} — no sentence is printed twice`, found.sentences.length === 0, found.sentences.slice(0, 3));
+    ok(`${route} — no figure is printed three times in one block`, found.figs.length === 0, found.figs.slice(0, 3));
+  }
+  await dupCtx.close();
+
   console.log("\n  320 x 568 — the narrowest phone in use");
   const mCtx = await browser.newContext({ viewport: { width: 320, height: 568 } });
   const mp = await mCtx.newPage();

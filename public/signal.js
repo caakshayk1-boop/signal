@@ -471,6 +471,17 @@
     b.remove();                      // one-way: nothing re-hides it
   });
 
+  /* A SECTION THAT KEEPS ITS HEADING AND FOLDS ITS BODY.
+   *
+   * Used where a block is genuinely worth having on the page but is not what
+   * the page is FOR — the long-horizon research under a page whose top is
+   * today's orders, the books nobody is being told to apply to. The heading,
+   * the count in the section rail and the standfirst all still render, so the
+   * reader can see the block exists and what is in it; only the rows wait for
+   * a tap. Nothing is removed and nothing becomes unreachable. */
+  const foldBody = (summary, html) =>
+    `<details class="foldb"><summary>${esc(summary)}</summary>${html}</details>`;
+
   const xrow = (summary, detail, opts = {}) => {
     if (!detail) return `<div class="rank-r ${opts.cls || ''}" ${opts.attrs || ''}>${summary}</div>`;
     const id = `xr${++xrSeq}`;
@@ -544,8 +555,18 @@
     </div>`;
   };
 
+  /* LABEL FIRST.
+   *
+   * The tile printed value → qualifier → label, so a reader met "41" and
+   * "since 2026-09-02" and only then learned, on the third line, that it was
+   * the count of published signals. A figure whose name arrives last has to
+   * be read twice, and a row of four of them has to be read twice four times.
+   *
+   * Label, then figure, then the one line that qualifies it. The qualifier
+   * sits on the floor of the tile so a row of tiles still shares one baseline
+   * however far a label wraps. */
   const tile = (v, k, sub, cls) =>
-    `<div class="tile"><div class="v ${cls || ''}">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}<div class="k">${esc(k)}</div></div>`;
+    `<div class="tile"><div class="k">${esc(k)}</div><div class="v ${cls || ''}">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
 
   /* ── ANIMATED NUMBER ─────────────────────────────────────────────────────
    * One implementation, used everywhere a figure is worth watching arrive.
@@ -1900,9 +1921,12 @@
     })();
     TODAY5 = { wire, wireTop, spurts, cal };
 
+    // Same order as tile(): label, figure, qualifier. This is a tile with a
+    // destination, so it must read like one — the two sitting side by side in
+    // different orders would be worse than either order on its own.
     const t5 = (id, v, k, sub, cls) => `<button type="button" class="tile tile-go" data-t5="${id}">
-      <div class="v ${cls || ''}">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}
-      <div class="k">${esc(k)}</div></button>`;
+      <div class="k">${esc(k)}</div>
+      <div class="v ${cls || ''}">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</button>`;
 
     /* ── THE RECORD, FIRST ────────────────────────────────────────────────
      * Placed above every pick on the page, and that placement is the whole
@@ -1947,14 +1971,22 @@
         }
       }
       const rows = [...fam.values()].sort((a, b) => b.closed - a.closed || b.pub - a.pub);
+      const anyClosed = rows.some(r => r.closed);
       const neg = LR.expectancy_r != null && LR.expectancy_r < 0;
       out += sec('The record', `
         <div class="grid">
           ${tile(LR.published, 'Published', `since ${esc(LAUNCH)}`, LR.published ? 'ac' : '')}
           ${tile(LR.trades, 'Closed and scored', LR.open + ' still open')}
-          ${tile(LR.trades ? LR.win_rate + '%' : '—', 'Win rate',
-                 LR.trades ? `${LR.wins}W / ${LR.losses}L` : 'nothing closed yet',
-                 LR.trades ? (LR.win_rate >= 50 ? 'up' : 'dn') : '')}
+          ${/* Same rule the ledger page applies to itself: under five closed
+              * trades the tile shows the COUNT, not a percentage. A "50%" in
+              * the up-colour off 1W/1L is a claim, and engines.json's own
+              * basis note draws the not-evidence line far above two. */''}
+          ${tile(LR.trades >= 5 ? LR.win_rate + '%' : (LR.trades ? `${LR.wins}W / ${LR.losses}L` : '—'),
+                 'Win rate',
+                 LR.trades >= 5 ? `${LR.wins}W / ${LR.losses}L`
+                   : LR.trades ? `${LR.trades} closed — too few to quote a rate`
+                               : 'nothing closed yet',
+                 LR.trades >= 5 ? (LR.win_rate >= 50 ? 'up' : 'dn') : '')}
           ${tile(LR.trades ? (LR.expectancy_r > 0 ? '+' : '') + LR.expectancy_r + 'R' : '—', 'Per trade',
                  'expectancy, closed only', LR.trades ? dir(LR.expectancy_r) : '')}
         </div>
@@ -1966,23 +1998,31 @@
              <b class="${neg ? 'dn' : 'up'}">${LR.expectancy_r > 0 ? '+' : ''}${LR.expectancy_r}R</b>.
              ${LR.trades < 30 ? 'Too few to settle anything, and shown anyway.' : ''}`}
         </p>
+        ${/* COLUMNS ARE EARNED.
+            * "Closed" and "Win rate" are printed for every engine whether or
+            * not any engine has closed a trade. Today that is eight rows of
+            * sixteen em-dashes under two headers, directly below a sentence
+            * that has already said "Nothing has closed yet" — the table
+            * repeating, in dashes, the one thing the reader was just told.
+            * The two columns appear the moment any engine has something to
+            * put in them, and not before. */''}
         <div class="rank">
-          <div class="rank-r eng eng-h">
+          <div class="rank-r eng${anyClosed ? '' : ' eng-2'} eng-h">
             <span class="s">Engine</span><span class="x">Published</span>
-            <span class="x">Closed</span><span class="x">Win rate</span>
+            ${anyClosed ? `<span class="x">Closed</span><span class="x">Win rate</span>` : ''}
           </div>
           ${/* A LINK, NOT A DEAD ROW. These nine were the only rows left on the
               site that showed a name and a number and answered nothing when
               tapped — the floor now holds what each engine fires on, where its
               stop comes from and how it can be wrong, so the roster points at
               it rather than restating a fraction of it. */''}
-          ${rows.map(r => `<a class="rank-r eng" href="/engines"
+          ${rows.map(r => `<a class="rank-r eng${anyClosed ? '' : ' eng-2'}" href="/engines"
               aria-label="${esc(r.label)} — open the engine floor">
             <span class="s"><b>${esc(r.label)}</b></span>
             <span class="x">${r.pub || '—'}</span>
-            <span class="x">${r.closed || '—'}</span>
+            ${anyClosed ? `<span class="x">${r.closed || '—'}</span>
             <span class="x">${r.closed
-              ? (Math.round(r.wins / r.closed * 1000) / 10) + '%' : '—'}</span>
+              ? (Math.round(r.wins / r.closed * 1000) / 10) + '%' : '—'}</span>` : ''}
           </a>`).join('')}
         </div>
         <p class="hint">An engine is trusted with capital at 30 closed trades and t&nbsp;≥&nbsp;2.
@@ -2063,7 +2103,18 @@
       return pinned.concat(rotating);
     })();
 
-    out += sec('The wire', wire.length ? `<div class="wire">${capList(wireView.map(x => `
+    /* THE WIRE READS LAST.
+     *
+     * It was the fourth block on the page — five stories, each with a
+     * 150-character summary, roughly a full phone screen of prose — sitting
+     * ABOVE the only two blocks that name something to do. A reader arriving
+     * for a decision had to scroll past the newspaper to reach it.
+     *
+     * Built here, where its data is, and appended after the conviction slate
+     * and the open books. Nothing is dropped except the summaries, which
+     * restate the headline they sit under; /news carries them in full and the
+     * link below goes there. */
+    const wireSec = sec('The wire', wire.length ? `<div class="wire wire-tight">${capList(wireView.map(x => `
         <a href="${esc(x.link || '#')}" ${x.link ? 'target="_blank" rel="noopener"' : ''}>
           <span class="ws">${esc(x.source || 'wire')}${
             // HOW MANY WIRES CARRIED IT. The closest thing this feed has to a
@@ -2074,7 +2125,6 @@
               ? `<i class="w-also" title="${esc(x._also.join(', '))}">+${x._also.length} more</i>` : ''}${
             x.at ? `<i class="w-at">${esc(storyAge(x.at))}</i>` : ''}</span>
           <span class="wt">${esc(x.title || '')}</span>
-          ${x.summary ? `<span class="wd">${esc(String(x.summary).slice(0, 150))}</span>` : ''}
         </a>`), 5, 'stories')}</div>
         <p class="hint">${wireIsLive
           ? `Read live from <b>${liveWire.sources}</b> newswires, refreshed every fifteen minutes,
@@ -2096,7 +2146,8 @@
        * refreshing a page whose stories do not change has no way to tell
        * whether the wire is quiet or stuck. */
       `${wire.length > wireView.length ? `${wireView.length} of ${wire.length}` : `${wire.length} stories`}${
-        wireAge ? ` · ${esc(wireAge)}` : ''}`);
+        wireAge ? ` · ${esc(wireAge)}` : ''}`,
+      'Context, not signal — the headlines, read after the decision rather than before it.');
 
     const cv = await get('/conviction.json');
     if (cv.ok && (cv.data.picks || []).length) {
@@ -2104,7 +2155,28 @@
       // Five symbols, one call. The slate is priced at the morning build; this
       // is what it is worth now.
       const cvpx = await quotes(c.picks.map(x => x.sym));
-      c.picks.forEach(x => { x._live = cvpx[x.sym] || null; });
+      /* THE FOUR SCREEN FIGURES THE CARD ASKS FOR ARE NOT IN conviction.json.
+       *
+       * The card renders sd1y, r3y_cagr, roce_trend and next_earnings off the
+       * pick. A pick carries none of them — its keys are the levels, the
+       * score, the reasons and seven ratios — so those four cells have printed
+       * an em dash on every conviction card since they were added, and the
+       * comment beside them describing "four figures the screen computes and
+       * nothing showed" still described the situation exactly.
+       *
+       * They live on the screen row, which this route deliberately does not
+       * download: screen.json is 1.5 MB and the front page must not pay for
+       * it. So they are filled from SCREEN only when it is ALREADY in memory —
+       * a reader who has been to /screen, /radar or a company card this
+       * session — and the cells that cannot be filled are not drawn at all.
+       * A cell that can never hold anything is not a cell. */
+      const cvIdx = SCREEN ? new Map(SCREEN.map(r => [r.sym, r])) : null;
+      c.picks.forEach(x => {
+        x._live = cvpx[x.sym] || null;
+        const sr = cvIdx && cvIdx.get(x.sym);
+        if (sr) for (const k of ['sd1y', 'r3y_cagr', 'roce_trend', 'next_earnings'])
+          if (x[k] == null && sr[k] != null) x[k] = sr[k];
+      });
       out += sec('Today’s conviction', `<div class="cards-2">${capList(c.picks.map(convictionCard), 2, 'conviction picks')}</div>` +
         TRAIL_NOTE +
         `<details class="meth"><summary>How these five were chosen</summary>
@@ -2130,12 +2202,27 @@
     // used to keep yesterday's shut books under a heading saying "open".
     const ipoOpen = io.ok ? ipoOpenNow(io.data.open) : [];
     if (ipoOpen.length) {
-      out += sec('Open right now', ipoOpen.slice(0, 2).map(ipoCard).join(''),
-        `${ipoOpen.length} book${ipoOpen.length === 1 ? '' : 's'} open`);
+      /* THE FRONT PAGE SHOWS THE TWO WORTH SHOWING, NOT THE FIRST TWO.
+       *
+       * This sliced the feed's own order, so with ten books open the front
+       * page could carry two AVOIDs and never mention the one rated apply —
+       * a page that names something to do, showing the two things not to.
+       * Same ranking /ipo uses: the call first, then demand. */
+      const vR = r => { const v = String(r.verdict || '').toUpperCase();
+        return v.startsWith('APPLY') ? 0 : v === 'AVOID' ? 2 : 1; };
+      const ranked = ipoOpen.slice().sort((a, b) =>
+        vR(a) - vR(b) || (Number(b.subscription_x) || 0) - (Number(a.subscription_x) || 0));
+      const nApply = ranked.filter(r => vR(r) === 0).length;
+      out += sec('Open right now', ranked.slice(0, 2).map(ipoCard).join('') + ipoStaleNote(),
+        `${ranked.length} book${ranked.length === 1 ? '' : 's'} open`,
+        /* Plain text: sec() escapes the lead, so markup here would render as
+         * its own tags. The tab bar already links to the IPO page. */
+        `${nApply || 'None'} of ${ranked.length} rated apply. The best-rated first; the rest are on the IPO page.`);
     }
     // Nothing in the mirror is still open. NSE may well disagree — that is
     // exactly the case fillIpoLive() is for, so give it somewhere to render.
     if (!ipoOpen.length) out += '<div id="ipoExtraHome"></div>';
+    out += wireSec;
     paint(out);
     // The front page renders the same IPO card as the IPO route, so it needs
     // the same upgrade to the live book. Wiring it to one route and not the
@@ -2153,15 +2240,32 @@
     <div class="card-h">
       ${watchBtn(p.sym)}
       <span class="sym">${esc(p.sym)}</span>
-      <span class="pill pill-ac">${esc(p.score)}</span>
+      ${/* 81.27 was printed to two decimals. A composite score is a rank
+          * order, not a measurement to a hundredth of a point, and the gap
+          * between 81.27 and 79.44 is not a thing this screen can resolve.
+          * Rounded, and given its denominator so the number means something
+          * on its own. */''}
+      <span class="pill pill-ac" title="Composite score">${Math.round(Number(p.score))}/100</span>
+      ${p.rr ? `<span class="pill pill-up" title="Reward to risk, entry to the second target">${esc(p.rr)}:1</span>` : ''}
       ${p.brk52w ? `<span class="pill pill-up">52w high</span>` : ''}
       <span class="spacer"></span>
       <span class="pill">${esc(p.sector || '')}</span>
     </div>
     <div class="card-body" style="color:var(--text);font-weight:500">${esc(p.name || '')}</div>
+    ${/* THE SENTENCE, NOT THE SENTENCE AND ITS OWN BULLET POINTS.
+        * `view` and `reasons` are the same four facts twice: SMLMAH's view
+        * reads "ROCE 29%, Piotroski 7/9, up 71% in three months, at 52-week
+        * high" and its four bullets are "ROCE 29%", "Piotroski 7/9", "+71%
+        * over three months", "at a 52-week high". Each of those four then
+        * appears a THIRD time in the grid below — ROCE, Piotroski, 3M, and
+        * the 52w-high pill in the header. Nothing was wrong; all of it was
+        * said three ways, on five cards, on the front page.
+        *
+        * The sentence survives because it reads. The bullets go. What was
+        * MISSING is now in the header: r:r, which is in conviction.json, is
+        * the number that decides whether an idea is worth taking, and was on
+        * no card while ROCE was on every card three times. */''}
     ${p.view ? `<div class="cv-view"><span>View</span>${esc(p.view)}</div>` : ''}
-    ${(p.reasons || []).length ? `<div class="reads">${p.reasons.map(x =>
-        `<div class="read read-for">${esc(x)}</div>`).join('')}</div>` : ''}
     <div class="kv">
       <div><span class="kk">${p._live ? 'Live' : 'Price'}</span><span class="vv${p._live ? ' lv' : ''}">${p._live ? price(p._live.price) : price(p.price)}</span></div>
       <div><span class="kk">Today</span><span class="vv ${p._live ? dir(p._live.change_pct) : ''}">${p._live && p._live.change_pct != null ? pct(p._live.change_pct) : '—'}</span></div>
@@ -2180,19 +2284,19 @@
           * and the thing that decides position size. ROCE trend is here
           * because a returns figure without its direction is half a fact —
           * "18%, peaked" and "18%, improving" are different companies. */''}
-      <div><span class="kk">Volatility <i class="kk-q">1y</i></span><span class="vv">${
-        p.sd1y != null ? Number(p.sd1y).toFixed(0) + '%' : '—'}</span></div>
-      <div><span class="kk">3Y CAGR</span><span class="vv ${dir(p.r3y_cagr)}">${
-        p.r3y_cagr != null ? Number(p.r3y_cagr).toFixed(0) + '%' : '—'}</span></div>
-      <div><span class="kk">ROCE trend</span><span class="vv">${
-        p.roce_trend ? esc(String(p.roce_trend)) : '—'}</span></div>
+      ${p.sd1y == null ? '' : `<div><span class="kk">Volatility <i class="kk-q">1y</i></span><span class="vv">${
+        Number(p.sd1y).toFixed(0)}%</span></div>`}
+      ${p.r3y_cagr == null ? '' : `<div><span class="kk">3Y CAGR</span><span class="vv ${dir(p.r3y_cagr)}">${
+        Number(p.r3y_cagr).toFixed(0)}%</span></div>`}
+      ${!p.roce_trend ? '' : `<div><span class="kk">ROCE trend</span><span class="vv">${
+        esc(String(p.roce_trend))}</span></div>`}
       ${(() => {
         /* ── THE ONE DATE THAT CHANGES A SWING TRADE ──────────────────────
          * A setup that runs into a results print is a different trade from the
          * same setup two weeks clear of one, and the screen has known the date
          * all along. Counted in days rather than shown as a date, because
          * "in 4 days" is the form the decision is made in. */
-        if (!p.next_earnings) return '<div><span class="kk">Results</span><span class="vv">—</span></div>';
+        if (!p.next_earnings) return '';
         const d = new Date(p.next_earnings + 'T00:00:00');
         const days = Math.round((d - new Date()) / 86400000);
         const near = days >= 0 && days <= 10;
@@ -2203,7 +2307,10 @@
     </div>
     ${p.entry ? `<div class="kv lv-plan">
       <div><span class="kk">Entry</span><span class="vv">${price(p.entry)}</span></div>
-      <div><span class="kk">Stop</span><span class="vv dn">₹${esc(p.stop)} <i>${esc(p.stop_pct)}%</i></span></div>
+      ${/* price(), like every other figure on this card. Raw, this printed
+          * "₹5818.09" beside an entry of "₹6,394" — the same card grouping
+          * two prices in two different number formats. */''}
+      <div><span class="kk">Stop</span><span class="vv dn">${price(p.stop)} <i>${esc(p.stop_pct)}%</i></span></div>
       <div><span class="kk">Target 1</span><span class="vv up">${price(p.t1)} <i>+${esc(p.t1_pct)}%</i></span></div>
       <div><span class="kk">Target 2</span><span class="vv up">${price(p.t2)} <i>+${esc(p.t2_pct)}%</i></span></div>
     </div>
@@ -2279,8 +2386,7 @@
           <path class="ic-f" d="${d} L${W} ${H} L0 ${H} Z"/>
           <path class="ic-p" d="${d}"/>
           ${rule(Number(pick.target), 't')}${rule(Number(pick.stop_loss), 's')}
-        </svg>
-        <span class="idea-cxl">6M closes · target and stop to scale</span>`;
+        </svg>`;
     }));
   }
 
@@ -2305,13 +2411,26 @@
       ${liveX != null
         ? `<span class="subs-age is-live">Live from NSE${IPO_LIVE_AT
              ? ` · read ${esc(String(IPO_LIVE_AT).slice(11, 16))} UTC` : ''}</span>`
+        /* THE VINTAGE IS THE CARD'S; THE CAVEAT IS THE PAGE'S.
+         * "and a book moves fastest on its last day" is a fact about IPO
+         * books, not about this issue, and it printed on every card still
+         * reading from the morning mirror. The stamp and the age stay — those
+         * differ per card and are the honest marker — and the sentence is
+         * said once, under the block. See ipoStaleNote(). */
         : (IPO_AGE_H != null ? `<span class="subs-age${IPO_AGE_H > 6 ? ' is-old' : ''}">
-            as at ${esc(IPO_STAMP)}${IPO_AGE_H > 6
-              ? ` · <b>${esc(ageWord(IPO_AGE_H))}</b>, and a book moves fastest on its last day`
-              : ''}</span>` : '')}
+            as at ${esc(IPO_STAMP)}${IPO_AGE_H > 6 ? ` · <b>${esc(ageWord(IPO_AGE_H))}</b>` : ''}</span>` : '')}
       ${cats.length ? `<span class="subs-cat">${cats.slice(0, 4).map(c =>
           `<i><u>${esc(c.cat)}</u><b>${Number(c.x).toFixed(2)}×</b></i>`).join('')}</span>` : ''}`;
   };
+
+  /* Said once, under whichever block is showing mirrored figures, instead of
+   * on every card that happens to be reading from the morning build. */
+  const ipoStaleNote = () => IPO_AGE_H != null && IPO_AGE_H > 6
+    ? `<p class="hint">Figures marked <b>as at ${esc(IPO_STAMP)}</b> come from the morning build,
+       not from NSE just now — and a book moves fastest on its last day, so treat a subscription
+       figure that old as a floor rather than a reading. Anything marked <b>Live from NSE</b> was
+       read on this page load.</p>`
+    : '';
 
   /* Fetch the live book once and patch every card on screen. A targeted DOM
    * update, not a re-render: re-entering a route when a deferred fetch
@@ -2942,17 +3061,47 @@
     if (tk.ok) {
       const segs = (tk.data.segments || []).filter(sg => (sg.items || []).length);
       MKDATA = new Map();   // one map per paint; the route repaints every 60s
+      /* ELEVEN SEGMENTS, ALL OPEN, IS NOT A BOARD — IT IS A LIST.
+       *
+       * Forty-six instruments in eleven segments rendered expanded, so a
+       * reader who came for crypto scrolled past forty rows of Asia, India,
+       * the Nifty movers, Europe, the US, the US top ten, FX and commodities
+       * to reach three. On a phone that is the longest block on the site.
+       *
+       * Each segment is a disclosure now, and the summary carries what the
+       * segment header already carried — icon, name, how many instruments,
+       * how many of them are trading — plus how many are up, so the closed
+       * state still answers "is anything happening in there".
+       *
+       * INDIA stays open. This is a site about Indian markets and that
+       * segment is the reason most readers are on this page; folding it would
+       * be tidiness at the cost of the point. The Nifty gainers and losers
+       * open with it, because "which names moved" is the question the Indian
+       * indices immediately raise. */
+      const OPEN_SEGS = new Set(['india', 'gainers', 'losers']);
       out += sec('The board',
-        segs.map(sg => `<div class="segh">${esc(sg.icon || '')} ${esc(sg.label)}
-            ${segWhen(sg.items)}<span class="cnt">${sg.items.length}</span></div>
-          <div class="board">${sg.items.map(mkRow).join('')}</div>`).join('') +
+        segs.map(sg => {
+          const up = sg.items.filter(x => x.up).length;
+          return `<details class="segd"${OPEN_SEGS.has(sg.key) ? ' open' : ''}>
+            <summary class="segh">${esc(sg.icon || '')} ${esc(sg.label)}
+              ${segWhen(sg.items)}<span class="cnt">${up}/${sg.items.length} up</span></summary>
+            <div class="board">${sg.items.map(mkRow).join('')}</div>
+          </details>`;
+        }).join('') +
         `<p class="sec-note"><b>Every row opens.</b> The line under each name is the past month of
           real daily closes; the bar beside it is where the price sits between its own 52-week low
           and high ${tip('range52')}. Tap a row for the extremes, the day's range, volume, the exchange session ${tip('session')} and
           the exact time the quote was taken. A figure this site cannot measure says
           <b>Not measured</b> — it is never filled in.</p>`,
         `${tk.data.live ?? 0} of ${tk.data.total ?? 0} live`,
-        'Forty-six instruments, each with the year behind it.');
+        /* COUNTED, NOT SPELLED OUT. The lead read "Forty-six instruments"
+         * while the count beside it came from the feed, so the two could
+         * disagree the moment a segment was added or a symbol stopped
+         * resolving — a hardcoded number in a sentence about live data is a
+         * claim with no source. It is the same figure the rail already
+         * reports, in words. */
+        `${segs.reduce((n, sg) => n + sg.items.length, 0)} instruments across
+         ${segs.length} segments, each with the year behind it.`);
     } else { out += sec('The board', fail('The live board', tk.error)); }
 
     const movers = () =>
@@ -3027,7 +3176,25 @@
     const mbRows = (mbSeg && mbSeg.items) || [];
     const picked = mbRows.find(r => r.pick_date) || {};
 
-    out += sec('Multibaggers this week', mbRows.length ? `<div class="mbg">${mbRows.map(r => {
+    /* FIVE LISTS, ORDERED BY CLOCK.
+     *
+     * This page carries five different idea sources — the book, the daily
+     * engine, the daily breakout screen, a Saturday multibagger scan and a
+     * weekly long-horizon file — and stacked them in the order the code
+     * happened to fetch them: the weekly scans first, the orders you could
+     * place this morning last, five screens down. A reader could not tell
+     * which of the five they were meant to act on, and the one that is
+     * actionable today was the one they had to scroll furthest to reach.
+     *
+     * Nothing is removed. Each block is built where its data is and composed
+     * at the end, shortest clock first: today's orders, today's engine,
+     * today's breakouts, this week's scan, this quarter's theses. The order
+     * IS the answer to "which of these is for me". */
+    const parts = {};
+    parts.mbg = sec('Multibaggers this week', mbRows.length ? foldBody(
+      `${mbRows.length} name${mbRows.length === 1 ? '' : 's'} from Saturday's scan${
+        picked.pick_date ? `, picked ${picked.pick_date}` : ''}`,
+      `<div class="mbg">${mbRows.map(r => {
         const since = r.pick_entry && Number.isFinite(Number(r.price_raw))
           ? (r.price_raw - r.pick_entry) / r.pick_entry * 100 : null;
         const up = r.pick_target && Number.isFinite(Number(r.price_raw))
@@ -3068,7 +3235,7 @@
       }).join('')}</div>
       <p class="hint">The scan runs on a Saturday and this list is the newest run — it does not
         change between runs, and the prices beside the names are live, which is what makes a
-        stalled-looking list look like a bug rather than the design.</p>`
+        stalled-looking list look like a bug rather than the design.</p>`)
       : `<div class="empty">The weekly scan has not written a list in the last month, so there is
          nothing current to show. Stale ideas presented as current would be worse.</div>`,
       mbRows.length ? `${mbRows.length} names${picked.pick_date ? ` · ${esc(picked.pick_date)}` : ''}` : '',
@@ -3131,7 +3298,9 @@
 
     if (aiRows.length) {
       const horizon = ((aiRows[0].metadata || {}).horizon) || 'multi-year';
-      out += sec('AI long-term ideas', (aiSuperseded ? `<p class="hint" style="margin:-4px 0 14px">
+      parts.ai = sec('AI long-term ideas', foldBody(
+        `${aiRows.length} open thesis${aiRows.length === 1 ? '' : 'es'} · ${horizon} · entry, stop and the three stages on each`,
+        (aiSuperseded ? `<p class="hint" style="margin:-4px 0 14px">
         Showing the <b>latest</b> filing for each name. The engine re-runs weekly and
         re-files names it still likes, so <b>${aiSuperseded}</b> earlier open row${aiSuperseded === 1 ? '' : 's'}
         for these same companies ${aiSuperseded === 1 ? 'is' : 'are'} folded away here.
@@ -3210,20 +3379,29 @@
         <b>+35%</b>, <b>+75%</b> and <b>+150%</b> from entry on every name without exception. The
         ladder is a rule, so the stages are milestones on one thesis rather than three separate
         pieces of research. What IS specific to each name is the entry, the structure stop, the two
-        scores and the written thesis — which is why those are what the card spends its room on.</p>`,
+        scores and the written thesis — which is why those are what the card spends its room on.</p>`),
         `${aiRows.length} open · ${esc(horizon)}`,
         'One thesis per name, and the three points at which it would have paid.');
     }
 
     const picks = t.data.picks || [];
-    out += sec('The daily engine’s ranked picks', picks.length ? `<div class="cards-2">${picks.map(x => ideaCard(x, false)).join('')}</div>`
+    /* THE CHART'S CAPTION WAS PRINTED ONCE PER CARD.
+     * "6M closes · target and stop to scale" is a fact about how every chart
+     * in this block is drawn, not about any one name, and it appeared five
+     * times on the page. Said once, under the block it describes — the same
+     * rule the trailing note and the engine notes already follow. */
+    parts.picks = sec('The daily engine’s ranked picks', picks.length
+      ? `<div class="cards-2">${picks.map(x => ideaCard(x, false)).join('')}</div>
+         <p class="hint">Each chart is <b>six months of real daily closes</b>; the two rules across
+           it are that name's published target and stop, drawn to the same scale as the price.</p>`
       : `<div class="empty">Nothing clears the bar this week. That is a result, not a gap.</div>`,
       `${picks.length} ranked`, 'A different engine, on a different clock — names that cleared every floor, and the levels that define each one.');
 
     const pu = p.ok ? p.data : {};
-    out += sec('Breaking to 52-week highs',
+    parts.brk = sec('Breaking to 52-week highs',
       levelTable((pu.breakouts || []).slice(0, 12)),
-      pu.breakouts ? `${pu.breakouts.length} names` : '');
+      pu.breakouts ? `${pu.breakouts.length} names` : '',
+      'Today’s screen output — names printing a new one-year high, with where each sits against its own averages.');
 
     if (mn.ok) {
       const d = mn.data, st = d.state || {}, orders = d.admitted || [];
@@ -3234,7 +3412,7 @@
       // ₹2 lakh cannot use "₹10 L"; they can use "10% of the book".
       const shareOf = v => d.capital ? (Number(v) / d.capital * 100) : null;
 
-      out += sec('The book', `<div class="grid" style="margin-bottom:10px">
+      parts.book = sec('The book', `<div class="grid" style="margin-bottom:10px">
           ${tile(orders.length, 'Orders to place', 'nothing here is bought yet', 'ac')}
           ${tile(st.deployed_pct != null ? st.deployed_pct + '%' : '—', 'Would be deployed',
                  st.heat_pct != null ? st.heat_pct + '% at risk if every stop hits' : '')}
@@ -3251,9 +3429,13 @@
                      : `<span class="pill">no mark</span>`}
               ${o.rr ? `<span class="pill pill-up">${esc(o.rr)}:1</span>` : ''}</div>
             <div class="kv">
-              <div><span class="kk">Entry</span><span class="vv">₹${esc(o.entry ?? '—')}</span></div>
+              ${/* price(), like the Last cell beside them. Raw, this card
+                  * grouped "₹1886.3", "₹1,961" and "₹1759.39" in one row —
+                  * three prices in three different number formats, one of
+                  * which is the only one with a thousands separator. */''}
+              <div><span class="kk">Entry</span><span class="vv">${price(o.entry)}</span></div>
               <div><span class="kk">Last</span><span class="vv">${live ? price(live.price) : '—'}</span></div>
-              <div><span class="kk">Stop</span><span class="vv dn">₹${esc(o.stop ?? '—')}</span></div>
+              <div><span class="kk">Stop</span><span class="vv dn">${price(o.stop)}</span></div>
               <div><span class="kk">Size</span><span class="vv">${sh != null ? sh.toFixed(1) + '% of book' : '—'}</span></div>
               <div><span class="kk">Risk</span><span class="vv">${o.risk_pct != null ? o.risk_pct + '%' : (d.capital ? (Number(o.risk_amount) / d.capital * 100).toFixed(2) + '%' : '—')}</span></div>
               <div><span class="kk">Hold</span><span class="vv" style="font-size:var(--t-2)">${esc(o.hold_days || o.horizon || '—')}</span></div>
@@ -3261,19 +3443,35 @@
             ${(o.legs || []).length ? `<div class="ladder">
               ${o.legs.map(l => `<div class="leg">
                 <span class="leg-l">${esc(l.label)}</span>
-                <span class="leg-p">₹${esc(l.price)}</span>
+                ${/* One formatter. DIXON's ladder printed "₹15866.4",
+                    * "₹17168.7" and "₹18471" directly under an entry of
+                    * "₹14,130" — three number formats in one article. */''}
+                <span class="leg-p">${price(l.price)}</span>
                 <span class="leg-q">${esc(l.qty)} sh</span>
                 <span class="leg-g up">+${esc(l.gain_pct)}%</span>
                 <span class="leg-r">${esc(l.r_multiple)}R</span>
               </div>`).join('')}
             </div>` : ''}
             ${o.trail_note ? `<div class="trail"><span>Trailing stop</span>${esc(o.trail_note)}</div>` : ''}
+            ${/* The footer restated the size and the hold that the grid four
+                * rows up already carries — "sized at 10.0% ... · hold 14-31
+                * days" under a Size cell reading "10.0% of book" and a Hold
+                * cell reading "14-31 days". The one thing it said that the
+                * grid does not is that the percentage scales to whatever book
+                * you run, and that is a fact about every order on the page,
+                * so it is stated once beneath them. */''}
             <div class="card-foot">
-              <span class="mono" style="font-size:var(--t-2);color:var(--dim)">${sh != null ? 'sized at ' + sh.toFixed(1) + '% — scale to your own book' : ''}${o.hold_days ? ' · hold ' + esc(o.hold_days) : ''}</span>
               ${symLinks(o.symbol)}
             </div>
-          </article>`; }), 3, 'orders') : `<div class="empty">No orders clear the mandate today.</div>`));
+          </article>`; }), 3, 'orders')
+          + `<p class="hint">Every size above is a <b>share of the book</b>, not a rupee amount, so
+             it scales to whatever you actually run. Nothing here is bought — these are the orders
+             the mandate would place.</p>`
+          : `<div class="empty">No orders clear the mandate today.</div>`));
     }
+    // Shortest clock first. A missing block is simply absent — no placeholder.
+    out += [parts.book, parts.picks, parts.brk, parts.mbg, parts.ai]
+      .filter(Boolean).join('');
     paint(out);
     fillIdeaCharts(picks);   // six months of real closes on every idea, after paint
 
@@ -3306,16 +3504,50 @@
     if (!io.ok) { paint(out + fail('The IPO radar', io.error)); return; }
     const d = io.data, c = d.counts || {};
 
+    /* THE CALL RANKS THE PAGE.
+     *
+     * Ten books were listed in feed order under one heading, every one of them
+     * a full card — so comparing ten verdicts meant reading ten cards. The
+     * verdict is the only thing on an IPO card that changes what somebody
+     * does next, so it sorts the section and it names the headings.
+     *
+     * Nothing is hidden and no card is trimmed: the books that were not rated
+     * apply sit in a disclosure directly underneath, which says how many it
+     * holds and opens on a tap. fillIpoLive() patches by document query, so a
+     * card inside a closed panel still gets its live subscription figure. */
     const dOpen = ipoOpenNow(d.open);
+    const vRank = r => { const v = String(r.verdict || '').toUpperCase();
+      return v.startsWith('APPLY') ? 0 : v === 'AVOID' ? 2 : 1; };
+    const ordered = dOpen.slice().sort((a, b) =>
+      vRank(a) - vRank(b) || (Number(b.subscription_x) || 0) - (Number(a.subscription_x) || 0));
+    const applyBooks = ordered.filter(r => vRank(r) === 0);
+    const otherBooks = ordered.filter(r => vRank(r) !== 0);
+
     out += sec('Where it stands', `<div class="grid">
+        ${tile(c.apply ?? applyBooks.length, 'Rated apply', 'on public demand and pricing',
+               (c.apply ?? applyBooks.length) ? 'up' : '')}
         ${tile(dOpen.length, 'Books open', 'bidding today', dOpen.length ? 'ac' : '')}
         ${tile((d.upcoming || []).length, 'Upcoming', 'announced, not open')}
         ${tile((d.awaiting_listing || []).length, 'Awaiting listing', 'closed, not yet traded')}
-        ${tile(c.apply ?? '—', 'Rated apply', 'on public demand only', c.apply ? 'up' : '')}
-      </div>`);
+      </div>`, '', dOpen.length
+        ? `${applyBooks.length || 'None'} of ${dOpen.length} open book${dOpen.length === 1 ? '' : 's'} ${
+            applyBooks.length === 1 ? 'is' : 'are'} rated apply.`
+        : 'No mainboard book is open today.');
 
-    out += sec('Open now', dOpen.length ? `<div class="cards-2">${dOpen.map(ipoCard).join('')}</div>`
-      : `<div class="empty">No mainboard book is open today.</div>`);
+    out += sec('Worth applying', applyBooks.length
+      ? `<div class="${applyBooks.length > 1 ? 'cards-2' : ''}">${applyBooks.map(ipoCard).join('')}</div>` + ipoStaleNote()
+      : dOpen.length
+        ? `<div class="empty">Nothing open today clears the bar. That is a result, not a gap —
+             an issue is rated on demand and on what it is priced against, and neither becomes
+             negotiable because a book happens to be open.</div>`
+        : `<div class="empty">No mainboard book is open today.</div>`,
+      dOpen.length ? `${applyBooks.length} of ${dOpen.length} open` : '');
+
+    if (otherBooks.length) out += sec('Open, not recommended',
+      `<details class="meth ipo-rest"><summary>${otherBooks.length} other book${
+        otherBooks.length === 1 ? '' : 's'} bidding today — the full card on each</summary>
+        <div class="cards-2">${otherBooks.map(ipoCard).join('')}</div></details>`,
+      `${otherBooks.length}`);
 
     /* NSE'S LIST IS LONGER THAN THE MIRROR'S.
      *
@@ -3449,7 +3681,15 @@
              // data-rank is the row's place in the CURRENT order, rewritten by
              // the sort. The default view shows the first IPO_SHOW of them.
              + ` data-rank="${i}"` });
-    const ipoHead = `<div class="rank-r lvl-r rank-head">
+    /* NINE CELLS, AND THE ROW BELOW IT HAS NINE TOO — so both need nine
+     * tracks. `.rank-r.lvl-r` declares eight, so "Since listing" wrapped onto
+     * a second grid line and sized itself to track one: a 24px box under the
+     * rank number, in the header AND in every row. Measured on the live page,
+     * the header label sat at x=130 in 24px while its column heading was at
+     * x=1230 — the last column of this table has been unreadable since the
+     * "Range since" column was added. `.ipo-lr` now carries the count, and it
+     * is on the header as well as the rows so the two cannot drift. */
+    const ipoHead = `<div class="rank-r lvl-r ipo-lr rank-head">
       <span class="i">#</span><span class="s">Company</span>
       <span class="x">Listed</span><span class="x">Price band</span>
       <span class="x">Listed at</span><span class="x">Last</span>
@@ -3984,13 +4224,27 @@
              value="${esc(instiAdv[k])}" placeholder="${esc(ph)}" aria-label="${esc(lab)}"></label>`;
     const active = instiFiltered();
 
-    return `<section class="insti-g" aria-label="Institutional movement filters">
-      <div class="insti-h">
+    /* CLOSED UNTIL IT IS WANTED.
+     *
+     * This block opened expanded on every visit: a heading, a sub-line, seven
+     * quick chips, five saved screens, a ranges disclosure and a coverage
+     * paragraph. On a phone that is roughly two screens of secondary filters
+     * standing between the reader and the first row of the thing they came
+     * for — and it sits below the primary preset chips, which most sessions
+     * never scroll past.
+     *
+     * It is not removed and nothing inside it changes. It opens on a tap, and
+     * it opens BY ITSELF whenever one of its filters is active, so the panel
+     * can never be closed over a filter that is silently narrowing the table.
+     * The summary says so too. */
+    return `<details class="insti-g"${active || instiAdvOpen ? ' open' : ''}>
+      <summary class="insti-h">
         <h3>Institutional movement</h3>
         <span class="insti-sub">FII and DII holding, ${esc(INSTI_META.latest_period_end
           ? 'latest quarterly filings' : 'quarterly filings')} · change in percentage points</span>
-        ${active ? `<button type="button" class="insti-clear" id="insti-clear">Clear</button>` : ''}
-      </div>
+        ${active ? `<b class="insti-on">filtering</b>` : ''}
+      </summary>
+      ${active ? `<button type="button" class="insti-clear" id="insti-clear">Clear institutional filters</button>` : ''}
       <div class="chips" role="group" aria-label="Institutional quick filters">
         ${chip('data-ic', '', !instiChip && !instiPreset, 'Any')}
         ${Object.entries(INSTI_CHIPS).map(([k, [l]]) => chip('data-ic', k, instiChip === k, l)).join('')}
@@ -4024,7 +4278,7 @@
           ? ` · latest filing ${esc(INSTI_META.latest_period_end)}` : ''}.
         Names with no comparable quarter are excluded from these filters rather
         than counted as unchanged. <a href="/methodology">How this is measured →</a></p>
-    </section>`;
+    </details>`;
   };
 
   /* Every institutional control, delegated from one place. Called after each
@@ -4267,7 +4521,17 @@
            * carry a live mark. What was wrong was that rows 41 to 750 were
            * simply unreachable: the header said "750 of 750" while the table
            * showed forty, which reads as a broken table rather than a page. */
-          const PER = 40;
+          /* FORTY ON A DESK, TWENTY ON A PHONE.
+           *
+           * Forty rows is one quote request and, at 72px a row on a desk,
+           * 2,900px — a table you can scan. The same forty on a phone are
+           * stacked cards at ~200px each: 8,000px, four names on screen at a
+           * time, and a "screen" that can only be scrolled rather than
+           * scanned. Twenty is still one request (the cap is 40 symbols), the
+           * pager is already there and already says which page of how many,
+           * and no row becomes unreachable — which was the whole point of
+           * paginating rather than capping in the first place. */
+          const PER = window.matchMedia('(max-width:700px)').matches ? 20 : 40;
           const pages = Math.max(1, Math.ceil(rows.length / PER));
           if (scrPage >= pages) scrPage = 0;          // a filter change shortens the list
           const from = scrPage * PER;
@@ -4292,7 +4556,8 @@
           if (instiTrend) parts.push(`${instiTrendKey()[1]} rising ${instiTrend}Q+`);
           if (Object.values(instiAdv).some(v => v !== '')) parts.push('custom ranges');
           const title = parts.length ? parts.join(' + ') : PRESETS.all[0];
-          return sec(title, rows.length ? screenTable(page, from) + heatKey(20, 'Distance from the moving averages') + key + nav
+          return sec(title, rows.length
+              ? key + heatKey(20, 'Distance from the moving averages') + screenTable(page, from) + nav
             : `<div class="empty">Nothing matches. Try a different preset or clear the search.</div>`,
             `${rows.length} of ${SCREEN.length}`);
         })());
@@ -4484,13 +4749,21 @@
     <span><i class="hk h-p3"></i>+${scale}%</span>
     <span>and beyond at the ends.</span></p>`;
 
+  /* A KEY BELOW FORTY ROWS IS A KEY NOBODY READS.
+   *
+   * This sat under the table, so the reader met forty bars carrying four
+   * unexplained tick marks and found out what they were after scrolling past
+   * every one of them. It goes above the rows it explains.
+   *
+   * Shorter, too: the line's two ends now carry their own labels on every
+   * row, so the key no longer has to say what the bar spans — only what the
+   * marks on it are. */
   const PLKEY = `<p class="pl-key">
-    <span>Each row's line runs from its <b>52-week low</b> to its <b>high</b>:</span>
+    <span>Marks on each row's 52-week line:</span>
     <span><i class="know"></i>price now</span>
     <span><i class="k200"></i>200-day</span>
     <span><i class="k50"></i>50-day</span>
-    <span><i class="k20"></i>20-day</span>
-    <span>— the levels these engines trade against.</span></p>`;
+    <span><i class="k20"></i>20-day</span></p>`;
 
   const priceLine = r => {
     const n = v => Number.isFinite(Number(v)) ? Number(v) : null;
@@ -4627,22 +4900,51 @@
     </div>`;
   };
 
+  /* THE CALL IS A COLUMN.
+   *
+   * Every one of the 750 rows carries `vd` — verdict.py's call on the stock,
+   * computed at build time: 204 BUY, 24 WAIT, 19 AVOID, 503 WATCH today. None
+   * of it reached the table. A reader ranked 750 names by composite score and
+   * had to open a sheet, one name at a time, to find out whether the site
+   * thought any of them was actionable. The one field that changes what
+   * somebody does was the one field behind a tap.
+   *
+   * It leads the numbers, because it is the reason for the row rather than one
+   * more measurement of it.
+   *
+   * ── AND THE TRACKS NOW MATCH THE CELLS ─────────────────────────────────
+   * `.scr-r` declared eight grid tracks and this function emitted TEN cells.
+   * The last two — 52w low and 52w high — wrapped onto a second grid line and
+   * landed in tracks one and two, so they rendered underneath the rank number
+   * and the company name at 24px and 700px wide, and their headers did the
+   * same. Measured on the live page: "52w low" sat at x=130 in a 24px box.
+   * Two columns of the table were unreadable and unlabelled, which is the
+   * exact failure the comment above the CSS rule was written about.
+   *
+   * They are not given tracks; they are given to the price line. That line
+   * already RUNS from the 52-week low to the 52-week high — labelling its two
+   * ends is what those two numbers are for, it removes two columns from an
+   * eleven-column table, and it makes the line legible without a key. */
   const screenTable = (rows, offset) => `<div class="rank">
-    <div class="rank-r rank-head scr-r">
+    <div class="rank-r rank-head scr-r scr-call">
       <span class="i">#</span><span class="s">Name</span>
+      <span class="x">Call</span>
       <span class="x">Price</span><span class="x">Today</span><span class="x">vs 50D</span>
       <span class="x">vs 200D</span><span class="x">RSI 14D</span><span class="m">1M</span>
-      <span class="x">52w low</span><span class="x">52w high</span>
     </div>
     ${rows.map((r, i) => {
       const v50 = r.sma50 ? (r.price - r.sma50) / r.sma50 * 100 : null;
       const v200 = r.sma200 ? (r.price - r.sma200) / r.sma200 * 100 : null;
+      const vc = (r.vd && r.vd.c) || null;
       /* data-sym opens the sheet, which keeps your place in 750 rows.
        * data-href gives the same row a real destination, so the company page
        * is reachable and shareable rather than existing only behind a tap. */
-      return `<div class="rank-r scr-r" data-sym="${esc(r.sym)}" data-href="/stock/${encodeURIComponent(r.sym)}" role="button" tabindex="0">
+      return `<div class="rank-r scr-r scr-call" data-sym="${esc(r.sym)}" data-href="/stock/${encodeURIComponent(r.sym)}" role="button" tabindex="0">
         <span class="i">${(offset || 0) + i + 1}</span>
         <span class="s">${watchBtn(r.sym)}<b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span>${instiBadge(r.sym)}</span>
+        <span class="x" data-l="Call">${vc
+          ? `<span class="vtag v-${esc(vc.toLowerCase())}" title="${esc((r.vd.o || '') + (r.vd.l ? ' · ' + r.vd.l : ''))}">${esc(VD_WORD[vc] || vc)}</span>`
+          : '—'}</span>
         <span class="x" data-l="Price" data-px>₹${esc(r.price ?? '—')}</span>
         <!-- Filled by the live quote call below. An em dash, not a bullet: a
              cell that never fills should read as "not measured" like every
@@ -4652,20 +4954,44 @@
         <span class="x ${dir(v200)} ${heatCell(v200, 20)}" data-l="vs 200D" data-v200>${v200 == null ? '—' : pct(v200)}</span>
         <span class="x" data-l="RSI" style="color:${(r.rsi ?? 50) > 70 ? 'var(--warn)' : (r.rsi ?? 50) < 35 ? 'var(--accent)' : 'var(--dim)'}">${r.rsi != null ? Math.round(r.rsi) : '—'}</span>
         <span class="m ${dir(r.r1m)} ${heatCell(r.r1m, 12)}" data-l="1 month">${pct(r.r1m)}</span>
-        ${/* THE YEAR'S RANGE, AS NUMBERS.
-             The price line under each row already draws where the close sits
-             between the two, but a bar cannot be read off. The distance from
-             each extreme is what makes the pair decision-useful: a 52-week
-             high of 2,008 means nothing until you know the close is 3% under
-             it, and a low means nothing until you know it is 47% above it. */''}
-        <span class="x" data-l="52w low">${r.low52 != null
-          ? `${price(r.low52)}${r.price ? `<i class="u52 up">+${((r.price - r.low52) / r.low52 * 100).toFixed(0)}%</i>` : ''}`
-          : '—'}</span>
-        <span class="x" data-l="52w high">${r.high52 != null
-          ? `${price(r.high52)}${r.price ? `<i class="u52 ${r.price >= r.high52 ? 'up' : 'dn'}">${((r.price - r.high52) / r.high52 * 100).toFixed(0)}%</i>` : ''}`
-          : '—'}</span>
-        <span class="pl-w">${priceLine(r)}</span>
+        <span class="pl-w">${priceLine(r)}${plEnds(r)}</span>
       </div>`; }).join('')}</div>`;
+
+  /* The two ends of the line, named. The bar was drawn between two numbers the
+   * reader could not see; these are those numbers, each with how far the close
+   * sits from it. */
+  const plEnds = r => {
+    if (r.low52 == null || r.high52 == null || !(Number(r.high52) > Number(r.low52))) return '';
+    return `<span class="pl-ends">
+      <span><em>52w low</em>${price(r.low52)}${r.price ? gap(r.price, r.low52) : ''}</span>
+      <span><em>52w high</em>${price(r.high52)}${r.price ? gap(r.price, r.high52) : ''}</span>
+    </span>`;
+  };
+
+  /* THE DISTANCE FROM AN EXTREME, WITHOUT A SIGNED ZERO.
+   *
+   * Both cells used `.toFixed(0)` on the raw ratio, and `(-0.195).toFixed(0)`
+   * is the string "-0". Nine of today's 750 rows print "-0%" against their
+   * 52-week high — and they are precisely the rows a breakout screen exists to
+   * surface, so the defect lands on the most-read numbers in the table. The
+   * site already fixed this once in pct(); this pair of cells never got it.
+   *
+   * The low-side cell also hardcoded a "+" and the up colour, which would
+   * render "+-4%" in green for a price that had broken below its own 52-week
+   * low. No row does that today — low52 is rebuilt with the price — but a
+   * formatter that can emit "+-4%" is one build away from doing it.
+   *
+   * Under 1% the digit is kept, because "0%" and "0.4% off the high" are
+   * different facts at exactly the place on this table where the difference
+   * matters. */
+  const gap = (px, ref) => {
+    const a = Number(px), b = Number(ref);
+    if (!isFinite(a) || !isFinite(b) || b === 0) return '';
+    const raw = (a - b) / b * 100;
+    const r = Math.abs(raw) < 1 ? Number(raw.toFixed(1)) : Math.round(raw);
+    const txt = r === 0 ? '0%' : (r > 0 ? '+' : '') + r + '%';
+    return `<i class="u52 ${r > 0 ? 'up' : r < 0 ? 'dn' : ''}">${txt}</i>`;
+  };
 
   /* THE CARD. Same fields the broadsheet's modal shows, from the same
    * screen.json — the 3.1 MB screen-detail.json is not needed for any of it,
@@ -5251,13 +5577,21 @@
      * sat on the same page as the signals table, which carries the same rows
      * with headers, filters and the full ladder under each. Two renderings of
      * one dataset is not extra information; the weaker one was removed. */
-    return sec('The floor', `<div class="floor">${cards}</div>
+    /* REFERENCE, FOLDED. Nine engine cards ran to 2,073px on a phone — a
+     * third of this page — under a heading whose own note calls the block
+     * reference: who is on the roster and what each must earn. It is worth
+     * having and it is not what somebody opens the ledger to read, so the
+     * heading, the working count and the standfirst stay in the flow and the
+     * cards wait for a tap. */
+    return sec('The floor', foldBody(
+      `${Object.keys(ENGINE_REGISTRY).length} engines — what each hunts, what it must earn, and the record behind that bar`,
+      `<div class="floor">${cards}</div>
       <p class="hint">The bar is how far each engine's floor has been raised above the
         2R default, toward the 6R cap at which it stops publishing altogether. That floor
         comes from the engine's own win rate — break-even R:R is (1−p)/p — so an engine
         that wins less often has to earn more per trade before it is allowed to file one.
         A raised bar is not a fault; it is the system refusing trades that record says
-        lose money.</p>`,
+        lose money.</p>`),
       `${on} of ${Object.keys(ENGINE_REGISTRY).length} working`,
       'Who is on the floor, what each one hunts, and what it has to earn to file a trade.');
   }
@@ -5723,43 +6057,63 @@
         </div>` + (ENG_TABLE ? floorHtml(ENG_TABLE, all) : '');
         return;
       }
-      main.innerHTML = base +
-        /* A missing curve is EXPLAINED, not omitted. It needs graded R
-         * multiples, and the build-time snapshot this page falls back to when
-         * the live ledger is unreachable does not carry them — so on that path
-         * the section would simply vanish, which reads as a page that forgot
-         * to include it rather than data that is not there. */
-        (CURVE ? sec('Cumulative R', rCurveHtml(CURVE), `${CURVE.used} closed`,
-          'Every closed signal, in the order it closed.')
-         : sec('Cumulative R', `<div class="empty" style="text-align:left;padding:22px 20px">
-            <b style="color:var(--text)">The record starts here.</b><br>
-            ${/* THE EMPTY STATE HAS TO KNOW WHICH EMPTY IT IS.
-                * This said "no signal has closed yet" whether that was true or
-                * not. rCurve returns null below five closed trades — three
-                * points joined by two lines is not a curve, it is noise with a
-                * trend line through it — so on a page whose tiles read "3
-                * closed" the copy underneath flatly contradicted them. */''}
-            ${!a.live
-              ? `The live ledger did not answer, and the morning snapshot does not record graded
-                 R multiples, so the curve cannot be drawn from it.`
-              : closed.length === 0
-                ? `No signal published since ${esc(LAUNCH)} has closed yet, so there is no curve to
-                   draw. It appears the moment one does, and every closed trade after that adds a
-                   point — up or down.`
-                : `<b style="color:var(--text)">${closed.length}</b> of the
-                   ${all.length} signals published since ${esc(LAUNCH)} ${closed.length === 1 ? 'has' : 'have'}
-                   closed. A curve needs <b style="color:var(--text)">five</b> before its shape means
-                   anything — three points joined by two lines is noise with a trend drawn through
-                   it. The tiles below carry the record as it stands, and the line appears at five.`}
+      /* THE CURVE IS A SECTION ONLY WHEN THERE IS A CURVE.
+       *
+       * A missing curve is still EXPLAINED, not omitted — but it was explained
+       * inside a full section, with the serif standfirst and the section rule
+       * that every real block on this site gets. On a 390px phone that spent
+       * the entire first screen on a paragraph saying why there is no chart,
+       * before a single number. The explanation is the same sentence; it now
+       * sits under the record it qualifies, as a note, at the size of a note.
+       *
+       * The empty state still has to know WHICH empty it is: the snapshot
+       * fallback carries no graded R multiples, five closed trades is the
+       * floor for a shape, and a page whose tiles read "3 closed" must not
+       * say "none closed". */
+      const scored = wins + losses;
+      const curveNote = `<div class="note note-quiet">
+          <b>The record starts here.</b>
+          ${!a.live
+            ? `The live ledger did not answer, and the morning snapshot does not record graded
+               R multiples, so the curve cannot be drawn from it.`
+            : closed.length === 0
+              ? `No signal published since ${esc(LAUNCH)} has closed yet, so there is no curve to
+                 draw. It appears the moment one does, and every closed trade after that adds a
+                 point — up or down.`
+              : `<b>${closed.length}</b> of the ${all.length} signals published since
+                 ${esc(LAUNCH)} ${closed.length === 1 ? 'has' : 'have'} closed. A curve needs
+                 <b>five</b> before its shape means anything — three points joined by two lines is
+                 noise with a trend drawn through it. The line appears at five.`}
+        </div>`;
 
-          </div>`, '', 'Every closed signal, in the order it closed.')) +
+      /* A WIN RATE OFF TWO TRADES IS NOT A WIN RATE.
+       *
+       * The tile printed "50%" in the up-colour over 1W/1L. engines.json's own
+       * basis note draws the line at 25 closed trades — below it the win rate
+       * "is not evidence" and an engine keeps its default floor. The headline
+       * tile on the ledger page was applying no such test to itself, and a
+       * green 50% is a claim.
+       *
+       * Under five closed trades the tile shows the COUNT, which is the whole
+       * truth available, and takes no colour. The percentage returns when
+       * there is enough of a sample to carry one. */
+      const wrShown = scored >= 5;
+      const wr = scored ? Math.round(wins / scored * 100) : null;
+
+      main.innerHTML = base +
+        (CURVE ? sec('Cumulative R', rCurveHtml(CURVE), `${CURVE.used} closed`,
+          'Every closed signal, in the order it closed.') : '') +
         sec('The record', `<div class="grid">
           ${tile(all.length, 'Signals published', 'since ' + esc(LAUNCH), 'ac')}
           ${tile(opens.length, 'Still open', 'marked to live prices')}
-          ${tile(closed.length ? Math.round(wins / (wins + losses) * 100) + '%' : '—', 'Win rate',
-                 `${wins}W / ${losses}L closed`, (wins + losses) && wins / (wins + losses) >= .5 ? 'up' : 'dn')}
+          ${tile(wrShown ? wr + '%' : (scored ? `${wins}W / ${losses}L` : '—'),
+                 'Win rate',
+                 wrShown ? `${wins}W / ${losses}L closed`
+                         : scored ? `${scored} closed — too few to quote a rate`
+                                  : 'nothing closed yet',
+                 wrShown ? (wr >= 50 ? 'up' : 'dn') : '')}
           ${tile(closed.length, 'Closed and scored', 'expiries counted as losses')}
-        </div>`) +
+        </div>` + (CURVE ? '' : curveNote)) +
         /* NO PRE-LAUNCH RECORD ON THIS PAGE. A second block used to sit here
          * carrying 80 trades closed before LAUNCH. Removed on instruction: the
          * site is a fresh start, and until a published signal closes this page
@@ -5837,7 +6191,11 @@
     management rules, not part of the grade.</b> Every signal above is still scored on
     the single stop it was sent with — a break-even trail measured <b>worse</b> than the
     fixed stop over 470 closed trades, so publishing it as the graded rule would flatter
-    the record.</p>`;
+    the record. The stop path runs from where the signal was sent to break-even once the
+    first target prints, then to the first target once the second does. Each card's
+    <b>laddered</b> figure is what the scale-out banks if every target prints, against
+    <b>held</b> for carrying the whole position to the last target — the difference is what
+    taking money off the table costs, and what the certainty of having taken it buys.</p>`;
 
   const trailPlan = (entry, sl, t1, t2, t3, action) => {
     /* EVERY NUMBER HERE IS A PRICE, SO ZERO MEANS ABSENT.
@@ -5902,18 +6260,46 @@
      * this signal has, and saying so is shorter and truer. */
     if (rungs.length === 1) { rungs[0][0] = 'All'; rungs[0][2] = 'the only target'; }
     const banked = rungs.reduce((x, [pcStr, lv]) => x + parseFloat(pcStr) / 100 * rOf(lv), 0);
-    return `<div class="trail"><span>Trailing rule</span>
-      ${steps.map(([t, k]) => `<div class="tr-s"><b>${esc(t)}</b><i>${esc(k)}</i></div>`).join('')}
+    /* SAY THE PRICES PER CARD; SAY THE SENTENCE ONCE PER PAGE.
+     *
+     * Every number below differs from card to card. None of the WORDS did.
+     * "until the first target prints", "break-even — never back below it",
+     * "locking the first target in", "first target", "second target", "the
+     * balance, at the third", and a forty-word closing paragraph about what
+     * taking money off the table costs — all identical on every card, on a
+     * page carrying five of them, and again on /signals under thirty rows.
+     *
+     * The stop path becomes one line of three prices. The ladder keeps a line
+     * per rung, because each rung is a different price at a different R. The
+     * closing paragraph is deleted from the card: TRAIL_NOTE already states
+     * the same standing once, under the list it applies to, and the two
+     * figures it was carrying survive as the line beneath the rungs.
+     *
+     * Eleven lines to five, and not one number lost. */
+    /* THE RULE NAMES THE LEVELS; THE GRID ABOVE HOLDS THE PRICES.
+     *
+     * This line printed the three prices again — stop, entry, target 1 — every
+     * one of which is in the key-value grid four rows above it. On the
+     * conviction cards that put target 1 on the card THREE times: once in the
+     * plan grid, once here, and once more as the first scale-out rung.
+     *
+     * A stop path is a rule, and a rule reads better as roles than as
+     * repeated figures: "as sent, then break-even once the first target
+     * prints, then the first target once the second does" is the whole
+     * management plan and contains nothing the reader has to reconcile
+     * against the numbers beside it. */
+    const hops = ['as sent', 'break-even after T1'];
+    if (b !== null) hops.push('target 1 after T2');
+    return `<div class="trail">
+      <div class="tr-1"><span class="tr-k">Stop path</span>
+        <span class="tr-v">${hops.map(esc).join('<i>→</i>')}</span></div>
       <div class="tr-sc">
         <span class="tr-sch">Scale-out</span>
         ${rungs.map(([pcStr, lv, lab]) => `<div class="tr-r">
           <b>${esc(pcStr)}</b><span>at ${f(lv)}</span><i>${esc(lab)} · ${rOf(lv).toFixed(1)}R</i>
         </div>`).join('')}
-        ${rungs.length < 2 ? '' : `<div class="tr-n">Sold this way the whole position returns
-          <b>${banked.toFixed(2)}R</b> if every target prints, against
-          <b>${rOf(rungs[rungs.length - 1][1]).toFixed(2)}R</b> for holding all of it to the
-          last one. Taking money off the table costs that difference; it buys the certainty
-          of having taken it.</div>`}
+        ${rungs.length < 2 ? '' : `<div class="tr-b"><b>${banked.toFixed(2)}R</b> laddered ·
+          <b>${rOf(rungs[rungs.length - 1][1]).toFixed(2)}R</b> held to the last target</div>`}
       </div>
     </div>`;
   };
@@ -6732,7 +7118,8 @@
         has none right now, so this is the best open setup instead, not a substitute for it.</div>` : ''}
 
       <nav class="b-qnav" id="qnav" aria-label="Sections of this brief">
-        ${SECTIONS.map(([id, lab, key]) => `<a href="#${id}" data-jump="${id}">
+        ${SECTIONS.map(([id, lab, key, node, sub]) => `<a href="#${id}" data-jump="${id}"
+            title="${esc(node)} — ${esc(sub)}">
           <span class="kb" aria-hidden="true">${key}</span>${esc(lab)}</a>`).join('')}
       </nav>
 
@@ -6758,6 +7145,10 @@
           <div class="b-m"><span class="k">R:R to T2</span><span class="v gold">${rrT2.toFixed(1)} : 1</span></div>
           <div class="b-m"><span class="k">Signal age</span><span class="v">${ageDays == null ? '—' : ageDays + 'd'}</span></div>
           <div class="b-m"><span class="k">Sector</span><span class="v" style="font-family:var(--ui);font-size:var(--t-5)">${esc(row.sector || 'Not on screen')}</span></div>
+          ${/* THE ONE FIELD THE DUPLICATE TABLE BELOW CARRIED AND THIS DID NOT.
+              * See the note on the section that used to follow this one. */''}
+          <div class="b-m"><span class="k">Setup</span><span class="v" style="font-family:var(--ui);font-size:var(--t-5)">${
+            esc((row.setup && (row.setup.tags || [])[0]) || sig.signal_type || 'Engine signal')}</span></div>
         </div>
       </section>
       <p class="b-p" style="margin-top:14px;font-size:var(--t-4)">${esc(stateChip[2])}
@@ -6768,29 +7159,48 @@
           published levels, so the arithmetic above is what this page shows and the ledger field is the
           one to distrust.</b>` : ''}</p>
 
-      <nav class="b-jr" id="journey" aria-label="Where you are in this brief">
-        ${SECTIONS.map(([id, , , node, sub]) => `<div class="b-jn" data-node="${id}">
-          <i aria-hidden="true"></i><b>${esc(node)}</b><span>${esc(sub)}</span></div>`).join('')}
-      </nav>
+      ${/* ONE NAVIGATION, NOT TWO.
+          *
+          * A six-item progress rail stood here, twelve lines below a six-item
+          * chip nav built from the SAME SECTIONS array and pointing at the
+          * same six anchors. Worse than a repeat: the two used different
+          * words for one destination — "Chart" in the chips, "Entry · where
+          * it starts" in the rail — so a reader had to learn that they were
+          * the same place before either was usable.
+          *
+          * The rail's actual contribution was PROGRESS: which sections are
+          * behind you and which one you are in. That moved into the chips,
+          * which were already tracking the active section for aria-current
+          * and were already the clickable one. The rail's plain-English node
+          * names ride along as each chip's title. */''}
 
+      ${/* THE SAME SIX NUMBERS, FOR THE THIRD TIME.
+          *
+          * A table headed "Everything that defines the position" sat here
+          * carrying Setup, Direction, Entry, Stop, Target 1, Target 2, R:R to
+          * T1 and Horizon. Five of those eight are in the metrics panel
+          * directly above it; Direction restates the panel's own "▲ LONG"
+          * headline and Horizon restates the pill beside it. Only Setup was
+          * new, and it has moved up into that panel.
+          *
+          * Counting the at-a-glance bar higher on the page, entry / stop /
+          * target 1 / target 2 / R:R were printed THREE times before the
+          * reader reached the chart — which then draws all four again as
+          * lines. On a page arguing one trade, that is the strongest version
+          * of the complaint this whole pass is about.
+          *
+          * The entry-state bar is the only thing here that was not a repeat,
+          * so it keeps the section and the section takes its name. */''}
       <section class="b-sec b-reveal">
-        <div class="b-lab">The trade in one view</div>
-        <h2 class="b-h2">Everything that defines the position.</h2>
-        <dl class="b-view">
-          <div class="b-vi"><dt>Setup</dt><dd class="txt">${esc((row.setup && (row.setup.tags || [])[0]) || sig.signal_type || 'Engine signal')}</dd></div>
-          <div class="b-vi"><dt>Direction</dt><dd class="txt">${isShort ? 'Short' : 'Long'}</dd></div>
-          <div class="b-vi"><dt>Entry</dt><dd>${f(entry)}</dd></div>
-          <div class="b-vi"><dt>Stop</dt><dd>${f(stop)}</dd></div>
-          <div class="b-vi"><dt>Target 1</dt><dd>${f(t1)}</dd></div>
-          <div class="b-vi"><dt>Target 2</dt><dd>${f(t2)}</dd></div>
-          <div class="b-vi"><dt>R:R to T1</dt><dd>${rrT1.toFixed(1)} : 1</dd></div>
-          <div class="b-vi"><dt>Horizon</dt><dd class="txt">${esc(sig.timeframe === '1D' ? 'Swing' : (sig.timeframe || 'Swing'))}</dd></div>
-        </dl>
+        <div class="b-lab">Entry state ${tip('zone')}</div>
+        <h2 class="b-h2">Where price sits against the plan.</h2>
 
         <div class="b-zone">
+          ${/* The help mark moved up to the section label. Left here it was a
+              * lone marker with nothing to qualify, once the words beside it
+              * became the section's own heading. */''}
           <div class="b-zone-h">
             <span class="b-zst ${zoneState[0]}">${esc(zoneState[1])}</span>
-            <span class="b-lab" style="letter-spacing:.16em">Entry state ${tip('zone')}</span>
           </div>
           <div class="b-zt">
             <span class="band" style="left:${Math.min(zAt(entry), zAt(t1)).toFixed(1)}%;width:${Math.abs(zAt(t1) - zAt(entry)).toFixed(1)}%"></span>
@@ -7457,7 +7867,6 @@
       window.scrollTo({ top, behavior: (REDUCED || far) ? 'auto' : 'smooth' });
     };
     const qlinks = [...main.querySelectorAll('#qnav a')];
-    const jnodes = [...main.querySelectorAll('.b-jn')];
     qlinks.forEach(a => a.addEventListener('click', ev => { ev.preventDefault(); jump(a.dataset.jump); }));
 
     // One scroll listener for the whole page, throttled to one frame. Reading
@@ -7471,12 +7880,13 @@
         const el = $(id); if (!el) continue;
         if (el.getBoundingClientRect().top <= stickyOffset() + 24) active = id;
       }
-      qlinks.forEach(a => a.setAttribute('aria-current', a.dataset.jump === active ? 'true' : 'false'));
+      // aria-current for assistive tech, `done` for the sighted progress cue.
+      // Both on the one nav that is also the clickable one.
       let seen = false;
-      jnodes.forEach(n => {
-        const isNow = n.dataset.node === active;
-        n.classList.toggle('on', isNow);
-        n.classList.toggle('done', !seen && !isNow);
+      qlinks.forEach(a => {
+        const isNow = a.dataset.jump === active;
+        a.setAttribute('aria-current', isNow ? 'true' : 'false');
+        a.classList.toggle('done', !seen && !isNow);
         if (isNow) seen = true;
       });
     };
@@ -7593,18 +8003,27 @@
 
     /* ── scenarios ──────────────────────────────────────────────────────── */
     const baseRate = H && Number.isFinite(Number(H.win_rate)) ? Number(H.win_rate) : null;
+    /* THE PROSE SAYS WHAT HAS TO BE TRUE; THE GRID HOLDS THE NUMBERS.
+     *
+     * Each of these paragraphs restated the four cells printed directly
+     * beneath it. The base case managed to print the first target twice in
+     * one sentence — "first target ₹611.41 ... once ₹611.41 prints" — above a
+     * Target cell reading ₹611.41 for the third time.
+     *
+     * Every price is in the grid. What the grid cannot carry is the
+     * CONDITION and the reasoning, so that is all the sentence does now. */
     const SC = [
       ['Continuation through both targets.',
-       `Price clears ${f(t1)} and carries to ${f(t2)}. That needs the structure that produced this setup to hold — the 50-day above the 200-day, volume staying at or above its recent average, and no close back under ${f(entry)}.`,
+       `The structure that produced this setup has to hold: the 50-day above the 200-day, volume at or above its recent average, and no close back under the entry.`,
        [['Requires', `Above ${f(t1)}`], ['Target', f(t2)], ['Move from here', Number.isFinite(last) ? pct((t2 - last) / last * 100) : '—'],
         ['R multiple', ((Math.abs(t2 - entry)) / (risk || 1)).toFixed(1) + 'R']]],
       ['The published plan, run as written.',
-       `Entry at ${f(entry)}, first target ${f(t1)}, stop ${f(stop)}. On the published trailing rule the stop moves to entry once ${f(t1)} prints, so the remainder rides to ${f(t2)} with no capital at risk.`,
+       `On the published trailing rule the stop moves to break-even once the first target prints, so the balance rides to the second with no capital left at risk.`,
        [['Requires', `Entry at or better than ${f(entry)}`], ['Target', f(t1)],
         ['Move from here', Number.isFinite(last) ? pct((t1 - last) / last * 100) : '—'],
         ['R multiple', rrT1.toFixed(1) + 'R']]],
       ['The stop does its job.',
-       `A close beyond ${f(stop)} and the position closes for a defined loss of ${f(risk)} a share. This is the outcome the whole structure is built to make survivable: it is a known number decided before entry, not a decision taken while losing.`,
+       `The outcome the whole structure is built to make survivable: a loss decided before entry and sized to the book, rather than a decision taken while losing.`,
        [['Requires', `Close beyond ${f(stop)}`], ['Loss', '−' + f(risk) + ' / share'],
         ['Move from here', Number.isFinite(last) ? pct((stop - last) / last * 100) : '—'],
         ['R multiple', '−1.0R']]],
@@ -8704,10 +9123,14 @@
           <span class="ef-n"><b>${open}</b><em>still open</em></span>
           <span class="ef-n"><b>${shut}</b><em>closed</em></span>
         </div>
-        ${shut === 0
-          ? `<p class="ef-thin">Nothing has closed yet, so this engine has <b>no win rate
-             and no expectancy on this site</b>. It gets one when a position closes.</p>`
-          : `<p class="ef-thin">${shut} closed — far below the 30 this book requires before
+        ${/* SAID ONCE FOR THE ROSTER, NOT ONCE PER ENGINE.
+            * Nine of the engines have closed nothing, so this sentence — 16
+            * identical words about what an empty record means — printed nine
+            * times down the page. The COUNT is per engine and stays on the
+            * card; what "0 closed" means is the same for all of them and is
+            * stated once under the roster. */''}
+        ${shut === 0 ? `<p class="ef-thin">No win rate yet.</p>`
+          : `<p class="ef-thin">${shut} closed — below the 30 this book requires before
              a win rate is treated as evidence.</p>`}
       </div>`;
       // THE SAMPLE GATE. Under 20 closed trades a win rate is a coin-flip
@@ -8726,10 +9149,12 @@
                <i style="width:${Math.max(2, Math.min(100, L.win_rate)).toFixed(0)}%"></i></div>`
           : `<p class="ef-thin">Only <b>${n}</b> closed trade${n === 1 ? '' : 's'} — not enough
                to carry a win rate.</p>`}
-        <p class="ef-thin">Published under an earlier configuration, on a ledger that has been
-          re-graded twice. It is shown because deleting it would be the more flattering
-          choice${floorN ? `, and because the ${floorN} closed trades behind it are what set
-          this engine's floor` : ''} — it is <b>not</b> this site's record.</p>
+        ${/* The same two clauses appeared on all five engines carrying an
+            * earlier ledger. What differs per engine is the trade count that
+            * set its floor; the reason the block is published at all is a
+            * property of the page, and moved under the roster. */''}
+        ${floorN ? `<p class="ef-thin">The <b>${floorN}</b> closed trades behind it are what set
+          this engine's floor.</p>` : ''}
       </div>`;
       const rec = mine + prior;
       const bt = B ? `<p class="ef-bt"><span class="ef-btk">BACKTEST</span>
@@ -8774,6 +9199,17 @@
         </div>
       </section>` +
       `<div class="ef-grid">${keys.map(card).join('')}</div>` +
+      /* THE TWO SENTENCES THE CARDS USED TO CARRY EACH, ONCE.
+       * "Nothing has closed yet, so this engine has no win rate and no
+       * expectancy on this site" appeared on nine cards; "Published under an
+       * earlier configuration, on a ledger that has been re-graded twice"
+       * on five. Neither is about any one engine. */
+      `<p class="hint" style="margin-top:16px">An engine showing <b>no win rate yet</b> has closed
+        nothing since ${esc(LAUNCH)} — that is the honest state of a record that restarted, not a
+        missing figure, and it gets one when a position closes. Where a card also shows an
+        <b>earlier ledger</b>, those trades were published under a different configuration on a
+        ledger that has been re-graded twice; they are shown because deleting them would be the
+        more flattering choice, and they are <b>not</b> this site's record.</p>` +
       (() => {
         /* KEYS IN THE LEDGER THAT ARE NOT ON THIS FLOOR.
          * The roster is a whitelist — it is what the site publishes as an
