@@ -1238,6 +1238,67 @@ try {
   }
   await colCtx.close();
 
+  /* ── THE SAME FACT, TWICE ON ONE PAGE ───────────────────────────────────
+   *
+   * The complaint that started this pass was duplication, and it was found by
+   * reading pages one at a time. That does not survive the next feature, so
+   * it is measured here instead. Two hunts, both over the RENDERED text:
+   *
+   *   A. A clause of eight or more words appearing more than once. That is
+   *      boilerplate printed per card instead of once per page — the shape
+   *      that put the same 45-word trailing note on thirty signal rows, the
+   *      same chart caption on five idea cards, and the same sentence about
+   *      an empty record on nine engine cards.
+   *
+   *   B. The same formatted FIGURE three or more times inside one card or
+   *      section. Twice can be honest — a value and the axis it sits on.
+   *      Three times is a fact being restated: target 1 in the plan grid, in
+   *      the stop path and again as the first scale-out rung.
+   *
+   * Only figures carrying a unit are counted — a currency mark, a per cent,
+   * an ×, an R or an :1. A bare integer is usually a label ("200-day") or a
+   * share quantity that two ladder rungs may legitimately share, and counting
+   * those produces noise that trains people to ignore the check.
+   *
+   * Visible text only: anything inside a closed <details> is not on the page,
+   * so folding a block is not a way to pass this. */
+  console.log("\n  the same fact is not printed twice");
+  const dupCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const dupP = await dupCtx.newPage();
+  for (const route of ["/", "/signals", "/screen", "/ideas", "/markets", "/ipo",
+                       "/brief", "/engines", "/radar", "/news", "/funds", "/watch"]) {
+    await dupP.goto(SITE + route, { waitUntil: "domcontentloaded" });
+    await dupP.waitForTimeout(SETTLE + 3000);
+    const found = await dupP.evaluate(() => {
+      const txt = document.getElementById("main").innerText;
+      const seen = new Map();
+      for (const raw of txt.split(/(?<=[.!?])\s+|\n+/)) {
+        const t = raw.trim().replace(/\s+/g, " ");
+        if (t.split(" ").length < 8) continue;
+        seen.set(t, (seen.get(t) || 0) + 1);
+      }
+      const sentences = [...seen].filter(([, n]) => n > 1)
+        .map(([t, n]) => `x${n}: "${t.slice(0, 70)}"`);
+
+      // A figure only counts when it carries a unit.
+      const UNIT = /(?:₹|\$)[\d,]+(?:\.\d+)?|[\d,]+(?:\.\d+)?\s?(?:%|×|R\b|:\s?1)/g;
+      const figs = [];
+      for (const el of document.querySelectorAll("#main .card, #main .ipo, #main .b-sec, #main .aic, #main .ef-c")) {
+        const c = new Map();
+        for (const m of (el.innerText || "").match(UNIT) || []) {
+          const k = m.replace(/\s+/g, "");
+          c.set(k, (c.get(k) || 0) + 1);
+        }
+        const bad = [...c].filter(([, n]) => n >= 3).map(([v, n]) => `${v} x${n}`);
+        if (bad.length) figs.push(`${(el.innerText || "").split("\n")[0].slice(0, 14)}: ${bad.join(", ")}`);
+      }
+      return { sentences, figs };
+    });
+    ok(`${route} — no sentence is printed twice`, found.sentences.length === 0, found.sentences.slice(0, 3));
+    ok(`${route} — no figure is printed three times in one block`, found.figs.length === 0, found.figs.slice(0, 3));
+  }
+  await dupCtx.close();
+
   console.log("\n  320 x 568 — the narrowest phone in use");
   const mCtx = await browser.newContext({ viewport: { width: 320, height: 568 } });
   const mp = await mCtx.newPage();

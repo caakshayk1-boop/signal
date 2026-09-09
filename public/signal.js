@@ -2213,7 +2213,7 @@
       const ranked = ipoOpen.slice().sort((a, b) =>
         vR(a) - vR(b) || (Number(b.subscription_x) || 0) - (Number(a.subscription_x) || 0));
       const nApply = ranked.filter(r => vR(r) === 0).length;
-      out += sec('Open right now', ranked.slice(0, 2).map(ipoCard).join(''),
+      out += sec('Open right now', ranked.slice(0, 2).map(ipoCard).join('') + ipoStaleNote(),
         `${ranked.length} book${ranked.length === 1 ? '' : 's'} open`,
         /* Plain text: sec() escapes the lead, so markup here would render as
          * its own tags. The tab bar already links to the IPO page. */
@@ -2386,8 +2386,7 @@
           <path class="ic-f" d="${d} L${W} ${H} L0 ${H} Z"/>
           <path class="ic-p" d="${d}"/>
           ${rule(Number(pick.target), 't')}${rule(Number(pick.stop_loss), 's')}
-        </svg>
-        <span class="idea-cxl">6M closes · target and stop to scale</span>`;
+        </svg>`;
     }));
   }
 
@@ -2412,13 +2411,26 @@
       ${liveX != null
         ? `<span class="subs-age is-live">Live from NSE${IPO_LIVE_AT
              ? ` · read ${esc(String(IPO_LIVE_AT).slice(11, 16))} UTC` : ''}</span>`
+        /* THE VINTAGE IS THE CARD'S; THE CAVEAT IS THE PAGE'S.
+         * "and a book moves fastest on its last day" is a fact about IPO
+         * books, not about this issue, and it printed on every card still
+         * reading from the morning mirror. The stamp and the age stay — those
+         * differ per card and are the honest marker — and the sentence is
+         * said once, under the block. See ipoStaleNote(). */
         : (IPO_AGE_H != null ? `<span class="subs-age${IPO_AGE_H > 6 ? ' is-old' : ''}">
-            as at ${esc(IPO_STAMP)}${IPO_AGE_H > 6
-              ? ` · <b>${esc(ageWord(IPO_AGE_H))}</b>, and a book moves fastest on its last day`
-              : ''}</span>` : '')}
+            as at ${esc(IPO_STAMP)}${IPO_AGE_H > 6 ? ` · <b>${esc(ageWord(IPO_AGE_H))}</b>` : ''}</span>` : '')}
       ${cats.length ? `<span class="subs-cat">${cats.slice(0, 4).map(c =>
           `<i><u>${esc(c.cat)}</u><b>${Number(c.x).toFixed(2)}×</b></i>`).join('')}</span>` : ''}`;
   };
+
+  /* Said once, under whichever block is showing mirrored figures, instead of
+   * on every card that happens to be reading from the morning build. */
+  const ipoStaleNote = () => IPO_AGE_H != null && IPO_AGE_H > 6
+    ? `<p class="hint">Figures marked <b>as at ${esc(IPO_STAMP)}</b> come from the morning build,
+       not from NSE just now — and a book moves fastest on its last day, so treat a subscription
+       figure that old as a floor rather than a reading. Anything marked <b>Live from NSE</b> was
+       read on this page load.</p>`
+    : '';
 
   /* Fetch the live book once and patch every card on screen. A targeted DOM
    * update, not a re-render: re-entering a route when a deferred fetch
@@ -3373,7 +3385,15 @@
     }
 
     const picks = t.data.picks || [];
-    parts.picks = sec('The daily engine’s ranked picks', picks.length ? `<div class="cards-2">${picks.map(x => ideaCard(x, false)).join('')}</div>`
+    /* THE CHART'S CAPTION WAS PRINTED ONCE PER CARD.
+     * "6M closes · target and stop to scale" is a fact about how every chart
+     * in this block is drawn, not about any one name, and it appeared five
+     * times on the page. Said once, under the block it describes — the same
+     * rule the trailing note and the engine notes already follow. */
+    parts.picks = sec('The daily engine’s ranked picks', picks.length
+      ? `<div class="cards-2">${picks.map(x => ideaCard(x, false)).join('')}</div>
+         <p class="hint">Each chart is <b>six months of real daily closes</b>; the two rules across
+           it are that name's published target and stop, drawn to the same scale as the price.</p>`
       : `<div class="empty">Nothing clears the bar this week. That is a result, not a gap.</div>`,
       `${picks.length} ranked`, 'A different engine, on a different clock — names that cleared every floor, and the levels that define each one.');
 
@@ -3409,9 +3429,13 @@
                      : `<span class="pill">no mark</span>`}
               ${o.rr ? `<span class="pill pill-up">${esc(o.rr)}:1</span>` : ''}</div>
             <div class="kv">
-              <div><span class="kk">Entry</span><span class="vv">₹${esc(o.entry ?? '—')}</span></div>
+              ${/* price(), like the Last cell beside them. Raw, this card
+                  * grouped "₹1886.3", "₹1,961" and "₹1759.39" in one row —
+                  * three prices in three different number formats, one of
+                  * which is the only one with a thousands separator. */''}
+              <div><span class="kk">Entry</span><span class="vv">${price(o.entry)}</span></div>
               <div><span class="kk">Last</span><span class="vv">${live ? price(live.price) : '—'}</span></div>
-              <div><span class="kk">Stop</span><span class="vv dn">₹${esc(o.stop ?? '—')}</span></div>
+              <div><span class="kk">Stop</span><span class="vv dn">${price(o.stop)}</span></div>
               <div><span class="kk">Size</span><span class="vv">${sh != null ? sh.toFixed(1) + '% of book' : '—'}</span></div>
               <div><span class="kk">Risk</span><span class="vv">${o.risk_pct != null ? o.risk_pct + '%' : (d.capital ? (Number(o.risk_amount) / d.capital * 100).toFixed(2) + '%' : '—')}</span></div>
               <div><span class="kk">Hold</span><span class="vv" style="font-size:var(--t-2)">${esc(o.hold_days || o.horizon || '—')}</span></div>
@@ -3419,18 +3443,31 @@
             ${(o.legs || []).length ? `<div class="ladder">
               ${o.legs.map(l => `<div class="leg">
                 <span class="leg-l">${esc(l.label)}</span>
-                <span class="leg-p">₹${esc(l.price)}</span>
+                ${/* One formatter. DIXON's ladder printed "₹15866.4",
+                    * "₹17168.7" and "₹18471" directly under an entry of
+                    * "₹14,130" — three number formats in one article. */''}
+                <span class="leg-p">${price(l.price)}</span>
                 <span class="leg-q">${esc(l.qty)} sh</span>
                 <span class="leg-g up">+${esc(l.gain_pct)}%</span>
                 <span class="leg-r">${esc(l.r_multiple)}R</span>
               </div>`).join('')}
             </div>` : ''}
             ${o.trail_note ? `<div class="trail"><span>Trailing stop</span>${esc(o.trail_note)}</div>` : ''}
+            ${/* The footer restated the size and the hold that the grid four
+                * rows up already carries — "sized at 10.0% ... · hold 14-31
+                * days" under a Size cell reading "10.0% of book" and a Hold
+                * cell reading "14-31 days". The one thing it said that the
+                * grid does not is that the percentage scales to whatever book
+                * you run, and that is a fact about every order on the page,
+                * so it is stated once beneath them. */''}
             <div class="card-foot">
-              <span class="mono" style="font-size:var(--t-2);color:var(--dim)">${sh != null ? 'sized at ' + sh.toFixed(1) + '% — scale to your own book' : ''}${o.hold_days ? ' · hold ' + esc(o.hold_days) : ''}</span>
               ${symLinks(o.symbol)}
             </div>
-          </article>`; }), 3, 'orders') : `<div class="empty">No orders clear the mandate today.</div>`));
+          </article>`; }), 3, 'orders')
+          + `<p class="hint">Every size above is a <b>share of the book</b>, not a rupee amount, so
+             it scales to whatever you actually run. Nothing here is bought — these are the orders
+             the mandate would place.</p>`
+          : `<div class="empty">No orders clear the mandate today.</div>`));
     }
     // Shortest clock first. A missing block is simply absent — no placeholder.
     out += [parts.book, parts.picks, parts.brk, parts.mbg, parts.ai]
@@ -3498,7 +3535,7 @@
         : 'No mainboard book is open today.');
 
     out += sec('Worth applying', applyBooks.length
-      ? `<div class="${applyBooks.length > 1 ? 'cards-2' : ''}">${applyBooks.map(ipoCard).join('')}</div>`
+      ? `<div class="${applyBooks.length > 1 ? 'cards-2' : ''}">${applyBooks.map(ipoCard).join('')}</div>` + ipoStaleNote()
       : dOpen.length
         ? `<div class="empty">Nothing open today clears the bar. That is a result, not a gap —
              an issue is rated on demand and on what it is priced against, and neither becomes
@@ -6239,8 +6276,20 @@
      * figures it was carrying survive as the line beneath the rungs.
      *
      * Eleven lines to five, and not one number lost. */
-    const hops = [f(s0), `${f(e)} after T1`];
-    if (b !== null) hops.push(`${f(a)} after T2`);
+    /* THE RULE NAMES THE LEVELS; THE GRID ABOVE HOLDS THE PRICES.
+     *
+     * This line printed the three prices again — stop, entry, target 1 — every
+     * one of which is in the key-value grid four rows above it. On the
+     * conviction cards that put target 1 on the card THREE times: once in the
+     * plan grid, once here, and once more as the first scale-out rung.
+     *
+     * A stop path is a rule, and a rule reads better as roles than as
+     * repeated figures: "as sent, then break-even once the first target
+     * prints, then the first target once the second does" is the whole
+     * management plan and contains nothing the reader has to reconcile
+     * against the numbers beside it. */
+    const hops = ['as sent', 'break-even after T1'];
+    if (b !== null) hops.push('target 1 after T2');
     return `<div class="trail">
       <div class="tr-1"><span class="tr-k">Stop path</span>
         <span class="tr-v">${hops.map(esc).join('<i>→</i>')}</span></div>
@@ -7954,18 +8003,27 @@
 
     /* ── scenarios ──────────────────────────────────────────────────────── */
     const baseRate = H && Number.isFinite(Number(H.win_rate)) ? Number(H.win_rate) : null;
+    /* THE PROSE SAYS WHAT HAS TO BE TRUE; THE GRID HOLDS THE NUMBERS.
+     *
+     * Each of these paragraphs restated the four cells printed directly
+     * beneath it. The base case managed to print the first target twice in
+     * one sentence — "first target ₹611.41 ... once ₹611.41 prints" — above a
+     * Target cell reading ₹611.41 for the third time.
+     *
+     * Every price is in the grid. What the grid cannot carry is the
+     * CONDITION and the reasoning, so that is all the sentence does now. */
     const SC = [
       ['Continuation through both targets.',
-       `Price clears ${f(t1)} and carries to ${f(t2)}. That needs the structure that produced this setup to hold — the 50-day above the 200-day, volume staying at or above its recent average, and no close back under ${f(entry)}.`,
+       `The structure that produced this setup has to hold: the 50-day above the 200-day, volume at or above its recent average, and no close back under the entry.`,
        [['Requires', `Above ${f(t1)}`], ['Target', f(t2)], ['Move from here', Number.isFinite(last) ? pct((t2 - last) / last * 100) : '—'],
         ['R multiple', ((Math.abs(t2 - entry)) / (risk || 1)).toFixed(1) + 'R']]],
       ['The published plan, run as written.',
-       `Entry at ${f(entry)}, first target ${f(t1)}, stop ${f(stop)}. On the published trailing rule the stop moves to entry once ${f(t1)} prints, so the remainder rides to ${f(t2)} with no capital at risk.`,
+       `On the published trailing rule the stop moves to break-even once the first target prints, so the balance rides to the second with no capital left at risk.`,
        [['Requires', `Entry at or better than ${f(entry)}`], ['Target', f(t1)],
         ['Move from here', Number.isFinite(last) ? pct((t1 - last) / last * 100) : '—'],
         ['R multiple', rrT1.toFixed(1) + 'R']]],
       ['The stop does its job.',
-       `A close beyond ${f(stop)} and the position closes for a defined loss of ${f(risk)} a share. This is the outcome the whole structure is built to make survivable: it is a known number decided before entry, not a decision taken while losing.`,
+       `The outcome the whole structure is built to make survivable: a loss decided before entry and sized to the book, rather than a decision taken while losing.`,
        [['Requires', `Close beyond ${f(stop)}`], ['Loss', '−' + f(risk) + ' / share'],
         ['Move from here', Number.isFinite(last) ? pct((stop - last) / last * 100) : '—'],
         ['R multiple', '−1.0R']]],
@@ -9065,10 +9123,14 @@
           <span class="ef-n"><b>${open}</b><em>still open</em></span>
           <span class="ef-n"><b>${shut}</b><em>closed</em></span>
         </div>
-        ${shut === 0
-          ? `<p class="ef-thin">Nothing has closed yet, so this engine has <b>no win rate
-             and no expectancy on this site</b>. It gets one when a position closes.</p>`
-          : `<p class="ef-thin">${shut} closed — far below the 30 this book requires before
+        ${/* SAID ONCE FOR THE ROSTER, NOT ONCE PER ENGINE.
+            * Nine of the engines have closed nothing, so this sentence — 16
+            * identical words about what an empty record means — printed nine
+            * times down the page. The COUNT is per engine and stays on the
+            * card; what "0 closed" means is the same for all of them and is
+            * stated once under the roster. */''}
+        ${shut === 0 ? `<p class="ef-thin">No win rate yet.</p>`
+          : `<p class="ef-thin">${shut} closed — below the 30 this book requires before
              a win rate is treated as evidence.</p>`}
       </div>`;
       // THE SAMPLE GATE. Under 20 closed trades a win rate is a coin-flip
@@ -9087,10 +9149,12 @@
                <i style="width:${Math.max(2, Math.min(100, L.win_rate)).toFixed(0)}%"></i></div>`
           : `<p class="ef-thin">Only <b>${n}</b> closed trade${n === 1 ? '' : 's'} — not enough
                to carry a win rate.</p>`}
-        <p class="ef-thin">Published under an earlier configuration, on a ledger that has been
-          re-graded twice. It is shown because deleting it would be the more flattering
-          choice${floorN ? `, and because the ${floorN} closed trades behind it are what set
-          this engine's floor` : ''} — it is <b>not</b> this site's record.</p>
+        ${/* The same two clauses appeared on all five engines carrying an
+            * earlier ledger. What differs per engine is the trade count that
+            * set its floor; the reason the block is published at all is a
+            * property of the page, and moved under the roster. */''}
+        ${floorN ? `<p class="ef-thin">The <b>${floorN}</b> closed trades behind it are what set
+          this engine's floor.</p>` : ''}
       </div>`;
       const rec = mine + prior;
       const bt = B ? `<p class="ef-bt"><span class="ef-btk">BACKTEST</span>
@@ -9135,6 +9199,17 @@
         </div>
       </section>` +
       `<div class="ef-grid">${keys.map(card).join('')}</div>` +
+      /* THE TWO SENTENCES THE CARDS USED TO CARRY EACH, ONCE.
+       * "Nothing has closed yet, so this engine has no win rate and no
+       * expectancy on this site" appeared on nine cards; "Published under an
+       * earlier configuration, on a ledger that has been re-graded twice"
+       * on five. Neither is about any one engine. */
+      `<p class="hint" style="margin-top:16px">An engine showing <b>no win rate yet</b> has closed
+        nothing since ${esc(LAUNCH)} — that is the honest state of a record that restarted, not a
+        missing figure, and it gets one when a position closes. Where a card also shows an
+        <b>earlier ledger</b>, those trades were published under a different configuration on a
+        ledger that has been re-graded twice; they are shown because deleting them would be the
+        more flattering choice, and they are <b>not</b> this site's record.</p>` +
       (() => {
         /* KEYS IN THE LEDGER THAT ARE NOT ON THIS FLOOR.
          * The roster is a whitelist — it is what the site publishes as an
