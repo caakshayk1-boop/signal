@@ -92,13 +92,18 @@ const WATCH = [
     file: "daily_scan.yml",
     why: "signals and Telegram alerts",
     slots: [
-      // 13:00 MYT — the operator's "signals opening" slot. 05:00 UTC is
-      // 10:30 IST, an hour and a quarter into the NSE session, so the day has
-      // a real range to score and there are still four hours to act in.
-      { dow: [1, 2, 3, 4, 5], h: 5, m: 0, inputs: { slot: "midday" }, job: "scan_midday" },
-      // 21:00 MYT — "closing, with all updates". 13:00 UTC is 18:30 IST, three
-      // hours after the bell: every close is final and the ledger settles.
-      { dow: [1, 2, 3, 4, 5], h: 13, m: 0, inputs: { slot: "eod" }, job: "scan_eod" },
+      /* 20:00 MYT — the day's only weekday scan, on the operator's
+       * instruction: "needed only 2 times a day - morning 8am MYT & night
+       * 8pm MYT". 12:00 UTC is 17:30 IST, two hours after the bell, so every
+       * close is final and the ledger settles.
+       *
+       * THE 13:00 MYT "SIGNALS OPENING" SLOT IS GONE FROM HERE TOO, AND HAD
+       * TO BE. This watchdog does not read the crons — it holds its own copy
+       * of the schedule. Removing the cron and leaving the slot would not have
+       * stopped the midday scan; it would have MOVED it here, dispatched every
+       * weekday at 05:12 UTC by the very mechanism built to repair drops,
+       * with no cron anywhere to explain why. */
+      { dow: [1, 2, 3, 4, 5], h: 12, m: 0, inputs: { slot: "eod" }, job: "scan_eod" },
       { dow: [6], h: 4, m: 0, inputs: { slot: "weekend" }, job: "scan_weekend" },
     ],
   },
@@ -116,12 +121,12 @@ const WATCH = [
      * exactly the behaviour a second trigger must have. */
     repo: "caakshayk1-boop/trading-dashboard",
     file: "scheduled_tasks.yml",
-    why: "the morning and evening Telegram briefs",
+    why: "the morning and night Telegram briefs",
     slots: [
       // 08:00 MYT.
       { dow: [1, 2, 3, 4, 5], h: 0, m: 0, inputs: { task: "brief_morning_catchup" }, job: "brief_morning" },
-      // 21:00 MYT.
-      { dow: [1, 2, 3, 4, 5], h: 13, m: 0, inputs: { task: "brief_evening_catchup" }, job: "brief_evening" },
+      // 20:00 MYT — moved from 21:00 with the cron it watches.
+      { dow: [1, 2, 3, 4, 5], h: 12, m: 0, inputs: { task: "brief_evening_catchup" }, job: "brief_evening" },
     ],
   },
   {
