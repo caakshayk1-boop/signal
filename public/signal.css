@@ -4765,3 +4765,20 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   .rank-r.lvl-r.xr > .m[data-l="Since listing"]{
     order:2;flex:0 0 auto;margin:0;font-size:var(--t-4);text-align:right }
 }
+
+/* ── A SETUP WHOSE STOP HAS GONE ───────────────────────────────────────────
+ * The stop already struck itself through when breached (.rd-f b.is-hit). The
+ * CALL beside it kept reading "Buy" in green, because the verdict is stamped
+ * at the screen's build and only the facts were being re-read live. IFCI on
+ * 2026-09-09: "Buy · 89 Strong" over "off its high -13.1%" and a breached
+ * stop, with the verdict's own reason being "Broke its 52-week high".
+ *
+ * Dimmed rather than hidden. The row is still worth seeing — the stock's
+ * quality figures did not change when the trade died — but it must not read
+ * as an invitation. */
+.rd-row.is-void, .rdc.is-void{opacity:.72}
+.rd-row.is-void .rd-sc b, .rdc.is-void .rdc-m u{color:var(--dim)}
+.rd-row.is-void .rd-v, .rdc.is-void .rdc-v{
+  color:var(--down);letter-spacing:.04em}
+.rd-row.is-void .rd-sc em, .rdc.is-void .rdc-m em{
+  color:var(--dim);font-style:italic}
