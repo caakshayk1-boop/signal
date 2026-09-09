@@ -2202,8 +2202,22 @@
     // used to keep yesterday's shut books under a heading saying "open".
     const ipoOpen = io.ok ? ipoOpenNow(io.data.open) : [];
     if (ipoOpen.length) {
-      out += sec('Open right now', ipoOpen.slice(0, 2).map(ipoCard).join(''),
-        `${ipoOpen.length} book${ipoOpen.length === 1 ? '' : 's'} open`);
+      /* THE FRONT PAGE SHOWS THE TWO WORTH SHOWING, NOT THE FIRST TWO.
+       *
+       * This sliced the feed's own order, so with ten books open the front
+       * page could carry two AVOIDs and never mention the one rated apply —
+       * a page that names something to do, showing the two things not to.
+       * Same ranking /ipo uses: the call first, then demand. */
+      const vR = r => { const v = String(r.verdict || '').toUpperCase();
+        return v.startsWith('APPLY') ? 0 : v === 'AVOID' ? 2 : 1; };
+      const ranked = ipoOpen.slice().sort((a, b) =>
+        vR(a) - vR(b) || (Number(b.subscription_x) || 0) - (Number(a.subscription_x) || 0));
+      const nApply = ranked.filter(r => vR(r) === 0).length;
+      out += sec('Open right now', ranked.slice(0, 2).map(ipoCard).join(''),
+        `${ranked.length} book${ranked.length === 1 ? '' : 's'} open`,
+        /* Plain text: sec() escapes the lead, so markup here would render as
+         * its own tags. The tab bar already links to the IPO page. */
+        `${nApply || 'None'} of ${ranked.length} rated apply. The best-rated first; the rest are on the IPO page.`);
     }
     // Nothing in the mirror is still open. NSE may well disagree — that is
     // exactly the case fillIpoLive() is for, so give it somewhere to render.
@@ -7129,13 +7143,15 @@
           * The entry-state bar is the only thing here that was not a repeat,
           * so it keeps the section and the section takes its name. */''}
       <section class="b-sec b-reveal">
-        <div class="b-lab">Entry state</div>
+        <div class="b-lab">Entry state ${tip('zone')}</div>
         <h2 class="b-h2">Where price sits against the plan.</h2>
 
         <div class="b-zone">
+          ${/* The help mark moved up to the section label. Left here it was a
+              * lone marker with nothing to qualify, once the words beside it
+              * became the section's own heading. */''}
           <div class="b-zone-h">
             <span class="b-zst ${zoneState[0]}">${esc(zoneState[1])}</span>
-            <span class="b-lab" style="letter-spacing:.16em">${tip('zone')}</span>
           </div>
           <div class="b-zt">
             <span class="band" style="left:${Math.min(zAt(entry), zAt(t1)).toFixed(1)}%;width:${Math.abs(zAt(t1) - zAt(entry)).toFixed(1)}%"></span>
