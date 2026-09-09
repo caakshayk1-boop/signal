@@ -157,18 +157,28 @@
   <a href="/" data-route="/">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/></svg>
     <span>Home</span></a>
-  <a href="/signals" data-route="/signals">
+  <!-- MARKETS REPLACES "SIGNALS" IN SLOT 2, AND "LEDGER" REPLACES "MORE".
+       /markets existed and was reachable from NO tab — the one destination that
+       answers "what is happening?" was behind a search or a link on Home.
+       "More" was a junk drawer in a five-slot bar: its label tells a reader
+       nothing, and everything in it that a phone needs day to day (theme,
+       density, search, freshness) is already in the header. What remained —
+       methodology, sources, legal, the floor — is provenance, and provenance
+       belongs with the record it qualifies, so it now sits at the foot of the
+       Ledger. Five slots, five answers: what is happening, where do I look,
+       what am I holding, what happened. -->
+  <a href="/markets" data-route="/markets">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-6 4 4 4-7 5 5"/></svg>
-    <span>Signals</span></a>
+    <span>Markets</span></a>
   <a href="/discover" data-route="/discover">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M15 9l-2 5-5 2 2-5z"/></svg>
     <span>Discover</span></a>
   <a href="/watch" data-route="/watch">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.8l2.5 5.1 5.6.8-4 3.9 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4-3.9 5.6-.8z"/></svg>
     <span>Watch</span></a>
-  <button type="button" id="moreBtn" class="tab-more" aria-haspopup="dialog" aria-expanded="false">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
-    <span>More</span></button>
+  <a href="/signals" data-route="/signals">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"/><path d="M7 19V9"/><path d="M12 19V5"/><path d="M17 19v-7"/></svg>
+    <span>Ledger</span></a>
 </nav>
 
 <!-- A new edition arrived and the page has already swapped to it. This is a

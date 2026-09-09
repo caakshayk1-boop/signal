@@ -444,6 +444,193 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      missing.length === 0, missing);
 }
 
+/* ── THE LITE TABLE MUST STILL CARRY EVERYTHING THE PAGE READS ───────────────
+ * screen-lite.json is screen.json with 29 unread fields and the per-company
+ * prose removed: 298 KB gzipped down to 207 KB, on the nine routes that LIST
+ * companies rather than examine one.
+ *
+ * Its keep-list lives in another repo (stock_screen.LITE_DROP_FIELDS) and the
+ * code that consumes it lives here, which is exactly the shape of coupling
+ * that rots. This check closes it from this side: every field signal.js reads
+ * must be present in the payload it reads it from, or the page renders an
+ * em dash and nobody hears about it. */
+{
+  const litePath = "public/screen-lite.json";
+  let lite = null;
+  try { lite = JSON.parse(readFileSync(litePath, "utf8")); } catch { /* not synced yet */ }
+  /* The file is a build artefact that arrives via sync-data.yml, so on a fresh
+   * branch it is legitimately absent and this must not block a deploy. What is
+   * NOT optional is that it is on its way: if the feed list does not name it,
+   * it will never arrive and the nine routes 404 on every load. So the
+   * PIPELINE is asserted unconditionally and the CONTENT only when present. */
+  const SYNC = readFileSync(".github/workflows/sync-data.yml", "utf8");
+  ok("screen-lite is in the sync feed list, so it will arrive",
+     /FEEDS="[^"]*\bscreen-lite\b/.test(SYNC));
+  if (lite) {
+    ok("screen-lite.json declares itself lite and carries rows",
+       lite.is_lite === true && Array.isArray(lite.rows) && lite.rows.length > 0);
+  } else {
+    console.log("  note  screen-lite.json not synced into this checkout yet");
+  }
+
+  if (lite && lite.rows) {
+    const have = new Set();
+    for (const r of lite.rows.slice(0, 400)) for (const k of Object.keys(r)) have.add(k);
+    // Fields legitimately absent: they are the prose and the columns only the
+    // full-payload routes read, and the payload names them itself.
+    const dropped = new Set(lite.lite_dropped || []);
+    // The comparison is against screen.json ITSELF, not a list written here.
+    // A field the current build has not shipped yet (ahimsa, added the day this
+    // was written) is absent from both files and is not a projection bug; a
+    // field present in the full table and missing from the lite one is.
+    let full = null;
+    try { full = JSON.parse(readFileSync("public/screen.json", "utf8")); } catch { /* */ }
+    if (full && full.rows) {
+      const inFull = new Set();
+      for (const r of full.rows.slice(0, 400)) for (const k of Object.keys(r)) inFull.add(k);
+      const missing = [];
+      for (const m of JS.matchAll(/\br\.([a-z][a-z0-9_]{2,})\b/gi)) {
+        const f = m[1];
+        if (!inFull.has(f)) continue;          // not a screen column at all
+        if (have.has(f) || dropped.has(f)) continue;
+        missing.push(f);
+      }
+      ok("every screen column the page reads survives the lite projection",
+         missing.length === 0, [...new Set(missing)]);
+    }
+
+    // The prose is the point of the saving; if it comes back the saving is gone.
+    const withProse = lite.rows.filter(
+      (r) => (r.risk && r.risk.flags) || (r.vd && r.vd.f)).length;
+    ok("the per-company prose is NOT in the lite table", withProse === 0, withProse);
+  }
+}
+
+/* ── A LITE CACHE MUST NEVER SERVE A ROUTE THAT NEEDS THE PROSE ──────────────
+ * SCREEN is one module-level cache shared by every route. Without the variant
+ * flag, the first light route to load poisons /screen and /stock/:id: both
+ * open with `if (!SCREEN)`, find a full cache, and render a company page whose
+ * risk flags are silently absent. Not an error — an empty section, on the page
+ * whose entire job is to explain that company. */
+{
+  ok("the cache records which projection it holds", /let SCREEN_LITE = false/.test(JS));
+  ok("SCREEN is only ever set through setScreen",
+     !/\bSCREEN = \((?!.*setScreen)/.test(JS.replace(/let SCREEN = null;/, "")));
+  // Comment lines explain this guard and would otherwise be counted as uses
+  // of it — the same trap that made an earlier check match its own docstring.
+  const code = JS.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
+  const fullGuards = (code.match(/!SCREEN \|\| SCREEN_LITE/g) || []).length;
+  ok("all three full-payload call sites reject a lite cache", fullGuards === 3, fullGuards);
+  // And nothing may reach for the raw path any more.
+  ok("no route fetches '/screen.json' by literal — FULL_URL or LITE_URL",
+     !/get\(\s*['"]\/screen\.json['"]\s*\)/.test(JS));
+  const liteN = (JS.match(/get\(LITE_URL\)/g) || []).length;
+  ok("the light routes read the lite table", liteN >= 7, liteN);
+}
+
+/* ── FIVE SLOTS, FIVE ANSWERS ────────────────────────────────────────────────
+ * The bar was Home / Signals / Discover / Watch / More. Two faults:
+ *   - /markets — the one route that answers "what is happening?" — was
+ *     reachable from NO tab. It existed and was navigable only by search or a
+ *     link on Home.
+ *   - "More" is not a destination. In a five-slot bar one slot said nothing,
+ *     and everything in it a phone needs day to day (search, freshness, theme,
+ *     density) was already in the header.
+ * Every tab must be a real, renderable route — a bar entry pointing at a
+ * missing route is a dead end the router turns into a 404. */
+{
+  const nav = [...HTML.matchAll(/<a href="(\/[a-z/]*)" data-route="([^"]+)">[\s\S]*?<span>([^<]+)<\/span>/g)]
+    .map((m) => ({ href: m[1], route: m[2], label: m[3] }));
+  ok("the bar has five slots", nav.length === 5, nav.map((n) => n.label));
+  ok("href and data-route agree on every tab",
+     nav.every((n) => n.href === n.route), nav.filter((n) => n.href !== n.route));
+
+  const routes = new Set([...JS.matchAll(/R\['(\/[a-z0-9:/-]*)'\]\s*=/g)].map((m) => m[1]));
+  const dead = nav.filter((n) => !routes.has(n.route));
+  ok("every tab points at a route the app can render", dead.length === 0, dead);
+
+  ok("Markets is in the bar — it answers the first question the app exists for",
+     nav.some((n) => n.route === "/markets"));
+  ok("no slot is a junk drawer",
+     !nav.some((n) => /^(more|other|misc)$/i.test(n.label.trim())),
+     nav.map((n) => n.label));
+
+  // What "More" held that lives nowhere else must still be reachable.
+  ok("the provenance links moved to the Ledger rather than being dropped",
+     /const provenance = \(\) => sec\(/.test(JS) && /provenance\(\);/.test(JS));
+  ok("nothing still binds the removed #moreBtn", !/getElementById\('moreBtn'\)/.test(JS));
+}
+
+/* ── EVERY EXPLANATION MUST BE REACHABLE, AND THE BIG NUMBERS MUST HAVE ONE ──
+ * TIPS carried nine entries and covered the mechanics — the 52-week range, the
+ * session, R:R — while none of the four figures a reader actually decides on
+ * had a help mark. A "?" on `zone` and none on `win rate` explains the easy
+ * number and leaves the load-bearing one bare.
+ *
+ * `basis` was also defined and surfaced NOWHERE: an explanation written, paid
+ * for in bytes, and never once shown. */
+{
+  const block = (JS.match(/const TIPS = \{[\s\S]*?\n  \};/) || [""])[0];
+  const keys = [...block.matchAll(/^\s{4}(\w+):\s*\[/gm)].map((m) => m[1]);
+  ok("TIPS is readable", keys.length > 0);
+
+  // Two ways to surface one: tip('k') inline, or tile(..., 'k') on a label.
+  const used = new Set([
+    ...[...JS.matchAll(/\btip\('(\w+)'\)/g)].map((m) => m[1]),
+    ...[...JS.matchAll(/,\s*'(\w+)'\)\}/g)].map((m) => m[1]),
+  ]);
+  const orphan = keys.filter((k) => !used.has(k));
+  ok("every TIPS entry is surfaced somewhere", orphan.length === 0, orphan);
+
+  for (const k of ["winrate", "score", "call", "risk"]) {
+    ok(`the ${k} figure carries an explanation`, keys.includes(k) && used.has(k));
+  }
+
+  // The control goes on the LABEL, never on the value: answer first, reason
+  // second. tile() takes the key as its fifth argument and renders it inside
+  // the .k element, so this holds by construction — assert the construction.
+  ok("tile() renders its tip on the label, not the value",
+     /<div class="k">\$\{esc\(k\)\}\$\{tipKey \? ' ' \+ tip\(tipKey\) : ''\}<\/div>/.test(JS));
+}
+
+/* ── ONE FIELD, ONE VOCABULARY ───────────────────────────────────────────────
+ * `vd.c` was rendered two ways depending on the page: the screen said Act and
+ * Ignore where the radar said Buy and Avoid. Same company, same build, same
+ * field, two answers — and "Act" is a stronger word than a site with no
+ * cleared engine is entitled to use.
+ *
+ * It survived because test/ui.mjs pins the vocabulary by sampling `.rd-v` on
+ * the radar, and nothing looked at the screen's tag. The map is single now;
+ * this asserts it stays single. */
+{
+  ok("there is exactly one verdict table", /const VERDICT = \{/.test(JS));
+  ok("VD_WORD is derived from it, not hand-kept",
+     /const VD_WORD = Object\.fromEntries\(/.test(JS));
+  ok("VERDICT_LOOK is derived from it, not hand-kept",
+     /const VERDICT_LOOK = VERDICT;/.test(JS));
+  /* THE REAL INVARIANT, not a list of banned words.
+   *
+   * Banning "Act" catches the spelling that happened; it does not catch the
+   * next one. What must hold is that the words this table produces are the
+   * words test/ui.mjs allows on the live page — so the two files are compared
+   * against each other rather than both against a guess. That is the check
+   * that would have caught the original drift on the day it landed. */
+  const vblock = (JS.match(/const VERDICT = \{[\s\S]*?\n  \};/) || [""])[0];
+  const words = [...vblock.matchAll(/\[\s*'[a-z]*',\s*'([^']+)'\s*\]/g)].map((m) => m[1]);
+  const UI = readFileSync("test/ui.mjs", "utf8");
+  const allowed = [...(UI.match(/const allowed = new Set\(\[([^\]]*)\]/) || ["", ""])[1]
+    .matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  ok("ui.mjs declares an allowed verdict set", allowed.length > 0);
+  const stray = words.filter((w) => !allowed.includes(w));
+  ok("every word the verdict table produces is one the live page allows",
+     stray.length === 0, stray);
+  ok("the two files agree on the whole set",
+     words.length === allowed.length, { words, allowed });
+  // UNRATED must be declared, not reached by falling off the end of the table.
+  ok("UNRATED is a declared verdict, not an accident of the default",
+     /UNRATED:\s*\[/.test(JS));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

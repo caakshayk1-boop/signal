@@ -864,8 +864,15 @@ try {
   // Kept OUT of `allowed` deliberately. A check whose fix is always "add the
   // new word" is not a check; a SECOND new verdict still fails this.
   const VOID = "Setup void · stop breached";
+  /* `.vtag` AS WELL AS `.rd-v`.
+   *
+   * This sampled the radar only, and that is exactly how the screen kept a
+   * second vocabulary — Act / Ignore against the radar's Buy / Avoid — for as
+   * long as it did. A taxonomy check that watches one of the two surfaces
+   * rendering the field is a check that cannot find a disagreement between
+   * them. */
   const verdicts = await p.evaluate(() =>
-    [...document.querySelectorAll(".rd-v")].map(x => x.textContent.trim()));
+    [...document.querySelectorAll(".rd-v, .vtag")].map(x => x.textContent.trim()));
   const allowed = new Set(["Buy", "Wait for entry", "Watch", "Avoid", "Not rated"]);
   ok("it uses the site's own verdict words, not a new taxonomy",
      verdicts.every(v => allowed.has(v) || v === VOID), [...new Set(verdicts)]);
