@@ -10051,7 +10051,13 @@
       <span class="rd-id"><b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span>
         <em class="rd-v ${vcls}">${esc(vlabel)}</em></span>
       <span class="rd-px">${price(r.price)}<i class="${dir(r.r1d)}">${pct(r.r1d)}</i></span>
-      <span class="rd-sc"><b>${nd.score}</b><em>${esc(strengthWord(nd.score))}</em></span>
+      ${/* WHICH SCORE THIS IS. The screen publishes a fundamental composite
+          * too, and for IFCI on 2026-09-09 that read 39.6 while this read 89 —
+          * both correct, measuring different things, with nothing on the card
+          * saying which was which. A reader seeing "89 Strong" has no way to
+          * know the same site scores the same name 39.6 on quality, growth and
+          * valuation. The number is unchanged; it now says what it is of. */''}
+      <span class="rd-sc" title="Trend, momentum, volume and institutional flow, each normalised to 0-100 and averaged. This is a score of the MOVE, not of the business — the screen's fundamental composite (quality, growth, valuation, technical) is a separate number on the stock's own page."><b>${nd.score}</b><em>${esc(strengthWord(nd.score))}</em></span>
       <span class="rd-parts">${bar('Trend', p.trend)}${bar('Momentum', p.momentum)}${bar('Volume', p.volume)}${bar('Institutional', p.institutional)}</span>
       ${/* ── THE NUMBERS THE FOUR BARS DO NOT CARRY ────────────────────────
           * Trend/Momentum/Volume/Institutional are the SCORE's components —
@@ -10230,6 +10236,44 @@
               const hit = v.price <= s;
               st.textContent = price(s) + (hit ? ' · breached' : '');
               st.className = hit ? 'dn is-hit' : 'dn';
+              /* ── THE HALF-FIX THIS COMPLETES ────────────────────────────
+               * Marking the stop breached made the FACTS live and left the
+               * CALL stamped at the build, so a card could read:
+               *
+               *   IFCI  ·  Buy  ·  89 Strong
+               *   Off its high  -13.1%      (live)
+               *   Stop  ₹95.56 · breached   (live)
+               *
+               * measured on 2026-09-09, where the verdict's own stated reason
+               * was "Broke its 52-week high" — a premise the line above it now
+               * contradicts. Two live facts under two stale ones, with nothing
+               * reconciling them, and the stale pair is the headline.
+               *
+               * A breached stop VOIDS the setup. Not pauses it: the entry was
+               * chosen because of a level that has since failed, so waiting to
+               * re-enter there is acting on a falsified premise. The verdict
+               * says so, and the score keeps its number while saying when it
+               * was taken — the number is not recomputed here, because
+               * inventing a fresh score in the browser is exactly the kind of
+               * made-up figure this site refuses elsewhere. */
+              el.classList.toggle('is-void', hit);
+              const vd = el.querySelector('.rd-v, .rdc-v');
+              if (vd) {
+                if (hit) {
+                  if (!vd.dataset.was) vd.dataset.was = vd.textContent;
+                  vd.textContent = 'Setup void · stop breached';
+                  vd.className = vd.className.replace(/\b(up|warn)\b/g, '') + ' dn';
+                  vd.title = `The published stop ${price(s)} was broken at `
+                    + `${price(v.price)}. The call and score beside it were `
+                    + `measured at the build price, before this. A new setup `
+                    + `needs a new level, not this one again.`;
+                } else if (vd.dataset.was) {
+                  vd.textContent = vd.dataset.was;
+                  delete vd.dataset.was;
+                }
+              }
+              const sw = el.querySelector('.rd-sc em');
+              if (sw && hit) sw.textContent = 'at build';
             }
           }
         });
