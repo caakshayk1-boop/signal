@@ -524,8 +524,18 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   // And nothing may reach for the raw path any more.
   ok("no route fetches '/screen.json' by literal — FULL_URL or LITE_URL",
      !/get\(\s*['"]\/screen\.json['"]\s*\)/.test(JS));
-  const liteN = (JS.match(/get\(LITE_URL\)/g) || []).length;
-  ok("the light routes read the lite table", liteN >= 7, liteN);
+  /* The light routes go through getScreen(false), which asks for the lite
+     table and FALLS BACK to the full one when it 404s. That fallback is not
+     optional: screen-lite.json is produced by one pipeline and delivered by
+     another, so there is a window where this code is live and the file is not
+     — and on the deploy that shipped this, /radar fetched a 404 and rendered
+     ZERO names. A missing projection is not a missing answer. */
+  ok("the lite fetch falls back to the full table rather than failing",
+     /const getScreen = async \(wantFull\) => \{[\s\S]*?return \{ r: await get\(FULL_URL\), lite: false \};/.test(JS));
+  const liteN = (JS.match(/getScreen\(false\)/g) || []).length;
+  ok("every light route goes through it", liteN >= 7, liteN);
+  ok("no light route sets the lite flag as a literal true",
+     !/setScreen\([^;]*\), true\)/.test(JS));
 }
 
 /* ── FIVE SLOTS, FIVE ANSWERS ────────────────────────────────────────────────
