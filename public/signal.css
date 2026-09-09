@@ -3886,15 +3886,32 @@ html:has(dialog[open]){overflow:hidden}
 @media (max-width:600px){ .tkr-i{padding:6px 11px;gap:6px} .tkr-seg{padding:6px 10px} }
 .rank-r.eng.eng-h .s,.rank-r.eng.eng-h .x{font:500 var(--t-1)/1 var(--mono);color:var(--dim);
   letter-spacing:.08em;text-transform:uppercase}
-@media (max-width:560px){
-  /* Three tracks for four cells, on purpose: the win rate drops to its own
-     full-width line under the name. That only holds when the win-rate cell is
-     THERE — with the two-column roster, :last-child is Published, and moving
-     the published count to a line of its own would be nonsense. */
-  .rank-r.eng:not(.eng-2){grid-template-columns:minmax(0,1fr) 64px 72px;gap:6px 10px}
-  .rank-r.eng:not(.eng-2) .x:last-child{grid-column:1/-1;text-align:left}
-  .rank-r.eng:not(.eng-2).eng-h .x:last-child{display:none}
-  .rank-r.eng.eng-2{gap:6px 10px}
+/* ── THE ROSTER STAYS A GRID ON A PHONE ───────────────────────────────────
+   These rules were written as grid rules and never ran. At 700px and below
+   the generic `.rank-r{display:flex;flex-wrap:wrap}` rule catches
+   `.rank-r.eng` too — it was written for the screen, IPO and funds rows —
+   so the roster became a wrapping flex strip and every grid-template-columns
+   and grid-column below it was inert.
+
+   What that looked like on a phone, reported from a real device: the header
+   read "ENGINE   PUBLISHED" with "CLOSED" wrapped onto a second line and the
+   fourth heading hidden, while the row beneath it ran "VECTOR  6  2  50%" on
+   one line. Four figures under two-and-a-bit headings, in different places,
+   with nothing lining up — a table that cannot be read at the width most of
+   this site is read at.
+
+   It is a four-column table of a name and three short numbers, which fits
+   390px comfortably. So it opts OUT of the flex stack and stays a grid, with
+   the header showing all four headings because there is now room for them.
+   `display:grid` has to be restated here: the flex rule is inside the same
+   media block and would otherwise win on source order. */
+@media (max-width:700px){
+  .rank-r.eng{display:grid;gap:6px 8px;padding-left:12px;padding-right:12px}
+  .rank-r.eng:not(.eng-2){grid-template-columns:minmax(0,1fr) 58px 52px 52px}
+  .rank-r.eng.eng-2{grid-template-columns:minmax(0,1fr) 62px}
+  .rank-r.eng .s b{font-size:var(--t-3)}
+  .rank-r.eng .x{font-size:var(--t-3)}
+  .rank-r.eng.eng-h .s,.rank-r.eng.eng-h .x{font-size:var(--t-1)}
 }
 .rank-r.xtra .s b{display:block;font:600 var(--t-4)/1.2 var(--mono);color:var(--text)}
 .rank-r.xtra .s span{display:block;margin-top:2px;font:400 var(--t-3)/1.4 var(--ui);color:var(--dim)}

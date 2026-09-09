@@ -85,8 +85,13 @@
       ${body}
     </section>`;
 
+  /* LABEL FIRST — the same change the full site made to both its tile
+   * helpers. A figure printed above its own name has to be read twice: the
+   * reader meets "51", then "47", then "0", and only on the second line of
+   * each learns what was counted. Four of them in a row is that cost four
+   * times. Name, then figure. */
   const figs = (items) => `<div class="figs">${items.filter(Boolean).map(([v, l, c]) =>
-    `<div class="fig"><b class="${c || ''}">${v}</b><span>${esc(l)}</span></div>`).join('')}</div>`;
+    `<div class="fig"><span>${esc(l)}</span><b class="${c || ''}">${v}</b></div>`).join('')}</div>`;
 
   /* ── THE EXPANDING ROW ────────────────────────────────────────────────────
    * <details>, not a JS toggle. It is keyboard-operable, screen-reader
@@ -442,12 +447,15 @@
              <b>${winSince}</b> of them winners, <b class="${dir(sumR)}">${rr(sumR / closedSince.length)}</b>
              each. At ${closedSince.length} closed that is <span class="dim">far too few to mean
              anything</span>. <b>No engine is cleared for capital.</b>`,
+        /* Written out by hand rather than through figs(); it has to carry the
+         * same order, or this one block reads upside down against every other
+         * on the page. */
         `<div class="figs">
-          <div class="fig"><b>${since.length}</b><span>published since ${esc(LAUNCH)}</span></div>
-          <div class="fig"><b>${openSince.length}</b><span>still open</span></div>
-          <div class="fig"><b>${closedSince.length}</b><span>closed and scored</span></div>
-          <div class="fig"><b class="${closedSince.length ? dir(sumR) : ''}">${
-            closedSince.length ? rr(sumR / closedSince.length) : '—'}</b><span>per trade</span></div>
+          <div class="fig"><span>published since ${esc(LAUNCH)}</span><b>${since.length}</b></div>
+          <div class="fig"><span>still open</span><b>${openSince.length}</b></div>
+          <div class="fig"><span>closed and scored</span><b>${closedSince.length}</b></div>
+          <div class="fig"><span>per trade</span><b class="${closedSince.length ? dir(sumR) : ''}">${
+            closedSince.length ? rr(sumR / closedSince.length) : '—'}</b></div>
         </div>` +
         (closedSince.length >= 5 ? (curve(sinceCurve) || '') : '') +
         `<div class="call dnb"><h3>Read this before the setups below</h3>

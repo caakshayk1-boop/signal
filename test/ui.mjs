@@ -290,6 +290,19 @@ try {
    * is open counts zero — the markup sits in a <template> until a row is
    * first expanded. Opening one row is what a reader does and is what the
    * assertions below are actually about. */
+  /* AND IT HAS TO OPEN AN *OPEN* SIGNAL.
+   * This expanded whichever row happened to be first. The brief link is only
+   * rendered for open signals — a closed one has no brief to link to — so the
+   * assertion below was passing because production's newest row happened to
+   * be open, and failed the moment a run had a closed signal at the top. A
+   * check that depends on the order of the data is a check that will go red
+   * on a normal Tuesday. Filter to Open first, then expand. */
+  await p.evaluate(() => {
+    const chip = [...document.querySelectorAll('.chip[data-s]')]
+      .find(b => b.dataset.s === 'open');
+    if (chip) chip.click();
+  });
+  await p.waitForTimeout(700);
   await p.evaluate(() => {
     const r = document.querySelector('.xr[data-xr]');
     if (r) r.click();
@@ -1242,15 +1255,31 @@ try {
    * same x as the cell beneath it. Cells that opt out of the columns on
    * purpose (grid-column: 1 / -1, or absolutely positioned) are excluded. */
   console.log("\n  table columns map to their headers");
-  // Its own page: by this point in the run the shared one has been closed.
+  /* AT BOTH WIDTHS, and the second one is not decoration.
+   *
+   * This check ran at 1440 only, and a table shipped broken at 390 while it
+   * stayed green: the engine roster's grid rules were written but never ran,
+   * because at 700px and below the generic `.rank-r{display:flex}` rule
+   * catches `.rank-r.eng` too. On a real phone the header read
+   * "ENGINE  PUBLISHED" with "CLOSED" wrapped to a second line and the fourth
+   * heading hidden, over a row reading "VECTOR 6 2 50%" — four figures under
+   * two-and-a-bit headings, nothing lining up. Reported from a device, not
+   * caught here.
+   *
+   * A table is a claim that a column means something, and that claim is made
+   * at every width the site is read at. Most of this site is read at the
+   * narrow one. */
   const colCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const colP = await colCtx.newPage();
+  const colMobCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const colMobP = await colMobCtx.newPage();
+  for (const [label, pg] of [["desktop", colP], ["phone", colMobP]])
   for (const route of ["/", "/signals", "/screen", "/ideas", "/markets", "/ipo",
                        "/brief", "/watch", "/engines", "/radar", "/news", "/funds",
                        "/research"]) {
-    await colP.goto(SITE + route, { waitUntil: "domcontentloaded" });
-    await colP.waitForTimeout(SETTLE + 3000);
-    const faults = await colP.evaluate(() => {
+    await pg.goto(SITE + route, { waitUntil: "domcontentloaded" });
+    await pg.waitForTimeout(SETTLE + 3000);
+    const faults = await pg.evaluate(() => {
       const inflow = el => [...el.children].filter(c => {
         const k = getComputedStyle(c);
         return k.display !== "none" && k.position !== "absolute"
@@ -1258,22 +1287,35 @@ try {
       });
       const out = [];
       for (const head of document.querySelectorAll("#main .rank-head")) {
+        if (!head.offsetParent && getComputedStyle(head).display === "none") continue;
         let row = head.nextElementSibling;
         while (row && !row.classList.contains("rank-r")) row = row.nextElementSibling;
         if (!row) continue;
         const hc = inflow(head), rc = inflow(row);
+        if (!hc.length) continue;                 // a header hidden by design
+        const grid = getComputedStyle(head).display.includes("grid");
         const tracks = getComputedStyle(head).gridTemplateColumns.split(" ").filter(Boolean).length;
+        /* A HEADER THAT WRAPS IS A HEADER WHOSE COLUMNS ARE NOT COLUMNS.
+         * Cells are baseline-aligned, so a few pixels apart is one line; a
+         * whole line apart is a wrap, and that is what the phone fault was. */
+        const line = els => { const ys = els.map(c => c.getBoundingClientRect().y);
+          return els.length > 1 && (Math.max(...ys) - Math.min(...ys)) > 14; };
         const off = hc.length === rc.length && hc.findIndex((c, i) =>
           Math.abs(c.getBoundingClientRect().x - rc[i].getBoundingClientRect().x) > 1);
-        if (hc.length !== rc.length || hc.length !== tracks || (off !== false && off > -1))
-          out.push({ cls: String(row.className).slice(0, 40), tracks,
-                     head: hc.length, row: rc.length, firstOffColumn: off });
+        const bad = hc.length !== rc.length
+          || (grid && hc.length !== tracks)
+          || (off !== false && off > -1)
+          || line(hc);
+        if (bad)
+          out.push({ cls: String(row.className).slice(0, 40), grid, tracks,
+                     head: hc.length, row: rc.length, firstOffColumn: off, headerWraps: line(hc) });
       }
       return out;
     });
-    ok(`${route} — every column sits under its own header`, faults.length === 0, faults);
+    ok(`${label} · ${route} — every column sits under its own header`, faults.length === 0, faults);
   }
   await colCtx.close();
+  await colMobCtx.close();
 
   /* ── THE SAME FACT, TWICE ON ONE PAGE ───────────────────────────────────
    *

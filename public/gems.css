@@ -113,10 +113,14 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
   gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r2);
   overflow:hidden;margin-bottom:var(--s4)}
 .fig{background:var(--surf);padding:var(--s3) var(--s3) 11px}
+/* Label above figure. The tile is a column, so the order in the markup is the
+   order on screen — and the figure keeps the floor, so a row of tiles shares
+   one baseline however far a label wraps. */
+.fig{display:flex;flex-direction:column}
 .fig b{display:block;font:500 21px/1.1 var(--mono);font-variant-numeric:tabular-nums;
-  letter-spacing:-.02em;color:var(--ink)}
+  letter-spacing:-.02em;color:var(--ink);margin-top:auto;padding-top:3px}
 .fig b.up{color:var(--up)} .fig b.dn{color:var(--dn)} .fig b.warn{color:var(--warn)}
-.fig span{display:block;margin-top:3px;font:600 9.5px/1.3 var(--ui);letter-spacing:.09em;
+.fig span{display:block;font:600 9.5px/1.3 var(--ui);letter-spacing:.09em;
   text-transform:uppercase;color:var(--dim)}
 
 /* ── list rows ──────────────────────────────────────────────────────────── */
@@ -159,7 +163,12 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 
 @media(min-width:700px){
   :root{--toph:128px}
-  .row{grid-template-columns:auto 1fr auto auto;gap:var(--s4)}
+  /* FOUR TRACKS HERE WAS DEAD AND WRONG. Twenty lines below, another
+     min-width:700px block sets three — "Three cells, three columns" — and
+     wins on source order, which is also what the markup actually emits.
+     Two rules at the same breakpoint disagreeing about one grid is a coin
+     flip for whoever edits next. */
+  .row{gap:var(--s4)}
 }
 
 /* The #wire overrides went with the wire section itself — nothing on this page
