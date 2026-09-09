@@ -1023,20 +1023,35 @@ try {
   ok("every destination has an icon", shell.icons === 5, shell);
   ok("tap targets clear 44px", shell.minTap >= 44, shell.minTap);
 
-  /* Every route must still be reachable from the bar, Discover or More. A
-   * flattened nav that strands a page is worse than the menu it replaced. */
-  const reachable = await p.evaluate(async () => {
-    const seen = new Set(["/", "/signals", "/discover", "/watch"]);
-    const go = document.createElement("a"); go.href = "/discover";
-    document.body.appendChild(go); go.click(); go.remove();
-    await new Promise(r => setTimeout(r, 2500));
-    document.querySelectorAll(".disc-c").forEach(c => seen.add(c.getAttribute("href")));
-    document.getElementById("moreBtn").click();
-    await new Promise(r => setTimeout(r, 600));
-    document.querySelectorAll(".more-i[href]").forEach(x => seen.add(x.getAttribute("href")));
-    document.getElementById("sheet")?.close();
-    return [...seen];
-  });
+  /* Every route must still be reachable from the bar, Discover or the Ledger.
+   * A flattened nav that strands a page is worse than the menu it replaced.
+   *
+   * THE PATH CHANGED, THE INVARIANT DID NOT. This used to click #moreBtn and
+   * read the sheet it opened. That button is gone: "More" was a slot in a
+   * five-slot bar that named nothing, and what it held that nothing else did —
+   * methodology, sources, the floor, legal — is provenance, which now sits at
+   * the foot of the Ledger where the record it qualifies is. Same links, same
+   * .more-i markup, reached by visiting a page rather than opening a drawer.
+   *
+   * Navigating rather than clicking a button is also the more honest test: it
+   * proves a reader can GET there, not merely that a handler fires. */
+  const hop = async (href, waitMs) => {
+    await p.evaluate(async (h) => {
+      const a = document.createElement("a"); a.href = h;
+      document.body.appendChild(a); a.click(); a.remove();
+    }, href);
+    await p.waitForTimeout(waitMs);
+  };
+  const seen = new Set(["/", "/markets", "/discover", "/watch", "/signals"]);
+  await hop("/discover", 2500);
+  for (const h of await p.$$eval(".disc-c", (n) => n.map((x) => x.getAttribute("href"))))
+    seen.add(h);
+  await hop("/signals", 4000);
+  for (const h of await p.$$eval(".more-i[href]", (n) => n.map((x) => x.getAttribute("href"))))
+    seen.add(h);
+  const reachable = [...seen];
+  ok("the Ledger carries the provenance links",
+     (await p.locator(".more-i[href]").count()) >= 4);
   const mustReach = ["/markets", "/screen", "/ideas", "/ipo", "/news", "/funds",
                      "/radar", "/engines", "/brief", "/methodology", "/sources"];
   const stranded = mustReach.filter(r => !reachable.includes(r));
