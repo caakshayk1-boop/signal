@@ -363,6 +363,50 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      JS.includes("laneStat(") && /nKey:\s*['"]n_no_div['"]/.test(lanes));
 }
 
+/* ── ONE CARD MUST NOT PRINT TWO THINGS UNDER ONE NAME ───────────────────────
+ * The incident: SARDAEN's card showed "Target 1 ₹594.82 / Target 2 ₹649.21"
+ * from the signal, and the support-and-resistance table under it showed
+ * "Target 2 ₹576.44 / Target 1 ₹557.96" from the SCREEN's ladder. Four numbers,
+ * two labels, one screen. Neither was wrong; the table was answering a question
+ * it was not being asked, and a reader had no way to tell which pair to act on.
+ *
+ * levelsBlock always receives a SCREEN row, so every level it names is the
+ * screen's. It must say so rather than borrow the signal's vocabulary. */
+{
+  const blk = (JS.match(/const levelsBlock = \(r\) => \{[\s\S]*?\n  \};/) || [""])[0];
+  ok("levelsBlock exists", blk.length > 0);
+  // No bare "Target N" label inside the levels table.
+  const bare = [...blk.matchAll(/add\([^,]+,\s*[`'"]Target \$?\{?/g)].map((m) => lineOf(blk, m.index));
+  ok("the levels table does not label a screen level 'Target N'", bare.length === 0, bare);
+  ok("its ladder levels are attributed to the screen",
+     /The screen's target/.test(blk) && /The screen's stop/.test(blk));
+  // Both must disown the signal's numbers in the same breath.
+  ok("each says it is not the signal's own level",
+     (blk.match(/not the (target this signal was filed with|stop the engine)/g) || []).length === 2);
+}
+
+/* ── AHIMSA IS THREE-STATE, AND MUST NEVER COLLAPSE TO TWO ───────────────────
+ * NSE publishes the Nifty500 Ahimsa CONSTITUENT LIST and no per-company
+ * quotient. So the page may report membership and must not report a figure.
+ *
+ * The dangerous shortcut is `r.ahimsa ? 'In' : 'Not in'`: the build sets the
+ * key to null when NSE's list could not be read, _compact strips nulls, and a
+ * falsy test then marks all 500 names as excluded on a failed fetch — an
+ * ethics claim manufactured by a network error. */
+{
+  const strip = (JS.match(/const factsStrip = \(r, opts\) => \{[\s\S]*?\n  \};/) || [""])[0];
+  ok("the facts strip reports Nifty500 Ahimsa", /Nifty500 Ahimsa/.test(strip));
+  ok("membership is tested with ===, so null is its own state",
+     /r\.ahimsa === true/.test(strip) && /r\.ahimsa === false/.test(strip));
+  ok("a truthy shortcut is not used for it",
+     !/r\.ahimsa\s*\?/.test(strip.replace(/r\.ahimsa == null \?/g, "")));
+  ok("the unknown state says so rather than answering No",
+     /not stated/.test(strip));
+  // No score, ever: the index has no published per-company number.
+  ok("no ahimsa score or quotient is rendered",
+     !/ahimsa[_ ]?(score|quotient|pct|points)/i.test(JS));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

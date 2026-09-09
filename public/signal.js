@@ -9750,16 +9750,35 @@
     add(r.sma200, '200-day average', 'the line the market itself uses to call a trend up or down');
     /* The ladder's own levels carry a MEASURED reason — "prior swing high,
      * tested 6x" — which is the strongest kind available here, so they are
-     * added last and win the de-duplication below. */
+     * added last and win the de-duplication below.
+     *
+     * THEY ARE THE SCREEN'S TARGETS AND THEY MUST SAY SO.
+     *
+     * These were named "Target 1" and "Target 2". The card directly above this
+     * table shows the SIGNAL's targets, under those same two words. On SARDAEN
+     * that read: Target 1 ₹594.82 and Target 2 ₹649.21 on the card, then
+     * Target 2 ₹576.44 and Target 1 ₹557.96 in the table — four numbers, two
+     * labels, one screen, and no way for a reader to tell which pair to act on
+     * or which one was wrong.
+     *
+     * Neither was wrong. `r.lad` is the SCREEN's ladder for the name — where
+     * the daily screen would place levels on it — and the card carries what
+     * the ENGINE published when it filed the signal. Two different questions
+     * with two different answers, and the table was answering the one it was
+     * not being asked.
+     *
+     * The stop below already made this distinction in as many words. The
+     * targets were simply missed when it was written. */
     if (Array.isArray(L.t)) {
-      L.t.forEach(([p, , reach, b], k) => add(p, `Target ${k + 1}`,
-        `${basisText(b) || 'a level the ladder targets'}${reach != null ? ` · reached by ${reach}% of closed trades` : ''}`));
+      L.t.forEach(([p, , reach, b], k) => add(p, `The screen's target ${k + 1}`,
+        `${basisText(b) || "a level the screen's ladder targets"}${reach != null ? ` · reached by ${reach}% of closed trades` : ''}`
+        + ' — the screen\u2019s own level, not the target this signal was filed with'));
     }
     if (Array.isArray(L.w)) add(L.w[0], 'In the way',
       `${basisText(L.w[2]) || 'a level between price and the first target'} — the trade has to clear it`);
-    if (L.s != null) add(L.s, "The screen's ladder stop",
+    if (L.s != null) add(L.s, "The screen's stop",
       'where the SCREEN would place a stop on this name — not the stop the engine '
-      + 'published for this signal, which is in the levels above');
+      + 'published for this signal, which is on the card above');
 
     if (!cand.length) return '';
     // Two levels within 0.4% of each other are one level. The later entry wins
@@ -10101,6 +10120,28 @@
       <span class="rd-f"><em>Off its high</em><b data-fhigh="${esc(String(r.high52 ?? ''))}"
         class="${dir(r.from_high)}">${
         r.from_high == null ? '—' : Number(r.from_high).toFixed(1) + '%'}</b></span>
+      ${/* ── NIFTY500 AHIMSA ─────────────────────────────────────────────
+          * NSE Indices launched this on 10 July 2026 — the Nifty 500 filtered
+          * to companies not engaged in activities harmful to animals, 326 of
+          * the 500 at launch.
+          *
+          * MEMBERSHIP, NOT A SCORE. NSE publishes the constituent list and no
+          * per-company quotient, so there is none to show; inventing one would
+          * put a number with no source beside a table where every other number
+          * has one. It is also not an input to the composite, because nothing
+          * measured says a constituent outperforms.
+          *
+          * THREE STATES, NOT TWO. A missing key means the build could not read
+          * NSE's list, which is not the same as NSE leaving the name out — so
+          * it reads "not stated" rather than silently taking the No branch and
+          * marking all 500 names as failing an ethics test on a failed
+          * fetch. */''}
+      <span class="rd-f"><em>Nifty500 Ahimsa</em><b class="${
+        r.ahimsa === true ? 'up' : r.ahimsa === false ? '' : ''}" title="${
+        r.ahimsa === true ? 'NSE Indices includes this name in the Nifty500 Ahimsa index'
+        : r.ahimsa === false ? 'NSE Indices does not include this name in the Nifty500 Ahimsa index'
+        : "NSE's constituent list was not readable for this build"}">${
+        r.ahimsa === true ? 'In' : r.ahimsa === false ? 'Not in' : 'not stated'}</b></span>
       ${/* ── THE LADDER, AND ONLY WHERE THERE IS NOT ALREADY ONE ─────────
           * A stop and a first target with NO ENTRY beside them cannot be
           * read: R is measured from the entry, so without it neither number
