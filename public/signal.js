@@ -3109,7 +3109,22 @@
     const mbRows = (mbSeg && mbSeg.items) || [];
     const picked = mbRows.find(r => r.pick_date) || {};
 
-    out += sec('Multibaggers this week', mbRows.length ? `<div class="mbg">${mbRows.map(r => {
+    /* FIVE LISTS, ORDERED BY CLOCK.
+     *
+     * This page carries five different idea sources — the book, the daily
+     * engine, the daily breakout screen, a Saturday multibagger scan and a
+     * weekly long-horizon file — and stacked them in the order the code
+     * happened to fetch them: the weekly scans first, the orders you could
+     * place this morning last, five screens down. A reader could not tell
+     * which of the five they were meant to act on, and the one that is
+     * actionable today was the one they had to scroll furthest to reach.
+     *
+     * Nothing is removed. Each block is built where its data is and composed
+     * at the end, shortest clock first: today's orders, today's engine,
+     * today's breakouts, this week's scan, this quarter's theses. The order
+     * IS the answer to "which of these is for me". */
+    const parts = {};
+    parts.mbg = sec('Multibaggers this week', mbRows.length ? `<div class="mbg">${mbRows.map(r => {
         const since = r.pick_entry && Number.isFinite(Number(r.price_raw))
           ? (r.price_raw - r.pick_entry) / r.pick_entry * 100 : null;
         const up = r.pick_target && Number.isFinite(Number(r.price_raw))
@@ -3213,7 +3228,7 @@
 
     if (aiRows.length) {
       const horizon = ((aiRows[0].metadata || {}).horizon) || 'multi-year';
-      out += sec('AI long-term ideas', (aiSuperseded ? `<p class="hint" style="margin:-4px 0 14px">
+      parts.ai = sec('AI long-term ideas', (aiSuperseded ? `<p class="hint" style="margin:-4px 0 14px">
         Showing the <b>latest</b> filing for each name. The engine re-runs weekly and
         re-files names it still likes, so <b>${aiSuperseded}</b> earlier open row${aiSuperseded === 1 ? '' : 's'}
         for these same companies ${aiSuperseded === 1 ? 'is' : 'are'} folded away here.
@@ -3298,14 +3313,15 @@
     }
 
     const picks = t.data.picks || [];
-    out += sec('The daily engine’s ranked picks', picks.length ? `<div class="cards-2">${picks.map(x => ideaCard(x, false)).join('')}</div>`
+    parts.picks = sec('The daily engine’s ranked picks', picks.length ? `<div class="cards-2">${picks.map(x => ideaCard(x, false)).join('')}</div>`
       : `<div class="empty">Nothing clears the bar this week. That is a result, not a gap.</div>`,
       `${picks.length} ranked`, 'A different engine, on a different clock — names that cleared every floor, and the levels that define each one.');
 
     const pu = p.ok ? p.data : {};
-    out += sec('Breaking to 52-week highs',
+    parts.brk = sec('Breaking to 52-week highs',
       levelTable((pu.breakouts || []).slice(0, 12)),
-      pu.breakouts ? `${pu.breakouts.length} names` : '');
+      pu.breakouts ? `${pu.breakouts.length} names` : '',
+      'Today’s screen output — names printing a new one-year high, with where each sits against its own averages.');
 
     if (mn.ok) {
       const d = mn.data, st = d.state || {}, orders = d.admitted || [];
@@ -3316,7 +3332,7 @@
       // ₹2 lakh cannot use "₹10 L"; they can use "10% of the book".
       const shareOf = v => d.capital ? (Number(v) / d.capital * 100) : null;
 
-      out += sec('The book', `<div class="grid" style="margin-bottom:10px">
+      parts.book = sec('The book', `<div class="grid" style="margin-bottom:10px">
           ${tile(orders.length, 'Orders to place', 'nothing here is bought yet', 'ac')}
           ${tile(st.deployed_pct != null ? st.deployed_pct + '%' : '—', 'Would be deployed',
                  st.heat_pct != null ? st.heat_pct + '% at risk if every stop hits' : '')}
@@ -3356,6 +3372,9 @@
             </div>
           </article>`; }), 3, 'orders') : `<div class="empty">No orders clear the mandate today.</div>`));
     }
+    // Shortest clock first. A missing block is simply absent — no placeholder.
+    out += [parts.book, parts.picks, parts.brk, parts.mbg, parts.ai]
+      .filter(Boolean).join('');
     paint(out);
     fillIdeaCharts(picks);   // six months of real closes on every idea, after paint
 
@@ -3388,16 +3407,50 @@
     if (!io.ok) { paint(out + fail('The IPO radar', io.error)); return; }
     const d = io.data, c = d.counts || {};
 
+    /* THE CALL RANKS THE PAGE.
+     *
+     * Ten books were listed in feed order under one heading, every one of them
+     * a full card — so comparing ten verdicts meant reading ten cards. The
+     * verdict is the only thing on an IPO card that changes what somebody
+     * does next, so it sorts the section and it names the headings.
+     *
+     * Nothing is hidden and no card is trimmed: the books that were not rated
+     * apply sit in a disclosure directly underneath, which says how many it
+     * holds and opens on a tap. fillIpoLive() patches by document query, so a
+     * card inside a closed panel still gets its live subscription figure. */
     const dOpen = ipoOpenNow(d.open);
+    const vRank = r => { const v = String(r.verdict || '').toUpperCase();
+      return v.startsWith('APPLY') ? 0 : v === 'AVOID' ? 2 : 1; };
+    const ordered = dOpen.slice().sort((a, b) =>
+      vRank(a) - vRank(b) || (Number(b.subscription_x) || 0) - (Number(a.subscription_x) || 0));
+    const applyBooks = ordered.filter(r => vRank(r) === 0);
+    const otherBooks = ordered.filter(r => vRank(r) !== 0);
+
     out += sec('Where it stands', `<div class="grid">
+        ${tile(c.apply ?? applyBooks.length, 'Rated apply', 'on public demand and pricing',
+               (c.apply ?? applyBooks.length) ? 'up' : '')}
         ${tile(dOpen.length, 'Books open', 'bidding today', dOpen.length ? 'ac' : '')}
         ${tile((d.upcoming || []).length, 'Upcoming', 'announced, not open')}
         ${tile((d.awaiting_listing || []).length, 'Awaiting listing', 'closed, not yet traded')}
-        ${tile(c.apply ?? '—', 'Rated apply', 'on public demand only', c.apply ? 'up' : '')}
-      </div>`);
+      </div>`, '', dOpen.length
+        ? `${applyBooks.length || 'None'} of ${dOpen.length} open book${dOpen.length === 1 ? '' : 's'} ${
+            applyBooks.length === 1 ? 'is' : 'are'} rated apply.`
+        : 'No mainboard book is open today.');
 
-    out += sec('Open now', dOpen.length ? `<div class="cards-2">${dOpen.map(ipoCard).join('')}</div>`
-      : `<div class="empty">No mainboard book is open today.</div>`);
+    out += sec('Worth applying', applyBooks.length
+      ? `<div class="${applyBooks.length > 1 ? 'cards-2' : ''}">${applyBooks.map(ipoCard).join('')}</div>`
+      : dOpen.length
+        ? `<div class="empty">Nothing open today clears the bar. That is a result, not a gap —
+             an issue is rated on demand and on what it is priced against, and neither becomes
+             negotiable because a book happens to be open.</div>`
+        : `<div class="empty">No mainboard book is open today.</div>`,
+      dOpen.length ? `${applyBooks.length} of ${dOpen.length} open` : '');
+
+    if (otherBooks.length) out += sec('Open, not recommended',
+      `<details class="meth ipo-rest"><summary>${otherBooks.length} other book${
+        otherBooks.length === 1 ? '' : 's'} bidding today — the full card on each</summary>
+        <div class="cards-2">${otherBooks.map(ipoCard).join('')}</div></details>`,
+      `${otherBooks.length}`);
 
     /* NSE'S LIST IS LONGER THAN THE MIRROR'S.
      *
@@ -3531,7 +3584,15 @@
              // data-rank is the row's place in the CURRENT order, rewritten by
              // the sort. The default view shows the first IPO_SHOW of them.
              + ` data-rank="${i}"` });
-    const ipoHead = `<div class="rank-r lvl-r rank-head">
+    /* NINE CELLS, AND THE ROW BELOW IT HAS NINE TOO — so both need nine
+     * tracks. `.rank-r.lvl-r` declares eight, so "Since listing" wrapped onto
+     * a second grid line and sized itself to track one: a 24px box under the
+     * rank number, in the header AND in every row. Measured on the live page,
+     * the header label sat at x=130 in 24px while its column heading was at
+     * x=1230 — the last column of this table has been unreadable since the
+     * "Range since" column was added. `.ipo-lr` now carries the count, and it
+     * is on the header as well as the rows so the two cannot drift. */
+    const ipoHead = `<div class="rank-r lvl-r ipo-lr rank-head">
       <span class="i">#</span><span class="s">Company</span>
       <span class="x">Listed</span><span class="x">Price band</span>
       <span class="x">Listed at</span><span class="x">Last</span>

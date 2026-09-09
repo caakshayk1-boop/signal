@@ -4137,6 +4137,23 @@ html:has(dialog[open]){overflow:hidden}
 .xr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 /* A chevron, so a row that opens is distinguishable from one that does not
    before you tap it. Rotates rather than swapping glyphs, so nothing reflows. */
+/* The books that were not rated apply keep their full cards; they simply do
+   not open ten of them over the one that was. */
+.ipo-rest > .cards-2{padding:0 12px 12px}
+.ipo-rest[open] > summary{border-bottom:1px solid var(--line);margin-bottom:12px}
+
+/* THE LISTINGS TABLE ON /ipo — NINE COLUMNS, DECLARED.
+   It reuses .lvl-r, which declares eight tracks, and emits nine cells. The
+   ninth ("Since listing" — the whole point of the table) wrapped to a second
+   grid line and took track one's 24px, in the header and in every row, so the
+   column heading and its figures were in different places and both clipped.
+   The caret is absolutely positioned and out of flow, so nine is the count.
+   Right padding keeps the last figure clear of it. */
+.rank-r.lvl-r.ipo-lr{
+  grid-template-columns:24px minmax(0,1fr) 82px 96px 68px 68px 104px 62px 78px;
+  padding-right:28px}
+@media(max-width:700px){ .rank-r.lvl-r.ipo-lr{padding-right:22px} }
+
 .xr-caret{position:absolute;right:10px;top:50%;width:7px;height:7px;margin-top:-5px;
   border-right:1.6px solid var(--dim);border-bottom:1.6px solid var(--dim);
   transform:rotate(45deg);transition:transform var(--t-fast) var(--ease);pointer-events:none}

@@ -1190,6 +1190,54 @@ try {
   await swCtx.close();
 
   /* ── NARROW ──────────────────────────────────────────────────────────── */
+  /* ── EVERY TABLE'S COLUMNS MAP TO ITS HEADERS ───────────────────────────
+   *
+   * Two tables shipped with more cells than declared grid tracks, and CSS
+   * does not complain: the surplus cells wrap onto a second grid line and
+   * take the widths of the FIRST columns. On /screen "52w low" rendered
+   * clipped in a 24px box under the rank number while its heading sat 1,100px
+   * away; on /ipo "Since listing" — the entire point of the listings table —
+   * did the same in the header and in every row.
+   *
+   * Neither threw, neither failed a snapshot, and both were invisible to
+   * every existing assertion. The invariant is simple and worth holding: a
+   * header row and the row under it have the same number of in-flow cells,
+   * that number equals the declared track count, and each header sits at the
+   * same x as the cell beneath it. Cells that opt out of the columns on
+   * purpose (grid-column: 1 / -1, or absolutely positioned) are excluded. */
+  console.log("\n  table columns map to their headers");
+  // Its own page: by this point in the run the shared one has been closed.
+  const colCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const colP = await colCtx.newPage();
+  for (const route of ["/", "/signals", "/screen", "/ideas", "/markets", "/ipo",
+                       "/brief", "/watch", "/engines", "/radar", "/news", "/funds"]) {
+    await colP.goto(SITE + route, { waitUntil: "domcontentloaded" });
+    await colP.waitForTimeout(SETTLE + 3000);
+    const faults = await colP.evaluate(() => {
+      const inflow = el => [...el.children].filter(c => {
+        const k = getComputedStyle(c);
+        return k.display !== "none" && k.position !== "absolute"
+            && !/^1 ?\/ ?-1$/.test(k.gridColumn.trim());
+      });
+      const out = [];
+      for (const head of document.querySelectorAll("#main .rank-head")) {
+        let row = head.nextElementSibling;
+        while (row && !row.classList.contains("rank-r")) row = row.nextElementSibling;
+        if (!row) continue;
+        const hc = inflow(head), rc = inflow(row);
+        const tracks = getComputedStyle(head).gridTemplateColumns.split(" ").filter(Boolean).length;
+        const off = hc.length === rc.length && hc.findIndex((c, i) =>
+          Math.abs(c.getBoundingClientRect().x - rc[i].getBoundingClientRect().x) > 1);
+        if (hc.length !== rc.length || hc.length !== tracks || (off !== false && off > -1))
+          out.push({ cls: String(row.className).slice(0, 40), tracks,
+                     head: hc.length, row: rc.length, firstOffColumn: off });
+      }
+      return out;
+    });
+    ok(`${route} — every column sits under its own header`, faults.length === 0, faults);
+  }
+  await colCtx.close();
+
   console.log("\n  320 x 568 — the narrowest phone in use");
   const mCtx = await browser.newContext({ viewport: { width: 320, height: 568 } });
   const mp = await mCtx.newPage();
