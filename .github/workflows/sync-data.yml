@@ -92,6 +92,25 @@ jobs:
       #
       # The DATA still mirrors, below, because the fourteen JSON feeds are genuinely
       # build artefacts of generate.py upstream and are not authored here.
+      #
+      # ── AND ONE FRONTEND FILE DOES, WHICH IS NOT A REVERSAL OF THE ABOVE ──
+      #
+      # brief_fundamentals.js renders the Business section of the brief — the
+      # composite, the four component scores, the ratio tables and the screen's
+      # own risk flags. Every field in it is computed by stock_screen.py
+      # upstream, so it is a build artefact of the screen in exactly the sense
+      # the JSON feeds are.
+      #
+      # What was removed above was a mirror of signal.js and signal.css: files
+      # with two authors, actively edited on BOTH sides, which had already
+      # drifted while both repos stayed green. The objection was to overwriting
+      # work done here. This file has one author, is never edited here, and has
+      # nothing on this side to overwrite — and if it were, the alternative is
+      # two copies of one section drifting, which is the fault that note is
+      # about.
+      #
+      # It carries its own <style>, so it is one file rather than two and
+      # cannot arrive half-delivered.
 
       - name: Fetch the data feeds
         env:
@@ -144,6 +163,34 @@ jobs:
           if [ "$fail" -ge "$total" ]; then
             echo "::error::every feed failed to fetch — check $UPSTREAM still publishes docs/*.json"
             exit 1
+          fi
+
+      # ── THE ONE SHARED FRONTEND FILE ──────────────────────────────────────
+      #
+      # Validated the way the feeds are, with the check that fits the format: a
+      # 404 body and an HTML error page are both non-empty files, so size alone
+      # proves nothing. It has to PARSE as JavaScript and it has to define the
+      # thing both briefs call. A copy that parses but exports nothing would
+      # load clean and leave the section rendering its "could not load" notice
+      # with no error anywhere.
+      #
+      # A failure here keeps the copy already in this repo, exactly as a failed
+      # feed does. Stale is a state the page handles; gone is not.
+      - name: Fetch the shared brief section
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          f=brief_fundamentals.js
+          if gh api "repos/$UPSTREAM/contents/docs/$f" \
+               -H "Accept: application/vnd.github.raw" > ".incoming/$f" 2>/dev/null \
+             && [ -s ".incoming/$f" ] \
+             && node --check ".incoming/$f" 2>/dev/null \
+             && grep -q 'BriefFundamentals' ".incoming/$f"; then
+            printf '  ok    %-12s %s\n' "$f" "$(du -h ".incoming/$f" | cut -f1)"
+          else
+            printf '  MISS  %-12s not fetched, not valid JS, or missing its export — keeping the copy in this repo\n' "$f"
+            rm -f ".incoming/$f"
           fi
 
       # Age is reported, never asserted, because staleness is upstream's

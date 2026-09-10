@@ -7976,205 +7976,39 @@
 
       ${/* ── 4 · THE BUSINESS ──────────────────────────────────────────────
           *
-          * Built ENTIRELY from fields already on the screen row this route
-          * downloads. Nothing here is fetched, nothing is recomputed, and
-          * nothing is filled in.
+          * ONE renderer, shared with news.askakshay.com's brief and AUTHORED
+          * IN trading-dashboard, beside stock_screen.py, which computes every
+          * field it reads — q / g / v / tech, roce, de, piotroski, pe_pctile
+          * and risk.flags. It arrives here through sync-data.yml with the
+          * fourteen JSON feeds, for the same reason they do: it is a build
+          * artefact of the upstream screen and is not authored on this side.
           *
-          * The rule the screen holds and this section inherits: a missing
-          * measurement scores null and LEAVES ITS DENOMINATOR. It is never
-          * zero-filled, because a zero is a measurement and an absence is
-          * not. Every cell below is either a number the screen published or
-          * the word for its absence — there is no third rendering. */''}
+          * That is not a reversal of the note in sync-data.yml about no longer
+          * mirroring the frontend. What was removed there was a mirror of
+          * signal.js and signal.css — files with two authors, which had
+          * already drifted. This file has one author and no edits on this
+          * side to overwrite.
+          *
+          * It carries its own styles, so there is no companion stylesheet to
+          * forget and the markup can never reach a page whose CSS did not.
+          *
+          * A 404 on it is a STATE, not an impossibility: it crosses a repo
+          * boundary twice a day. It must not delete the section silently,
+          * because a section that vanishes is indistinguishable from one that
+          * was never meant to be there. */''}
       <section class="b-sec b-reveal" id="b-fund">
         <div class="b-lab">The business</div>
-        ${(() => {
-          const num = v => (v === null || v === undefined || v === '' || Number.isNaN(Number(v)))
-            ? null : Number(v);
-          const one = (v, dp = 1, suf = '') => num(v) === null ? '<i class="b-na">not published</i>'
-            : `${num(v).toFixed(dp)}${suf}`;
-          const cross = num(row.roce) === null && num(row.comp) === null && num(row.pe) === null;
-
-          /* NO STATEMENTS, NO COMPOSITE, NO RANK — and this page must say the
-           * same thing the screen says rather than rendering an empty grid
-           * that reads like a loading failure. */
-          if (cross) return `<h2 class="b-h2">This company reports nothing the screen could read.</h2>
-            <p class="b-p">${esc(sig.symbol)} carries no financial statements in the 750-name screen, so it has
-              no quality, growth or valuation score and no composite. That is a fact about the
-              disclosure, not about the business — and it is the reason the setup above is a price
-              argument and only a price argument. A company that reports nothing must not be allowed
-              to outrank one that does, so nothing is estimated here to fill the gap.</p>
-            <p class="b-cap">Fundamentals come from the same screen the rest of this site runs on.
-              Missing means missing.</p>`;
-
-          const BARS = [
-            ['Quality', num(row.q), 'Return on capital, margins, leverage and cash conversion, read on the multi-year median rather than the latest year.'],
-            ['Growth', num(row.g), 'Revenue, EBITDA and earnings compounded over the statement history. Per-share growth is withheld entirely where the share count moved structurally.'],
-            ['Valuation', num(row.v), 'What the multiple asks against what the business earns — scored against the screen, not against a fixed band.'],
-            ['Technical', num(row.tech), 'Trend, momentum and participation. It is the only one of the four that the setup above already argued.'],
-          ];
-          const scored = BARS.filter(b => b[1] !== null).length;
-          const bar = ([lab, v, why]) => `<div class="b-bar-r" title="${esc(why)}">
-            <span class="n">${esc(lab)}</span>
-            <span class="t"><i style="width:${v === null ? 0 : Math.max(0, Math.min(100, v)).toFixed(1)}%"></i></span>
-            <span class="s">${v === null ? '—' : Math.round(v)}</span></div>`;
-
-          /* VALUATION AGAINST ITS OWN HISTORY, not against a number somebody
-           * remembers. pe_pctile is where today's multiple sits in this
-           * company's own published range: 90 means it has been cheaper than
-           * this 90% of the time. */
-          const pep = num(row.pe_pctile);
-          const peWidget = pep === null ? '' : `<div class="b-pctl">
-            <div class="b-pctl-h"><b>Where the multiple sits in its own range</b>
-              <span>${Math.round(pep)}th percentile</span></div>
-            <div class="b-pctl-t"><i style="left:${Math.max(0, Math.min(100, pep)).toFixed(1)}%"></i></div>
-            <div class="b-pctl-l"><span>cheapest it has been</span><span>dearest</span></div>
-            <p class="b-pctl-n">A price-to-earnings of ${one(row.pe, 1)} today. This name has traded cheaper
-              than that ${Math.round(pep)}% of the time in the history the screen holds.
-              ${pep >= 80 ? 'Buying here is buying it near the expensive end of its own record.'
-                : pep <= 30 ? 'That is the cheap end of its own record — which is a reason to look, not a reason to buy.'
-                : 'That is an unremarkable place in its own record, which is the most common answer and the least interesting one.'}</p>
-          </div>`;
-
-          const TBL = [
-            ['Returns', [
-              ['Return on capital', one(row.roce, 1, '%'), 'ROCE — EBIT over invested capital. Yahoo publishes no such field; it is computed from the statements.'],
-              ['ROCE, multi-year median', one(row.roce_med, 1, '%'), 'The median across the statement history. The score reads this, not the latest year, so a one-off cannot top the table.'],
-              ['ROCE trend', row.roce_trend ? esc(String(row.roce_trend)) : '<i class="b-na">not published</i>', 'Direction of return on capital across the years on file.'],
-              ['Return on equity', one(row.roe, 1, '%'), ''],
-            ]],
-            ['Balance sheet', [
-              ['Debt to equity', num(row.de) === null ? '<i class="b-na">not published</i>'
-                : (num(row.de) < 0 ? `${num(row.de).toFixed(2)} <b class="b-warn">negative equity</b>` : num(row.de).toFixed(2)),
-                'A negative reading means negative equity, which is insolvency — it scores zero on leverage, not full marks.'],
-              ['Interest cover', one(row.icover, 1, '×'), 'Operating profit against the interest bill.'],
-              ['Current ratio', one(row.curr, 2, '×'), ''],
-              ['Piotroski', num(row.piotroski) === null ? '<i class="b-na">not published</i>' : `${Math.round(num(row.piotroski))} / 9`,
-                'Nine binary accounting tests. Seven or more is strong, under five is weak.'],
-            ]],
-            ['Growth', [
-              ['Revenue CAGR', one(row.rev_cagr, 1, '%'), 'Compounded across the statement history.'],
-              ['EBITDA CAGR', one(row.ebitda_cagr, 1, '%'), ''],
-              ['EPS CAGR', one(row.eps_cagr, 1, '%'), 'Withheld entirely where the share count moved structurally — a split or an issue is not earnings growth.'],
-              ['Revenue, latest year', one(row.rev_yoy, 1, '%'), ''],
-              ['Earnings, latest year', one(row.eps_yoy, 1, '%'), ''],
-            ]],
-            ['Cash', [
-              ['Cash from operations / profit', one(row.cfo_pat, 2, '×'), 'Under 1.0 means the reported profit is not arriving as cash.'],
-              ['Free cash flow / profit', one(row.fcf_pat, 2, '×'), ''],
-              ['Cash score', one(row.cf, 0), 'The screen\u2019s own reading of cash quality, 0 to 100.'],
-            ]],
-            ['Valuation', [
-              ['Price to earnings', one(row.pe, 1, '×'), ''],
-              ['Price to book', one(row.pb, 2, '×'), ''],
-              /* DIVIDEND YIELD IS DELIBERATELY NOT HERE. The screen's
-                 `div_yield` is Yahoo's dividendYield put through a
-                 fraction-to-percent conversion it no longer needs — yfinance
-                 returns percentage points now — so the published column reads
-                 ITC at 601%, COALINDIA at 503%, and a universe median of
-                 65.5%. stock_screen.py is fixed, but rows already built still
-                 carry the old number and this table will not print it. Restore
-                 this row once a screen built after that fix is being served. */
-              ['Effective tax rate', one(row.tax, 1, '%'), 'A rate far from the statutory one is worth a look at the notes.'],
-              ['Market capitalisation', num(row.mcap_cr) === null ? '<i class="b-na">not published</i>'
-                : `\u20b9${Math.round(num(row.mcap_cr)).toLocaleString('en-IN')} cr`, ''],
-            ]],
-            ['Ownership', [
-              ['Promoters', one(row.insiders, 1, '%'), ''],
-              ['Institutions', one(row.instis, 1, '%'), ''],
-            ]],
-          ];
-
-          const flags = (row.risk && Array.isArray(row.risk.flags)) ? row.risk.flags : [];
-
-          return `<h2 class="b-h2">${scored === 0
-              ? 'The screen holds figures for this name but scored none of them.'
-              : scored < 4
-                ? `Scored on ${scored} of four measures. The rest are not on file.`
-                : 'What you would own, on four measures the price argument never touches.'}</h2>
-            <p class="b-sub" style="max-width:70ch">Every figure below is read from the same 750-name
-              screen this page already downloaded — the same numbers, the same build, no second source
-              and no rounding of its own. ${num(row.fy_count) !== null
-                ? `${Math.round(num(row.fy_count))} fiscal ${num(row.fy_count) === 1 ? 'year' : 'years'} of statements${row.fy ? `, latest ${esc(String(row.fy))}` : ''}.`
-                : ''}</p>
-
-            <div class="b-score">
-              <div>
-                <div class="b-score-big">${num(row.comp) === null ? '—' : Math.round(num(row.comp))}<span>/100</span></div>
-                <p class="b-cap" style="margin-top:6px">Composite${num(row.comp) === null
-                  ? ' — unranked. A company with no statements gets no composite, so it cannot outrank one that reports.'
-                  : `. A declared weighting of the four scores beside it${num(row.v_conf) !== null
-                      ? `, valuation carrying ${Math.round(num(row.v_conf) * 100)}% confidence` : ''}.`}</p>
-              </div>
-              <div style="display:grid;gap:16px">${BARS.map(bar).join('')}</div>
-            </div>
-
-            ${peWidget}
-
-            <div class="b-ftbl-w">${TBL.map(([head, rowsIn]) => `
-              <div class="b-ftbl">
-                <h4>${esc(head)}</h4>
-                <table><tbody>${rowsIn.map(([k, v, why]) => `<tr${why ? ` title="${esc(why)}"` : ''}>
-                  <th scope="row">${esc(k)}</th><td>${v}</td></tr>`).join('')}</tbody></table>
-              </div>`).join('')}</div>
-
-            ${/* ── "NO FLAGS" AND "THE FLAGS ARE NOT IN THIS FILE" ARE
-                * DIFFERENT SENTENCES, AND THE FIRST DRAFT PRINTED THE WRONG
-                * ONE.
-                *
-                * This route reads screen-lite.json, and lite_dropped strips
-                * `risk.flags` — the per-company prose — while KEEPING
-                * `risk.level` and `risk.score`. So a first pass that branched
-                * on flags.length alone published
-                *
-                *     "The screen raises no risk flags on this name."
-                *
-                * for SPLPETRO, which carries three and is graded HIGH. That is
-                * the exact fault this page exists to avoid: a projection's
-                * omission rendered as a measured result.
-                *
-                * The GRADE is shown wherever it exists, because it is the part
-                * that survives the projection. The itemised objections are
-                * shown when the full table is what got loaded, and named as
-                * elsewhere when it is not. */''}
-            ${(() => {
-              const lvlR = row.risk && row.risk.level ? String(row.risk.level) : null;
-              const scoreR = row.risk && Number.isFinite(Number(row.risk.score)) ? Number(row.risk.score) : null;
-              if (!lvlR && !flags.length) return `<p class="b-cap" style="margin-top:22px">The screen
-                published no risk grade for this name. That is a gap in the data, not a clean bill of health.</p>`;
-              const head = `<h4>What the screen flags against it</h4>
-                ${lvlR ? `<p class="b-riskg"><b class="rg-${esc(lvlR.toLowerCase())}">${esc(lvlR)} RISK</b>
-                  ${scoreR === null ? '' : `<span>risk score ${scoreR}</span>`}</p>` : ''}`;
-              if (flags.length) return `<div class="b-flags">${head}
-                <ul>${flags.map(fl => `<li class="sev-${esc(String(fl.s || 'low'))}">
-                  <b>${esc(String(fl.t || ''))}</b>${fl.k ? `<span>${esc(String(fl.k))}</span>` : ''}</li>`).join('')}</ul>
-                <p class="b-cap">${flags.length} flag${flags.length === 1 ? '' : 's'} on this name.
-                  These are the screen's objections, published beside its scores rather than netted off
-                  against them.</p></div>`;
-              return `<div class="b-flags">${head}
-                <p class="b-cap">The grade above is carried by the light table this page loads; the
-                  itemised objections behind it are not — they are stripped from that projection to keep
-                  it small. This is <b>not</b> a statement that there are none.
-                  <a href="/screen?q=${encodeURIComponent(sig.symbol)}">Open ${esc(sig.symbol)} on the screen</a>
-                  to read them.</p></div>`;
-            })()}
-
-            <p class="b-cap" style="margin-top:20px"><b>Missing means missing.</b> A field the screen did not
-              publish reads <i>not published</i> here and is left out of the score that would have used it —
-              it is never carried as a zero, which would read as a measured result of zero. Fundamentals do
-              not move on the day; they are as current as the last set of accounts, not as current as the
-              price above them.</p>`;
-        })()}
+        ${window.BriefFundamentals
+          ? window.BriefFundamentals.render(row, {
+              symbol: sig.symbol,
+              screenHref: '/screen?q=' + encodeURIComponent(sig.symbol),
+            })
+          : `<h2 class="b-h2">The business section could not load.</h2>
+             <p class="b-p">It is served as a separate file, shared with the newspaper and synced
+               from it, and that file did not arrive. The fundamentals are not shown rather than
+               shown incompletely, and everything else on this page is unaffected.</p>`}
       </section>
 
-      ${/* THE "TRADE PLAN" CHIP LANDED ON "SCENARIOS".
-          * id="b-plan" sat on this section while the trade plan — the rows
-          * naming entry, stop, target and invalidation — is the section
-          * BELOW it. A reader pressing 5, or tapping the chip that says
-          * Trade plan, arrived at a heading reading "Three ways this
-          * resolves" and had to scroll to find what they asked for. The id
-          * now sits on the section it names; scenarios keep their place in
-          * the reading order and simply have no chip of their own, which is
-          * what the trade plan had until now. */''}
       <section class="b-sec b-reveal">
         <div class="b-lab">Scenarios</div>
         <h2 class="b-h2">Three ways this resolves.</h2>

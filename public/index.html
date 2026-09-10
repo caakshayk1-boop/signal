@@ -255,6 +255,16 @@
             "https://news.askakshay.com/"]}]}
 </script>
 
+<!-- The Business section of the brief. ONE renderer, authored in
+     trading-dashboard beside the screen that computes every field it reads,
+     and synced here with the JSON feeds. It carries its own styles so it
+     cannot arrive half-delivered.
+
+     Loaded BEFORE the renderer: both are defer, so they execute in document
+     order and BriefFundamentals is defined before any route can call it. If it
+     404s — it crosses a repo boundary — the brief prints a notice saying so
+     rather than dropping the section. -->
+<script src="/brief_fundamentals.js" defer></script>
 <script src="/signal.js" defer></script>
 <script>
 /* The service worker caches the SHELL only — never a price. Registered after

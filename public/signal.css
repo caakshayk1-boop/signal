@@ -1310,68 +1310,14 @@ body::before{display:none}
 .b-bar-r .s{font:500 var(--t-4)/1 var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 @media(prefers-reduced-motion:reduce){.b-bar-r .t i{transition:none}}
 
-/* ── THE BUSINESS ─────────────────────────────────────────────────────────
-   Fundamentals. Mobile-first: every grid here starts as one column and only
-   splits when there is width for it, because this section is read on a phone
-   more often than anywhere else and a two-column table at 390px is a
-   horizontal scrollbar wearing a layout. */
-.b-na{font-style:normal;font-family:var(--ui);font-size:var(--t-3);color:var(--b-dim)}
-.b-warn{font:500 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-wide);text-transform:uppercase;
-  color:var(--b-bear);margin-left:6px}
-
-/* Valuation against its own record. A dot on a track, not a gauge: the reader
-   is being told a position in a range, and a range is a line. */
-.b-pctl{margin-top:30px;padding:20px;border:1px solid var(--b-line);border-radius:var(--r-4);
-  background:var(--b-sur)}
-.b-pctl-h{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:baseline}
-.b-pctl-h b{font:500 var(--t-5)/1.3 var(--ui);color:var(--b-ink)}
-.b-pctl-h span{font:500 var(--t-4)/1 var(--mono);color:var(--b-acc);font-variant-numeric:tabular-nums}
-.b-pctl-t{position:relative;height:3px;background:var(--b-hi);border-radius:2px;margin:16px 0 8px}
-.b-pctl-t i{position:absolute;top:50%;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;
-  border-radius:50%;background:var(--b-acc)}
-.b-pctl-l{display:flex;justify-content:space-between;font:500 var(--t-1)/1 var(--mono);
-  letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--b-dim)}
-.b-pctl-n{margin:14px 0 0;font-size:var(--t-4);line-height:1.65;color:var(--b-mut)}
-
-/* Six small tables rather than one wide one. A single table of twenty rows
-   forces a reader to hold the section headings in their head; six named
-   blocks reflow to one column on a phone and stay legible at every width. */
-.b-ftbl-w{display:grid;gap:1px;background:var(--b-line);border:1px solid var(--b-line);
-  border-radius:var(--r-4);overflow:hidden;margin-top:30px}
-@media(min-width:640px){.b-ftbl-w{grid-template-columns:1fr 1fr}}
-@media(min-width:1040px){.b-ftbl-w{grid-template-columns:repeat(3,1fr)}}
-.b-ftbl{background:var(--b-card);padding:20px}
-.b-ftbl h4{margin:0 0 12px;font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-widest);
-  text-transform:uppercase;color:var(--b-dim)}
-.b-ftbl table{width:100%;border-collapse:collapse}
-.b-ftbl tr{border-top:1px solid var(--b-line)}
-.b-ftbl tr:first-child{border-top:0}
-.b-ftbl th{text-align:left;font:400 var(--t-4)/1.4 var(--ui);color:var(--b-mut);
-  padding:9px 10px 9px 0;font-weight:400}
-.b-ftbl td{text-align:right;font:500 var(--t-4)/1.4 var(--mono);color:var(--b-ink);
-  padding:9px 0;font-variant-numeric:tabular-nums;white-space:nowrap}
-
-/* The screen's objections, kept as objections. Severity is carried by a rule
-   down the left AND by the word in the caption — colour is never the only cue
-   anywhere else on this page and is not the only cue here. */
-.b-flags{margin-top:30px;padding:22px;border:1px solid var(--b-line);border-radius:var(--r-4);
-  background:var(--b-sur)}
-.b-flags h4{margin:0 0 14px;font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-widest);
-  text-transform:uppercase;color:var(--b-dim)}
-.b-flags ul{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-.b-flags li{padding-left:14px;border-left:2px solid var(--b-line2)}
-.b-flags li.sev-high{border-left-color:var(--b-bear)}
-.b-flags li.sev-med{border-left-color:var(--b-gold)}
-.b-flags li b{display:block;font:500 var(--t-5)/1.45 var(--ui);color:var(--b-ink)}
-.b-flags li span{display:block;margin-top:3px;font:500 var(--t-3)/1.4 var(--mono);color:var(--b-dim)}
-.b-flags .b-cap{margin-top:16px}
-.b-riskg{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:0 0 14px}
-.b-riskg b{font:600 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-wide);
-  padding:4px 8px;border-radius:var(--r-1);background:var(--b-hi);color:var(--b-mut)}
-.b-riskg b.rg-high{background:color-mix(in srgb,var(--b-bear) 16%,transparent);color:var(--b-bear)}
-.b-riskg b.rg-medium,.b-riskg b.rg-med{background:color-mix(in srgb,var(--b-gold) 18%,transparent);color:var(--b-gold)}
-.b-riskg span{font:500 var(--t-3)/1 var(--mono);color:var(--b-dim)}
-.b-flags a{color:var(--b-acc);text-decoration:underline;text-underline-offset:2px}
+/* THE BUSINESS SECTION'S STYLES ARE NOT HERE.
+   They travel inside public/brief_fundamentals.js, which renders that section
+   for this site and for the newspaper's brief. One file cannot arrive
+   half-delivered, so the markup can never reach a page whose stylesheet did
+   not — which is the failure a companion .css invites, and which this repo has
+   already paid for once (see the note in vercel-news/build.js upstream: a
+   docs/ file needs allow-listing in three places, and today.json had two).
+   Search brief_fundamentals.js for .bf- to find them. */
 
 /* A second measurement, fenced off so it cannot be read as part of the plan
    above it. The rule down the left is the fence. */

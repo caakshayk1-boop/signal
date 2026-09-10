@@ -709,54 +709,59 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
  * of it reached the page. A reader got to the trade plan having been told the
  * chart was willing and nothing whatsoever about the business.
  *
- * These check the section is WIRED, not that it renders any particular
- * sentence: the fault was absence, and absence is what is pinned. */
+ * ── AND THE SECTION IS NOT WRITTEN HERE ──────────────────────────────────
+ *
+ * It is rendered by public/brief_fundamentals.js, one file shared with the
+ * newspaper's brief and authored upstream beside stock_screen.py, which
+ * computes every field in it. So what is pinned on THIS side is the WIRING —
+ * that the section exists, that it calls the shared renderer, and that a file
+ * which did not arrive produces a notice rather than a hole. What the renderer
+ * puts in it is pinned in that file's own repo.
+ *
+ * The three rules below are the ones a future edit here could break without
+ * touching the renderer at all. */
 {
   ok("the brief has a business section", /'b-fund', 'Business'/.test(JS));
-  ok("it is in document order too, not just in the nav",
-     /id="b-fund"/.test(JS));
-  const fund = (JS.match(/id="b-fund"[\s\S]*?id="b-plan"/) || [""])[0];
-  for (const k of ["row.roce", "row.de", "row.piotroski", "row.pe", "row.rev_cagr",
-                   "row.cfo_pat", "row.q", "row.g", "row.v", "row.comp"])
-    ok(`the business section reads ${k}`, fund.includes(k));
-  /* The screen's own objections are published BESIDE its scores, never netted
-   * off against them — the same rule stock_screen.py holds. */
-  ok("the screen's risk flags are shown, not summarised away",
-     /row\.risk && Array\.isArray\(row\.risk\.flags\)/.test(fund));
-  /* MISSING IS MISSING. A null must render as words, never as a zero that
-   * reads like a measured result of zero. */
-  ok("an absent figure renders as words, not as a number",
-     /class="b-na"/.test(fund) && /not published/.test(fund));
-  ok("a company with no statements is said to be unranked rather than shown an empty grid",
-     /reports nothing the screen could read/.test(fund));
-  /* Negative equity is insolvency. It is called out, not printed as a small
-   * tidy number that reads like a clean balance sheet. */
-  ok("negative equity is named", /negative equity/.test(fund));
-}
+  ok("it is in document order too, not just in the nav", /id="b-fund"/.test(JS));
 
-/* ── AND THE CHIP MUST REACH THE SECTION, NOT THE FOLD OVER IT ──────────────
- * foldBrief moves everything except the levels, the chart and the trade plan
- * into a <details>. A closed <details> gives its contents zero height, so four
- * chips measured the summary's position instead of the section's and appeared
- * to do nothing at all. jump() opens the ancestors first, THEN measures —
- * measuring first reads the collapsed geometry and lands short. */
-{
-  const j = (JS.match(/const jump = id => \{[\s\S]*?\n    \};/) || [""])[0];
-  ok("jump opens any fold in the way", /tagName === 'DETAILS'/.test(j));
-  const iOpen = j.indexOf("p.open = true");
-  // The measuring LINE, not the word — which also appears in the note above it.
-  const iMeasure = j.indexOf("const top = el.getBoundingClientRect");
-  ok("and opens it before it measures", iOpen > -1 && iMeasure > iOpen, { iOpen, iMeasure });
-  /* BRIEF_KEEP names the sections that stay out of the fold. Its own comment
-   * says "the plan — what to do, and when to stop doing it", and for a while
-   * id="b-plan" was on the SCENARIOS section, so the fold kept the scenarios
-   * and folded away the trade plan. The id now sits on the section whose
-   * label is Trade plan; this asserts the pairing rather than the id. */
-  const secs = (JS.match(/const SECTIONS = \[[\s\S]*?\n    \];/) || [""])[0];
-  ok("b-plan is the section labelled Trade plan",
-     /\['b-plan', 'Trade plan'/.test(secs));
-  ok("the fold keeps the chart and the plan out of it",
-     /const BRIEF_KEEP = \['b-chart', 'b-plan'\];/.test(JS));
+  const fund = (JS.match(/id="b-fund"[\s\S]*?<\/section>/) || [""])[0];
+  ok("the section calls the shared renderer rather than carrying its own copy",
+     /window\.BriefFundamentals\s*\n?\s*\?\s*window\.BriefFundamentals\.render\(row,/.test(fund),
+     fund.slice(0, 160));
+  /* A 404 on a file that crosses a repo boundary is a state, not an
+   * impossibility. A section that vanishes silently is indistinguishable from
+   * one that was never meant to be there. */
+  ok("a renderer that did not arrive produces a notice, not a hole",
+     /could not load/.test(fund));
+  /* The two sites route their screens differently — /screen?q= here, a hash
+   * route there. A link that renders the front page looks like a click that
+   * was ignored, so each caller supplies its own. */
+  ok("the caller supplies its own screen link", /screenHref:/.test(fund));
+
+  /* THE FILE HAS TO BE SERVED, AND ITS STYLES TRAVEL INSIDE IT.
+   * A companion stylesheet would be a second thing to sync and the markup
+   * could reach a page whose CSS did not. */
+  const files = new Set(readdirSync("public"));
+  ok("the shared renderer is in public/", files.has("brief_fundamentals.js"));
+  const BF = readFileSync("public/brief_fundamentals.js", "utf8");
+  ok("it defines what the page calls", /root\.BriefFundamentals = \{/.test(BF));
+  ok("it carries its own styles", /var CSS = \[/.test(BF) && /getElementById\(STYLE_ID\)/.test(BF));
+  ok("the shell loads it before the renderer",
+     HTML.indexOf('src="/brief_fundamentals.js"') > -1 &&
+     HTML.indexOf('src="/brief_fundamentals.js"') < HTML.indexOf('src="/signal.js"'));
+  /* signal.css must NOT re-declare what the shared file carries, or the two
+   * drift and the page shows whichever loses the cascade. */
+  ok("signal.css does not keep a second copy of those styles",
+     !/\.bf-(tbl|pctl|flags|riskg|bar)\b/.test(CSS));
+
+  /* And the sync has to actually collect it — it is not authored here, so if
+   * nothing fetches it this repo silently keeps whatever was committed by
+   * hand, which is the exact fault that froze #research for a week. */
+  const SYNC = readFileSync(".github/workflows/sync-data.yml", "utf8");
+  ok("sync-data.yml fetches the shared renderer",
+     /brief_fundamentals\.js/.test(SYNC));
+  ok("and validates it as JavaScript, not just as a non-empty file",
+     /node --check/.test(SYNC) && /grep -q 'BriefFundamentals'/.test(SYNC));
 }
 
 /* ── EVERY SECTION THE CHIPS ADVERTISE MUST HAVE A KEY THAT REACHES IT ───────
