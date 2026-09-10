@@ -285,8 +285,19 @@ try {
   await p.waitForTimeout(200);
   ok("Escape closes it", await p.locator("#tipcard.on").count() === 0);
 
-  // Section jump must clear all three sticky layers.
-  await p.keyboard.press("4");
+  /* Section jump must clear all three sticky layers.
+   *
+   * THE DIGIT IS READ FROM THE PAGE, NOT WRITTEN DOWN HERE. This pressed "4",
+   * which was the trade plan's key when it was written. A Business section was
+   * later added ahead of it, every key after it shifted by one, and "4" then
+   * jumped to Business while this still measured #b-plan — reporting a scroll
+   * 3,957px out as a broken sticky stack rather than a moved section.
+   *
+   * The chip prints its own key, so the test asks the page which digit reaches
+   * the plan. Reordering the sections cannot break it again. */
+  const planKey = (await p.locator('#qnav a[data-jump="b-plan"] .kb').innerText()).trim();
+  ok("the trade plan chip advertises a key", /^\d$/.test(planKey), planKey);
+  await p.keyboard.press(planKey);
   /* Wait for the scroll to SETTLE rather than a fixed timeout. The page grows
    * as sections are added, so a jump that used to take 300ms started taking
    * two seconds and the old fixed wait measured it mid-flight — a green test
@@ -1031,8 +1042,19 @@ try {
 
   /* ── THE APP SHELL ──────────────────────────────────────────────────────
    * The bar was four items, two of which opened <details> menus, so the ledger
-   * cost two taps and a guess. Five flat destinations, and nothing that lived
-   * in those menus may become unreachable. */
+   * cost two taps and a guess. Flat destinations, and nothing that lived in
+   * those menus may become unreachable.
+   *
+   * SIX NOW, NOT FIVE. /brief was the longest page on the site and reachable
+   * from a phone only through the header CTA — which signal.css hides under
+   * 560px — or a "Full brief" link inside an expanded ledger card. Both are
+   * links from somewhere else, and a destination with no entry of its own is
+   * not navigable.
+   *
+   * The count is asserted EXACTLY, not as a floor: a bar that can grow
+   * silently is how a seventh tab once pushed a 390px phone to 454px and
+   * scrolled the page sideways. Adding one means editing these numbers and
+   * saying why. The width is checked separately, at 320px, further down. */
   console.log("\n  app shell");
   await p.goto(SITE + "/", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 3000);
@@ -1044,9 +1066,10 @@ try {
              dropdowns: document.querySelectorAll(".tabs details").length,
              minTap: Math.min(...tabs.map(t => Math.round(t.getBoundingClientRect().height))) };
   });
-  ok("the bar has five destinations", shell.count === 5, shell);
+  ok("the bar has six destinations", shell.count === 6, shell);
   ok("none of them is a dropdown", shell.dropdowns === 0, shell);
-  ok("every destination has an icon", shell.icons === 5, shell);
+  ok("every destination has an icon", shell.icons === shell.count, shell);
+  ok("the brief has an entry of its own", shell.labels.includes("Brief"), shell.labels);
   ok("tap targets clear 44px", shell.minTap >= 44, shell.minTap);
 
   /* Every route must still be reachable from the bar, Discover or the Ledger.
