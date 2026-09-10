@@ -179,6 +179,19 @@
   <a href="/signals" data-route="/signals">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"/><path d="M7 19V9"/><path d="M12 19V5"/><path d="M17 19v-7"/></svg>
     <span>Ledger</span></a>
+  <!-- BRIEF IS A SIXTH SLOT BECAUSE ON A PHONE IT HAD NO SLOT AT ALL.
+       /brief is the longest, most-worked page on this site and the only route
+       to it from a phone was the header CTA — which signal.css hides under
+       560px — or a "Full brief" link inside an expanded ledger card, below the
+       fold, two taps in. A destination reachable only from inside another
+       destination is not navigation.
+
+       The bar is grid-auto-flow:column at minmax(0,1fr), so a sixth cell costs
+       no layout change: 65px each on a 390px phone, and the type already steps
+       down under 400px. -->
+  <a href="/brief" data-route="/brief">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 3.5h13v17h-13z"/><path d="M8.5 8h7"/><path d="M8.5 12h7"/><path d="M8.5 16h4"/></svg>
+    <span>Brief</span></a>
 </nav>
 
 <!-- A new edition arrived and the page has already swapped to it. This is a

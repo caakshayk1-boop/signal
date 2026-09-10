@@ -7018,7 +7018,58 @@
 
     const cur = sig.currency || '₹';
     const N = v => Number(v);
-    const entry = N(sig.entry), stop = N(sig.sl), t1 = N(sig.target1), t2 = N(sig.target2 || sig.target1);
+    const entry = N(sig.entry), stop = N(sig.sl), t1 = N(sig.target1);
+    /* ── A SECOND TARGET THAT DOES NOT EXIST IS NOT THE FIRST ONE AGAIN ────
+     *
+     * This read `N(sig.target2 || sig.target1)`. The API blanks a target that
+     * is not far enough from the one before it to BE a target — _levels.js,
+     * a 0.5R floor — and returns null, which is the honest answer. The `||`
+     * then put T1's own price back under T2's label, and every consumer below
+     * believed it. The ladder printed "Target 2" and "Target 1" at one price.
+     * The chart drew two level lines on top of each other. The glance bar drew
+     * a second reward segment of zero width. And the Risk section said, in
+     * words, of a setup with one target:
+     *
+     *     "Reward to risk is 1.6 to one against the first target
+     *      and 1.6 to one against the second."
+     *
+     * SPLPETRO is the live case: T1 938.02 and T2 951.57 against 104.36 of
+     * risk — 0.13R apart — so the ledger card correctly reads "the only
+     * target" while the brief, on the same row, invented a second one.
+     *
+     * lvl() is this site's own absent-price test and it is used here for
+     * exactly the reason its own comment gives: Number(null) is 0, and 0 is
+     * finite, so a plain isFinite check passes a target that is not there.
+     *
+     * `hasT2` is the ONE fact every consumer branches on. Where there is no
+     * second target the brief says so; it never fills the hole. */
+    const t2 = lvl(sig.target2);
+    const hasT2 = t2 !== null;
+    /* The furthest level the engine actually published, whatever that is. A
+     * scale or a zone that needs the top of the trade uses this, so a
+     * one-target setup draws in proportion instead of drawing nothing. */
+    const tFinal = hasT2 ? t2 : t1;
+    /* ── THE SCREEN'S OWN LADDER, WHERE THE ENGINE PUBLISHED ONE TARGET ────
+     *
+     * targets.py places levels on resistance that price actually turned at —
+     * swing highs clustered within an ATR and scored by how many times they
+     * held — and publishes, beside each one, the MEASURED share of closed
+     * trades that ran at least that far. Every screen row carries the result
+     * as `lad`, and this page already downloads it.
+     *
+     * It is a DIFFERENT MEASUREMENT ON THE SAME STOCK, not this signal's
+     * plan. So it is only ever shown under the screen's name, it never fills
+     * a "Target 2" field, and it appears only where the engine published no
+     * second target of its own that it could be mistaken for.
+     *
+     * A rung at or below the engine's first target is not a second target
+     * either; it is dropped rather than printed as one. */
+    const scrLad = (row && row.lad && Array.isArray(row.lad.t)) ? row.lad : null;
+    const SCR2 = (() => {
+      if (hasT2 || !scrLad) return null;
+      const above = scrLad.t.filter(t => Array.isArray(t) && lvl(t[0]) !== null && t[0] > t1);
+      return above.length ? above[0] : null;
+    })();
     const last = live ? live.price : (N(row.price) || (closes ? closes[closes.length - 1] : entry));
     const isShort = /SELL|SHORT/i.test(sig.action || '');
     const risk = Math.abs(entry - stop);
@@ -7035,13 +7086,18 @@
      * only as a cross-check: if it disagrees with the arithmetic on its own
      * levels, the page says so rather than choosing a winner silently. */
     const rrT1 = Math.abs(t1 - entry) / (risk || 1);
-    const rrT2 = Math.abs(t2 - entry) / (risk || 1);
+    const rrT2 = hasT2 ? Math.abs(t2 - entry) / (risk || 1) : null;
+    const rrFinal = Math.abs(tFinal - entry) / (risk || 1);
     const rr = rrT1;
     const rrLedger = Number(sig.rr);
     // 0.15 is wider than rounding (the ledger stores one decimal) and narrower
     // than the gap between a T1 and a T2 reading on any real setup.
+    /* With no second target there is only one reading to disagree with, so
+     * the T2 arm is dropped rather than compared against a null that would
+     * coerce to zero and make every ledger value look wrong. */
     const rrDisagrees = Number.isFinite(rrLedger)
-      && Math.abs(rrLedger - rrT1) > 0.15 && Math.abs(rrLedger - rrT2) > 0.15;
+      && Math.abs(rrLedger - rrT1) > 0.15
+      && (!hasT2 || Math.abs(rrLedger - rrT2) > 0.15);
     const f = v => price(v, cur);
     const dist = v => Number.isFinite(v) && Number.isFinite(last) && last
       ? `${v >= last ? '+' : '−'}${f(Math.abs(v - last)).replace(cur, cur)} · ${pct((v - last) / last * 100)}` : '—';
@@ -7181,7 +7237,11 @@
       { k: 'STOP', v: stop, f: f(stop), c: 's', step: 6 },
       { k: '200D', v: N(row.sma200), f: f(N(row.sma200)), c: 'k', step: 3 },
     ].filter(l => Number.isFinite(l.v));
-    const CH = pts ? priceChart(pts, chartLevels, { entry, stop, t1, t2 }) : null;
+    /* tFinal, not t2: the green zone is "entry to the top of the trade", and
+     * on a one-target setup that top is T1. Passing a null t2 made zone()
+     * return an empty string and the reward side of the chart vanished, which
+     * reads as a setup with no upside rather than one with a single target. */
+    const CH = pts ? priceChart(pts, chartLevels, { entry, stop, t1, t2: tFinal }) : null;
 
     /* ── ENTRY STATE. Published levels only — no invented zone width. */
     const zoneState = (() => {
@@ -7263,18 +7323,32 @@
         `Entry sits at ${f(entry)} with the invalidation ${f(stop)} — ${pct(-Math.abs(risk / entry * 100))} away. The first target at ${f(t1)} is ${pct(Math.abs(t1 - entry) / entry * 100)} from entry.`,
         [['Entry', f(entry)], ['Stop', f(stop)], ['Target 1', f(t1)]]],
       ['Risk', 'The setup is attractive because the risk is defined.',
-        `Reward to risk is ${rrT1.toFixed(1)} to one against the first target and ${rrT2.toFixed(1)} to one against the second. The stop is a price, not an intention: below ${f(stop)} the reason for the trade is gone and the position is closed.`,
-        [['R:R to T1', rrT1.toFixed(1) + ' : 1'], ['R:R to T2', rrT2.toFixed(1) + ' : 1'], ['Risk per share', f(risk)],
+        `Reward to risk is ${rrT1.toFixed(1)} to one against the ${hasT2 ? 'first target and ' + rrT2.toFixed(1) + ' to one against the second' : 'only target this setup publishes'}. The stop is a price, not an intention: below ${f(stop)} the reason for the trade is gone and the position is closed.`,
+        [[hasT2 ? 'R:R to T1' : 'Reward : risk', rrT1.toFixed(1) + ' : 1'],
+         ['R:R to T2', hasT2 ? rrT2.toFixed(1) + ' : 1' : 'no second target'],
+         ['Risk per share', f(risk)],
          ['Daily ATR', Number.isFinite(N(row.atr_pct)) ? N(row.atr_pct).toFixed(2) + '%' : '—']]],
     ];
 
+    /* FUNDAMENTALS SIT BETWEEN THE THESIS AND THE PLAN, and that position is
+     * the argument. Everything above this point is price — structure,
+     * momentum, volume, the levels. A reader who has got that far has been
+     * told the chart is willing and told nothing whatsoever about the
+     * company. The screen this page already downloads carries return on
+     * capital, leverage, cash conversion, growth and valuation on every row,
+     * scored and confidence-weighted, and none of it reached the brief.
+     *
+     * It goes before the plan because it can change whether there is a trade,
+     * and after the thesis because the thesis is what it is being tested
+     * against. */
     const SECTIONS = [
       ['b-overview', 'Overview', '1', 'Signal', 'the setup exists'],
       ['b-chart', 'Chart', '2', 'Entry', 'where it starts'],
       ['b-thesis', 'Thesis', '3', 'Confirmation', 'why it should work'],
-      ['b-plan', 'Trade plan', '4', 'Target', 'what it is worth'],
-      ['b-risk', 'Risk', '5', 'Sizing', 'what it costs'],
-      ['b-history', 'History', '6', 'Exit', 'what happened before'],
+      ['b-fund', 'Business', '4', 'Company', 'what you would own'],
+      ['b-plan', 'Trade plan', '5', 'Target', 'what it is worth'],
+      ['b-risk', 'Risk', '6', 'Sizing', 'what it costs'],
+      ['b-history', 'History', '7', 'Exit', 'what happened before'],
     ];
 
     paint(`<div class="brief"><div class="b-wrap">
@@ -7385,8 +7459,12 @@
       ${(() => {
         const dStop = Math.abs(entry - stop) / entry * 100;
         const d1 = Math.abs(t1 - entry) / entry * 100;
-        const d2 = Math.abs(t2 - entry) / entry * 100;
-        const span = dStop + d2 || 1;
+        /* The bar is drawn over the whole trade, so its span ends at the last
+         * PUBLISHED target. With no T2 that is T1, and the second segment is
+         * not drawn at all — it used to be drawn at zero width with a "Target
+         * 2" label beside it, which is a label for nothing. */
+        const d2 = hasT2 ? Math.abs(t2 - entry) / entry * 100 : null;
+        const span = dStop + (hasT2 ? d2 : d1) || 1;
         const seg = (v, cls, lab, sub) => `<div class="bg-seg ${cls}" style="--w:${(v / span * 100).toFixed(1)}%">
           <span class="bg-l">${esc(lab)}</span><span class="bg-v">${sub}</span></div>`;
         const band = score == null ? '' : `<div class="bg-score">
@@ -7396,18 +7474,21 @@
         return `<div class="b-glance">
           <div class="bg-h">At a glance</div>
           <div class="bg-bar" role="img"
-               aria-label="Risk ${dStop.toFixed(1)}% against reward ${d1.toFixed(1)}% to the first target and ${d2.toFixed(1)}% to the second">
+               aria-label="Risk ${dStop.toFixed(1)}% against reward ${d1.toFixed(1)}% to the first target${
+                 hasT2 ? ` and ${d2.toFixed(1)}% to the second` : ', which is the only target published'}">
             ${seg(dStop, 'is-risk', 'Risk', '−' + dStop.toFixed(1) + '%')}
-            ${seg(d1, 'is-r1', 'Target 1', '+' + d1.toFixed(1) + '%')}
-            ${seg(d2 - d1, 'is-r2', 'Target 2', '+' + d2.toFixed(1) + '%')}
+            ${seg(d1, 'is-r1', hasT2 ? 'Target 1' : 'Target', '+' + d1.toFixed(1) + '%')}
+            ${hasT2 ? seg(d2 - d1, 'is-r2', 'Target 2', '+' + d2.toFixed(1) + '%') : ''}
           </div>
           <div class="bg-row">
             <div class="bg-i"><span class="bg-k">If the stop hits</span>
               <span class="bg-n dn">−${dStop.toFixed(1)}%</span><span class="bg-s">−1.0R</span></div>
-            <div class="bg-i"><span class="bg-k">If target 1 prints</span>
+            <div class="bg-i"><span class="bg-k">If ${hasT2 ? 'target 1' : 'the target'} prints</span>
               <span class="bg-n up">+${d1.toFixed(1)}%</span><span class="bg-s">+${rrT1.toFixed(1)}R</span></div>
-            <div class="bg-i"><span class="bg-k">If target 2 prints</span>
-              <span class="bg-n up">+${d2.toFixed(1)}%</span><span class="bg-s">+${rrT2.toFixed(1)}R</span></div>
+            ${hasT2 ? `<div class="bg-i"><span class="bg-k">If target 2 prints</span>
+              <span class="bg-n up">+${d2.toFixed(1)}%</span><span class="bg-s">+${rrT2.toFixed(1)}R</span></div>`
+            : `<div class="bg-i"><span class="bg-k">Second target</span>
+              <span class="bg-n">None</span><span class="bg-s">one target only</span></div>`}
             ${band}
           </div>
         </div>`;
@@ -7439,10 +7520,16 @@
           <div class="b-m"><span class="k">Current</span><span class="v ${last >= entry ? 'up' : 'dn'}" id="curPx">${f(last)}</span></div>
           <div class="b-m"><span class="k">Day</span><span class="v ${live && live.change_pct >= 0 ? 'up' : 'dn'}">${live && Number.isFinite(live.change_pct) ? pct(live.change_pct) : '—'}</span></div>
           <div class="b-m"><span class="k">Stop</span><span class="v dn">${f(stop)}</span></div>
-          <div class="b-m"><span class="k">Target 1</span><span class="v up">${f(t1)}</span></div>
-          <div class="b-m"><span class="k">Target 2</span><span class="v up">${f(t2)}</span></div>
-          <div class="b-m"><span class="k">R:R to T1</span><span class="v gold">${rrT1.toFixed(1)} : 1</span></div>
-          <div class="b-m"><span class="k">R:R to T2</span><span class="v gold">${rrT2.toFixed(1)} : 1</span></div>
+          <div class="b-m"><span class="k">${hasT2 ? 'Target 1' : 'Target'}</span><span class="v up">${f(t1)}</span></div>
+          ${/* A tile reading "Target 2  —" is a tile saying the number failed
+              * to load. The absence is stated in words instead, once, and the
+              * R:R tile beside it does not appear at all rather than printing
+              * the T1 figure a second time under a second name. */''}
+          ${hasT2
+            ? `<div class="b-m"><span class="k">Target 2</span><span class="v up">${f(t2)}</span></div>`
+            : `<div class="b-m"><span class="k">Target 2</span><span class="v" style="font-family:var(--ui);font-size:var(--t-5)">Not published</span></div>`}
+          <div class="b-m"><span class="k">${hasT2 ? 'R:R to T1' : 'Reward : risk'}</span><span class="v gold">${rrT1.toFixed(1)} : 1</span></div>
+          ${hasT2 ? `<div class="b-m"><span class="k">R:R to T2</span><span class="v gold">${rrT2.toFixed(1)} : 1</span></div>` : ''}
           <div class="b-m"><span class="k">Signal age</span><span class="v">${ageDays == null ? '—' : ageDays + 'd'}</span></div>
           <div class="b-m"><span class="k">Sector</span><span class="v" style="font-family:var(--ui);font-size:var(--t-5)">${esc(row.sector || 'Not on screen')}</span></div>
           ${/* THE ONE FIELD THE DUPLICATE TABLE BELOW CARRIED AND THIS DID NOT.
@@ -7452,9 +7539,16 @@
         </div>
       </section>
       <p class="b-p" style="margin-top:14px;font-size:var(--t-4)">${esc(stateChip[2])}
-        Reward to risk is shown against <b style="color:var(--b-ink)">both</b> targets, because they are
-        different numbers and the trade plan acts on the first one. The ledger's own published field
-        reads ${Number.isFinite(rrLedger) ? rrLedger.toFixed(1) : '—'}, which is the reading to target 2.
+        ${hasT2
+          ? `Reward to risk is shown against <b style="color:var(--b-ink)">both</b> targets, because they are
+             different numbers and the trade plan acts on the first one.`
+          : `<b style="color:var(--b-ink)">This setup has one target.</b> The engine filed a second and a third,
+             and both sat inside half the trade's own risk of the first — too close to be separate exits — so
+             they are not published and nothing on this page stands in for them. One target means one
+             reward-to-risk reading, and it is the one above.`}
+        The ledger's own published field
+        reads ${Number.isFinite(rrLedger) ? rrLedger.toFixed(1) : '—'}, which is ${hasT2
+          ? 'the reading to target 2' : 'measured to a target this row does not publish'}.
         ${rrDisagrees ? `<b style="color:var(--b-gold)">It agrees with neither figure computed from its own
           published levels, so the arithmetic above is what this page shows and the ledger field is the
           one to distrust.</b>` : ''}</p>
@@ -7556,7 +7650,11 @@
               * first thing visible. The ladder keeps the full context
               * underneath it — this replaces nothing, it answers first. */''}
           ${(() => {
-            const lo = Math.min(stop, t2), hi = Math.max(stop, t2);
+            /* tFinal: the strip is drawn stop-to-the-last-published-target.
+             * Under the old `|| t1` fallback that was always a real number by
+             * accident; with a null t2 it would collapse the whole scale to
+             * NaN and every pin would land at 0%. */
+            const lo = Math.min(stop, tFinal), hi = Math.max(stop, tFinal);
             const span = (hi - lo) || 1;
             const at2 = v => Math.max(0, Math.min(100, ((v - lo) / span) * 100));
             /* The label is a SIBLING of the pin, not a child. A pin is a 2px
@@ -7573,28 +7671,28 @@
                   Math.abs(at2(entry) - at2(stop)).toFixed(2)}%"></span>
                 <span class="ts-w1" style="left:${at2(entry).toFixed(2)}%;width:${
                   Math.abs(at2(t1) - at2(entry)).toFixed(2)}%"></span>
-                <span class="ts-w2" style="left:${at2(t1).toFixed(2)}%;width:${
-                  Math.abs(at2(t2) - at2(t1)).toFixed(2)}%"></span>
+                ${hasT2 ? `<span class="ts-w2" style="left:${at2(t1).toFixed(2)}%;width:${
+                  Math.abs(at2(t2) - at2(t1)).toFixed(2)}%"></span>` : ''}
                 ${pin(stop, 'is-stop', 'Stop')}
                 ${pin(entry, 'is-entry', 'Entry')}
                 ${pin(last, 'is-now', 'Now')}
-                ${pin(t1, 'is-t', 'T1')}
-                ${pin(t2, 'is-t', 'T2')}
+                ${pin(t1, 'is-t', hasT2 ? 'T1' : 'Target')}
+                ${hasT2 ? pin(t2, 'is-t', 'T2') : ''}
               </div>
               <div class="ts-n">
                 <span><i>Risk per share</i><b>${f(risk)}</b></span>
-                <span><i>To target 1</i><b>${f(Math.abs(t1 - entry))}</b><em>${rrT1.toFixed(1)}×</em></span>
-                <span><i>To target 2</i><b>${f(Math.abs(t2 - entry))}</b><em>${rrT2.toFixed(1)}×</em></span>
+                <span><i>To ${hasT2 ? 'target 1' : 'the target'}</i><b>${f(Math.abs(t1 - entry))}</b><em>${rrT1.toFixed(1)}×</em></span>
+                ${hasT2 ? `<span><i>To target 2</i><b>${f(Math.abs(t2 - entry))}</b><em>${rrT2.toFixed(1)}×</em></span>` : ''}
                 <span><i>Now vs entry</i><b class="${dir(last - entry)}">${pct((last - entry) / entry * 100)}</b></span>
               </div>
-              <p class="ts-c">Drawn stop to target 2, so the red band and the green are in the same
+              <p class="ts-c">Drawn stop to ${hasT2 ? 'target 2' : 'the target'}, so the red band and the green are in the same
                 proportion as the money. The 52-week high is context and is on the ladder below,
                 not here — it is not part of this trade.</p>
             </div>`;
           })()}
           <div class="b-ladder">
             <div class="b-band risk" style="top:${at(entry).toFixed(1)}%;height:${Math.abs(at(stop) - at(entry)).toFixed(1)}%"></div>
-            <div class="b-band reward" style="top:${at(t2).toFixed(1)}%;height:${Math.abs(at(entry) - at(t2)).toFixed(1)}%"></div>
+            <div class="b-band reward" style="top:${at(tFinal).toFixed(1)}%;height:${Math.abs(at(entry) - at(tFinal)).toFixed(1)}%"></div>
             ${ladder}
           </div>
           <p class="b-cap"><b>The ladder is every published level on one linear scale.</b> Hover or focus a
@@ -7736,8 +7834,8 @@
             ${counted
               ? [0, 1, 2].map(k => `<span class="c ${['bull', 'neu', 'bear'][k]} ${st_ === k ? 'hit' : ''}"
                   >${st_ === k ? `<u aria-label="${['Bullish', 'Neutral', 'Bearish'][k]}"></u>` : '<u></u>'}</span>`).join('')
-              : `<span class="c mx-flat">${rrT1.toFixed(1)} : 1 to the first target${
-                  rrT2 > rrT1 ? `, ${rrT2.toFixed(1)} : 1 to the second` : ''} — geometry, not direction</span>`}
+              : `<span class="c mx-flat">${rrT1.toFixed(1)} : 1 to the ${hasT2 ? 'first' : 'only'} target${
+                  hasT2 && rrT2 > rrT1 ? `, ${rrT2.toFixed(1)} : 1 to the second` : ''} — geometry, not direction</span>`}
             <span class="b-mxd"><span>${st_ == null ? 'Not measured — this factor has no data on the screen for this name, so it takes no stance.' : esc(why)}</span></span>
           </button>`).join('')}
         </div>
@@ -7875,7 +7973,209 @@
             series did not load. It is left blank rather than guessed from the levels.</p>`}
       </section>
 
-      <section class="b-sec b-reveal" id="b-plan">
+
+      ${/* ── 4 · THE BUSINESS ──────────────────────────────────────────────
+          *
+          * Built ENTIRELY from fields already on the screen row this route
+          * downloads. Nothing here is fetched, nothing is recomputed, and
+          * nothing is filled in.
+          *
+          * The rule the screen holds and this section inherits: a missing
+          * measurement scores null and LEAVES ITS DENOMINATOR. It is never
+          * zero-filled, because a zero is a measurement and an absence is
+          * not. Every cell below is either a number the screen published or
+          * the word for its absence — there is no third rendering. */''}
+      <section class="b-sec b-reveal" id="b-fund">
+        <div class="b-lab">The business</div>
+        ${(() => {
+          const num = v => (v === null || v === undefined || v === '' || Number.isNaN(Number(v)))
+            ? null : Number(v);
+          const one = (v, dp = 1, suf = '') => num(v) === null ? '<i class="b-na">not published</i>'
+            : `${num(v).toFixed(dp)}${suf}`;
+          const cross = num(row.roce) === null && num(row.comp) === null && num(row.pe) === null;
+
+          /* NO STATEMENTS, NO COMPOSITE, NO RANK — and this page must say the
+           * same thing the screen says rather than rendering an empty grid
+           * that reads like a loading failure. */
+          if (cross) return `<h2 class="b-h2">This company reports nothing the screen could read.</h2>
+            <p class="b-p">${esc(sig.symbol)} carries no financial statements in the 750-name screen, so it has
+              no quality, growth or valuation score and no composite. That is a fact about the
+              disclosure, not about the business — and it is the reason the setup above is a price
+              argument and only a price argument. A company that reports nothing must not be allowed
+              to outrank one that does, so nothing is estimated here to fill the gap.</p>
+            <p class="b-cap">Fundamentals come from the same screen the rest of this site runs on.
+              Missing means missing.</p>`;
+
+          const BARS = [
+            ['Quality', num(row.q), 'Return on capital, margins, leverage and cash conversion, read on the multi-year median rather than the latest year.'],
+            ['Growth', num(row.g), 'Revenue, EBITDA and earnings compounded over the statement history. Per-share growth is withheld entirely where the share count moved structurally.'],
+            ['Valuation', num(row.v), 'What the multiple asks against what the business earns — scored against the screen, not against a fixed band.'],
+            ['Technical', num(row.tech), 'Trend, momentum and participation. It is the only one of the four that the setup above already argued.'],
+          ];
+          const scored = BARS.filter(b => b[1] !== null).length;
+          const bar = ([lab, v, why]) => `<div class="b-bar-r" title="${esc(why)}">
+            <span class="n">${esc(lab)}</span>
+            <span class="t"><i style="width:${v === null ? 0 : Math.max(0, Math.min(100, v)).toFixed(1)}%"></i></span>
+            <span class="s">${v === null ? '—' : Math.round(v)}</span></div>`;
+
+          /* VALUATION AGAINST ITS OWN HISTORY, not against a number somebody
+           * remembers. pe_pctile is where today's multiple sits in this
+           * company's own published range: 90 means it has been cheaper than
+           * this 90% of the time. */
+          const pep = num(row.pe_pctile);
+          const peWidget = pep === null ? '' : `<div class="b-pctl">
+            <div class="b-pctl-h"><b>Where the multiple sits in its own range</b>
+              <span>${Math.round(pep)}th percentile</span></div>
+            <div class="b-pctl-t"><i style="left:${Math.max(0, Math.min(100, pep)).toFixed(1)}%"></i></div>
+            <div class="b-pctl-l"><span>cheapest it has been</span><span>dearest</span></div>
+            <p class="b-pctl-n">A price-to-earnings of ${one(row.pe, 1)} today. This name has traded cheaper
+              than that ${Math.round(pep)}% of the time in the history the screen holds.
+              ${pep >= 80 ? 'Buying here is buying it near the expensive end of its own record.'
+                : pep <= 30 ? 'That is the cheap end of its own record — which is a reason to look, not a reason to buy.'
+                : 'That is an unremarkable place in its own record, which is the most common answer and the least interesting one.'}</p>
+          </div>`;
+
+          const TBL = [
+            ['Returns', [
+              ['Return on capital', one(row.roce, 1, '%'), 'ROCE — EBIT over invested capital. Yahoo publishes no such field; it is computed from the statements.'],
+              ['ROCE, multi-year median', one(row.roce_med, 1, '%'), 'The median across the statement history. The score reads this, not the latest year, so a one-off cannot top the table.'],
+              ['ROCE trend', row.roce_trend ? esc(String(row.roce_trend)) : '<i class="b-na">not published</i>', 'Direction of return on capital across the years on file.'],
+              ['Return on equity', one(row.roe, 1, '%'), ''],
+            ]],
+            ['Balance sheet', [
+              ['Debt to equity', num(row.de) === null ? '<i class="b-na">not published</i>'
+                : (num(row.de) < 0 ? `${num(row.de).toFixed(2)} <b class="b-warn">negative equity</b>` : num(row.de).toFixed(2)),
+                'A negative reading means negative equity, which is insolvency — it scores zero on leverage, not full marks.'],
+              ['Interest cover', one(row.icover, 1, '×'), 'Operating profit against the interest bill.'],
+              ['Current ratio', one(row.curr, 2, '×'), ''],
+              ['Piotroski', num(row.piotroski) === null ? '<i class="b-na">not published</i>' : `${Math.round(num(row.piotroski))} / 9`,
+                'Nine binary accounting tests. Seven or more is strong, under five is weak.'],
+            ]],
+            ['Growth', [
+              ['Revenue CAGR', one(row.rev_cagr, 1, '%'), 'Compounded across the statement history.'],
+              ['EBITDA CAGR', one(row.ebitda_cagr, 1, '%'), ''],
+              ['EPS CAGR', one(row.eps_cagr, 1, '%'), 'Withheld entirely where the share count moved structurally — a split or an issue is not earnings growth.'],
+              ['Revenue, latest year', one(row.rev_yoy, 1, '%'), ''],
+              ['Earnings, latest year', one(row.eps_yoy, 1, '%'), ''],
+            ]],
+            ['Cash', [
+              ['Cash from operations / profit', one(row.cfo_pat, 2, '×'), 'Under 1.0 means the reported profit is not arriving as cash.'],
+              ['Free cash flow / profit', one(row.fcf_pat, 2, '×'), ''],
+              ['Cash score', one(row.cf, 0), 'The screen\u2019s own reading of cash quality, 0 to 100.'],
+            ]],
+            ['Valuation', [
+              ['Price to earnings', one(row.pe, 1, '×'), ''],
+              ['Price to book', one(row.pb, 2, '×'), ''],
+              /* DIVIDEND YIELD IS DELIBERATELY NOT HERE. The screen's
+                 `div_yield` is Yahoo's dividendYield put through a
+                 fraction-to-percent conversion it no longer needs — yfinance
+                 returns percentage points now — so the published column reads
+                 ITC at 601%, COALINDIA at 503%, and a universe median of
+                 65.5%. stock_screen.py is fixed, but rows already built still
+                 carry the old number and this table will not print it. Restore
+                 this row once a screen built after that fix is being served. */
+              ['Effective tax rate', one(row.tax, 1, '%'), 'A rate far from the statutory one is worth a look at the notes.'],
+              ['Market capitalisation', num(row.mcap_cr) === null ? '<i class="b-na">not published</i>'
+                : `\u20b9${Math.round(num(row.mcap_cr)).toLocaleString('en-IN')} cr`, ''],
+            ]],
+            ['Ownership', [
+              ['Promoters', one(row.insiders, 1, '%'), ''],
+              ['Institutions', one(row.instis, 1, '%'), ''],
+            ]],
+          ];
+
+          const flags = (row.risk && Array.isArray(row.risk.flags)) ? row.risk.flags : [];
+
+          return `<h2 class="b-h2">${scored === 0
+              ? 'The screen holds figures for this name but scored none of them.'
+              : scored < 4
+                ? `Scored on ${scored} of four measures. The rest are not on file.`
+                : 'What you would own, on four measures the price argument never touches.'}</h2>
+            <p class="b-sub" style="max-width:70ch">Every figure below is read from the same 750-name
+              screen this page already downloaded — the same numbers, the same build, no second source
+              and no rounding of its own. ${num(row.fy_count) !== null
+                ? `${Math.round(num(row.fy_count))} fiscal ${num(row.fy_count) === 1 ? 'year' : 'years'} of statements${row.fy ? `, latest ${esc(String(row.fy))}` : ''}.`
+                : ''}</p>
+
+            <div class="b-score">
+              <div>
+                <div class="b-score-big">${num(row.comp) === null ? '—' : Math.round(num(row.comp))}<span>/100</span></div>
+                <p class="b-cap" style="margin-top:6px">Composite${num(row.comp) === null
+                  ? ' — unranked. A company with no statements gets no composite, so it cannot outrank one that reports.'
+                  : `. A declared weighting of the four scores beside it${num(row.v_conf) !== null
+                      ? `, valuation carrying ${Math.round(num(row.v_conf) * 100)}% confidence` : ''}.`}</p>
+              </div>
+              <div style="display:grid;gap:16px">${BARS.map(bar).join('')}</div>
+            </div>
+
+            ${peWidget}
+
+            <div class="b-ftbl-w">${TBL.map(([head, rowsIn]) => `
+              <div class="b-ftbl">
+                <h4>${esc(head)}</h4>
+                <table><tbody>${rowsIn.map(([k, v, why]) => `<tr${why ? ` title="${esc(why)}"` : ''}>
+                  <th scope="row">${esc(k)}</th><td>${v}</td></tr>`).join('')}</tbody></table>
+              </div>`).join('')}</div>
+
+            ${/* ── "NO FLAGS" AND "THE FLAGS ARE NOT IN THIS FILE" ARE
+                * DIFFERENT SENTENCES, AND THE FIRST DRAFT PRINTED THE WRONG
+                * ONE.
+                *
+                * This route reads screen-lite.json, and lite_dropped strips
+                * `risk.flags` — the per-company prose — while KEEPING
+                * `risk.level` and `risk.score`. So a first pass that branched
+                * on flags.length alone published
+                *
+                *     "The screen raises no risk flags on this name."
+                *
+                * for SPLPETRO, which carries three and is graded HIGH. That is
+                * the exact fault this page exists to avoid: a projection's
+                * omission rendered as a measured result.
+                *
+                * The GRADE is shown wherever it exists, because it is the part
+                * that survives the projection. The itemised objections are
+                * shown when the full table is what got loaded, and named as
+                * elsewhere when it is not. */''}
+            ${(() => {
+              const lvlR = row.risk && row.risk.level ? String(row.risk.level) : null;
+              const scoreR = row.risk && Number.isFinite(Number(row.risk.score)) ? Number(row.risk.score) : null;
+              if (!lvlR && !flags.length) return `<p class="b-cap" style="margin-top:22px">The screen
+                published no risk grade for this name. That is a gap in the data, not a clean bill of health.</p>`;
+              const head = `<h4>What the screen flags against it</h4>
+                ${lvlR ? `<p class="b-riskg"><b class="rg-${esc(lvlR.toLowerCase())}">${esc(lvlR)} RISK</b>
+                  ${scoreR === null ? '' : `<span>risk score ${scoreR}</span>`}</p>` : ''}`;
+              if (flags.length) return `<div class="b-flags">${head}
+                <ul>${flags.map(fl => `<li class="sev-${esc(String(fl.s || 'low'))}">
+                  <b>${esc(String(fl.t || ''))}</b>${fl.k ? `<span>${esc(String(fl.k))}</span>` : ''}</li>`).join('')}</ul>
+                <p class="b-cap">${flags.length} flag${flags.length === 1 ? '' : 's'} on this name.
+                  These are the screen's objections, published beside its scores rather than netted off
+                  against them.</p></div>`;
+              return `<div class="b-flags">${head}
+                <p class="b-cap">The grade above is carried by the light table this page loads; the
+                  itemised objections behind it are not — they are stripped from that projection to keep
+                  it small. This is <b>not</b> a statement that there are none.
+                  <a href="/screen?q=${encodeURIComponent(sig.symbol)}">Open ${esc(sig.symbol)} on the screen</a>
+                  to read them.</p></div>`;
+            })()}
+
+            <p class="b-cap" style="margin-top:20px"><b>Missing means missing.</b> A field the screen did not
+              publish reads <i>not published</i> here and is left out of the score that would have used it —
+              it is never carried as a zero, which would read as a measured result of zero. Fundamentals do
+              not move on the day; they are as current as the last set of accounts, not as current as the
+              price above them.</p>`;
+        })()}
+      </section>
+
+      ${/* THE "TRADE PLAN" CHIP LANDED ON "SCENARIOS".
+          * id="b-plan" sat on this section while the trade plan — the rows
+          * naming entry, stop, target and invalidation — is the section
+          * BELOW it. A reader pressing 5, or tapping the chip that says
+          * Trade plan, arrived at a heading reading "Three ways this
+          * resolves" and had to scroll to find what they asked for. The id
+          * now sits on the section it names; scenarios keep their place in
+          * the reading order and simply have no chip of their own, which is
+          * what the trade plan had until now. */''}
+      <section class="b-sec b-reveal">
         <div class="b-lab">Scenarios</div>
         <h2 class="b-h2">Three ways this resolves.</h2>
         <div class="b-scb" role="group" aria-label="Scenario">
@@ -7890,7 +8190,7 @@
           history and not this trade.</p>
       </section>
 
-      <section class="b-sec b-reveal">
+      <section class="b-sec b-reveal" id="b-plan">
         <div class="b-lab">Trade plan</div>
         <h2 class="b-h2">What to do, and when to stop doing it.</h2>
         <div class="b-plan">
@@ -7903,17 +8203,59 @@
           <div class="b-pr"><span class="st">Stop</span>
             <span class="tx">Invalidation. A close beyond this removes the reason for the trade.</span>
             <span class="px" style="color:var(--b-bear)">${f(stop)}</span></div>
-          <div class="b-pr"><span class="st">Target 1</span>
-            <span class="tx">First profit level. The published trailing rule moves the stop to entry once this prints.</span>
+          <div class="b-pr"><span class="st">${hasT2 ? 'Target 1' : 'Target'}</span>
+            <span class="tx">${hasT2
+              ? 'First profit level. The published trailing rule moves the stop to entry once this prints.'
+              : 'The only published profit level. The trailing rule moves the stop to entry once it prints, and the position is closed there — there is no second rung to carry a remainder to.'}</span>
             <span class="px" style="color:var(--b-bull)">${f(t1)}</span></div>
-          <div class="b-pr"><span class="st">Target 2</span>
+          ${hasT2 ? `<div class="b-pr"><span class="st">Target 2</span>
             <span class="tx">Extended target, carried only by the remainder.</span>
-            <span class="px" style="color:var(--b-bull)">${f(t2)}</span></div>
+            <span class="px" style="color:var(--b-bull)">${f(t2)}</span></div>` : ''}
           <div class="b-pr is-invalid"><span class="st">Invalidation ${tip('invalidation')}</span>
             <span class="tx">Below ${f(stop)} the structure that produced this setup is gone. The position is
               closed at that price — not re-argued, not averaged into, not widened.</span>
             <span class="px" style="color:var(--b-bear)">${f(stop)}</span></div>
         </div>
+
+        ${/* THE TRAIL AND THE SCALE-OUT, WHICH THE ROWS ABOVE DO NOT CARRY.
+            *
+            * The rows say where the levels are. They have never said how much
+            * of the position leaves at each one, so a reader following this
+            * page held the whole thing to a single exit. trailPlan is the
+            * ledger card's own renderer for exactly this, reused rather than
+            * rewritten — and it is already correct about a null second
+            * target, which is the fault this pass exists to fix. */''}
+        ${trailPlan(entry, sig.sl, sig.target1, sig.target2, sig.target3, sig.action)}
+
+        ${/* ── AND THE SCREEN'S OWN LADDER, WHERE IT HAS ONE ────────────────
+            *
+            * A SECOND MEASUREMENT, NOT A SECOND OPINION DRESSED AS THIS ONE.
+            *
+            * targets.py builds this from resistance the price actually turned
+            * at, and publishes beside each rung the measured share of closed
+            * trades that ran that far — 120 of them, cf_1h and intraday
+            * excluded because their excursions are not credible. It carries
+            * its own entry and its own stop, which are NOT this signal's.
+            *
+            * That is the whole reason it is fenced off under its own heading
+            * instead of being merged into the plan above. It is most useful
+            * on a one-target row, where the engine published nothing past T1
+            * and the alternative is an empty space — but it is shown either
+            * way, because hiding a measurement when it agrees and showing it
+            * when it fills a gap is how a page starts choosing its evidence. */''}
+        ${scrLad ? `<div class="b-scrlad">
+          <h3 class="b-h3">The screen's own ladder for ${esc(sig.symbol)}</h3>
+          <p class="b-p" style="font-size:var(--t-4)">${hasT2
+            ? `A separate measurement of the same stock, built from resistance rather than from this
+               signal's arithmetic. It carries its own entry and its own stop — read it against the plan
+               above, not as part of it.`
+            : `<b style="color:var(--b-ink)">This is the nearest thing to a second target that exists for
+               this name</b>, and it is not one: the engine published a single level and this ladder is a
+               different measurement, with its own entry and its own stop. It is here because the honest
+               answer to "what is above the target" is another measurement, not a bigger number on this
+               one.`}</p>
+          ${ladderBlock(row)}
+        </div>` : ''}
       </section>
 
       <section class="b-sec b-reveal" id="b-risk">
@@ -7924,7 +8266,7 @@
             <div class="b-rrb" id="rrBars">
               <div class="row"><span class="k">Loss</span><span class="b loss" id="barL"></span><span class="v" id="barLv" style="color:var(--b-bear)"></span></div>
               <div class="row"><span class="k">Gain T1</span><span class="b gain" id="barG"></span><span class="v" id="barGv" style="color:var(--b-bull)"></span></div>
-              <div class="row"><span class="k">Gain T2</span><span class="b gain" id="barG2"></span><span class="v" id="barG2v" style="color:var(--b-bull)"></span></div>
+              ${hasT2 ? `<div class="row"><span class="k">Gain T2</span><span class="b gain" id="barG2"></span><span class="v" id="barG2v" style="color:var(--b-bull)"></span></div>` : ''}
             </div>
             <div class="b-metrics" style="margin-top:22px" id="rkOut"></div>
             <p class="b-p" style="font-size:var(--t-4)">Position size is the risk amount divided by the distance
@@ -8157,6 +8499,21 @@
     };
     const jump = id => {
       const el = $(id); if (!el) return;
+      /* ── A CHIP THAT JUMPS INTO A CLOSED FOLD DOES NOTHING ────────────────
+       *
+       * foldBrief moves every section except the levels, the chart and the
+       * trade plan into a <details class="b-fold">. A closed <details> gives
+       * its contents zero height, so getBoundingClientRect on a section inside
+       * one returns the summary's own position — and four of the chips
+       * (Thesis, Business, Risk, History) scrolled to the same spot, or to the
+       * foot of the page, and nothing appeared to happen.
+       *
+       * The section nav is the one thing on this page whose entire job is to
+       * reach a section, so it opens whatever is in the way first, then
+       * measures. Measuring before opening reads the collapsed geometry and
+       * lands hundreds of pixels short. */
+      for (let p = el.parentElement; p; p = p.parentElement)
+        if (p.tagName === 'DETAILS' && !p.open) p.open = true;
       const top = el.getBoundingClientRect().top + window.scrollY - stickyOffset();
       /* Smooth ONLY for a short hop. The brief grew long enough that a jump
        * from the hero to the trade plan travels ~6,500px, and smooth-scrolling
@@ -8194,13 +8551,16 @@
     window.addEventListener('scroll', onScroll, { passive: true });
     markActive();
 
-    // 1–6 jump to a section, Escape closes any open overlay. Ignored while a
+    // 1–7 jump to a section, Escape closes any open overlay. Ignored while a
     // field has focus, so typing "1" into the account box does not navigate.
+    // The digit string and SECTIONS must stay the same length: a section added
+    // to the array without a digit here is one the keyboard cannot reach, and
+    // the chip beside it still advertises the key.
     const onKey = ev => {
       if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
       const t = ev.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-      const i = '123456'.indexOf(ev.key);
+      const i = '1234567'.indexOf(ev.key);
       if (i >= 0 && SECTIONS[i]) { ev.preventDefault(); jump(SECTIONS[i][0]); }
     };
     document.addEventListener('keydown', onKey);
@@ -8312,13 +8672,32 @@
      *
      * Every price is in the grid. What the grid cannot carry is the
      * CONDITION and the reasoning, so that is all the sentence does now. */
+    /* THE FIRST SCENARIO IS "RUNS PAST THE PLAN", AND ON A ONE-TARGET SETUP
+     * THERE IS NO PUBLISHED LEVEL TO RUN TO. It is not silently re-pointed at
+     * T1 — that would make it identical to the scenario beneath it, which is
+     * two scenarios saying one thing. Where the screen carries its own
+     * structural ladder, its second rung is offered INSTEAD, named as the
+     * screen's level and carrying the reach rate that was measured for it. */
     const SC = [
-      ['Continuation through both targets.',
+      hasT2
+      ? ['Continuation through both targets.',
        `The structure that produced this setup has to hold: the 50-day above the 200-day, volume at or above its recent average, and no close back under the entry.`,
        [['Requires', `Above ${f(t1)}`], ['Target', f(t2)], ['Move from here', Number.isFinite(last) ? pct((t2 - last) / last * 100) : '—'],
-        ['R multiple', ((Math.abs(t2 - entry)) / (risk || 1)).toFixed(1) + 'R']]],
+        ['R multiple', ((Math.abs(t2 - entry)) / (risk || 1)).toFixed(1) + 'R']]]
+      : SCR2
+      ? ['It runs past the only target it has.',
+       `The engine published one level, so past it there is no plan on this row. The figure beside it is the screen's OWN second structural target for this name — a different measurement, on the same stock, shown here because the alternative is an empty scenario. Reaching it is not part of what this signal underwrote.`,
+       [['Requires', `Above ${f(t1)}`], ["Screen's T2", f(SCR2[0])],
+        ['Move from here', Number.isFinite(last) ? pct((SCR2[0] - last) / last * 100) : '—'],
+        ['Reached, historically', SCR2[2] + '% of closed trades']]]
+      : ['It runs past the only target it has.',
+       `The engine published one level and there is nothing beyond it on this row — no second target, and no structural ladder on the screen for this name either. Past the target the plan is the trailing stop and nothing else. A number invented here would be the only number on this page that nobody measured.`,
+       [['Requires', `Above ${f(t1)}`], ['Target', 'None published'],
+        ['Move from here', '—'], ['R multiple', '—']]],
       ['The published plan, run as written.',
-       `On the published trailing rule the stop moves to break-even once the first target prints, so the balance rides to the second with no capital left at risk.`,
+       hasT2
+         ? `On the published trailing rule the stop moves to break-even once the first target prints, so the balance rides to the second with no capital left at risk.`
+         : `On the published trailing rule the stop moves to break-even once the target prints. There is no second rung for a balance to ride to, so this is the whole plan rather than the first half of one — the position closes at the target or at the trailed stop.`,
        [['Requires', `Entry at or better than ${f(entry)}`], ['Target', f(t1)],
         ['Move from here', Number.isFinite(last) ? pct((t1 - last) / last * 100) : '—'],
         ['R multiple', rrT1.toFixed(1) + 'R']]],
@@ -8355,19 +8734,24 @@
       const rr2 = risk2 > 0 ? Math.abs(t1b - e2) / risk2 : 0;
       const amt = acct * rp / 100;
       const qty = risk2 > 0 ? Math.floor(amt / risk2) : 0;
-      const loss = qty * risk2, g1 = qty * Math.abs(t1b - e2), g2 = qty * Math.abs(t2 - e2);
+      /* g2 is the gain at the SECOND target. With no second target it is not
+       * zero and it is not the first target's gain again — there is no such
+       * outcome, so the bar is not drawn. `hasT2` decides, not the arithmetic:
+       * Math.abs(null - e2) is a real number and it is the entry price. */
+      const loss = qty * risk2, g1 = qty * Math.abs(t1b - e2);
+      const g2 = hasT2 ? qty * Math.abs(t2 - e2) : null;
 
       $('lvA').textContent = f(acct);
       $('lvP').textContent = rp.toFixed(1) + '% · ' + f(amt);
       $('lvE').textContent = f(e2); $('lvS').textContent = f(s2); $('lvT').textContent = f(t1b);
 
-      const peak = Math.max(loss, g1, g2, 1);
+      const peak = Math.max(loss, g1, hasT2 ? g2 : 0, 1);
       $('barL').style.width = (loss / peak * 100).toFixed(1) + '%';
       $('barG').style.width = (g1 / peak * 100).toFixed(1) + '%';
-      $('barG2').style.width = (g2 / peak * 100).toFixed(1) + '%';
+      if (hasT2) $('barG2').style.width = (g2 / peak * 100).toFixed(1) + '%';
       countTo($('barLv'), loss, { dp: 0, pre: '−' + cur });
       countTo($('barGv'), g1, { dp: 0, pre: '+' + cur });
-      countTo($('barG2v'), g2, { dp: 0, pre: '+' + cur });
+      if (hasT2) countTo($('barG2v'), g2, { dp: 0, pre: '+' + cur });
 
       $('rkOut').innerHTML = `
         <div class="b-m"><span class="k">Position size</span><span class="v">${qty.toLocaleString('en-IN')} sh</span></div>

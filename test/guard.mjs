@@ -538,7 +538,7 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      !/setScreen\([^;]*\), true\)/.test(JS));
 }
 
-/* ── FIVE SLOTS, FIVE ANSWERS ────────────────────────────────────────────────
+/* ── SIX SLOTS, SIX ANSWERS ──────────────────────────────────────────────────
  * The bar was Home / Signals / Discover / Watch / More. Two faults:
  *   - /markets — the one route that answers "what is happening?" — was
  *     reachable from NO tab. It existed and was navigable only by search or a
@@ -547,11 +547,24 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
  *     and everything in it a phone needs day to day (search, freshness, theme,
  *     density) was already in the header.
  * Every tab must be a real, renderable route — a bar entry pointing at a
- * missing route is a dead end the router turns into a 404. */
+ * missing route is a dead end the router turns into a 404.
+ *
+ * ── AND THE SIXTH SLOT IS /brief, FOR THE SAME REASON /markets IS HERE ──────
+ * It was the third instance of the fault this block was written for: the
+ * longest page on the site, reachable from a phone only through the header
+ * CTA — which signal.css hides under 560px — or a "Full brief" link inside an
+ * expanded ledger card. Both of those are links from somewhere else, and a
+ * destination with no entry of its own is not navigable.
+ *
+ * The count is asserted EXACTLY, not as a floor. A bar that can grow silently
+ * is how the seventh tab once pushed a 390px phone to 454px and scrolled the
+ * whole page sideways; the layout absorbs a deliberate change and must not
+ * absorb an accidental one. Adding a tab means editing this number and saying
+ * why, here. */
 {
   const nav = [...HTML.matchAll(/<a href="(\/[a-z/]*)" data-route="([^"]+)">[\s\S]*?<span>([^<]+)<\/span>/g)]
     .map((m) => ({ href: m[1], route: m[2], label: m[3] }));
-  ok("the bar has five slots", nav.length === 5, nav.map((n) => n.label));
+  ok("the bar has six slots", nav.length === 6, nav.map((n) => n.label));
   ok("href and data-route agree on every tab",
      nav.every((n) => n.href === n.route), nav.filter((n) => n.href !== n.route));
 
@@ -561,6 +574,8 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
 
   ok("Markets is in the bar — it answers the first question the app exists for",
      nav.some((n) => n.route === "/markets"));
+  ok("Brief is in the bar — on a phone it had no entry of its own at all",
+     nav.some((n) => n.route === "/brief"), nav.map((n) => n.route));
   ok("no slot is a junk drawer",
      !nav.some((n) => /^(more|other|misc)$/i.test(n.label.trim())),
      nav.map((n) => n.label));
@@ -639,6 +654,121 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   // UNRATED must be declared, not reached by falling off the end of the table.
   ok("UNRATED is a declared verdict, not an accident of the default",
      /UNRATED:\s*\[/.test(JS));
+}
+
+/* ── A TARGET THAT DOES NOT EXIST IS NEVER THE PREVIOUS ONE AGAIN ────────────
+ *
+ * The incident: the brief read
+ *
+ *     const t2 = N(sig.target2 || sig.target1);
+ *
+ * The API blanks a target that sits inside 0.5R of the one before it —
+ * _levels.js, and the generator now refuses to produce them at all — and
+ * returns null. The `||` put T1's price back under T2's label and every
+ * consumer downstream believed it: the ladder printed "Target 2" and
+ * "Target 1" at one price, the chart drew two lines on top of each other, the
+ * glance bar drew a zero-width second reward segment, and the Risk section
+ * said "1.6 to one against the first target and 1.6 to one against the
+ * second". SPLPETRO shipped exactly that, on a row whose own ledger card read
+ * "the only target".
+ *
+ * The same shape has now been fixed three times in this file — trailPlan
+ * (Number(t2) making a null into a ₹0.00 exit), price() (the same coercion),
+ * and the brief. So the rule bans the SHAPE, not the instance. */
+{
+  /* Comment lines are excluded, or this rule fails on the note above the fix
+   * that quotes the very line it bans — a check that cannot survive its own
+   * incident being written down is a check nobody will keep. */
+  const CODE = JS.split("\n")
+    .filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l))
+    .join("\n");
+  const fallback = /target[23]\s*\|\|\s*(sig\.)?target[123]/;
+  ok("no level falls back to the level before it",
+     !fallback.test(CODE),
+     (CODE.match(/.{0,60}target[23]\s*\|\|\s*(sig\.)?target[123].{0,40}/) || [])[0]);
+  ok("the brief decides on one flag, and every consumer reads it",
+     /const hasT2 = t2 !== null;/.test(JS));
+  ok("the brief's second target comes through lvl(), which treats 0 as absent",
+     /const t2 = lvl\(sig\.target2\);/.test(JS));
+  /* A scale or a zone still needs the top of the trade on a one-target row.
+   * tFinal is that, and it is a DIFFERENT name from t2 on purpose — the fault
+   * above was one variable meaning two things. */
+  ok("a one-target setup still draws to scale rather than drawing nothing",
+     /const tFinal = hasT2 \? t2 : t1;/.test(JS));
+  const rr2 = (JS.match(/const rrT2 = [^;]+;/) || [""])[0];
+  ok("reward-to-risk against a target that is not published is null, not a repeat of T1",
+     /hasT2 \?/.test(rr2) && /: null/.test(rr2), rr2);
+}
+
+/* ── THE BRIEF ARGUES A COMPANY, NOT ONLY A CHART ────────────────────────────
+ *
+ * The incident: the brief's five score components were Structure, Momentum,
+ * Trend, Volume and Risk-reward — every one of them a price measurement. The
+ * screen row this route already downloads carries return on capital, leverage,
+ * cash conversion, growth, valuation and the screen's own risk flags, and none
+ * of it reached the page. A reader got to the trade plan having been told the
+ * chart was willing and nothing whatsoever about the business.
+ *
+ * These check the section is WIRED, not that it renders any particular
+ * sentence: the fault was absence, and absence is what is pinned. */
+{
+  ok("the brief has a business section", /'b-fund', 'Business'/.test(JS));
+  ok("it is in document order too, not just in the nav",
+     /id="b-fund"/.test(JS));
+  const fund = (JS.match(/id="b-fund"[\s\S]*?id="b-plan"/) || [""])[0];
+  for (const k of ["row.roce", "row.de", "row.piotroski", "row.pe", "row.rev_cagr",
+                   "row.cfo_pat", "row.q", "row.g", "row.v", "row.comp"])
+    ok(`the business section reads ${k}`, fund.includes(k));
+  /* The screen's own objections are published BESIDE its scores, never netted
+   * off against them — the same rule stock_screen.py holds. */
+  ok("the screen's risk flags are shown, not summarised away",
+     /row\.risk && Array\.isArray\(row\.risk\.flags\)/.test(fund));
+  /* MISSING IS MISSING. A null must render as words, never as a zero that
+   * reads like a measured result of zero. */
+  ok("an absent figure renders as words, not as a number",
+     /class="b-na"/.test(fund) && /not published/.test(fund));
+  ok("a company with no statements is said to be unranked rather than shown an empty grid",
+     /reports nothing the screen could read/.test(fund));
+  /* Negative equity is insolvency. It is called out, not printed as a small
+   * tidy number that reads like a clean balance sheet. */
+  ok("negative equity is named", /negative equity/.test(fund));
+}
+
+/* ── AND THE CHIP MUST REACH THE SECTION, NOT THE FOLD OVER IT ──────────────
+ * foldBrief moves everything except the levels, the chart and the trade plan
+ * into a <details>. A closed <details> gives its contents zero height, so four
+ * chips measured the summary's position instead of the section's and appeared
+ * to do nothing at all. jump() opens the ancestors first, THEN measures —
+ * measuring first reads the collapsed geometry and lands short. */
+{
+  const j = (JS.match(/const jump = id => \{[\s\S]*?\n    \};/) || [""])[0];
+  ok("jump opens any fold in the way", /tagName === 'DETAILS'/.test(j));
+  const iOpen = j.indexOf("p.open = true");
+  // The measuring LINE, not the word — which also appears in the note above it.
+  const iMeasure = j.indexOf("const top = el.getBoundingClientRect");
+  ok("and opens it before it measures", iOpen > -1 && iMeasure > iOpen, { iOpen, iMeasure });
+  /* BRIEF_KEEP names the sections that stay out of the fold. Its own comment
+   * says "the plan — what to do, and when to stop doing it", and for a while
+   * id="b-plan" was on the SCENARIOS section, so the fold kept the scenarios
+   * and folded away the trade plan. The id now sits on the section whose
+   * label is Trade plan; this asserts the pairing rather than the id. */
+  const secs = (JS.match(/const SECTIONS = \[[\s\S]*?\n    \];/) || [""])[0];
+  ok("b-plan is the section labelled Trade plan",
+     /\['b-plan', 'Trade plan'/.test(secs));
+  ok("the fold keeps the chart and the plan out of it",
+     /const BRIEF_KEEP = \['b-chart', 'b-plan'\];/.test(JS));
+}
+
+/* ── EVERY SECTION THE CHIPS ADVERTISE MUST HAVE A KEY THAT REACHES IT ───────
+ * The chips print their keyboard shortcut. A section added to SECTIONS without
+ * a matching digit gets a chip advertising a key that does nothing. */
+{
+  const secs = (JS.match(/const SECTIONS = \[[\s\S]*?\n    \];/) || [""])[0];
+  const nSec = (secs.match(/\['b-/g) || []).length;
+  const digits = (JS.match(/const i = '(\d+)'\.indexOf\(ev\.key\);/) || ["", ""])[1];
+  ok("the brief declares its sections", nSec > 0, nSec);
+  ok("every section has a digit that jumps to it",
+     nSec === digits.length, { sections: nSec, digits });
 }
 
 console.log(fails
