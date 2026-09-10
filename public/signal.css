@@ -1310,6 +1310,21 @@ body::before{display:none}
 .b-bar-r .s{font:500 var(--t-4)/1 var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 @media(prefers-reduced-motion:reduce){.b-bar-r .t i{transition:none}}
 
+/* THE BUSINESS SECTION'S STYLES ARE NOT HERE.
+   They travel inside public/brief_fundamentals.js, which renders that section
+   for this site and for the newspaper's brief. One file cannot arrive
+   half-delivered, so the markup can never reach a page whose stylesheet did
+   not — which is the failure a companion .css invites, and which this repo has
+   already paid for once (see the note in vercel-news/build.js upstream: a
+   docs/ file needs allow-listing in three places, and today.json had two).
+   Search brief_fundamentals.js for .bf- to find them. */
+
+/* A second measurement, fenced off so it cannot be read as part of the plan
+   above it. The rule down the left is the fence. */
+.b-scrlad{margin-top:34px;padding-left:16px;border-left:2px solid var(--b-line2)}
+.b-h3{margin:0 0 8px;font:400 var(--t-7)/1.25 var(--b-serif);letter-spacing:var(--ls-tight);
+  color:var(--b-ink)}
+
 /* ── PLAN / SCENARIOS / RISK ─────────────────────────────────────────────── */
 .b-plan{display:grid;gap:1px;background:var(--b-line);border:1px solid var(--b-line);
   border-radius:var(--r-4);overflow:hidden;margin-top:26px}
