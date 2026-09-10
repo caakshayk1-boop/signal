@@ -187,9 +187,35 @@ try {
   const cap = await p.locator(".b-cap").first().innerText();
   ok("chart says how many closes it drew", /\d+ real daily closes/.test(cap), cap.slice(0, 80));
 
-  // R:R is stated against BOTH targets — one unlabelled figure meant the
-  // header and the calculator printed different numbers for the same trade.
-  ok("R:R is labelled by target", /R:R TO T1/i.test(body) && /R:R TO T2/i.test(body));
+  /* EVERY REWARD-TO-RISK FIGURE SAYS WHICH TARGET IT MEASURES TO.
+   *
+   * The original assertion was `/R:R TO T1/ && /R:R TO T2/`, and it encoded an
+   * assumption the ledger does not hold: that every signal has two targets.
+   * The API blanks a second target sitting inside 0.5R of the first, and on
+   * such a row the brief now prints ONE reward-to-risk figure labelled
+   * "Reward : risk" and states that no second target was published — rather
+   * than the old behaviour, which reinstated T1's price under T2's label and
+   * printed the same ratio twice under two different names.
+   *
+   * So the assertion could only pass on a two-target row, and which row the
+   * brief ranks first is a fact about today's data. That is a flake, and it
+   * would have read as a regression in the page rather than in the test.
+   *
+   * The invariant is the one the original comment names — no BARE ratio, ever
+   * — and it is now checked in both shapes. */
+  const twoTargets = /R:R TO T2/i.test(body);
+  ok("R:R is labelled by target",
+     twoTargets
+       ? /R:R TO T1/i.test(body)
+       : /REWARD\s*:\s*RISK/i.test(body) && /NOT PUBLISHED/i.test(body),
+     twoTargets ? "two targets" : "one target");
+  // And the two readings are never the same number under two names, which is
+  // what the collapsed-target fallback produced.
+  if (twoTargets) {
+    const rr = [...body.matchAll(/R:R TO T([12])\s*\n?\s*([\d.]+)/gi)].map(m => m[2]);
+    ok("the two R:R readings are different numbers",
+       rr.length < 2 || rr[0] !== rr[1], rr);
+  }
 
   // No probability may be attached to a scenario: no model publishes one.
   await p.locator('.b-scb button[data-sc="2"]').click();
