@@ -1,5 +1,5 @@
 {
- "build_id": "20260911T144240",
+ "build_id": "20260911T192236",
  "date": "2026-09-11",
  "date_str": "Friday, September 11 2026",
  "picks": [
@@ -411,67 +411,67 @@
  "picks_week": null,
  "open_context": {
   "ABREL": {
-   "price": 1283.0,
+   "price": 1281.6,
    "sector": "Real Estate"
   },
   "ANANTRAJ": {
-   "price": 590.6,
+   "price": 598.35,
    "sector": "Real Estate"
   },
   "ASHOKLEY": {
-   "price": 163.08,
+   "price": 163.75,
    "sector": "Industrials"
   },
   "BANKINDIA": {
-   "price": 138.35,
+   "price": 140.0,
    "sector": "Financial Services"
   },
   "BLUESTARCO": {
-   "price": 1552.7,
+   "price": 1558.0,
    "sector": "Industrials"
   },
   "BPCL": {
-   "price": 299.3,
+   "price": 304.5,
    "sector": "Energy"
   },
   "CAPLIPOINT": {
-   "price": 2738.0,
+   "price": 2754.8999,
    "sector": "Healthcare"
   },
   "CASTROLIND": {
-   "price": 188.45,
+   "price": 188.03,
    "sector": "Energy"
   },
   "CDSL": {
-   "price": 1334.1,
+   "price": 1360.0,
    "sector": "Financial Services"
   },
   "CEMPRO": {
-   "price": 1237.3,
+   "price": 1244.3,
    "sector": "Industrials"
   },
   "CGCL": {
-   "price": 268.7,
+   "price": 266.0,
    "sector": "Financial Services"
   },
   "CHALET": {
-   "price": 870.05,
+   "price": 877.25,
    "sector": "Consumer Cyclical"
   },
   "CHENNPETRO": {
-   "price": 1586.6,
+   "price": 1572.9,
    "sector": "Energy"
   },
   "COALINDIA": {
-   "price": 427.25,
+   "price": 426.4,
    "sector": "Energy"
   },
   "COCHINSHIP": {
-   "price": 1389.5,
+   "price": 1381.0,
    "sector": "Industrials"
   },
   "COFORGE.NS": {
-   "price": 1844.1,
+   "price": 1846.5,
    "sector": "Technology"
   },
   "COIN": {
@@ -479,15 +479,15 @@
    "sector": ""
   },
   "CPPLUS": {
-   "price": 3855.0,
+   "price": 3825.5,
    "sector": "Industrials"
   },
   "CRAFTSMAN": {
-   "price": 11699.0,
+   "price": 11669.0,
    "sector": "Consumer Cyclical"
   },
   "CREDITACC": {
-   "price": 1403.6,
+   "price": 1424.2,
    "sector": "Financial Services"
   },
   "CRM": {
@@ -495,7 +495,7 @@
    "sector": "Technology"
   },
   "CUPID": {
-   "price": 281.55,
+   "price": 280.0,
    "sector": "Consumer Defensive"
   },
   "DUOL": {
@@ -503,119 +503,119 @@
    "sector": "Technology"
   },
   "ECLERX": {
-   "price": 1906.8,
+   "price": 1899.6,
    "sector": "Technology"
   },
   "EIDPARRY": {
-   "price": 720.8,
+   "price": 721.05,
    "sector": "Basic Materials"
   },
   "EMMVEE": {
-   "price": 346.9,
+   "price": 346.0,
    "sector": "Technology"
   },
   "ESCORTS": {
-   "price": 2888.5,
+   "price": 2899.7,
    "sector": "Industrials"
   },
   "FSL": {
-   "price": 250.05,
+   "price": 247.6,
    "sector": "Technology"
   },
   "GESHIP": {
-   "price": 1400.4,
+   "price": 1412.2,
    "sector": "Industrials"
   },
   "GODREJIND": {
-   "price": 1106.7,
+   "price": 1126.8,
    "sector": "Industrials"
   },
   "GRAPHITE": {
-   "price": 817.1,
+   "price": 825.8,
    "sector": "Industrials"
   },
   "GVT&D": {
-   "price": 4507.2002,
+   "price": 4548.1001,
    "sector": "Industrials"
   },
   "HDFCBANK": {
-   "price": 684.2,
+   "price": 708.25,
    "sector": "Financial Services"
   },
   "HFCL": {
-   "price": 229.8,
+   "price": 233.69,
    "sector": "Technology"
   },
   "HINDUNILVR": {
-   "price": 1935.0,
+   "price": 1927.0,
    "sector": "Consumer Defensive"
   },
   "HINDZINC": {
-   "price": 574.9,
+   "price": 576.45,
    "sector": "Basic Materials"
   },
   "HSCL": {
-   "price": 656.9,
+   "price": 664.9,
    "sector": "Basic Materials"
   },
   "IDBI": {
-   "price": 82.88,
+   "price": 83.43,
    "sector": "Financial Services"
   },
   "INDGN": {
-   "price": 576.65,
+   "price": 578.35,
    "sector": "Healthcare"
   },
   "IRB": {
-   "price": 19.49,
+   "price": 19.64,
    "sector": "Industrials"
   },
   "J&KBANK": {
-   "price": 144.91,
+   "price": 145.27,
    "sector": "Financial Services"
   },
   "JAINREC": {
-   "price": 283.55,
+   "price": 284.7,
    "sector": "Basic Materials"
   },
   "JMFINANCIL": {
-   "price": 123.48,
+   "price": 124.47,
    "sector": "Financial Services"
   },
   "JSL": {
-   "price": 765.85,
+   "price": 756.1,
    "sector": "Basic Materials"
   },
   "JSWSTEEL": {
-   "price": 1275.0,
+   "price": 1265.0,
    "sector": "Basic Materials"
   },
   "JUBLPHARMA": {
-   "price": 1027.75,
+   "price": 1025.2,
    "sector": "Healthcare"
   },
   "KIRLOSENG": {
-   "price": 2220.0,
+   "price": 2168.6001,
    "sector": "Industrials"
   },
   "LAURUSLABS": {
-   "price": 1960.7,
+   "price": 1969.0,
    "sector": "Healthcare"
   },
   "LTFOODS": {
-   "price": 436.65,
+   "price": 438.1,
    "sector": "Consumer Defensive"
   },
   "MAHABANK": {
-   "price": 84.04,
+   "price": 84.2,
    "sector": "Financial Services"
   },
   "MINDACORP": {
-   "price": 704.55,
+   "price": 705.45,
    "sector": "Consumer Cyclical"
   },
   "MOTILALOFS": {
-   "price": 1014.6,
+   "price": 1026.5,
    "sector": "Financial Services"
   },
   "MRK": {
@@ -623,11 +623,11 @@
    "sector": "Healthcare"
   },
   "MRPL": {
-   "price": 176.19,
+   "price": 175.86,
    "sector": "Energy"
   },
   "NATIONALUM": {
-   "price": 357.0,
+   "price": 361.0,
    "sector": "Basic Materials"
   },
   "NEM": {
@@ -635,19 +635,19 @@
    "sector": "Basic Materials"
   },
   "NEULANDLAB": {
-   "price": 23725.0,
+   "price": 23535.0,
    "sector": "Healthcare"
   },
   "OFSS": {
-   "price": 11767.0,
+   "price": 11763.0,
    "sector": "Technology"
   },
   "ONGC": {
-   "price": 236.9,
+   "price": 232.5,
    "sector": "Energy"
   },
   "PARADEEP": {
-   "price": 153.78,
+   "price": 155.96,
    "sector": "Basic Materials"
   }
  },
@@ -779,7 +779,7 @@
    {
     "dataset": "Careers feed",
     "status": "DEGRADED",
-    "age": "1h old",
+    "age": "2h old",
     "note": "partial coverage \u2014 12/22 records"
    }
   ]
@@ -1328,27 +1328,47 @@
    "shows": 20,
    "source": "each channel's public Atom feed",
    "built_on": "2026-09-10",
-   "age_days": 0.3,
+   "age_days": 0.5,
    "is_fallback": false
   },
   "smart_reads": [
    {
-    "source": "Economic Times",
-    "cat": "money",
-    "title": "Selling gold after price rise: Have you factored in capital gains tax you will have to pay? Know how you will be taxed on selling Rs 10 lakh",
-    "link": "https://economictimes.indiatimes.com/wealth/invest/latest-gold-taxation-rules-want-to-sell-old-gold-jewellery-worth-rs-10-lakh-rs-1-crore-to-buy-new-know-how-you-will-be-taxed/articleshow/133954513.cms",
-    "summary": "When selling old gold jewellery, be aware that it comes with capital gains tax and Goods and Services Tax implications. Long-term capital gains tax is set at twelve point five percent, while short-term gains are taxed according to your income tax slab. The net proceeds from these sales are diminished after considering ",
-    "date": "Sep 11, 2026",
-    "_sort": "2026-09-11T05:57:29+00:00"
-   },
-   {
     "source": "Livemint",
     "cat": "money",
-    "title": "Section 87A rebate on STCG: ITAT ruling offers relief to taxpayers under new tax regime for AY 2025-26",
-    "link": "https://www.livemint.com/money/personal-finance/section-87a-rebate-on-stcg-itat-ruling-offers-relief-to-taxpayers-under-new-tax-regime-for-ay-202526-11789102445343.html",
-    "summary": "ITAT Delhi has ruled taxpayers can claim the full  \u20b925,000 Section 87A rebate against STCG tax under Section 111A for AY 2025-26, as the Finance Act 2025 restriction on special-rate income applies only from AY 2026-27 onwards.",
+    "title": "Two months of red: Large-cap outflows deepen after 6-month inflow streak \u2014 what should investors do?",
+    "link": "https://www.livemint.com/money/personal-finance/two-months-of-red-large-cap-outflows-deepen-after-6-month-inflow-streak-what-should-investors-do-11789116067701.html",
+    "summary": "Large-cap mutual funds saw  \u20b91,147 crore in outflows in August 2026, despite previous &amp;nbsp;inflows. Rising mid- and small-cap investments suggest a shift in investor preference. Here's what investors should make of the divergence.",
     "date": "Sep 11, 2026",
-    "_sort": "2026-09-11T05:53:42+00:00"
+    "_sort": "2026-09-11T10:30:08+00:00",
+    "smart": {
+     "what_happened": [
+      "Large-cap mutual funds saw \u20b91,147\u202fcrore of net outflows in August 2026 after a six\u2011month streak of inflows.",
+      "During the same period, investor allocations to mid\u2011cap and small\u2011cap funds increased."
+     ],
+     "why_it_matters": "The reversal from inflows to a sizable outflow in large\u2011cap funds signals a shift in investor sentiment away from the traditionally stable segment toward higher\u2011growth mid\u2011 and small\u2011cap opportunities, potentially affecting liquidity, fund performance, and the broader equity market composition.",
+     "what_to_watch": "Monitor the net flow figures for large\u2011cap mutual funds in September 2026 to see if the outflow trend continues or reverses.",
+     "headline": "Large-cap mutual funds record \u20b91,147\u202fcrore outflows in August 2026",
+     "read_seconds": 20
+    }
+   },
+   {
+    "source": "Economic Times",
+    "cat": "money",
+    "title": "Rs 2.5 crore retirement corpus: Can you get Rs 2 lakh monthly income for 25 years?",
+    "link": "https://economictimes.indiatimes.com/wealth/invest/rs-2-5-crore-retirement-corpus-planning-monthly-income-withdrawal-calculator-can-you-get-rs-2-lakh-monthly-income-for-25-years/articleshow/134059467.cms",
+    "summary": "Strategic planning of retirement withdrawals from a Rs 2.5 crore fund is essential for financial security. Adopting a conservative withdrawal rate that is lower than the annual returns can help sustain the corpus. By gradually increasing withdrawals based on a fixed percentage, retirees can plan for better financial lo",
+    "date": "Sep 11, 2026",
+    "_sort": "2026-09-11T10:16:19+00:00",
+    "smart": {
+     "what_happened": [
+      "The article outlines a strategy to withdraw Rs 2\u202flakh per month for 25 years from a Rs 2.5\u202fcrore retirement corpus.",
+      "It recommends using a conservative withdrawal rate below expected annual returns and increasing withdrawals gradually based on a fixed percentage."
+     ],
+     "why_it_matters": "A disciplined withdrawal approach helps retirees preserve their capital over a multi\u2011decade horizon, reducing the risk of depleting the corpus prematurely and ensuring a stable income stream throughout retirement.",
+     "what_to_watch": "Track the actual annual return of the retirement portfolio against the planned withdrawal rate to confirm the corpus remains sustainable.",
+     "headline": "Retirement plan aims Rs 2 lakh monthly from Rs 2.5 crore fund",
+     "read_seconds": 26
+    }
    },
    {
     "source": "Livemint Opinion",
@@ -1360,12 +1380,12 @@
     "_sort": "2026-09-11T01:30:56+00:00",
     "smart": {
      "what_happened": [
-      "Mutual fund inflow data for August showed a strong increase in equity fund purchases.",
-      "Retail investors remained confident while foreign investors returned to the market."
+      "Mutual fund inflow data for August showed a strong increase, reflecting confidence in Indian equities.",
+      "The surge aligns with solid economic performance and a return of foreign investors to the market."
      ],
-     "why_it_matters": "The surge in mutual fund inflows signals sustained demand for Indian equities, reinforcing the view that the market may break out of its recent directionless phase. Strong domestic retail participation combined with renewed foreign investor interest supports the outlook for continued equity market strength and can influence future capital allocation decisions.",
-     "what_to_watch": "Track the performance of India's major stock indices, such as the Nifty 50, in the coming weeks to see if they resume an upward trend.",
-     "headline": "India mutual fund inflows rise in August as retail confidence grows",
+     "why_it_matters": "The inflow growth signals sustained investor optimism toward India's equity market, suggesting that the recent directionless phase may be ending and that both domestic and foreign capital are backing the economy's momentum, which could support higher stock index levels.",
+     "what_to_watch": "September mutual fund inflow figures to see if the August trend continues",
+     "headline": "India mutual fund inflows rise sharply in August",
      "read_seconds": 20
     }
    },
@@ -1389,10 +1409,10 @@
     "smart": {
      "what_happened": [
       "Some doctors and influencers say women shouldn\u2019t wait until their 60s for a DEXA scan.",
-      "The article outlines factors to consider before getting a bone density test."
+      "The recommendation targets women at menopause to assess bone density sooner."
      ],
-     "why_it_matters": "The timing of a DEXA scan can affect when bone health issues are identified, influencing decisions about preventive care and treatment during menopause.",
-     "what_to_watch": "Any updates from health authorities on recommended age or criteria for DEXA screening.",
+     "why_it_matters": "Early bone density testing can identify osteoporosis risk before fractures occur, allowing timely interventions such as lifestyle changes or medication that can preserve bone health and reduce future healthcare costs associated with fractures in post\u2011menopausal women.",
+     "what_to_watch": "Monitor any new screening guidelines released by major endocrine or osteoporosis societies regarding the recommended age for DEXA scans in menopausal women.",
      "headline": "Doctors advise earlier DEXA scans for menopausal women",
      "read_seconds": 20
     }
@@ -1407,12 +1427,12 @@
     "_sort": "2026-09-10T10:00:00+00:00",
     "smart": {
      "what_happened": [
-      "The article argues that impatience is an emotion, not a personality trait.",
-      "It references Penelope\u2019s wait in The Odyssey to illustrate the concept."
+      "The piece examines impatience as an emotion rather than a fixed trait.",
+      "It references Penelope\u2019s wait in The Odyssey as an illustration."
      ],
-     "why_it_matters": "Understanding impatience as an emotion rather than a fixed trait can influence how individuals and professionals approach self\u2011control, motivation, and behavioral interventions, potentially affecting personal productivity and mental\u2011health strategies.",
-     "what_to_watch": "Future commentary or research by Amy Arthur or related psychologists on redefining impatience in behavioral studies.",
-     "headline": "Impatience described as emotion rather than trait",
+     "why_it_matters": "Understanding impatience as an emotional state rather than an immutable characteristic can influence how individuals manage expectations and decision\u2011making processes, which is relevant for personal productivity and mental\u2011wellness strategies.",
+     "what_to_watch": "Upcoming Psyche articles that explore other emotions and their impact on behavior",
+     "headline": "Impatience is an emotion, not a trait",
      "read_seconds": 20
     }
    },
@@ -1462,7 +1482,7 @@
     "moves": 49,
     "termination": "Draw",
     "speed": "Blitz",
-    "analysis": "Focus on early piece activity: after 1.e4 e5 2.Nf3 d6, develop the light\u2011squared bishop to\u202fBc5\u202finstead of\u202fBe7, then castle quickly; this cuts opponent\u2019s central pressure and reduces your average centipawn loss by ~15\u202fpts.",
+    "analysis": "Focus on early central tension: after 1.e4 e5\u202f2.Nf3 d6\u202f3.d4 exd4, avoid the passive 4.Nxd4 Nf6?; instead play 4...Nc6 5.Nc3 Be7, developing pieces and pressuring d4, reducing drawish exchange chances.",
     "is_upset": false,
     "is_collapse": false,
     "is_long": true,
@@ -1480,6 +1500,14 @@
     "analysed": false,
     "_mode": "full",
     "_trend": [
+     {
+      "day": "09/11",
+      "wins": 0,
+      "losses": 1,
+      "draws": 0,
+      "total": 1,
+      "pct": 0
+     },
      {
       "day": "09/10",
       "wins": 1,
@@ -1527,14 +1555,6 @@
       "draws": 0,
       "total": 1,
       "pct": 100
-     },
-     {
-      "day": "09/04",
-      "wins": 4,
-      "losses": 8,
-      "draws": 0,
-      "total": 12,
-      "pct": 33
      }
     ],
     "_yest_counts": {
@@ -1568,7 +1588,7 @@
     "moves": 25,
     "termination": "Resignation",
     "speed": "Blitz",
-    "analysis": "Strengthen your early king safety: after 1.e4 d6 2.d4 Nf6 3.Nc3 g6, avoid 4.Bc4; instead play 4.Nf3, then 5.Be2 and castle by move\u202f8, reducing tactical threats that cost you the game.",
+    "analysis": "Focus on early king safety: avoid 8.Qh5? and 12.Qg4?, instead develop pieces (Nf3, Be2) and castle by move\u202f7 to prevent tactical threats and reduce opponent\u2019s attack chances.",
     "is_upset": false,
     "is_collapse": false,
     "is_long": false,
@@ -1601,7 +1621,7 @@
     "moves": 35,
     "termination": "Checkmate",
     "speed": "Blitz",
-    "analysis": "Strengthen your king safety: after 26\u2026Qe6, avoid exchanging queens; instead play \u2026Kg8\u2011h8, keep rooks connected, and prevent forced mates like the 35\u2011move collapse.",
+    "analysis": "Focus on early king safety: after 1\u2026e6\u202f2.d4\u202fd5\u202f3.Nc3\u202fBb4\u202f4.e3\u202fNf6\u202f5.Bd3\u202fc5, avoid exchanging on d4 and instead develop with\u202f\u2026Nbd7,\u202f\u20260\u20110,\u202f\u2026b6,\u202f\u2026Bb7, keeping a solid pawn shield; your checkmate stemmed from a weakened king\u2011side after premature pawn pushes.",
     "is_upset": false,
     "is_collapse": false,
     "is_long": false,
@@ -1635,7 +1655,7 @@
     "moves": 26,
     "termination": "Checkmate",
     "speed": "Blitz",
-    "analysis": "Focus on early piece development: within the first 8 moves, place both knights and bishops on active squares, castle, and avoid moving the same piece twice. This alone would have prevented the rapid checkmate.",
+    "analysis": "Focus on early king safety: avoid moving the g\u2011pawn before castling; you lost material and allowed a forced mate at move\u202f26.",
     "is_upset": false,
     "is_collapse": false,
     "is_long": false,
@@ -1668,7 +1688,7 @@
     "moves": 21,
     "termination": "Checkmate",
     "speed": "Blitz",
-    "analysis": "Focus on early piece development: bring your knights out before moving the queen (e.g., Nf3, Nc3) to avoid wasting tempo and prevent opponent\u2019s counter\u2011play.",
+    "analysis": "Focus on early piece development: on move\u202f5, play\u202fNf3\u202finstead of\u202fa3; this saves ~2\u202fseconds and prevents the opponent\u2019s \u2026c5\u2011counter, improving your average centipawn loss by ~15.Focus on early piece development: on move\u202f5, play\u202fNf3\u202finstead of\u202fa3; this saves ~2\u202fseconds and prevents the opponent\u2019s \u2026c5\u2011counter, improving your average centipawn loss by ~15.",
     "is_upset": false,
     "is_collapse": false,
     "is_long": false,
@@ -1695,6 +1715,14 @@
    "icon": "\u274c",
    "score": "1/5",
    "trend": [
+    {
+     "day": "09/11",
+     "wins": 0,
+     "losses": 1,
+     "draws": 0,
+     "total": 1,
+     "pct": 0
+    },
     {
      "day": "09/10",
      "wins": 1,
@@ -1742,14 +1770,6 @@
      "draws": 0,
      "total": 1,
      "pct": 100
-    },
-    {
-     "day": "09/04",
-     "wins": 4,
-     "losses": 8,
-     "draws": 0,
-     "total": 12,
-     "pct": 33
     }
    ],
    "weak_op": "D00 Queen's Pawn Game (1/2 = 50% WR)",
@@ -1757,18 +1777,18 @@
    "upsets": 0,
    "collapses": 0,
    "long_games": 1,
-   "session_summary": "Your play is a disaster\u201420\u202f% win rate across five games proves you can\u2019t even maintain basic consistency, and a 50\u202f% split in the only opening you ever touch shows you have no depth beyond a single, over\u2011used line. Stop milking the D00 Queen\u2019s Pawn Game and force yourself into unfamiliar territory; study at least three solid openings (e.g., the Carlsen\u2011style Ruy\u202fLopez, the Slav, and the King\u2019s Indian) and master their key middle\u2011game ideas before you waste another move. Dedicate the next 10\u202fhours to drilling tactical motifs on\u202fchess.com puzzles (focus on forced mates and fork combos) and replay every loss with a stronger engine to identify the exact move where you veered off; if you can\u2019t improve your blunder rate by 50\u202f% in a week, quit and find a hobby that matches your skill level.",
+   "session_summary": "Your 20\u202f% win rate shows you\u2019re barely scraping by; you\u2019re either playing too passively or over\u2011committing in the opening, and the data proves you can\u2019t even hold a 50\u202f% score with the very same \u201cQueen\u2019s\u202fPawn\u201d system you claim as your strength. Drop the D00 lines immediately\u2014switch to a solid, theory\u2011backed repertoire (e.g., the London System or a Classical French) and force yourself to learn the critical middlegame plans instead of flailing in vague queen\u2011pawn structures. From now on, spend 30\u202fminutes after each loss analyzing the exact moment you deviated from objective best play, and commit to playing only openings where you can reach a known, favorable structure within the first ten moves.",
    "session_date": "2026-09-10",
    "is_yesterday": true,
    "token_missing": false
   },
   "lichess_puzzle": {
-   "pid": "DmxiP",
-   "rating": 1963,
+   "pid": "SfnSt",
+   "rating": 1971,
    "level": "\ud83d\udd34 stretch",
-   "themes": "Clearance \u00b7 Middlegame \u00b7 Crushing",
-   "tip": "Calculate 3 moves deep before touching a piece.",
-   "url": "https://lichess.org/training/DmxiP"
+   "themes": "Mate In5 \u00b7 Middlegame \u00b7 Attraction",
+   "tip": "Lure the king or a key piece onto a bad square with a sacrifice.",
+   "url": "https://lichess.org/training/SfnSt"
   }
  }
 }
