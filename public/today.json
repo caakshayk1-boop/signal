@@ -1,7 +1,7 @@
 {
- "build_id": "20260911T204305",
- "date": "2026-09-11",
- "date_str": "Friday, September 11 2026",
+ "build_id": "20260912T002248",
+ "date": "2026-09-12",
+ "date_str": "Saturday, September 12 2026",
  "picks": [
   {
    "symbol": "DUOL",
@@ -435,7 +435,7 @@
    "sector": "Energy"
   },
   "BRNUSD": {
-   "price": 104.28,
+   "price": 105.16,
    "sector": ""
   },
   "CAPLIPOINT": {
@@ -479,7 +479,7 @@
    "sector": "Technology"
   },
   "COIN": {
-   "price": 172.28,
+   "price": 177.73,
    "sector": ""
   },
   "CPPLUS": {
@@ -495,7 +495,7 @@
    "sector": "Financial Services"
   },
   "CRM": {
-   "price": 243.0,
+   "price": 248.945,
    "sector": "Technology"
   },
   "CUPID": {
@@ -503,7 +503,7 @@
    "sector": "Consumer Defensive"
   },
   "DUOL": {
-   "price": 145.16,
+   "price": 145.34,
    "sector": "Technology"
   },
   "ECLERX": {
@@ -619,7 +619,7 @@
    "sector": "Financial Services"
   },
   "MRK": {
-   "price": 144.71,
+   "price": 145.1051,
    "sector": "Healthcare"
   },
   "MRPL": {
@@ -631,7 +631,7 @@
    "sector": "Basic Materials"
   },
   "NEM": {
-   "price": 126.14,
+   "price": 126.265,
    "sector": "Basic Materials"
   },
   "NEULANDLAB": {
@@ -779,7 +779,7 @@
    {
     "dataset": "Careers feed",
     "status": "DEGRADED",
-    "age": "3h old",
+    "age": "7h old",
     "note": "partial coverage \u2014 12/22 records"
    }
   ]
@@ -1328,28 +1328,18 @@
    "shows": 20,
    "source": "each channel's public Atom feed",
    "built_on": "2026-09-10",
-   "age_days": 0.5,
+   "age_days": 0.7,
    "is_fallback": false
   },
   "smart_reads": [
    {
     "source": "Livemint",
     "cat": "money",
-    "title": "Two months of red: Large-cap outflows deepen after 6-month inflow streak \u2014 what should investors do?",
-    "link": "https://www.livemint.com/money/personal-finance/two-months-of-red-large-cap-outflows-deepen-after-6-month-inflow-streak-what-should-investors-do-11789116067701.html",
-    "summary": "Large-cap mutual funds saw  \u20b91,147 crore in outflows in August 2026, despite previous &amp;nbsp;inflows. Rising mid- and small-cap investments suggest a shift in investor preference. Here's what investors should make of the divergence.",
+    "title": "SWP: Here's how to generate  \u20b950,000 per month as steady income while keeping your corpus invested",
+    "link": "https://www.livemint.com/money/personal-finance/swp-systematic-withdrawal-plan-how-much-investment-gives-rs-50000-per-month-steady-income-mutual-funds-retirement-corpus-11789136620335.html",
+    "summary": "Today, we explain how much you would have to invest in a systematic withdrawal plan (SWP) in order to receive  \u20b950,000 per month as steady income after retirement, while keeping your corpus invested.",
     "date": "Sep 11, 2026",
-    "_sort": "2026-09-11T10:30:08+00:00",
-    "smart": {
-     "what_happened": [
-      "Large-cap mutual funds experienced \u20b91,147 crore net outflows in August 2026 after earlier inflows.",
-      "Mid-cap and small-cap funds attracted net inflows in the same period, indicating a preference shift."
-     ],
-     "why_it_matters": "The reversal from inflows to sizable outflows in large-cap funds suggests investors are reallocating away from established blue\u2011chip equities toward higher\u2011growth segments, which could pressure large\u2011cap fund performance and alter the composition of portfolio assets across the industry.",
-     "what_to_watch": "Track the net flow figures for large-cap mutual funds in September 2026 to see if the outflow trend continues.",
-     "headline": "Large-cap mutual funds record \u20b91,147 crore outflows in August 2026",
-     "read_seconds": 20
-    }
+    "_sort": "2026-09-11T15:55:15+00:00"
    },
    {
     "source": "Economic Times",
@@ -1361,12 +1351,12 @@
     "_sort": "2026-09-11T10:16:19+00:00",
     "smart": {
      "what_happened": [
-      "A retirement fund of Rs 2.5 crore can be structured to provide Rs 2 lakh per month for 25 years.",
-      "The plan recommends using a conservative withdrawal rate below the fund\u2019s annual returns and increasing withdrawals gradually by a fixed percentage."
+      "A Rs 2.5 crore retirement fund is being structured to provide Rs 2 lakh per month for 25 years.",
+      "The strategy calls for a conservative withdrawal rate below the fund's annual returns and gradual increases using a fixed percentage."
      ],
-     "why_it_matters": "Ensuring that a large retirement corpus can generate a steady, long\u2011term cash flow without depleting the principal is critical for retirees who need financial security throughout their post\u2011working years. By matching withdrawals to a rate lower than expected returns and allowing modest, systematic increases, retirees can reduce the risk of outliving their savings while maintaining purchasing power.",
-     "what_to_watch": "Track the actual annual return of the Rs 2.5\u202fcrore portfolio to confirm the withdrawal rate stays below that return.",
-     "headline": "Rs 2.5 crore corpus can fund Rs 2 lakh monthly for 25 years",
+     "why_it_matters": "Ensuring that withdrawals remain lower than the portfolio's earnings helps preserve the corpus over a 25\u2011year horizon, reducing the risk of outliving savings and providing retirees with a predictable cash flow for long\u2011term financial security.",
+     "what_to_watch": "Monitor the actual annual return of the retirement fund versus the withdrawal rate to confirm the corpus remains sustainable over the planned period.",
+     "headline": "Retirement plan targets Rs 2 lakh monthly from Rs 2.5 crore corpus",
      "read_seconds": 26
     }
    },
@@ -1380,12 +1370,12 @@
     "_sort": "2026-09-11T01:30:56+00:00",
     "smart": {
      "what_happened": [
-      "Mutual fund inflows in August increased, showing a strong retail bet on equities.",
-      "The rise aligns with solid economic performance and a return of foreign investors."
+      "Mutual fund inflow data for August showed a net increase, indicating continued investment in Indian equities.",
+      "The rise coincided with strong domestic economic performance and a return of foreign investors to the market."
      ],
-     "why_it_matters": "The inflow surge signals that retail investors remain confident in India's equity market despite recent sideways movement, and the accompanying foreign investor re\u2011entry suggests broader validation of the economic outlook, which could support higher stock valuations and sustain market momentum.",
-     "what_to_watch": "September's mutual fund inflow figures and the direction of the Nifty 50 index in the next trading week.",
-     "headline": "India mutual fund inflows surge in August as retail confidence rises",
+     "why_it_matters": "The inflow surge signals that both retail and foreign investors are betting on a breakout from the recent directionless phase in Indian equity markets, which could support higher stock prices and reinforce confidence in the economy's growth trajectory.",
+     "what_to_watch": "Track the net mutual fund inflow figures for September to see if the upward trend persists.",
+     "headline": "India mutual fund inflows rise in August as retail confidence grows",
      "read_seconds": 20
     }
    },
@@ -1409,11 +1399,11 @@
     "smart": {
      "what_happened": [
       "Some doctors and influencers say women shouldn\u2019t wait until their 60s for a DEXA scan.",
-      "The article outlines factors to consider before undergoing a bone density test at menopause."
+      "The article discusses considerations before getting a bone density test."
      ],
-     "why_it_matters": "Identifying reduced bone density earlier can allow women to address potential osteoporosis risk before it progresses, potentially influencing treatment decisions and reducing fracture risk during later years.",
-     "what_to_watch": "Monitor any new guidance from the medical community about the recommended age or timing for DEXA scans in menopausal women.",
-     "headline": "Doctors advise earlier DEXA scans for menopausal women",
+     "why_it_matters": "Early bone density testing can identify osteoporosis risk sooner, allowing timely preventive or therapeutic measures, which may reduce fracture risk and associated healthcare costs for women approaching menopause.",
+     "what_to_watch": "Watch for updated clinical guidelines on the recommended age or risk factors for initiating DEXA scans in menopausal women.",
+     "headline": "Doctors advise women not to wait until 60s for DEXA scan",
      "read_seconds": 20
     }
    },
@@ -1427,12 +1417,12 @@
     "_sort": "2026-09-10T10:00:00+00:00",
     "smart": {
      "what_happened": [
-      "The article references Penelope\u2019s wait in The Odyssey to illustrate impatience",
-      "Author argues that impatience should be viewed as an emotion rather than a fixed trait"
+      "The article argues that impatience is an emotion rather than a personality trait.",
+      "It references Penelope\u2019s wait in The Odyssey to illustrate the point."
      ],
-     "why_it_matters": "Understanding impatience as an emotion rather than an immutable characteristic may influence how individuals manage expectations and stress, which can affect personal decision\u2011making and mental well\u2011being in both personal and professional contexts.",
-     "what_to_watch": "Future writings by Amy Arthur or related commentary on the psychology of impatience in reputable publications",
-     "headline": "Amy Arthur discusses impatience as an emotion",
+     "why_it_matters": "The piece challenges the common framing of impatience as a fixed characteristic, suggesting that re\u2011labeling it as an emotion could alter how individuals understand and manage the feeling, which has implications for personal development and psychological discourse.",
+     "what_to_watch": "Monitor future Psyche publications for follow\u2011up discussions on emotion versus trait classifications.",
+     "headline": "Impatience described as emotion not trait",
      "read_seconds": 20
     }
    },
@@ -1482,7 +1472,7 @@
     "moves": 49,
     "termination": "Draw",
     "speed": "Blitz",
-    "analysis": "Strengthen your endgame technique: practice converting slight material advantages into wins; study pawn\u2011majority endgames to reduce draws by 30\u202f% in similar positions.",
+    "analysis": "Focus on early piece activity: after 1.e4 e5\u202f2.Nf3 d6, develop the bishop to\u202fBg4\u202finstead of\u202fBe7, pressuring\u202fNf3\u202fand preventing White\u2019s quick central expansion.Focus on early piece activity: after\u202f1.e4\u202fe5\u202f2.Nf3\u202fd6, develop the bishop to\u202fBg4\u202finstead of\u202fBe7, pressuring\u202fNf3\u202fand preventing White\u2019s quick central expansion.",
     "is_upset": false,
     "is_collapse": false,
     "is_long": true,
@@ -1588,7 +1578,7 @@
     "moves": 25,
     "termination": "Resignation",
     "speed": "Blitz",
-    "analysis": "Strengthen your early king safety: avoid 5.Nc3\u2011e5\u2011d4 pawn pushes; instead develop with 5.Nf3, castle quickly, and keep the center compact (\u22642 pawn moves before king safety). This reduces tactical vulnerabilities that cost you the game.",
+    "analysis": "Focus on early central control: after 1.e4 d6 2.d4 Nf6 3.Nc3 g6, play 4.Nf3 instead of 4.Bc4; you\u2019ll avoid losing a pawn by move\u202f12 and keep a solid 0.5\u202fpawn advantage.",
     "is_upset": false,
     "is_collapse": false,
     "is_long": false,
@@ -1621,7 +1611,7 @@
     "moves": 35,
     "termination": "Checkmate",
     "speed": "Blitz",
-    "analysis": "Improve your king safety: after 23\u2026Kd7, avoid exposing the king\u2014play 24\u2026Kd8; this alone reduces checkmate risk by ~30\u202f% and cuts ACPL by ~15\u202fpts.",
+    "analysis": "Focus on early king safety: after 7\u2026Nf6, avoid 9\u2026g5\u2011g4 pawn storms; instead develop pieces, castle, and keep the center solid (\u2264\u202f3\u202f% pawn\u2011storm errors). This prevents the decisive mating attack.",
     "is_upset": false,
     "is_collapse": false,
     "is_long": false,
@@ -1655,7 +1645,7 @@
     "moves": 26,
     "termination": "Checkmate",
     "speed": "Blitz",
-    "analysis": "Focus on early piece development: on move\u202f3 you played\u202fQd3\u202finstead of\u202fNf3, losing tempo and allowing Black\u2019s \u2026c5. Prioritize knights/bishops before queen to avoid such premature attacks.",
+    "analysis": "Focus on early king safety: after 6\u2026Nf6, avoid 7.Qd3?; instead develop knights/bishops, castle by move\u202f10 to prevent the decisive 22\u2026Qh4#.",
     "is_upset": false,
     "is_collapse": false,
     "is_long": false,
@@ -1688,7 +1678,7 @@
     "moves": 21,
     "termination": "Checkmate",
     "speed": "Blitz",
-    "analysis": "Focus on early piece development: aim to finish knights and bishops by move\u202f4, avoid unnecessary queen moves that waste tempo.",
+    "analysis": "Focus on early piece coordination: develop knights before queen (e.g., Nf3, Nc3 by move\u202f4) to avoid queen\u2011side tempo losses and reduce opponent\u2019s counter\u2011play.",
     "is_upset": false,
     "is_collapse": false,
     "is_long": false,
@@ -1777,14 +1767,14 @@
    "upsets": 0,
    "collapses": 0,
    "long_games": 1,
-   "session_summary": "Your 20\u202f% win rate shows you\u2019re barely scraping past the beginner tier\u2014stop treating \u201cQueen\u2019s\u202fPawn\u201d as a safety net and learn a single, sound opening line you can play confidently every game.\u202fEliminate the 50\u202f% draw\u2011or\u2011loss pattern by mastering the Classical French Advance (1.e4\u202fe6\u202f2.d4\u202fd5\u202f3.e5) and force your opponents into positions you understand, rather than wandering in the vague D00 repertoire.\u202fFrom now on, spend the next 10\u202fhours reviewing master games in that line, drill the first 12 moves until they\u2019re automatic, and only then return to the board\u2014any other approach guarantees continued mediocrity.",
+   "session_summary": "Your 20\u202f% win rate shows you\u2019re barely scraping by; you\u2019re playing too passively and letting opponents dictate the tempo. Stop opening with the generic D00 Queen\u2019s Pawn Game\u2014its 50\u202f% success rate is a symptom of indecision, not a strength, and you need a sharper, theory\u2011backed repertoire (e.g., the London System or a solid Slav). From now on, study one opening line deeply, practice the resulting middlegame plans, and force every game into positions where you\u2019re the one setting the agenda.",
    "session_date": "2026-09-10",
    "is_yesterday": true,
    "token_missing": false
   },
   "lichess_puzzle": {
    "pid": "SfnSt",
-   "rating": 1936,
+   "rating": 1952,
    "level": "\ud83d\udd34 stretch",
    "themes": "Mate In5 \u00b7 Middlegame \u00b7 Attraction",
    "tip": "Lure the king or a key piece onto a bad square with a sacrifice.",
