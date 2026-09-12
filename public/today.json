@@ -1,5 +1,5 @@
 {
- "build_id": "20260912T094209",
+ "build_id": "20260912T134221",
  "date": "2026-09-12",
  "date_str": "Saturday, September 12 2026",
  "picks": [
@@ -435,7 +435,7 @@
    "sector": "Energy"
   },
   "BRNUSD": {
-   "price": 104.42,
+   "price": 104.61,
    "sector": ""
   },
   "CAPLIPOINT": {
@@ -479,8 +479,12 @@
    "sector": "Technology"
   },
   "COIN": {
-   "price": 172.28,
+   "price": 175.26,
    "sector": ""
+  },
+  "COROMANDEL": {
+   "price": 1929.0,
+   "sector": "Basic Materials"
   },
   "CPPLUS": {
    "price": 3825.5,
@@ -495,7 +499,7 @@
    "sector": "Financial Services"
   },
   "CRM": {
-   "price": 243.0,
+   "price": 247.72,
    "sector": "Technology"
   },
   "CUPID": {
@@ -503,7 +507,7 @@
    "sector": "Consumer Defensive"
   },
   "DUOL": {
-   "price": 145.16,
+   "price": 143.68,
    "sector": "Technology"
   },
   "ECLERX": {
@@ -542,6 +546,10 @@
    "price": 4548.1001,
    "sector": "Industrials"
   },
+  "HCLTECH": {
+   "price": 1206.1,
+   "sector": "Technology"
+  },
   "HDFCBANK": {
    "price": 708.25,
    "sector": "Financial Services"
@@ -549,6 +557,10 @@
   "HFCL": {
    "price": 233.69,
    "sector": "Technology"
+  },
+  "HINDCOPPER": {
+   "price": 514.5,
+   "sector": "Basic Materials"
   },
   "HINDUNILVR": {
    "price": 1927.0,
@@ -569,6 +581,10 @@
   "INDGN": {
    "price": 577.35,
    "sector": "Healthcare"
+  },
+  "INDIANB": {
+   "price": 853.5,
+   "sector": "Financial Services"
   },
   "IPCALAB": {
    "price": 1970.9,
@@ -598,6 +614,10 @@
    "price": 1025.2,
    "sector": "Healthcare"
   },
+  "KAYNES": {
+   "price": 3505.0,
+   "sector": "Technology"
+  },
   "KIRLOSENG": {
    "price": 2209.0,
    "sector": "Industrials"
@@ -623,31 +643,11 @@
    "sector": "Financial Services"
   },
   "MRK": {
-   "price": 144.71,
+   "price": 143.93,
    "sector": "Healthcare"
   },
   "MRPL": {
    "price": 175.86,
-   "sector": "Energy"
-  },
-  "NATIONALUM": {
-   "price": 361.0,
-   "sector": "Basic Materials"
-  },
-  "NEM": {
-   "price": 126.14,
-   "sector": "Basic Materials"
-  },
-  "NEULANDLAB": {
-   "price": 23800.0,
-   "sector": "Healthcare"
-  },
-  "OFSS": {
-   "price": 11725.0,
-   "sector": "Technology"
-  },
-  "ONGC": {
-   "price": 232.5,
    "sector": "Energy"
   }
  },
@@ -779,7 +779,7 @@
    {
     "dataset": "Careers feed",
     "status": "DEGRADED",
-    "age": "16h old",
+    "age": "19 min old",
     "note": "partial coverage \u2014 12/22 records"
    }
   ]
@@ -1328,10 +1328,19 @@
    "shows": 20,
    "source": "each channel's public Atom feed",
    "built_on": "2026-09-11",
-   "age_days": 0.3,
+   "age_days": 0.5,
    "is_fallback": false
   },
   "smart_reads": [
+   {
+    "source": "Livemint",
+    "cat": "money",
+    "title": "EPF money withdrawal: When can employees claim their provident fund amount in advance?",
+    "link": "https://www.livemint.com/money/personal-finance/epf-money-withdrawal-when-can-employees-claim-their-provident-fund-amount-in-advance-11789185445459.html",
+    "summary": "Employees may need to access retirement savings before leaving the workforce for emergencies. The EPFO permits partial withdrawals, known as EPF advances, with specific eligibility. Check details here.&amp;nbsp;",
+    "date": "Sep 12, 2026",
+    "_sort": "2026-09-12T05:13:55+00:00"
+   },
    {
     "source": "Economic Times",
     "cat": "money",
@@ -1342,32 +1351,13 @@
     "_sort": "2026-09-12T01:30:00+00:00",
     "smart": {
      "what_happened": [
-      "Suryoday Small Finance Bank will pay 8.5% interest on five\u2011year fixed deposits for senior citizens.",
-      "Jana Small Finance Bank will pay 8% interest on five\u2011year fixed deposits for senior citizens, and banks will deduct TDS on FD interest exceeding one lakh."
+      "Suryoday Small Finance Bank offers an 8.5% interest rate on five-year fixed deposits for senior citizens.",
+      "Jana Small Finance Bank offers an 8% rate on similar deposits, and banks deduct TDS on FD interest exceeding one lakh."
      ],
-     "why_it_matters": "The higher fixed\u2011deposit rates give senior citizens a more attractive, low\u2011risk avenue for preserving and growing their savings, especially in a low\u2011interest environment. The differential between banks also creates competition, potentially prompting other lenders to raise senior\u2011citizen rates. The TDS rule on interest above one lakh affects the net return, making after\u2011tax yield an important consideration for this demographic.",
-     "what_to_watch": "Monitor any changes to the one\u2011lakh interest threshold for TDS deduction in upcoming finance ministry or RBI notifications.",
-     "headline": "Citizens FD Rates Up to 8.5% for Five-Year Term at Small Finance Banks",
+     "why_it_matters": "Higher fixed\u2011deposit rates for senior citizens improve the yield on low\u2011risk savings, potentially increasing the attractiveness of small finance banks for this demographic and influencing the allocation of retirement savings toward fixed-income products.",
+     "what_to_watch": "Monitor the Reserve Bank of India's next policy bulletin for any changes to senior citizen FD rate guidelines.",
+     "headline": "Senior citizens can earn up to 8.5% on five-year fixed deposits",
      "read_seconds": 26
-    }
-   },
-   {
-    "source": "Livemint",
-    "cat": "money",
-    "title": "Credit score 780, but home loan application rejected? Expert explains what lenders look for",
-    "link": "https://www.livemint.com/money/personal-finance/credit-score-780-but-home-loan-application-rejected-expert-explains-what-lenders-look-for-11789138844605.html",
-    "summary": "Credit score 780 but home loan rejected? Experts explain why a high CIBIL score may not guarantee approval, covering income stability, existing EMIs, repayment capacity, property value and documentation that lenders assess before sanctioning a home loan.",
-    "date": "Sep 12, 2026",
-    "_sort": "2026-09-12T01:16:32+00:00",
-    "smart": {
-     "what_happened": [
-      "Experts say a CIBIL score of 780 was insufficient for loan approval.",
-      "Lenders also assess income stability, existing EMIs, repayment capacity, property value and documentation."
-     ],
-     "why_it_matters": "For borrowers, a strong credit score alone may not guarantee a mortgage, because banks evaluate a broader set of criteria that affect repayment risk. Understanding these additional factors helps consumers prepare complete applications and manage expectations, reducing the likelihood of rejection after a seemingly favorable credit rating.",
-     "what_to_watch": "Monitor lenders' published debt\u2011to\u2011income ratio thresholds in upcoming loan policy updates.",
-     "headline": "High CIBIL score does not ensure home loan approval",
-     "read_seconds": 21
     }
    },
    {
@@ -1380,11 +1370,11 @@
     "_sort": "2026-09-11T18:52:34+00:00",
     "smart": {
      "what_happened": [
-      "Egypt's President congratulated India on its BRICS presidency and called India a vital strategic partner.",
-      "He highlighted Egypt's strategic location for trade and logistics and urged stronger India\u2011Egypt trade via the Suez Canal, seeking local manufacturing and technology transfer."
+      "Egypt's president congratulated India on its BRICS presidency and highlighted mutual cooperation.",
+      "He noted Egypt's strategic location offers trade and logistics advantages and sought increased Indian involvement in local manufacturing and technology transfer."
      ],
-     "why_it_matters": "The statements signal a push to deepen economic ties between India and Egypt, leveraging Egypt's position on the Suez Canal to facilitate Indian exports and imports and to expand Indian involvement in Egyptian manufacturing and technology sectors, which could enhance supply\u2011chain resilience and open new markets for Indian firms as BRICS expands its influence.",
-     "what_to_watch": "Whether India and Egypt sign a bilateral agreement on manufacturing or technology transfer in the next quarter.",
+     "why_it_matters": "The statements signal a push to deepen economic ties between the two countries, leveraging Egypt's position on the Suez Canal to facilitate Indian exports and supply chains while expanding India's influence within the BRICS framework and regional markets.",
+     "what_to_watch": "Quarterly data on Indian export volumes passing through the Suez Canal",
      "headline": "Egypt president calls India vital partner, urges stronger trade via Suez Canal",
      "read_seconds": 26
     }
@@ -1396,16 +1386,26 @@
     "link": "https://www.nytimes.com/2026/09/11/well/eat/dietary-supplements-survey-findings.html",
     "summary": "A new survey found that 8 in 10 Americans were taking vitamins, protein powders or other supplements. But experts said there is little evidence for many of these products.",
     "date": "Sep 11, 2026",
-    "_sort": "2026-09-11T17:37:38+00:00"
+    "_sort": "2026-09-11T17:37:38+00:00",
+    "smart": {
+     "what_happened": [
+      "A new survey found that eight out of ten Americans were taking vitamins, protein powders or other supplements.",
+      "Experts said there is little evidence that many of these products provide health benefits."
+     ],
+     "why_it_matters": "The high prevalence of supplement use highlights a large consumer market and suggests many Americans are spending money on products whose efficacy is not well supported by scientific evidence, which could influence public health outcomes and regulatory scrutiny.",
+     "what_to_watch": "Future studies or regulatory actions that assess the effectiveness or safety of popular supplement categories.",
+     "headline": "Eight in ten Americans report using dietary supplements",
+     "read_seconds": 20
+    }
    },
    {
     "source": "The Marginalian",
     "cat": "ideas",
-    "title": "Albert Camus on the Source of Strength and How to Save Our Sanity in Trying Times",
-    "link": "https://www.themarginalian.org/2026/09/10/albert-camus-almond-trees-character/",
-    "summary": "\"In the depths of winter, I finally learned that within me there lay an invincible summer.\"",
-    "date": "Sep 10, 2026",
-    "_sort": "2026-09-10T21:31:49+00:00"
+    "title": "The Unspeakable World: Alan Watts on How to Touch the Pulse of Life",
+    "link": "https://www.themarginalian.org/2026/09/10/alan-watts-unspeakable-world/",
+    "summary": "What makes life so disorienting is that its greatest revelations and greatest transformations are inarticulable. William James knew this when he listed ineffability as the first of the four features of transcendent experiences. Everything beautiful and meaningful, from the grand elations to the small gladnesses that ma",
+    "date": "Sep 11, 2026",
+    "_sort": "2026-09-11T02:44:27+00:00"
    },
    {
     "source": "Psyche",
@@ -1462,7 +1462,7 @@
     "moves": 55,
     "termination": "Resignation",
     "speed": "Blitz",
-    "analysis": "Focus on early piece coordination: after 1.d4\u202fd5\u202f2.Nf3\u202fNf6\u202f3.e3\u202fe6, develop your light\u2011squared bishop to b4 (or f5) before playing \u2026c5, preventing White\u2019s solid c3\u2011Nd2 setup and saving ~30\u202fseconds per move.",
+    "analysis": "Focus on early pawn structure: after 1.d4\u202fd5\u202f2.Nf3\u202fNf6\u202f3.e3\u202fc5, you allowed a weak isolated d\u2011pawn; exchange it before move\u202f12 to avoid a long\u2011term positional disadvantage.",
     "is_upset": false,
     "is_collapse": false,
     "is_long": true,
