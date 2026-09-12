@@ -1,5 +1,5 @@
 {
- "build_id": "20260912T204228",
+ "build_id": "20260912T234210",
  "date": "2026-09-12",
  "date_str": "Saturday, September 12 2026",
  "picks": [
@@ -779,7 +779,7 @@
    {
     "dataset": "Careers feed",
     "status": "DEGRADED",
-    "age": "4h old",
+    "age": "7h old",
     "note": "partial coverage \u2014 12/22 records"
    }
   ]
@@ -1328,10 +1328,29 @@
    "shows": 20,
    "source": "each channel's public Atom feed",
    "built_on": "2026-09-11",
-   "age_days": 0.7,
+   "age_days": 0.9,
    "is_fallback": false
   },
   "smart_reads": [
+   {
+    "source": "Livemint",
+    "cat": "money",
+    "title": "Can NRI nominees claim financial assets of deceased investors in India? Here's all you need to know",
+    "link": "https://www.livemint.com/money/personal-finance/can-nri-nominees-claim-financial-assets-of-deceased-investors-in-india-heres-all-you-need-to-know-11789144026804.html",
+    "summary": "Upon the death of an Indian mutual fund or asset holder, nominees manage assets until transferred to heirs. NRIs can be nominees, requiring compliance to regulations. Details here.",
+    "date": "Sep 12, 2026",
+    "_sort": "2026-09-12T15:10:14+00:00",
+    "smart": {
+     "what_happened": [
+      "When an Indian mutual fund or asset holder dies, the nominee manages the assets until they are transferred to the heirs.",
+      "Non\u2011resident Indians can act as nominees, provided they comply with the relevant regulations."
+     ],
+     "why_it_matters": "The clarification that NRIs may serve as nominees impacts estate planning for Indian investors living abroad, ensuring that their financial assets can be administered smoothly after death while complying with Indian regulatory requirements.",
+     "what_to_watch": "Monitor any new SEBI or RBI circulars that modify the eligibility or compliance requirements for NRI nominees.",
+     "headline": "NRIs allowed to serve as nominees for deceased Indian asset holders",
+     "read_seconds": 20
+    }
+   },
    {
     "source": "Economic Times",
     "cat": "money",
@@ -1340,25 +1359,6 @@
     "summary": "Rs 6.42 lakh foreign travel expenditure disallowed from business income as businessman used wife\u2019s credit card to pay for it; ITAT Mumbai gives relief to taxpayer. Challa Nagendra Prasad, Judicial Member and G.M. Doss, Accountant Member of ITAT Mumbai heard this case.",
     "date": "Sep 12, 2026",
     "_sort": "2026-09-12T11:20:04+00:00"
-   },
-   {
-    "source": "Livemint",
-    "cat": "money",
-    "title": "Can being a loan guarantor affect your chances of getting a loan? Expert explains",
-    "link": "https://www.livemint.com/money/personal-finance/can-being-a-loan-guarantor-affect-your-chances-of-getting-a-loan-expert-explains-11789060782363.html",
-    "summary": "Becoming a loan guarantor can affect your future loan eligibility, borrowing capacity and credit profile. Understand how a guaranteed loan may influence lender assessments and the key factors to check before signing a guarantee for someone else.",
-    "date": "Sep 12, 2026",
-    "_sort": "2026-09-12T10:58:14+00:00",
-    "smart": {
-     "what_happened": [
-      "Becoming a loan guarantor can affect future loan eligibility, borrowing capacity and credit profile.",
-      "Lenders assess guaranteed loans when evaluating a borrower\u2019s credit profile and loan applications."
-     ],
-     "why_it_matters": "The inclusion of a guaranteed loan in a borrower\u2019s credit profile can reduce borrowing capacity and alter lender assessments, potentially limiting access to future financing and affecting overall credit health.",
-     "what_to_watch": "Check your borrowing capacity before applying for new credit after signing a guarantee.",
-     "headline": "Loan guarantor status may impact future loan eligibility",
-     "read_seconds": 20
-    }
    },
    {
     "source": "ET Opinion",
@@ -1442,7 +1442,7 @@
     "moves": 55,
     "termination": "Resignation",
     "speed": "Blitz",
-    "analysis": "Focus on early piece coordination: after 1.d4\u202fNf6\u202f2.c4\u202fe6\u202f3.Nc3, develop the light\u2011squared bishop to b4 or g4 instead of passive \u2026d5, saving ~30\u202fcentipawns per move.",
+    "analysis": "",
     "is_upset": false,
     "is_collapse": false,
     "is_long": true,
@@ -1460,6 +1460,14 @@
     "analysed": false,
     "_mode": "full",
     "_trend": [
+     {
+      "day": "09/12",
+      "wins": 0,
+      "losses": 2,
+      "draws": 0,
+      "total": 2,
+      "pct": 0
+     },
      {
       "day": "09/11",
       "wins": 0,
@@ -1507,14 +1515,6 @@
       "draws": 0,
       "total": 7,
       "pct": 71
-     },
-     {
-      "day": "09/05",
-      "wins": 1,
-      "losses": 0,
-      "draws": 0,
-      "total": 1,
-      "pct": 100
      }
     ],
     "_yest_counts": {
@@ -1542,6 +1542,14 @@
    "icon": "\u274c",
    "score": "0/1",
    "trend": [
+    {
+     "day": "09/12",
+     "wins": 0,
+     "losses": 2,
+     "draws": 0,
+     "total": 2,
+     "pct": 0
+    },
     {
      "day": "09/11",
      "wins": 0,
@@ -1589,14 +1597,6 @@
      "draws": 0,
      "total": 7,
      "pct": 71
-    },
-    {
-     "day": "09/05",
-     "wins": 1,
-     "losses": 0,
-     "draws": 0,
-     "total": 1,
-     "pct": 100
     }
    ],
    "weak_op": "",
@@ -1604,14 +1604,14 @@
    "upsets": 0,
    "collapses": 0,
    "long_games": 1,
-   "session_summary": "Your opening choices are leaving you defenseless\u2014every game you\u2019ve played ends in a loss, so you\u2019re either picking the worst lines or playing them so poorly they\u2019re indistinguishable from blunders. Cut the \u201cfun\u201d openings now and study the top\u2011tier 1.e4 and 1.d4 systems (e.g., Sicilian Najdorf, King's Indian Defense) until you can execute the first ten moves without hesitation. Spend the next 20 hours on a tactical trainer, then replay each loss move\u2011by\u2011move, fixing every mistake before you ever sit at the board again.",
+   "session_summary": "",
    "session_date": "2026-09-11",
    "is_yesterday": true,
    "token_missing": false
   },
   "lichess_puzzle": {
    "pid": "qcgKo",
-   "rating": 2044,
+   "rating": 1996,
    "level": "\ud83d\udd34 stretch",
    "themes": "Exposed King \u00b7 Endgame \u00b7 Vukovic Mate",
    "tip": "King activity and pawn structure dominate. Technique over tactics here.",
