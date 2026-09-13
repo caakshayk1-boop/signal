@@ -54,23 +54,23 @@ async function ensure(c) {
   ensured = true;
 }
 
-export default async function clientError(req) {
-  if (req.method !== "POST") return fail("POST only", 405);
+export default async function clientError(req, res) {
+  if (req.method !== "POST") return fail(res, 405, "POST only");
 
   let body;
   try {
     body = await readBody(req);
   } catch {
-    return fail("unreadable body", 400);
+    return fail(res, 400, "unreadable body");
   }
 
   const message = str(body.message).slice(0, MAX_MSG).trim();
-  if (!message) return fail("no message", 400);
+  if (!message) return fail(res, 400, "no message");
 
   const route = str(body.route).slice(0, MAX_ROUTE);
   const stack = str(body.stack).slice(0, MAX_STACK);
   const build = str(body.build).slice(0, 64);
-  const ua = str(req.headers.get("user-agent") || "").slice(0, MAX_UA);
+  const ua = str(req.headers["user-agent"]).slice(0, MAX_UA);
 
   // A coarse bucket, not an identity: the same browser reporting the same
   // fault clusters together, and two different readers hitting one bug still
@@ -90,7 +90,7 @@ export default async function clientError(req) {
       // Not an error to the caller: the report WAS received, it is simply
       // already well known. Telling a broken page it failed to report would
       // make it retry.
-      return json({ ok: true, recorded: false, reason: "already reported this hour" });
+      return json(res, 200, { ok: true, recorded: false, reason: "already reported this hour" });
     }
 
     await c.execute({
@@ -103,10 +103,10 @@ export default async function clientError(req) {
     // spike live without anyone writing a query first.
     console.error(`[client] ${route || "?"} :: ${message}`);
 
-    return json({ ok: true, recorded: true });
+    return json(res, 200, { ok: true, recorded: true });
   } catch (e) {
     // A reporting endpoint that 500s teaches the page to retry into a wall.
     console.error(`[client-error] store failed: ${e && e.message}`);
-    return json({ ok: true, recorded: false, reason: "store unavailable" });
+    return json(res, 200, { ok: true, recorded: false, reason: "store unavailable" });
   }
 }
