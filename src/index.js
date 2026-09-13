@@ -31,6 +31,7 @@ import ipolive from "./api/ipolive.js";
 import wire from "./api/wire.js";
 import { runWatchdog } from "./watchdog.js";
 import subscribe from "./api/subscribe.js";
+import telegramWebhook from "./bot/webhook.js";
 import clientError from "./api/clienterror.js";
 
 const ROUTES = {
@@ -190,6 +191,27 @@ export default {
         status: 200,
         headers: { "content-type": "application/json", "cache-control": "no-store" },
       });
+    }
+
+    /* ── THE TELEGRAM BOT ────────────────────────────────────────────────
+     *
+     * Handled here rather than in ROUTES, for two reasons.
+     *
+     * The handlers in ROUTES are byte-for-byte Vercel PAGES-router handlers
+     * and adapter.js supplies them a `(req, res)` pair. This one came off an
+     * APP-router route and already returns a real Response — which is what
+     * this fetch() wants. Sending it through an adapter built to synthesise
+     * the other shape would be work to undo work.
+     *
+     * And the local-dev proxy below forwards credential-less GETs to
+     * production. A bot webhook must never be proxied anywhere: it is
+     * authenticated by a header Telegram sets, and forwarding it would either
+     * leak that header off-box or replay a command against the live bot.
+     *
+     * It moved here from akk-terminal (terminal.askakshay.com) when that
+     * Vercel project was dissolved — see src/bot/webhook.js. */
+    if (url.pathname === "/api/telegram/webhook") {
+      return telegramWebhook(request, env);
     }
 
     const handler = ROUTES[url.pathname];
