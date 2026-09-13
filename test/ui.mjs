@@ -301,12 +301,34 @@ try {
   /* Wait for the scroll to SETTLE rather than a fixed timeout. The page grows
    * as sections are added, so a jump that used to take 300ms started taking
    * two seconds and the old fixed wait measured it mid-flight — a green test
-   * turning red because the page got longer, not because it broke. */
+   * turning red because the page got longer, not because it broke.
+   *
+   * TWO THINGS MADE THAT SETTLE CHECK FLAKY, and both are fixed here.
+   *
+   * It polled window.scrollY and accepted any two equal consecutive samples.
+   * A smooth scroll EASES IN, so it is barely moving for the first frames —
+   * the sample at 0ms and the sample at 200ms can round to the same number
+   * while the scroll has not meaningfully started, and the check returns at
+   * once and measures the un-scrolled page. Measured live this assertion
+   * passed at 163 on one run and failed at 4000 on another, on the same
+   * unchanged site. Let the scroll begin before believing it has stopped.
+   *
+   * And __lastY was never reset, so the sentinel survived from whatever set
+   * it last and the first comparison could be against a stale value. Clear it.
+   *
+   * Poll the SECTION's own top rather than scrollY: it is the quantity the
+   * assertion below reads, so the thing waited on and the thing measured
+   * cannot disagree. */
+  await p.waitForTimeout(300);                 // let the smooth scroll begin
+  await p.evaluate(() => { window.__jt = null; });
   await p.waitForFunction(() => {
-    const y = Math.round(window.scrollY);
-    if (window.__lastY === y) return true;
-    window.__lastY = y; return false;
-  }, null, { timeout: 8000, polling: 200 });
+    const e = document.getElementById("b-plan");
+    if (!e) return false;
+    const t = Math.round(e.getBoundingClientRect().top);
+    const settled = window.__jt === t;
+    window.__jt = t;
+    return settled;
+  }, null, { timeout: 15000, polling: 200 });
   const planTop = await p.locator("#b-plan").evaluate(e => Math.round(e.getBoundingClientRect().top));
   ok("a section jump clears the sticky stack", planTop > 90 && planTop < 240, planTop);
 
@@ -1095,6 +1117,11 @@ try {
   await hop("/discover", 2500);
   for (const h of await p.$$eval(".disc-c", (n) => n.map((x) => x.getAttribute("href"))))
     seen.add(h);
+  /* COUNT THE CARDS WHILE STILL ON /discover. The assertion below used to run
+   * after the hop to /signals, where .disc-c does not exist — so it counted 0
+   * and failed every deploy on a page that was never broken. Measured live:
+   * /discover carries 8 cards, /signals carries none. */
+  const discCards = await p.locator(".disc-c").count();
   await hop("/signals", 4000);
   for (const h of await p.$$eval(".more-i[href]", (n) => n.map((x) => x.getAttribute("href"))))
     seen.add(h);
@@ -1105,8 +1132,7 @@ try {
                      "/radar", "/engines", "/brief", "/methodology", "/sources"];
   const stranded = mustReach.filter(r => !reachable.includes(r));
   ok("no page is stranded by the flattened nav", stranded.length === 0, stranded);
-  ok("Discover lists the discovery pages",
-     (await p.locator(".disc-c").count()) >= 6);
+  ok("Discover lists the discovery pages", discCards >= 6, discCards);
 
   await p.goto(SITE + "/watch", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 4000);
