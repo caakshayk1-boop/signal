@@ -284,7 +284,7 @@
        *   3. It has both, and they are shown. */
       if (!sr) {
         return `<h4 class="xd-h">The year, and momentum</h4>
-          <p class="said"><b>${esc(sym || 'This name')}</b> is not on the 750-stock Indian
+          <p class="said"><b>${esc(sym || 'This name')}</b> is not on the Indian
             screen${market && market !== 'NSE' ? ` — it is ${esc(market)}` : ''}, so its
             52-week range and monthly RSI are not measured here. The levels above are the
             engine's own and stand on their own.</p>`;
@@ -369,7 +369,7 @@
       const order = [['BUY', 'up'], ['WATCH', 'flat'], ['WAIT', 'warn'], ['AVOID', 'dn']];
       const buys = rows.filter(r => r.vd && r.vd.c === 'BUY' && (r.turnover_cr ?? 0) >= 5)
         .sort((x, y) => (num(y.rs3m) ?? -1e9) - (num(x.rs3m) ?? -1e9)).slice(0, 6);
-      add('verdicts', 'Verdicts', sec('verdicts', 'The call on 750 names',
+      add('verdicts', 'Verdicts', sec('verdicts', `The call on ${rows.length} names`,
         `<b>${cnt('BUY')}</b> rate a buy, <b>${cnt('WATCH')}</b> a watch,
          <b class="dn">${cnt('AVOID')}</b> an avoid. Most of a market is
          <span class="dim">neither</span> at any moment, and a screen that says otherwise

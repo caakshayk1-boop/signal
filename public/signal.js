@@ -913,7 +913,7 @@
                        hunts: 'Names already near their highs with institutional volume behind them — CAN SLIM, held for quarters not weeks.',
                        tf: 'Weekly → 6–12 months' },
     momentum_quant:  { name: 'VECTOR', role: 'Momentum',         band: null,
-                       hunts: 'Cross-sectional rank over 750 names: six and twelve month returns over one-year sigma, skipping the last month.',
+                       hunts: 'Cross-sectional rank over the full NSE screen: six and twelve month returns over one-year sigma, skipping the last month.',
                        tf: 'Monthly → months' },
     ai_longterm:     { name: 'NORTH',  role: 'Long horizon',     band: null,
                        hunts: 'The long-horizon screen, run weekly against the whole board.',
@@ -1040,7 +1040,7 @@
            + 'none should be inferred from the levels on the card.',
     },
     momentum_quant: {
-      triggers: ['Cross-sectional rank over the 750-name screen',
+      triggers: ['Cross-sectional rank over the full NSE screen',
                  '12-month and 6-month returns, each skipping the most recent '
                  + 'month because it reverses',
                  'Each divided by the name’s own ATR, then z-scored across '
@@ -1258,7 +1258,7 @@
   }
 
   /* ── THE SCREEN INDEX ────────────────────────────────────────────────────
-   * symbol → its row on the 750-name screen. Built once and reused, so the
+   * symbol → its row on the NSE screen. Built once and reused, so the
    * 237 KB (gzipped) feed is fetched at most once per session however many
    * routes want a technical field.
    *
@@ -1601,7 +1601,7 @@
           *
           * Offered only when there is a card to open: the button is drawn from
           * the row's bare symbol and openStock() is what decides whether that
-          * symbol is in the 750-name screen. */''}
+          * symbol is in the NSE screen. */''}
       ${/* WHERE A PICK CAME FROM. A weekly idea shown beside a live price and a
           * target, with no date and no entry, cannot be checked by the person
           * reading it — the two numbers that would let them judge it are the
@@ -1715,7 +1715,7 @@
         /* The movers feed carries sym, name, price, sector, r1w, r1m and
          * turnover — and NOT sma50, sma200, rsi or rsi_m. Four of this table's
          * eight columns were therefore permanently em dashes on the markets
-         * page. The values exist: every one is on the 750-name screen, keyed by
+         * page. The values exist: every one is on the NSE screen, keyed by
          * the same symbol. fillLevels() joins them in after paint. */
         const sc = (window.__SCRIDX && window.__SCRIDX[r.sym]) || r;
         const v50 = sc.sma50 && sc.price ? (sc.price - sc.sma50) / sc.sma50 * 100 : null;
@@ -2071,7 +2071,7 @@
       const uni = sr.ok ? (sr.data.rows || []) : [];
       if (!wire.length) return null;
       // "Impactful" measured, not asserted: the story naming the most companies
-      // on the 750-name screen.
+      // on the NSE screen.
       const scored = wire.map(x => ({ x, n: uni.length ? newsMatch(x, uni).length : 0 }));
       scored.sort((a, b) => b.n - a.n);
       return scored[0];
@@ -2226,9 +2226,9 @@
       heatmap(dayMap ? pu.sectors_day : (pu.sectors || []).slice(0, 11), dayMap ? 'r1d' : 'r1w') +
       `<p class="hint">${dayMap
         ? `Median move <b>today</b> per sector, across the <b>${pu.day_universe || 250} largest</b> by market cap. Tile width is how many names it holds.`
-        : 'Median move over the <b>week</b>, across all 750 screened names — today\'s figures arrive with the next screen build.'}
+        : 'Median move over the <b>week</b>, across all screened names — today\'s figures arrive with the next screen build.'}
         Tap a sector for the names behind it.</p>` + heatKey(1.5, 'Sector move'),
-      dayMap ? 'today · large caps' : 'this week · all 750');
+      dayMap ? 'today · large caps' : 'this week · full screen');
 
     /* ── TEN OF EIGHTEEN, AND THE BOTTOM SIX ROTATE ───────────────────────
      *
@@ -3019,7 +3019,7 @@
       const uni = [];
       const list = (T.wire || []).map(x => ({ x, n: T.wireTop ? 0 : 0 }));
       return sheet('The wire, by reach', `
-        <p class="hint" style="margin:0 0 14px">Ordered by how many of the 750 screened names each
+        <p class="hint" style="margin:0 0 14px">Ordered by how many screened names each
           story mentions. That is a measure of reach, not of importance — this feed carries no data
           that would support ranking importance.</p>
         ${(T.wire || []).length ? `<div class="t5l">${(T.wire || []).slice(0, 18).map(x => `
@@ -3175,13 +3175,13 @@
   });
 
   R['/markets'] = async () => {
-    paint(head('Markets', 'The board live, and what the 750-name screen underneath it did.', 'The board') +
+    paint(head('Markets', 'The board live, and what the NSE screen underneath it did.', 'The board') +
       sec('Breadth', `<div class="sk" style="height:104px"></div>`) +
       sec('Sector heat', `<div class="sk" style="height:120px"></div>`) +
       sec('The board', `<div class="board">${skel('sk-row', 8)}</div>`));
 
     const [m, p] = await Promise.all([get('/api/markets'), get('/pulse.json')]);
-    let out = head('Markets', 'The board live, and what the 750-name screen underneath it did.', 'The board');
+    let out = head('Markets', 'The board live, and what the NSE screen underneath it did.', 'The board');
     const pu = p.ok ? p.data : {};
     /* The page opened on a sector heatmap and left the reader to work out the
      * state of the market from it. These are the four numbers that heatmap is
@@ -3195,7 +3195,7 @@
           ? ['Advancing', `${up}<span style="color:var(--dim)">/${cnt}</span>`,
              Math.round(up / cnt * 100) + '% of the screen', up / cnt >= 0.5 ? 'up' : 'dn'] : null,
         Number.isFinite(Number(br.at_52w_high)) ? ['At 52-week high', br.at_52w_high, 'names', 'ac'] : null,
-        ['Screened', pu.universe || 750, 'names re-run daily'],
+        ['Screened', pu.universe || 1000, 'names re-run daily'],
       ]);
     }
 
@@ -3210,8 +3210,8 @@
 
     out += sec('Breadth', breadthWidget(pu.breadth) || `<div class="empty">Screen not built yet.</div>`,
       '', 'How many names went up, out of every name measured.');
-    out += sec('Sector heat — the week, all 750', heatmap(pu.sectors, 'r1w') +
-      `<p class="hint">Median move over the <b>past week</b> across the full <b>${pu.universe || 750}-name</b>
+    out += sec(`Sector heat — the week, all ${pu.universe || 1000}`, heatmap(pu.sectors, 'r1w') +
+      `<p class="hint">Median move over the <b>past week</b> across the full <b>${pu.universe || 1000}-name</b>
         screen — the wider, slower view. The front page shows today over the largest 250.
         Width is how many names the sector holds; tap one for the names behind it.</p>`
       + heatKey(1.5, 'Sector move'),
@@ -4368,7 +4368,7 @@
   const PRESETS = {
     all:        ['Everything',     () => true],
     /* Verdict filters come first because they answer the question a reader
-     * actually arrives with. The 750-name screen was 89 correct columns and no
+     * actually arrives with. The NSE screen was 89 correct columns and no
      * answer: on the 2026-09-04 build 203 rows carried no tags and no horizon
      * at all, and nothing anywhere said "don't touch this" or "right business,
      * wrong entry". verdict.py supplies one call per row — see its header for
@@ -4703,7 +4703,7 @@
     ]))(v => { if (v == null || v === '') return null;
                const x = Number(v); return Number.isFinite(x) ? x : null; });
     const shell = body => head('Screen',
-      'Every one of the 750 names, searchable. Tap any row for the full card.',
+      'Every name on the screen, searchable. Tap any row for the full card.',
       'The full universe') + body;
     if (!SCREEN) paint(shell(`<div class="note">Loading the full universe — about 260 KB, once per session.</div>` +
       `<div class="sk" style="height:320px"></div>`));
@@ -4966,7 +4966,7 @@
   // it is stretched, does.
   /* ── THE PRICE LINE ──────────────────────────────────────────────────────
    * The markets board's range bar, stretched into a full price ladder and
-   * given to every one of the 750 names.
+   * given to every one of the screened names.
    *
    * On one linear scale from the 52-week low to the 52-week high it marks the
    * 200-day, the 50-day, the 20-day and where the price is now. Those three
@@ -5415,7 +5415,7 @@
         <p>${esc(r.name || '')}</p>
       </div>
       <div class="stock-pg">${body}</div>
-      <p class="hint stock-back"><a href="/screen">← All 750 names</a> ·
+      <p class="hint stock-back"><a href="/screen">← All names</a> ·
         <a href="/signals">The ledger</a> · <a href="/engines">What fires a signal</a></p>`;
   };
   /* The sheet wires its own chart on open; the page has to do the same. */
@@ -5632,7 +5632,7 @@
    * SCREEN stores bare NSE symbols (PAYTM). Several feeds — and every Yahoo
    * round-trip — carry the exchange suffix (PAYTM.NS). A card opened from one
    * of those looked the symbol up verbatim, missed, and told the reader the
-   * company "is not in the 750-name screen", which is a sentence about the
+   * company "is not in the NSE screen", which is a sentence about the
    * universe used to report a string-format mismatch. This repo has already
    * been bitten by the same suffix in the sector cap and the dedupe guard.
    * Normalised once, here, so every caller agrees. */
@@ -5666,7 +5666,7 @@
     await loadInsti();
     const r = (SCREEN || []).find(x => x.sym === sym);
     if (!r) {
-      sheet(esc(sym), `<div class="empty">${esc(sym)} is not in the 750-name screen,
+      sheet(esc(sym), `<div class="empty">${esc(sym)} is not in the NSE screen,
         so there is no card for it — it may be an index, a commodity, or a name
         outside the screened universe.</div>`);
       return;
@@ -5971,7 +5971,7 @@
         <div class="chips" style="margin-top:10px">
           <a class="chip" href="/">Today</a>
           <a class="chip" href="/signals">The ledger</a>
-          <a class="chip" href="/screen">The 750-name screen</a>
+          <a class="chip" href="/screen">The NSE screen</a>
           <a class="chip" href="/radar">Radar</a>
           <a class="chip" href="/ipo">IPO</a>
           <a class="chip" href="/engines">The floor</a>
@@ -6349,7 +6349,7 @@
             * what decide whether that ladder is a short hop or the far side of
             * a wall. Both come off the screen row this symbol already has. */''}
         ${(sr => sr ? factsStrip(sr, { noLadder: true }) + bandLine(sr) + levelsBlock(sr) : `
-          <p class="hint">${esc(bareSym(r.symbol))} is not on the 750-name Indian screen${
+          <p class="hint">${esc(bareSym(r.symbol))} is not on the Indian screen${
             r.market && r.market !== 'NSE' ? ` — it is ${esc(r.market)}` : ''}, so its
             52-week range, moving averages and support levels are not measured here. The
             ladder above is the engine's own.</p>`)(screenRow(r.symbol))}
@@ -6740,7 +6740,7 @@
    *
    * A research document you can interrogate, not a page you read. Everything
    * on it is derived from three real sources — the published ledger, the
-   * 750-name screen, and six months of actual daily closes — and anything
+   * NSE screen, and six months of actual daily closes — and anything
    * those three cannot answer is printed as unmeasured rather than filled in.
    *
    * WHAT CHANGED, AND WHY THE CAPTION CHANGED WITH IT.
@@ -7394,7 +7394,7 @@
              what the market did, not on how far the engine placed its own target.`}
           A ${conviction.toLowerCase().replace(' conviction', '-conviction')} setup built from price
           structure, momentum, volume and defined risk. Every figure below comes from the published ledger,
-          the same 750-name screen the rest of this site runs on, and ${pts ? `${pts.length} real daily closes` : 'the published levels'}.</p>
+          the same NSE screen the rest of this site runs on, and ${pts ? `${pts.length} real daily closes` : 'the published levels'}.</p>
       </header>
 
       ${/* ── THE WHOLE TRADE, BEFORE THE ARGUMENT FOR IT ──────────────────────
@@ -7901,7 +7901,7 @@
           const has = ['roce', 'roe', 'pe', 'rev_yoy', 'pat_yoy', 'mcap_cr']
             .some(k => n(row[k]) != null);
           if (!has) return `<div class="empty" style="margin-top:22px">This name is not on the
-            750-name screen, so no fundamental data is published for it here. The price half of
+            NSE screen, so no fundamental data is published for it here. The price half of
             this brief still stands; the business half is simply not measured.</div>`;
           return `<dl class="b-view" style="margin-top:22px">
             ${cell('Market cap', money(row.mcap_cr))}
@@ -7929,7 +7929,7 @@
           </dl>
 
           <p class="b-p" style="font-size:var(--t-4)">Figures come from company filings as aggregated by
-            the same 750-name screen the rest of this site runs on${row.fy ? `, for ${esc(row.fy)}` : ''}${
+            the same NSE screen the rest of this site runs on${row.fy ? `, for ${esc(row.fy)}` : ''}${
             n(row.fy_count) ? ` across ${n(row.fy_count)} reported years` : ''}.
             <b style="color:var(--b-ink)">They are annual, not quarterly</b> — no quarterly series
             exists in this product, so none is shown. Filings get restated and these figures move.
@@ -8667,12 +8667,12 @@
     ['/markets', 'Markets', 'The board: 71 instruments with a year of context'],
     ['/ideas', 'Ideas', 'Ranked names and the orders a sized book would place'],
     ['/ipo', 'IPO', 'Books open now, and how last year’s listings did'],
-    ['/screen', 'Screen', 'All 750 names, searchable'],
+    ['/screen', 'Screen', 'All names, searchable'],
     ['/watch', 'Watchlist', 'Names you starred, and your price alerts'],
     ['/news', 'News', 'The full wire, and the screened names each story touches'],
     ['/signals', 'Signals', 'The public ledger — wins and losses'],
     ['/brief', 'Brief', 'Today’s setup, in full'],
-    ['/discover', 'Discover', 'Every way into the 750 names'],
+    ['/discover', 'Discover', 'Every way into the screen'],
     ['/radar', 'Signal radar', 'What the market is doing, and which names carry it'],
     ['/engines', 'The floor', 'Every engine — what fires it, and what it has done'],
     ['/methodology', 'Methodology', 'How every number on this site is made'],
@@ -9606,7 +9606,7 @@
          * — no timestamp, no clustering, no analysis — so an impact grade
          * would be a number I made up, printed in the typeface the rest of
          * this site reserves for measured things. What CAN be established is
-         * whether a story names a company in the 750-name screen, and what
+         * whether a story names a company in the NSE screen, and what
          * that company and its sector actually did. That is the badge. */
         const secs = [...new Set(hits.map(h => h.sector).filter(Boolean))];
         const secs0 = secs;
@@ -9923,7 +9923,7 @@
          <b>rostered</b> engines; the ledger's own total is higher because it also holds
          the unrostered keys listed above. Backtested records are marked as such and
          are not evidence of a live edge — the universe they are measured on is the
-         750 names screened today, so companies that collapsed and dropped out are
+         names screened today, so companies that collapsed and dropped out are
          missing, which flatters every long-only result.
          <a href="/methodology">How every number here is made →</a></p>`
     ));
@@ -10018,7 +10018,7 @@
     const r = (SCREEN || []).find(x => x.sym === sym);
     if (!r) {
       paint(head(esc(sym), '', 'Company') + `<div class="empty">
-        <b>${esc(sym)}</b> is not in the 750-name screen, so there is no card for it.
+        <b>${esc(sym)}</b> is not in the NSE screen, so there is no card for it.
         It may be an index, a commodity, or a name outside the screened universe.
         <p style="margin-top:12px"><a href="/screen">Browse the screen →</a></p></div>`);
       return;
@@ -10389,7 +10389,7 @@
         momentum 30, trend 30, volume 20 and institutional flow 20, over the screen's own
         fields; a name missing a component is scored on the rest rather than penalised.
         The verdict beside it (Buy / Wait / Watch / Avoid) is the screen's own reading and is
-        not derived from this score. <b>${ranked.length}</b> of the 750 screened names could be
+        not derived from this score. <b>${ranked.length}</b> of the screened names could be
         scored — the rest are under ₹5 cr of daily turnover, or have fewer than two of the
         four components measurable. The strip above carries the top 20; the ring and the
         list carry the top ${nodes.length}.
@@ -10502,7 +10502,7 @@
     return `<span class="rd-facts">
       <span class="rd-f"><em>RSI daily</em><b class="${r.rsi >= 70 ? 'dn' : r.rsi <= 35 ? 'up' : ''}">${
         r.rsi == null ? '—' : Math.round(r.rsi)}</b></span>
-      ${/* The screen carries a MONTHLY RSI for 705 of the 750 names, sampled
+      ${/* The screen carries a MONTHLY RSI for 705 of the screened names, sampled
           * every 21 sessions. On a swing ladder it answers a question the daily
           * one cannot: whether the move is early or already long in the tooth. */''}
       <span class="rd-f"><em>RSI monthly</em><b class="${r.rsi_m >= 70 ? 'dn' : r.rsi_m <= 35 ? 'up' : ''}">${
@@ -10875,7 +10875,7 @@
                  'Breadth over 750 names, with every term of the score printed.'],
     ['/research', 'The research floor', 'Three engines, none of them cleared',
                  'BUOY, ANCHOR and BEDROCK — each published with the measurement that rejects it.'],
-    ['/screen',  'Screen',        'All 750 names, filterable',
+    ['/screen',  'Screen',        'All names, filterable',
                  'Price, trend, quality, value — and FII/DII holding quarter on quarter.'],
     ['/ideas',   'Ideas',         'Ranked names and the orders behind them',
                  'Entry, stop and a three-stage ladder, sized as a share of the book.'],
@@ -11607,7 +11607,7 @@
                      'Nifty breadth, sector heat, IPO books open now, ranked trade ideas and a public signal ledger. India’s markets in one screen, rebuilt before every open.'],
     '/markets':     ['Markets — the board, 71 instruments with a year of context',
                      'Indices, sectors, commodities and currencies on one board, each against its own 52-week range. Sector heat, breadth and what moved today.'],
-    '/screen':      ['Screen — all 750 NSE names, filterable',
+    '/screen':      ['Screen — all 1,000 NSE names, filterable',
                      'Every name in the universe on price, trend, quality, value and institutional flow. FII and DII holding quarter on quarter, from the company’s own filings.'],
     '/signals':     ['Signals — the public ledger, wins and losses both',
                      'Every call this book has published, open and closed, with the entry, stop and targets it was sent with and what it actually did.'],
@@ -11622,7 +11622,7 @@
     '/ipo':         ['IPO — books open now, and how last year’s listings did',
                      'Issues open and upcoming with demand, valuation and peer comparison, plus every recent listing measured against its issue price.'],
     '/news':        ['News — the wire, and the screened names each story touches',
-                     'Market news filtered to what touches the 750-name screen, with the companies each story affects.'],
+                     'Market news filtered to what touches the NSE screen, with the companies each story affects.'],
     '/funds':       ['Funds — SIP screen over AMFI NAV, Direct plans only',
                      'Mutual funds ranked on three- and five-year return against their own drawdown and volatility. Direct plans only, because the cost difference compounds.'],
     '/watch':       ['Watchlist — your names, sorted by what needs attention',

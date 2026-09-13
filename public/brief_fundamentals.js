@@ -169,7 +169,7 @@
   ].join('\n');
 
   /* ── THE SECTION ─────────────────────────────────────────────────────────
-     row   one row of the 750-name screen (screen.json or screen-lite.json)
+     row   one row of the NSE screen (screen.json or screen-lite.json)
      opts  { symbol, screenHref, headingTag }
            screenHref  where "open it on the screen" should go. The two sites
                        route differently — /screen?q=SYM against #/screen — and
@@ -193,7 +193,7 @@
        a loading failure rather than an answer. */
     if (num(row.roce) === null && num(row.comp) === null && num(row.pe) === null) {
       return h('This company reports nothing the screen could read.') +
-        '<p class="b-p">' + esc(sym) + ' carries no financial statements in the 750-name ' +
+        '<p class="b-p">' + esc(sym) + ' carries no financial statements in the ' +
         'screen, so it has no quality, growth or valuation score and no composite. That is a ' +
         'fact about the disclosure, not about the business — and it is the reason the setup ' +
         'above is a price argument and only a price argument. A company that reports nothing ' +
@@ -355,7 +355,7 @@
         : scored < 4
           ? 'Scored on ' + scored + ' of four measures. The rest are not on file.'
           : 'What you would own, on four measures the price argument never touches.') +
-      '<p class="bf-sub">Every figure below is read from the same 750-name screen this page ' +
+      '<p class="bf-sub">Every figure below is read from the same NSE screen this page ' +
       'already downloaded — the same numbers, the same build, no second source and no rounding ' +
       'of its own.' + (fy === null ? '' : ' ' + Math.round(fy) + ' fiscal ' +
         (Math.round(fy) === 1 ? 'year' : 'years') + ' of statements' +
