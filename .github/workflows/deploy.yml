@@ -57,8 +57,26 @@ jobs:
 
       - run: npm ci
 
+      # REFRESH THE FEEDS FIRST, which this step did not do and had to.
+      #
+      # `npx wrangler deploy` ships whatever public/*.json is COMMITTED, and
+      # those files are only as fresh as the last sync-data run that committed
+      # them. So every push to this repo — a CSS tweak, a comment — redeployed
+      # whatever screen.json happened to be in git, silently rolling the live
+      # site back to it.
+      #
+      # Observed today: the universe went to 1,000 names and the Ahimsa join
+      # was fixed, both verified live at 989 rows / 325 constituents, and two
+      # later pushes put the site back to 748 rows / 0 constituents. Twice. The
+      # data was never wrong — the deploy was overwriting it with an older
+      # commit of the same file.
+      #
+      # `npm run deploy` is what a human runs from a laptop: pull-feeds,
+      # prerender, stamp, then wrangler deploy. CI now runs the identical
+      # command, so the two cannot drift and a push can no longer publish
+      # yesterday's feeds.
       - name: Deploy the Worker
-        run: npx wrangler deploy
+        run: npm run deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

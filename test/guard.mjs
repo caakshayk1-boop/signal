@@ -776,6 +776,21 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      nSec === digits.length, { sections: nSec, digits });
 }
 
+/* ── CI MUST DEPLOY THE SAME WAY A LAPTOP DOES ──────────────────────────────
+ * `wrangler deploy` on its own ships whatever public/*.json is COMMITTED, and
+ * those are only as fresh as the last sync that committed them. So any push —
+ * a CSS tweak, a comment — republished stale feeds and rolled the live site
+ * back. It happened twice in one evening: 989 rows and 325 Ahimsa constituents
+ * verified live, then back to 748 and 0, because a later push redeployed an
+ * older commit of the same file. `npm run deploy` pulls the feeds first. */
+{
+  const DEP = readFileSync(new URL("../.github/workflows/deploy.yml", import.meta.url), "utf8");
+  ok("CI deploys with npm run deploy, which refreshes the feeds first",
+     /run: npm run deploy/.test(DEP));
+  ok("CI does not deploy the committed feeds with a bare wrangler deploy",
+     !/run: npx wrangler deploy\s*$/m.test(DEP));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);
