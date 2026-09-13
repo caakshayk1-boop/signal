@@ -4972,3 +4972,32 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .sg-h:hover{color:var(--text)}
 .sg-h:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .sg-h.on{color:var(--text);font-weight:600}
+
+/* ── CLIMBING THE SCREEN ─────────────────────────────────────────────────────
+   Ideas' new lead block. A row is a link, so the whole strip is the target
+   rather than the ticker alone — a four-column row whose only hit area is
+   eight characters of monospace is a row most people miss. */
+.idm{display:flex;flex-direction:column;gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:var(--r-2);overflow:hidden}
+.idm-r{display:grid;grid-template-columns:minmax(0,1fr) 64px 58px minmax(0,1.1fr);
+  gap:0 12px;align-items:center;padding:12px 14px;background:var(--surface);
+  text-decoration:none;color:inherit;transition:background .14s var(--ease,ease)}
+.idm-r:hover{background:var(--raised)}
+.idm-s{min-width:0}
+.idm-s b{display:block;font:600 var(--t-3)/1.2 var(--mono)}
+.idm-s span{display:block;font-size:var(--t-2);color:var(--dim);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.idm-v{font:600 var(--t-1)/1 var(--ui);letter-spacing:.06em;text-transform:uppercase;
+  text-align:center;padding:4px 0;border-radius:var(--r-1);background:var(--raised)}
+.idm-v.v-buy{color:var(--up)}.idm-v.v-watch{color:var(--muted)}
+.idm-m{font:600 var(--t-3)/1 var(--mono);text-align:right}
+.idm-m.up{color:var(--up)}
+.idm-x{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;min-width:0}
+.idm-d{font:500 var(--t-1)/1 var(--mono);padding:3px 6px;border-radius:var(--r-1);
+  background:var(--raised);white-space:nowrap}
+.idm-d.up{color:var(--up)}.idm-d.dn{color:var(--down)}
+/* On a phone the drivers go under the name rather than compete for width. */
+@media(max-width:700px){
+  .idm-r{grid-template-columns:minmax(0,1fr) 58px 52px}
+  .idm-x{grid-column:1/-1;justify-content:flex-start;margin-top:8px}
+}

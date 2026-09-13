@@ -3653,8 +3653,73 @@
              the mandate would place.</p>`
           : `<div class="empty">No orders clear the mandate today.</div>`));
     }
+    /* ── WHAT THE SCREEN CHANGED ITS MIND ABOUT ──────────────────────────────
+     *
+     * This page was three lists of which two were empty: today.json carries
+     * `picks` and neither `picks_week` nor `multibaggers`, so "Multibaggers
+     * this week" and the weekly block rendered nothing at all, every day. What
+     * remained was five engine picks under a banner saying no engine is
+     * cleared for capital — which is honest and is not an idea.
+     *
+     * Meanwhile the screen has carried `rank_move` and `delta` on every row
+     * since it started diffing builds, and NOTHING rendered either. rank_move
+     * is prev_rank - new_rank, so positive is a name climbing; delta is the
+     * per-component change behind it. That is the one question a daily page is
+     * actually opened with — what is different from yesterday — and the answer
+     * was in the payload the whole time.
+     *
+     * AVOID is excluded on purpose. A name can climb 200 places and still be
+     * un-investable; leading a page called Ideas with one because it moved
+     * would be ranking by momentum of rank, which is not a thesis.
+     *
+     * Only real improvement counts: 93 of 744 ranked names moved up on this
+     * build, so the bar is the data's own, not a number chosen to fill a
+     * section. If nothing climbed, the block does not appear. */
+    if (SCREEN && SCREEN.length) {
+      const dnum = (v) => (v == null || v === '' ? null : (Number.isFinite(+v) ? +v : null));
+      const climbers = SCREEN
+        .filter(r => dnum(r.rank_move) != null && dnum(r.rank_move) > 0)
+        .filter(r => { const c = (r.vd || {}).c; return c === 'BUY' || c === 'WATCH'; })
+        .sort((a, b) => dnum(b.rank_move) - dnum(a.rank_move))
+        .slice(0, 8);
+      if (climbers.length) {
+        const drivers = (d) => {
+          if (!d || typeof d !== 'object') return '';
+          const NAME = { tech: 'technicals', comp: 'rank', v: 'valuation', pe: 'PE',
+                         rsi: 'RSI', m_inv: 'investor fit', m_pos: 'positional fit',
+                         m_swing: 'swing fit' };
+          return Object.entries(d)
+            .filter(([k, v]) => NAME[k] && dnum(v) != null && Math.abs(dnum(v)) >= 5)
+            .sort((a, b) => Math.abs(dnum(b[1])) - Math.abs(dnum(a[1])))
+            .slice(0, 3)
+            .map(([k, v]) => `<span class="idm-d ${dnum(v) > 0 ? 'up' : 'dn'}">${esc(NAME[k])}
+                 ${dnum(v) > 0 ? '+' : ''}${Math.round(dnum(v))}</span>`)
+            .join('');
+        };
+        const when = SCREEN_META.changes && SCREEN_META.changes.compared_with;
+        parts.moved = sec('Climbing the screen',
+          `<p class="hint" style="margin:-2px 0 12px">Names that moved UP the ranking since
+             ${when ? `the ${esc(when)} build` : 'the last build'}, with what moved them.
+             Rated buy or watch only — a name can climb two hundred places and still be
+             un-investable, and ranking by momentum of rank is not a thesis.</p>
+           <div class="idm">${climbers.map(r => {
+             const c = (r.vd || {}).c || '';
+             const mv = Math.round(dnum(r.rank_move));
+             return `<a class="idm-r" href="/stock/${encodeURIComponent(r.sym)}">
+               <span class="idm-s"><b>${esc(r.sym)}</b>
+                 <span>${esc(r.name || r.ind || '')}</span></span>
+               <span class="idm-v v-${esc(c.toLowerCase())}">${esc(c)}</span>
+               <span class="idm-m up">&#9650; ${mv}</span>
+               <span class="idm-x">${drivers(r.delta)}</span>
+             </a>`;
+           }).join('')}</div>
+           <p class="hint">Rank is the composite, so a climb is the screen re-reading the
+             company, not the price moving on its own. Tap for the full card.</p>`,
+          `${climbers.length} of ${SCREEN.filter(r => dnum(r.rank_move) > 0).length} climbing`);
+      }
+    }
     // Shortest clock first. A missing block is simply absent — no placeholder.
-    out += [parts.book, parts.picks, parts.brk, parts.mbg, parts.ai]
+    out += [parts.book, parts.moved, parts.picks, parts.brk, parts.mbg, parts.ai]
       .filter(Boolean).join('');
     paint(out);
     fillIdeaCharts(picks);   // six months of real closes on every idea, after paint
