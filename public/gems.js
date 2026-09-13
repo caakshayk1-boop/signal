@@ -401,6 +401,26 @@
              <p class="said">Conviction <b>${esc(r.vd.k || '—')}</b>. A verdict is the screen's
                reading of price and statements — not a recommendation, and not a position.</p>`
           )).join('')}</div>` : '') +
+        /* NSE's Nifty500 Ahimsa index — MEMBERSHIP, not a score, and the screen
+         * publishes no per-company quotient because NSE publishes none. Three
+         * states, and the third matters: true, false, and null for "the list
+         * could not be read", which is not the same as being left out of it.
+         * Counted only over rows that state it, so an unreadable list reports
+         * nothing rather than reporting zero. */
+        (() => {
+          const known = rows.filter(r => r.ahimsa === true || r.ahimsa === false);
+          if (!known.length) {
+            return `<p class="said">NSE's Nifty500 Ahimsa list could not be read on this
+              build, so no name on this page is marked either way.</p>`;
+          }
+          const inIdx = known.filter(r => r.ahimsa === true);
+          const buyIn = inIdx.filter(r => r.vd && r.vd.c === 'BUY').length;
+          return `<p class="said"><b>${inIdx.length}</b> of the ${known.length} names here sit in
+            NSE's <b>Nifty500 Ahimsa</b> index${buyIn ? `, and <b>${buyIn}</b> of those rate a buy` : ''}.
+            It is membership in an index, not a score: NSE publishes the list and no
+            per-company figure, so there is none to show — and it is deliberately kept out
+            of the composite, because nothing measured says a constituent outperforms.</p>`;
+        })() +
         `<p class="said">Every call above is the screen's, computed on the same run that
           priced this page. Nothing on this page re-scores a stock.</p>`,
         stale));
@@ -480,8 +500,18 @@
 
     /* ── 4. TODAY'S SETUPS ─────────────────────────────────────────────────
      * Open signals since launch, each opening onto its own ladder. */
+    /* INDIAN ONLY, because this page says so at the top.
+     * The ledger carries every engine, and top5_pick trades US equities and
+     * COMEX gold alongside the NSE ones. Ordering is newest-first, so on any
+     * day that engine published last the "Indian market in one page" opened
+     * with AAPL, META and a gold future — 18 of the 158 open setups are not
+     * Indian and they were crowding out the 140 that are. Filtered on the
+     * rupee, which is the currency field the feed sets per row, rather than on
+     * a symbol suffix: `.NS` is absent on plenty of NSE rows and present on
+     * none of the US ones. The full multi-market ledger stays on Signal. */
     const open = since.filter(r => String(r.status || '').toUpperCase() === 'OPEN'
-                               && r.entry && r.sl && r.target1);
+                               && r.entry && r.sl && r.target1
+                               && String(r.currency || '₹') === '₹');
     const seen = new Set();
     const picks = open.filter(r => {
       const k = String(r.symbol || '').toUpperCase();

@@ -12438,3 +12438,98 @@
 
   render();
 })();
+
+/* ── SORTABLE TABLES ─────────────────────────────────────────────────────────
+ * Click a column heading to sort the rows under it; click again to reverse.
+ *
+ * Delegated from the document rather than bound per table, because every table
+ * on this site is rendered into innerHTML by a route and then replaced whole on
+ * the next navigation. A listener bound at render time dies with the markup it
+ * was bound to, and the ledger is re-rendered on every filter change.
+ *
+ * The comparison reads the cell, not the model: these tables are built as HTML
+ * strings and there is no row object to sort. So a cell is parsed as a number
+ * when it looks like one AFTER the currency symbol, thousands separators, sign
+ * and percent are stripped — "₹1,206" and "-45.1%" are numbers, "HCLTECH" is
+ * not — and compared as text otherwise. An ISO date sorts correctly as text,
+ * which is why the date column needs no special case.
+ *
+ * Blank cells always sink, in both directions. A missing value is not a small
+ * one, and letting "—" sort as zero would put every unpriced row at the top of
+ * an ascending price sort. */
+(function sortableTables() {
+  /* Leading + as well as -: change columns are written "+3.50%" and "-45.1%",
+     and matching only the minus parsed every gain as TEXT — which sorted the
+     gains lexically and the losses numerically, in the same column. */
+  const NUM = /^[+-]?[\d,]+(\.\d+)?$/;
+
+  const val = (td) => {
+    const raw = (td ? td.textContent : '').trim();
+    if (!raw || raw === '—' || raw === '-') return { blank: true, n: 0, s: '' };
+    const bare = raw.replace(/[₹$€£,\s%]/g, '');
+    if (NUM.test(bare)) return { blank: false, n: parseFloat(bare.replace(/,/g, '')), s: raw };
+    return { blank: false, n: null, s: raw.toLowerCase() };
+  };
+
+  document.addEventListener('click', (ev) => {
+    const th = ev.target.closest ? ev.target.closest('th') : null;
+    if (!th) return;
+    const table = th.closest('table');
+    const head = th.closest('thead');
+    if (!table || !head) return;
+    const body = table.tBodies && table.tBodies[0];
+    if (!body || body.rows.length < 2) return;
+
+    const idx = Array.prototype.indexOf.call(th.parentNode.cells, th);
+    if (idx < 0) return;
+
+    const asc = table.getAttribute('data-sort-col') === String(idx)
+      ? table.getAttribute('data-sort-dir') !== 'asc'
+      : true;
+
+    const rows = Array.prototype.slice.call(body.rows);
+    rows.sort((ra, rb) => {
+      const a = val(ra.cells[idx]), b = val(rb.cells[idx]);
+      if (a.blank !== b.blank) return a.blank ? 1 : -1;   // blanks sink either way
+      if (a.blank) return 0;
+      const cmp = (a.n !== null && b.n !== null)
+        ? a.n - b.n
+        : String(a.s).localeCompare(String(b.s));
+      return asc ? cmp : -cmp;
+    });
+    rows.forEach((r) => body.appendChild(r));
+
+    table.setAttribute('data-sort-col', String(idx));
+    table.setAttribute('data-sort-dir', asc ? 'asc' : 'desc');
+    Array.prototype.forEach.call(head.querySelectorAll('th'), (h, i) => {
+      h.style.cursor = 'pointer';
+      h.setAttribute('aria-sort', i === idx ? (asc ? 'ascending' : 'descending') : 'none');
+      const mark = h.querySelector('.sort-mark');
+      if (mark) mark.remove();
+      if (i === idx) {
+        const s = document.createElement('span');
+        s.className = 'sort-mark';
+        s.style.cssText = 'opacity:.55;font-size:.85em;margin-left:.3em';
+        s.textContent = asc ? '▲' : '▼';
+        h.appendChild(s);
+      }
+    });
+  });
+
+  /* The heading only looks clickable once it is, and tables arrive after this
+     script runs, so the affordance is applied when one appears rather than at
+     load. Cheap: it fires on DOM changes the route already causes. */
+  const mark = () => {
+    document.querySelectorAll('table thead th').forEach((h) => {
+      if (h.style.cursor !== 'pointer') {
+        h.style.cursor = 'pointer';
+        h.title = h.title || 'Sort by this column';
+      }
+    });
+  };
+  /* setTimeout, not an observer: this site is read in a hidden tab often enough
+     that MutationObserver/rAF-driven work has been the wrong tool here before. */
+  document.addEventListener('click', () => setTimeout(mark, 0));
+  setTimeout(mark, 400);
+  setTimeout(mark, 1500);
+})();
