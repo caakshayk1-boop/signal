@@ -1,5 +1,5 @@
 {
- "build_id": "20260913T140328",
+ "build_id": "20260913T144333",
  "date": "2026-09-13",
  "date_str": "Sunday, September 13 2026",
  "picks": [
@@ -779,7 +779,7 @@
    {
     "dataset": "Careers feed",
     "status": "DEGRADED",
-    "age": "24 min old",
+    "age": "1h old",
     "note": "partial coverage \u2014 12/22 records"
    }
   ]
@@ -1342,12 +1342,12 @@
     "_sort": "2026-09-13T05:46:10+00:00",
     "smart": {
      "what_happened": [
-      "The tax department denied a \u20b96.42 lakh business travel expense claim because the payments were made with the claimant's wife's credit card.",
-      "The ITAT upheld the department's decision, ruling the claim ineligible."
+      "Tax department rejected the \u20b96.42\u202flakh business travel expense claim because payments were made with his wife's credit card.",
+      "The ITAT upheld the rejection, ruling the expenses non\u2011allowable."
      ],
-     "why_it_matters": "The ruling highlights that expenses paid through a spouse's credit card may not be allowable as business deductions, reinforcing strict documentation requirements for corporate travel claims and signaling heightened scrutiny by tax authorities.",
-     "what_to_watch": "Any subsequent tax authority guidance or court rulings on the use of family members' credit cards for business expense claims.",
-     "headline": "ITAT rejects \u20b96.42 lakh travel claim for Mumbai businessman",
+     "why_it_matters": "The decision underscores that business expenses must be paid directly by the taxpayer or a company account to qualify for tax deduction, and using a spouse's credit card can lead to disallowance, reinforcing strict compliance standards for corporate travel reimbursements.",
+     "what_to_watch": "Watch for any subsequent ITAT rulings on similar expense claims involving third\u2011party payment methods.",
+     "headline": "ITAT rejects \u20b96.42\u202flakh travel claim for Mumbai businessman who used wife's credit card",
      "read_seconds": 20
     }
    },
@@ -1361,12 +1361,12 @@
     "_sort": "2026-09-12T17:25:17+00:00",
     "smart": {
      "what_happened": [
-      "India assumes the BRICS chairmanship and highlights the need for practical cooperation among members.",
-      "The chairmanship will focus on launching health programs, technology projects, and supporting startup ecosystems."
+      "India, as BRICS chair, emphasizes launching impactful development initiatives",
+      "The agenda includes tailored health programs, technology use, and support for startup ecosystems"
      ],
-     "why_it_matters": "India's leadership of the BRICS group signals a push for multipolar collaboration that could shape policy coordination, investment flows, and development projects across emerging economies, potentially influencing global trade patterns and technology partnerships.",
-     "what_to_watch": "The announcement of the first BRICS-backed health program rollout date under India's chairmanship.",
-     "headline": "India chairs BRICS and stresses practical cooperation and development initiatives",
+     "why_it_matters": "India's chairmanship signals a push for multipolar collaboration within BRICS, aiming to translate political alignment into tangible projects that could improve public health, accelerate technology adoption, and foster entrepreneurship across member economies, potentially reshaping investment and policy priorities in the bloc.",
+     "what_to_watch": "The first development initiative announced under India's BRICS chairmanship, such as a specific health or startup program, and its implementation timeline",
+     "headline": "India leads BRICS with focus on practical cooperation and development",
      "read_seconds": 26
     }
    },
@@ -1377,7 +1377,17 @@
     "link": "https://economictimes.indiatimes.com/wealth/legal/will/rs-6-42-lakh-travel-expense-disallowed-as-business-expenditure-over-use-of-wifes-credit-card-businessman-contests-tax-order-wins-relief-in-itat-mumbai/articleshow/134126429.cms",
     "summary": "Rs 6.42 lakh foreign travel expenditure disallowed from business income as businessman used wife\u2019s credit card to pay for it; ITAT Mumbai gives relief to taxpayer. Challa Nagendra Prasad, Judicial Member and G.M. Doss, Accountant Member of ITAT Mumbai heard this case.",
     "date": "Sep 12, 2026",
-    "_sort": "2026-09-12T11:20:04+00:00"
+    "_sort": "2026-09-12T11:20:04+00:00",
+    "smart": {
+     "what_happened": [
+      "The tax authority disallowed Rs 6.42 lakh foreign travel expense claimed as business deduction because it was paid with the taxpayer\u2019s wife\u2019s credit card.",
+      "The ITAT Mumbai, hearing by Judicial Member Challa Nagendra Prasad and Accountant Member G.M. Doss, overturned the disallowance and granted relief to the taxpayer."
+     ],
+     "why_it_matters": "The decision clarifies that expenses paid through a spouse\u2019s credit card can still be treated as business deductions if the taxpayer can substantiate the business purpose, influencing how companies structure expense payments and how tax authorities assess such claims.",
+     "what_to_watch": "Future ITAT rulings on business expenses paid via relatives' credit cards for consistency with this precedent.",
+     "headline": "Rs 6.42 lakh travel expense disallowed, ITAT grants relief",
+     "read_seconds": 22
+    }
    },
    {
     "source": "NYT Well",
@@ -1404,17 +1414,7 @@
     "link": "https://psyche.co/notes-to-self/why-it-helps-to-see-impatience-as-an-emotion-not-a-trait",
     "summary": "Watching Penelope\u2019s heroic wait in The Odyssey made me lament my impatience. But maybe I\u2019ve been thinking about it wrong- by Amy ArthurRead on Psyche",
     "date": "Sep 10, 2026",
-    "_sort": "2026-09-10T10:00:00+00:00",
-    "smart": {
-     "what_happened": [
-      "The article titled \u201cImpatience is an emotion, not a trait\u201d was written by Amy Arthur and published on Psyche.",
-      "It references Penelope\u2019s wait in The Odyssey to illustrate the concept of impatience."
-     ],
-     "why_it_matters": "The piece challenges the common view that impatience is a fixed personality trait by framing it as an emotional response, which may influence how readers understand and manage their own reactions to delayed outcomes.",
-     "what_to_watch": "Future Psyche publications that examine other emotions through literary examples.",
-     "headline": "Amy Arthur explores impatience as an emotion in Psyche article",
-     "read_seconds": 20
-    }
+    "_sort": "2026-09-10T10:00:00+00:00"
    },
    {
     "source": "Farnam Street",
@@ -1462,7 +1462,7 @@
     "moves": 19,
     "termination": "Resignation",
     "speed": "Blitz",
-    "analysis": "Focus on early pawn structure: after 1.e4 c6 2.d4 d5 3.Nc3 dxe4 4.Nxe4 Nd7, you misplaced the knight on d7 instead of developing to f6; this allowed White\u2019s 5.Ng5! to gain a tempo and attack f7. Prioritize 4...Nf6 (or 4...Bf5) to keep solid, avoid losing central control, and reduce unnecessary piece shuffling.",
+    "analysis": "",
     "is_upset": false,
     "is_collapse": true,
     "is_long": false,
@@ -1567,7 +1567,7 @@
     "moves": 57,
     "termination": "Checkmate",
     "speed": "Blitz",
-    "analysis": "Study typical A45 plans; avoid early queen sorties\u2014your queen moved 5 times in first 12 moves, costing 0.5\u202fpawns.",
+    "analysis": "",
     "is_upset": false,
     "is_collapse": false,
     "is_long": true,
@@ -1665,14 +1665,14 @@
    "upsets": 0,
    "collapses": 1,
    "long_games": 1,
-   "session_summary": "AKK_010\u2019s play is catastrophically unprepared: a 0\u20112 record with a 0\u202f% win rate shows you\u2019re losing every fight, and the single collapse proves you can\u2019t even hold a modest opponent. Your weakest opening is a fatal, predictable line that lets opponents seize the initiative immediately\u2014ditch it now and replace it with a solid, low\u2011theory system (e.g., the London System as White or the Caro\u2011Kann as Black) to force them into unfamiliar territory. Focus on mastering basic endgame technique and pawn structure before attempting any flashy tactics; if you can hold a simple equal position for ten moves, you\u2019ll stop the bleeding and start building a real win\u2011rate.",
+   "session_summary": "",
    "session_date": "2026-09-12",
    "is_yesterday": true,
    "token_missing": false
   },
   "lichess_puzzle": {
    "pid": "qcgKo",
-   "rating": 1960,
+   "rating": 1924,
    "level": "\ud83d\udd34 stretch",
    "themes": "Exposed King \u00b7 Endgame \u00b7 Vukovic Mate",
    "tip": "King activity and pawn structure dominate. Technique over tactics here.",
