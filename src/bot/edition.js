@@ -612,6 +612,45 @@ function ladderBlock(lad) {
   return L;
 }
 
+// Structure and levels. Kept together because they answer one question —
+// where is this price sitting relative to everything that matters — and a
+// reader checking a 200-DMA is checking the 52-week range in the same breath.
+// rsi_m is a 14-period RSI on every 21st BAR, which is a trading-month
+// approximation, not a calendar month. It is absent on 47 of 748 names that
+// lack the ~315 bars it needs, and those render "—" rather than a guess.
+function techBlock(r) {
+  const L = [];
+  const rsiM = num(r.rsi_m);
+  L.push(`RSI ${n(r.rsi)} daily · ${rsiM === null ? "—" : rsiM} monthly`);
+  const lo = num(r.low52), hi = num(r.high52), fh = num(r.from_high);
+  if (lo !== null && hi !== null) {
+    L.push(`52W ₹${lo} – ₹${hi}${fh !== null ? ` · ${fh}% from high` : ""}`);
+  }
+  const s200 = num(r.sma200), price = num(r.price), am = num(r.above_mas);
+  if (s200 !== null) {
+    const rel = price === null ? "" : ` — price ${price >= s200 ? "above" : "below"}`;
+    L.push(`200-DMA ₹${s200}${rel}` +
+           (am !== null ? ` · above ${am} of 3 MAs` : "") +
+           (r.stack === true ? " · 20>50>200 stacked" : ""));
+  }
+  return L;
+}
+
+// SWOT as the screen wrote it, three per quadrant. Each item is a claim and
+// the figure behind it, so the reader can check the claim rather than take it.
+function swotBlock(sw) {
+  const QUAD = [["s", "Strengths"], ["w", "Weaknesses"], ["o", "Opportunities"], ["t", "Threats"]];
+  if (!QUAD.some(([k]) => arr(sw, k).length)) return [];
+  const L = ["", "*SWOT*"];
+  for (const [k, label] of QUAD) {
+    const items = arr(sw, k).slice(0, 3);
+    if (!items.length) continue;
+    L.push(`_${label}_`);
+    for (const it of items) L.push(`  • ${esc(it.t)}\n    _${esc(it.k)}_`);
+  }
+  return L;
+}
+
 function oneCompany(r, extra) {
   const g = (k) => (extra[k] !== undefined ? extra[k] : r[k]);
   const L = [
@@ -647,7 +686,9 @@ function oneCompany(r, extra) {
 
   L.push(
     "",
-    `₹${n(r.price)}   1Y ${n(r.r1y, "%")}   RSI ${n(r.rsi)}`,
+    `₹${n(r.price)}   1Y ${n(r.r1y, "%")}`,
+    ...techBlock(r),
+    "",
     `*Rank ${n(r.comp)}*  ·  Q ${n(r.q)} G ${n(r.g)} V ${n(r.v)} T ${n(r.tech)}`,
     `Investor ${n(r.m_inv)} · Positional ${n(r.m_pos)} · Swing ${n(r.m_swing)}`,
     "",
@@ -677,6 +718,7 @@ function oneCompany(r, extra) {
     L.push("", "*Why now*");
     for (const w of why.slice(0, 5)) L.push(`  + ${esc(w.t)}\n    _${esc(w.k)}_`);
   }
+  L.push(...swotBlock(obj({ v: g("swot") }, "v")));
   const ca = num(g("capalloc"));
   if (ca !== null) L.push("", `*Capital allocation* ${ca}/10`);
   const vh = obj({ v: g("val_hist") }, "v");
