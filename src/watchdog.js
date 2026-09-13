@@ -187,17 +187,47 @@ function dueSlot(now, slots, graceMin = GRACE_MIN) {
  *  A run still in flight DOES count — dispatching a second copy of a job that
  *  is running right now is the double-fire this whole file is built to avoid.
  *  Only a run that finished badly is discounted. */
-async function lastRunAt(repo, file, token) {
+/** ALSO: how many of the newest runs failed in a row.
+ *
+ *  Discounting a failed run is right for "was this slot covered?" and it is
+ *  exactly what turns a broken build into an unbounded loop. On 11-13 Sep
+ *  newspaper.yml failed on one stale assertion; every tick discounted all ten
+ *  failures, concluded the 22:00 slot was still uncovered, and dispatched
+ *  again — 90 times in 30 hours. Each of those runs commits and publishes
+ *  docs/index.html BEFORE the check that fails, so the loop also republished
+ *  the site 90 times and sent 90 failure emails.
+ *
+ *  A dropped cron and a broken build look identical from here — no run
+ *  covering the slot — but they need opposite responses. Dispatching repairs
+ *  the first and merely repeats the second. The count is what separates them:
+ *  a slot nothing ran has no failures behind it, a build that is broken has
+ *  nothing but. */
+async function recentRuns(repo, file, token) {
   const r = await fetch(`${API}/repos/${repo}/actions/workflows/${file}/runs?per_page=10`,
     { headers: hdrs(token), signal: AbortSignal.timeout(10000) });
   if (!r.ok) throw new Error(`runs ${r.status}`);
   const j = await r.json();
+  let at = 0;
+  const failedAt = [];
   for (const run of j.workflow_runs || []) {          // newest first
     const finished = run.status === "completed";
-    if (!finished || run.conclusion === "success") return Date.parse(run.created_at);
+    // A run still in flight counts as cover: dispatching a second copy of a
+    // job running right now is the double-fire this file exists to avoid.
+    if (finished && run.conclusion !== "success") { failedAt.push(Date.parse(run.created_at)); continue; }
+    at = Date.parse(run.created_at);
+    break;
   }
-  return 0;
+  return { at, failedAt };
 }
+
+/* Consecutive failures after which this stops dispatching. One dispatch to
+ * repair a genuinely dropped slot, two more in case the failure was transient
+ * — a runner dying, a third party down — and then it stands down and says so
+ * on /api/pipeline. Retrying past that is not repair, it is a broken build
+ * re-run on a timer, and for newspaper.yml each re-run is another publish and
+ * another email. The stand-down clears itself: one green run resets the count
+ * to zero and the watchdog resumes with no intervention. */
+const BROKEN_AFTER = 3;
 
 /** Did the WORK for this slot actually land in the ledger?
  *
@@ -271,9 +301,20 @@ export async function runWatchdog(env, { act = true } = {}) {
                   due_slot: due ? new Date(due.at).toISOString() : null,
                   dispatch_inputs: due && due.inputs ? due.inputs : null };
     try {
-      const last = await lastRunAt(w.repo, w.file, token);
+      const { at: last, failedAt } = await recentRuns(w.repo, w.file, token);
       row.last_run = last ? new Date(last).toISOString() : null;
       row.hours_since = last ? +((now - last) / 36e5).toFixed(1) : null;
+      row.consecutive_failures = failedAt.length;
+      /* ONLY THE FAILURES BEHIND THIS SLOT COUNT, and the distinction is not
+       * academic. A workflow can carry a long tail of old failures and still
+       * deserve its next slot dispatched — that is a build that was broken and
+       * is now merely untried. Counting the whole tail would suppress the
+       * first attempt at every future slot until something else happened to go
+       * green, which is the watchdog declining to do the one job it has.
+       * Failures after the slot are this slot's own retries; those are the
+       * ones that say retrying is pointless. */
+      const failsHere = due ? failedAt.filter(t => t >= due.at).length : 0;
+      row.failures_since_slot = failsHere;
 
       // A run newer than the slot is the WEAKEST evidence available, so it is
       // only the answer when nothing better exists.
@@ -333,7 +374,16 @@ export async function runWatchdog(env, { act = true } = {}) {
                  + "work — dispatching anyway, because --once and the brief's own "
                  + "guard make a duplicate a no-op";
       }
-      if (row.missed && act) {
+      /* A BROKEN BUILD IS NOT A MISSED ONE, AND DISPATCHING IT AGAIN ONLY
+       * REPEATS THE FAILURE. Reported either way, because a workflow that has
+       * stopped being retried is precisely the thing worth seeing. */
+      row.broken = failsHere >= BROKEN_AFTER;
+      if (row.broken) {
+        row.note = `${failsHere} failures since this slot — standing down rather than `
+                 + "re-running a build that is broken rather than dropped; one "
+                 + "green run resumes this automatically";
+      }
+      if (row.missed && act && !row.broken) {
         await dispatch(w.repo, w.file, token, due.inputs);
         row.dispatched = true;
       }
