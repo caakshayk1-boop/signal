@@ -1272,7 +1272,7 @@
     if (!SCREEN) {
       const g = await getScreen(false); const r = noteLadder(g.r);
       if (!r.ok) return null;
-      setScreen((r.data.rows || []).filter(x => x && x.sym), g.lite);
+      noteScreenMeta(r.data); setScreen((r.data.rows || []).filter(x => x && x.sym), g.lite);
     }
     const idx = {};
     for (const r of SCREEN) idx[r.sym] = r;
@@ -3297,7 +3297,7 @@
        SCREEN ? Promise.resolve({ ok: false }) : getScreen(false).then(g => (LITE_GOT = g.lite, g.r))]);
     if (sc && sc.ok && sc.data) {
       noteLadder(sc);
-      if (!SCREEN) setScreen((sc.data.rows || []).filter(x => x && x.sym), LITE_GOT);
+      noteScreenMeta(sc.data); if (!SCREEN) setScreen((sc.data.rows || []).filter(x => x && x.sym), LITE_GOT);
       SCREEN_DATE = SCREEN_DATE || sc.data.price_date || null;
     }
     let out = head('Ideas', 'Ranked names, and the orders a fully-sized book would place against them. Sizes are shown as a share of the book, so they scale to whatever you run.', 'Ranked ideas');
@@ -4079,6 +4079,20 @@
    * which is the whole reason the digest exists and why both can coexist.
    */
   let SCREEN = null;
+  /* The payload's META, not its rows. screen.json ships weights, changes and
+     the core/extension split and NOTHING rendered any of them — the page could
+     not say how its own composite is weighted, what moved since the last
+     build, or that 250 of its names are not index constituents. Captured
+     wherever the screen is fetched so any route can read it. */
+  let SCREEN_META = {};
+  const noteScreenMeta = (d) => {
+    if (!d || typeof d !== 'object') return d;
+    for (const k of ['weights', 'changes', 'universe', 'universe_size',
+                     'universe_core', 'universe_ext', 'built_on']) {
+      if (d[k] !== undefined) SCREEN_META[k] = d[k];
+    }
+    return d;
+  };
   /* ── WHICH TABLE IS IN THE CACHE ─────────────────────────────────────────
    *
    * The screen table ships in two projections. screen-lite.json is what nine
@@ -4711,7 +4725,13 @@
      * a reload must land on the same nine names the sender was looking at. */
     SCR_STATE.read();
     const screenSnap = rows => ((num) => snap([
-      ['Universe', rows.length, 'names screened'],
+      ['Universe', rows.length, (() => {
+        /* WHAT THE UNIVERSE IS MADE OF. 250 of these names are not Nifty Total
+           Market constituents — they are the most liquid listings outside it —
+           and the page said only "names screened", which reads as one index. */
+        const c = SCREEN_META.universe_core, e = SCREEN_META.universe_ext;
+        return (c && e) ? `${c} in the index · ${e} by turnover` : 'names screened';
+      })()],
       ['Above 200-day', rows.filter(r => num(r.price) && num(r.sma200) && num(r.price) > num(r.sma200)).length,
        'in an uptrend', 'up'],
       ['At 52-week high', rows.filter(r => r.brk52w).length, 'breaking out', 'ac'],
@@ -4736,7 +4756,7 @@
       // 750 rows they actually came for.
       const [r] = await Promise.all([get(FULL_URL).then(noteLadder), loadInsti()]);
       if (!r.ok) { paint(shell(fail('The screen', r.error))); return; }
-      setScreen((r.data.rows || []).filter(x => x && x.sym), false);
+      noteScreenMeta(r.data); setScreen((r.data.rows || []).filter(x => x && x.sym), false);
     } else await loadInsti();
 
     let shownRows = [];          // the page the live quote call must ask for
@@ -4767,6 +4787,23 @@
 
       main.innerHTML = shell(
         screenSnap(SCREEN) +
+        /* THE PROVENANCE LINE. Both halves were in the payload and neither was
+           rendered: a reader could rank by Composite without being told what
+           the composite weighs, and could not see that a quarter of the table
+           turned over since the last build. */
+        (() => {
+          const w = SCREEN_META.weights || {}, ch = SCREEN_META.changes || {};
+          const parts = Object.entries(w)
+            .sort((a, b) => b[1] - a[1])
+            .map(([k, v]) => `${esc(k)} ${Math.round(v * 100)}%`);
+          const bits = [];
+          if (parts.length) bits.push(`<b>Composite</b> = ${parts.join(' · ')}`);
+          if (ch.compared_with && (ch.new != null || ch.moved != null)) {
+            bits.push(`<b>${ch.new ?? 0}</b> new and <b>${ch.moved ?? 0}</b> re-ranked since ${esc(ch.compared_with)}`);
+          }
+          return bits.length
+            ? `<p class="hint scr-prov">${bits.join(' &nbsp;·&nbsp; ')}</p>` : '';
+        })() +
         `<div class="tools">
           <input type="search" id="scrq" class="scr-in" placeholder="Symbol, company or sector"
                  value="${esc(scrQ)}" aria-label="Search the screen">
@@ -5726,7 +5763,7 @@
         <p class="hint">Loading the full screen — about 300 KB, once per session.</p>`);
       const r0 = noteLadder(await get(FULL_URL));
       if (!r0.ok) { sheet(esc(sym), fail('The company card', r0.error)); return; }
-      setScreen((r0.data.rows || []).filter(x => x && x.sym), false);
+      noteScreenMeta(r0.data); setScreen((r0.data.rows || []).filter(x => x && x.sym), false);
     }
     // The card can be opened from Today, Markets, Ideas or search, none of
     // which touch the Screen route, so the institutional feed is requested
@@ -6314,7 +6351,7 @@
       getScreen(false).then(g => (LITE_GOT = g.lite, g.r)).then(sc => {
         if (!sc.ok || !sc.data) return;
         noteLadder(sc);
-        setScreen((sc.data.rows || []).filter(x => x && x.sym), LITE_GOT);
+        noteScreenMeta(sc.data); setScreen((sc.data.rows || []).filter(x => x && x.sym), LITE_GOT);
         SCREEN_DATE = sc.data.price_date || SCREEN_DATE;
         if (location.pathname === '/signals') draw();
       });

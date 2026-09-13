@@ -4961,3 +4961,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
    and keep the swipe-scroll only on phones where wrapping costs more height
    than it is worth. */
 @media(min-width:701px){ .chips{flex-wrap:wrap;overflow-x:visible} }
+
+/* The screen's provenance line: how the composite is weighted, and what moved
+   since the last build. Both were in the payload and neither was shown. */
+.scr-prov{margin:-4px 0 14px;font-size:var(--t-2);color:var(--muted);line-height:1.6}
+.scr-prov b{color:var(--text);font-weight:600}
