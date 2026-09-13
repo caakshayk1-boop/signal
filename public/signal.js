@@ -235,6 +235,20 @@
     return (r > 0 ? '+' : '') + (r === 0 ? '0.00' : r.toFixed(2)) + '%';
   };
   const dir = v => Number(v) > 0 ? 'up' : Number(v) < 0 ? 'dn' : '';
+  /* ── "OFF ITS HIGH" MUST NOT BE A POSITIVE NUMBER ────────────────────────
+   * from_high is measured against the 52-week high as of the last complete
+   * bar, so a stock printing a new high today comes back POSITIVE — and the
+   * cell rendered "0.4%" under a label that says "off its high", which reads
+   * as 0.4% below when it is 0.4% above. FINCABLES showed exactly that.
+   * Above the range top is not a distance from it; it is a new high. */
+  const offHigh = v => {
+    const n = Number(v);
+    if (v === null || v === undefined || !Number.isFinite(n)) return null;
+    return n >= 0 ? { txt: 'at a new high', cls: 'up' }
+                  : { txt: n.toFixed(1) + '%', cls: dir(n) };
+  };
+
+
   const ago = ms => { const m = Math.round(ms / 60000); return m < 60 ? m + 'm' : Math.round(m / 60) + 'h'; };
 
   /* Outbound detail links.
@@ -3834,8 +3848,8 @@
       <span class="x" data-l="Last">${r.last_close != null ? price(r.last_close) : '—'}</span>
       <span class="x" data-l="Range since">${r.low != null && r.high != null
         ? price(r.low) + '–' + price(r.high) : '—'}</span>
-      <span class="x ${dir(r.from_high_pct)}" data-l="Off high">${
-        r.from_high_pct != null ? pct(r.from_high_pct) : '—'}</span>
+      ${(() => { const o = offHigh(r.from_high_pct); return `<span class="x ${
+        o ? o.cls : ''}" data-l="Off high">${o ? esc(o.txt) : '—'}</span>`; })()}
       <span class="m ${dir(r.since_listing_pct)}" data-l="Since listing">${
         pct(r.since_listing_pct)}</span>`,
       ipoDetail(r),
@@ -10484,9 +10498,10 @@
       <span class="rd-f"><em>3 months</em><b class="${dir(r.r3m)}">${pct(r.r3m)}</b></span>
       <span class="rd-f"><em>52w range</em><b>${r.low52 == null || r.high52 == null ? '—'
         : `${price(r.low52)} – ${price(r.high52)}`}</b></span>
-      <span class="rd-f"><em>Off its high</em><b data-fhigh="${esc(String(r.high52 ?? ''))}"
-        class="${dir(r.from_high)}">${
-        r.from_high == null ? '—' : Number(r.from_high).toFixed(1) + '%'}</b></span>
+      ${(() => { const o = offHigh(r.from_high); return `<span class="rd-f">
+        <em>${o && o.txt === 'at a new high' ? '52-week high' : 'Off its high'}</em>
+        <b data-fhigh="${esc(String(r.high52 ?? ''))}" class="${o ? o.cls : ''}">${
+          o ? esc(o.txt) : '—'}</b></span>`; })()}
       ${/* ── NIFTY500 AHIMSA ─────────────────────────────────────────────
           * NSE Indices launched this on 10 July 2026 — the Nifty 500 filtered
           * to companies not engaged in activities harmful to animals, 326 of
