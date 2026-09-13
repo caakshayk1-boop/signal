@@ -134,6 +134,25 @@
     '@media(min-width:640px){.bf-tbls{grid-template-columns:1fr 1fr}}',
     '@media(min-width:1040px){.bf-tbls{grid-template-columns:repeat(3,1fr)}}',
     '.bf-tbl{background:var(--b-card,var(--b-sur,#fff));padding:20px}',
+    /* SWOT. Two columns where there is room, one where there is not — a
+       quadrant grid that squeezes to 160px a column turns every claim into
+       four lines of two words. */
+    '.bf-swot{background:var(--b-card,var(--b-sur,#fff));padding:20px;margin-top:12px}',
+    '.bf-swot h4{margin:0 0 12px;font-size:.95rem}',
+    '.bf-swot .bf-q{margin-bottom:14px}',
+    '.bf-swot .bf-q:last-child{margin-bottom:0}',
+    '.bf-swot .bf-q>b{display:block;font-size:.72rem;letter-spacing:.08em;',
+    '  text-transform:uppercase;opacity:.65;margin-bottom:6px}',
+    '.bf-swot ul{margin:0;padding:0;list-style:none}',
+    '.bf-swot li{margin:0 0 8px;padding-left:12px;position:relative;font-size:.88rem;line-height:1.45}',
+    '.bf-swot li:before{content:"";position:absolute;left:0;top:.55em;width:4px;height:4px;',
+    '  border-radius:50%;background:currentColor;opacity:.45}',
+    '.bf-swot li span{display:block;opacity:.6;font-size:.8rem;margin-top:2px}',
+    '.bf-q-s{color:var(--b-bull,#1a7f45)}.bf-q-o{color:var(--b-bull,#1a7f45)}',
+    '.bf-q-w{color:var(--b-bear,#b3261e)}.bf-q-t{color:var(--b-bear,#b3261e)}',
+    '.bf-swot li,.bf-swot li span{color:var(--b-ink,inherit)}',
+    '@media(min-width:640px){.bf-swot{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}',
+    '  .bf-swot h4{grid-column:1/-1}}',
     '.bf-tbl h4{margin:0 0 12px;font:500 var(--t-1,10px)/1 var(--mono,monospace);letter-spacing:.14em;',
     '  text-transform:uppercase;color:var(--b-dim,#6E7681)}',
     '.bf-tbl table{width:100%;border-collapse:collapse}',
@@ -169,7 +188,7 @@
   ].join('\n');
 
   /* ── THE SECTION ─────────────────────────────────────────────────────────
-     row   one row of the NSE screen (screen.json or screen-lite.json)
+     row   one row of the 750-name screen (screen.json or screen-lite.json)
      opts  { symbol, screenHref, headingTag }
            screenHref  where "open it on the screen" should go. The two sites
                        route differently — /screen?q=SYM against #/screen — and
@@ -390,11 +409,42 @@
       'incompletely. Everything else on this page is unaffected.</p>';
   }
 
+  /* SWOT — Strengths, Weaknesses, Opportunities, Threats.
+   *
+   * A SEPARATE EXPORT, not folded into render(). render() is synchronous and
+   * reads one screen row; SWOT lives in its own feed because the only other
+   * copy is inside a 4.1MB detail file neither brief will load. Keeping it
+   * separate means the caller fetches when it wants to and this module stays
+   * a pure function of what it is handed.
+   *
+   * Each item is a CLAIM and the figure behind it, so a reader can check the
+   * claim rather than take it. Empty quadrants are skipped — a heading with
+   * nothing under it reads as a loading failure. */
+  function swot(sw) {
+    if (!sw) return '';
+    var QUAD = [['s', 'Strengths'], ['w', 'Weaknesses'],
+                ['o', 'Opportunities'], ['t', 'Threats']];
+    var any = QUAD.some(function (q) { return (sw[q[0]] || []).length; });
+    if (!any) return '';
+    var out = '<div class="bf-swot"><h4>Strengths, weaknesses, and what could go wrong</h4>';
+    QUAD.forEach(function (q) {
+      var items = (sw[q[0]] || []).slice(0, 3);
+      if (!items.length) return;
+      out += '<div class="bf-q bf-q-' + q[0] + '"><b>' + esc(q[1]) + '</b><ul>' +
+        items.map(function (it) {
+          return '<li>' + esc(String(it.t || '')) +
+            (it.k ? '<span>' + esc(String(it.k)) + '</span>' : '') + '</li>';
+        }).join('') + '</ul></div>';
+    });
+    return out + '</div>';
+  }
+
   root.BriefFundamentals = {
     render: render,
+    swot: swot,
     missingNotice: missingNotice,
     /* Bumped when the shape of what render() needs from a row changes, so the
        two sites can say which copy they are running rather than guessing. */
-    VERSION: '1.0.0',
+    VERSION: '1.1.0',   // + swot()
   };
 })(typeof window !== 'undefined' ? window : globalThis);
