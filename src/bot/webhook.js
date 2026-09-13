@@ -60,12 +60,56 @@ const TOKEN  = process.env.TELEGRAM_BOT_TOKEN;
 const GH_RAW = "https://raw.githubusercontent.com/caakshayk1-boop/trading-dashboard/main/data";
 const WEBHOOK_URL = "https://terminal.askakshay.com/api/telegram/webhook";
 
+// Telegram REJECTS a message over 4096 characters outright — it does not
+// truncate it. The reply simply never arrives, the API returns 400, and
+// nothing here used to look at the response, so an over-long answer vanished
+// without a trace. /stock on a company with a full flag list clears 4096
+// comfortably, so this is load-bearing, not defensive.
+const TG_LIMIT = 4096;
+
+// Split on line boundaries so Markdown emphasis, which this bot opens and
+// closes within a single line, is never cut in half. A single line longer than
+// the limit is hard-split: there is nothing better available, and it is rare.
+function chunk(text, limit = TG_LIMIT) {
+  const out = [];
+  let buf = "";
+  for (const line of String(text == null ? "" : text).split("\n")) {
+    if (line.length > limit) {
+      if (buf) { out.push(buf); buf = ""; }
+      for (let i = 0; i < line.length; i += limit) out.push(line.slice(i, i + limit));
+      continue;
+    }
+    if (buf && buf.length + 1 + line.length > limit) { out.push(buf); buf = line; }
+    else buf = buf ? `${buf}\n${line}` : line;
+  }
+  if (buf) out.push(buf);
+  return out.length ? out : [""];
+}
+
 async function tg(chatId, text) {
-  await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "Markdown" }),
-  });
+  for (const part of chunk(text)) {
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: part, parse_mode: "Markdown" }),
+      });
+      // A 400 here is nearly always unbalanced Markdown in a name the escaper
+      // missed. Retrying as plain text delivers the answer rather than losing
+      // it, and the log line says which command produced it.
+      if (!r.ok) {
+        const body = await r.text().catch(() => "");
+        console.error(`[tg] ${r.status} on ${part.length} chars: ${body.slice(0, 200)}`);
+        await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chatId, text: part }),
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.error(`[tg] send failed: ${e && e.message}`);
+    }
+  }
 }
 
 async function gh(name) {

@@ -38,6 +38,13 @@ async function get(path, timeoutMs = 12000) {
 // ── formatting helpers ──────────────────────────────────────────────────────
 
 function num(v) {
+  // Number(null) is 0 and Number("") is 0, and both pass Number.isFinite — so
+  // the obvious one-liner turns every UNPUBLISHED figure into a real zero.
+  // That is not cosmetic here: 57 of 748 screened companies publish no ROCE
+  // and 6 publish no D/E, and "D/E 0" reads as debt-free while "PE 0" reads as
+  // absurdly cheap. A missing number must render as "—", never as 0.
+  // Booleans are excluded for the same reason: Number(true) is 1.
+  if (v === null || v === undefined || v === "" || typeof v === "boolean") return null;
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;
 }
@@ -578,11 +585,67 @@ function n(v, suf = "") {
 }
 
 /** One company, in full — the mobile version of the site's detail sheet. */
+// The four calls the screen publishes, in the order a reader cares about.
+// The icon carries the call for someone scanning a phone; the word carries it
+// for everyone else. Never icon alone.
+const VD_ICON = { BUY: "\u{1F7E2}", WAIT: "\u{1F7E1}", WATCH: "⚪", AVOID: "\u{1F534}" };
+
+// The ladder as the screen computed it. Only the fields whose meaning is
+// documented are rendered: `e`/`s`/`rk`/`rr` and the [price, R] head of each
+// target. `lad.t` entries carry two further integers and `lad.w` three, and
+// nothing in the repo states what they mean — so they are left out rather
+// than captioned with a guess a reader would trade on.
+function ladderBlock(lad) {
+  const e = num(lad.e), s = num(lad.s);
+  if (e === null || s === null) return [];
+  const rk = num(lad.rk), rr = num(lad.rr);
+  const L = ["", "*Trade ladder*",
+             `Entry ₹${e} · Stop ₹${s}${rk !== null ? ` · risk ${rk}%` : ""}`];
+  const ts = arr(lad, "t")
+    .map((t, i) => {
+      const p = num(Array.isArray(t) ? t[0] : null), r = num(Array.isArray(t) ? t[1] : null);
+      return p === null ? null : `T${i + 1} ₹${p}${r !== null ? ` (${r}R)` : ""}`;
+    })
+    .filter(Boolean);
+  if (ts.length) L.push(ts.join(" · "));
+  if (rr !== null) L.push(`Reward:risk ${rr} to T1`);
+  return L;
+}
+
 function oneCompany(r, extra) {
   const g = (k) => (extra[k] !== undefined ? extra[k] : r[k]);
   const L = [
-    `*${esc(r.sym)}* — ${esc(_nullishCoalesce(r.name, () => ( "")))}`,
-    `_${esc(_nullishCoalesce(r.ind, () => ( "")))}_${r.tier ? ` · ${esc(r.tier)}cap` : ""}`,
+    `*${esc(r.sym)}* — ${esc(r.name == null ? "" : r.name)}`,
+    `_${esc(r.ind == null ? "" : r.ind)}_${r.tier ? ` · ${esc(r.tier)}cap` : ""}`,
+  ];
+
+  // THE CALL FIRST. This is the one line the question "what do I do about
+  // this stock" is actually asking, and it sat in the payload unrendered
+  // while the reply opened with an industry label.
+  const vd = obj(r, "vd");
+  const call = String(vd.c || "").toUpperCase();
+  if (call) {
+    const icon = VD_ICON[call] || "";
+    L.push("", `${icon} *${esc(call)}*${vd.l ? ` — ${esc(vd.l)}` : ""}`);
+    if (vd.o) L.push(esc(vd.o));
+    const bits = [];
+    if (vd.k) bits.push(`conviction ${esc(vd.k)}`);
+    if (vd.h) bits.push(`horizon ${esc(vd.h)}`);
+    const alt = arr(vd, "a").map(esc).filter(Boolean);
+    if (alt.length) bits.push(`also rated ${alt.join(", ")}`);
+    if (bits.length) L.push(`_${bits.join(" · ")}_`);
+    // A WAIT is only actionable if it says what it is waiting FOR.
+    if (vd.t) L.push(`Waiting for: ${esc(vd.t)}`);
+  }
+
+  // The ladder belongs to the call, so it sits directly under it — but only
+  // when there is a call to act on. A ladder under an AVOID is an invitation.
+  if (call === "BUY" || call === "WAIT") L.push(...ladderBlock(obj(r, "lad")));
+
+  const tags = arr(obj(r, "setup"), "tags").map(esc).filter(Boolean);
+  if (tags.length) L.push(`Setup: ${tags.join(" · ")}`);
+
+  L.push(
     "",
     `₹${n(r.price)}   1Y ${n(r.r1y, "%")}   RSI ${n(r.rsi)}`,
     `*Rank ${n(r.comp)}*  ·  Q ${n(r.q)} G ${n(r.g)} V ${n(r.v)} T ${n(r.tech)}`,
@@ -591,21 +654,32 @@ function oneCompany(r, extra) {
     `ROCE ${n(r.roce, "%")} (3Y med ${n(r.roce_med, "%")})   ROE ${n(r.roe, "%")}`,
     `Revenue CAGR ${n(r.rev_cagr, "%")}   EBITDA CAGR ${n(r.ebitda_cagr, "%")}`,
     `D/E ${n(r.de)}   PE ${n(r.pe)}   Cash CFO/PAT ${n(r.cfo_pat)}`,
-  ];
+  );
+  if (num(r.piotroski) !== null) L.push(`Piotroski ${n(r.piotroski)}/${n(r.piotroski_of)}`);
   if (r.em_label) L.push(`Earnings momentum: *${esc(String(r.em_label).toUpperCase())}*`);
+
+  // The verdict's own flags are the reasons it was held back, so they belong
+  // with it rather than in a generic risk block.
+  const vf = arr(vd, "f");
+  if (vf.length) {
+    L.push("", "⚠ *Flags*");
+    for (const f of vf.slice(0, 5)) L.push(`  ! ${esc(f.w)}\n    _${esc(f.e)}_`);
+  }
+
   const risk = obj(r, "risk");
   if (risk.level) {
     L.push("", `*Risk ${esc(risk.level)}*`);
     for (const f of arr(risk, "flags").slice(0, 4)) L.push(`  ! ${esc(f.t)}\n    _${esc(f.k)}_`);
   }
-  const why = arr({ why_now: g("why_now") } , "why_now");
+
+  const why = arr({ why_now: g("why_now") }, "why_now");
   if (why.length) {
     L.push("", "*Why now*");
     for (const w of why.slice(0, 5)) L.push(`  + ${esc(w.t)}\n    _${esc(w.k)}_`);
   }
   const ca = num(g("capalloc"));
   if (ca !== null) L.push("", `*Capital allocation* ${ca}/10`);
-  const vh = obj({ v: g("val_hist") } , "v");
+  const vh = obj({ v: g("val_hist") }, "v");
   if (num(vh.median) !== null) {
     L.push(`*Vs its own history* — PE ${n(r.pe)} against a median of ${n(vh.median)}` +
            (num(vh.vs_own_median) !== null ? ` (${n(vh.vs_own_median, "%")})` : ""));
@@ -673,11 +747,20 @@ export async function cmdScreen(args) {
   const want = a.toUpperCase();
   const hit = rows.find((r) => String(r.sym).toUpperCase() === want);
   if (!hit) {
+    // Match on the SQUEEZED forms too — no spaces, no punctuation — so
+    // "TATAMOTORS" finds "Tata Motors Passenger Vehicles" and "MnM" finds
+    // "M&M". Index constituents get renamed and demerged constantly (Tata
+    // Motors became TMPV mid-2026), and a bare "not in the screen" for a
+    // company that plainly IS in it reads as the bot being broken.
+    const squeeze = (x) => String(x == null ? "" : x).toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const wantSq = squeeze(want);
     const near = rows
-      .filter((r) => String(r.sym).toUpperCase().includes(want) ||
-                     String(_nullishCoalesce(r.name, () => ( ""))).toUpperCase().includes(want))
+      .filter((r) => {
+        const sym = squeeze(r.sym), nm = squeeze(r.name);
+        return sym.includes(wantSq) || wantSq.includes(sym) || nm.includes(wantSq);
+      })
       .slice(0, 6)
-      .map((r) => esc(r.sym));
+      .map((r) => `${esc(r.sym)} (${esc(r.name)})`);
     return `*${esc(want)}* is not in the screen.` +
            (near.length ? `\nDid you mean: ${near.join(", ")}?` : `\nIt covers ${uni} — try \`/screen\`.`);
   }
