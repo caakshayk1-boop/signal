@@ -6501,7 +6501,11 @@
    *
    * A caveat repeated twenty times is not twenty times as honest. It is said
    * once, under the list it applies to. */
-  const TRAIL_NOTE = `<p class="hint trail-note"><b>The trail and the scale-out are
+  const TRAIL_NOTE = `<p class="hint trail-note"><b>Sold on the ladder, the whole
+    position returns 3.54R if every target prints, against 4.62R for holding all of it
+    to the last one</b> — the same arithmetic for every signal here, because the ladder
+    is fixed in R. Taking money off the table costs that difference; it buys the
+    certainty of having taken it.<br><b>The trail and the scale-out are
     management rules, not part of the grade.</b> Every signal above is still scored on
     the single stop it was sent with — a break-even trail measured <b>worse</b> than the
     fixed stop over 470 closed trades, so publishing it as the graded rule would flatter
@@ -6612,8 +6616,17 @@
         ${rungs.map(([pcStr, lv, lab]) => `<div class="tr-r">
           <b>${esc(pcStr)}</b><span>at ${f(lv)}</span><i>${esc(lab)} · ${rOf(lv).toFixed(1)}R</i>
         </div>`).join('')}
-        ${rungs.length < 2 ? '' : `<div class="tr-b"><b>${banked.toFixed(2)}R</b> laddered ·
-          <b>${rOf(rungs[rungs.length - 1][1]).toFixed(2)}R</b> held to the last target</div>`}
+        ${/* ── THE BLEND IS A PROPERTY OF THE LADDER, NOT OF THIS SIGNAL ──────
+            * It read "3.54R laddered · 4.62R held to the last target" on the
+            * card. Since the ladder was frozen in R — every 2R engine files
+            * T1 2.0R, T2 2.9R, T3 3.7R — that arithmetic is IDENTICAL for
+            * every signal the engine publishes. Measured on the front page:
+            * five different names, five identical sentences.
+            *
+            * A line that is the same on every card tells the reader nothing
+            * about the card it is on. It is a fact about the ladder, so it is
+            * stated once beneath the list, with the rungs above still carrying
+            * the per-signal prices and R-multiples that do differ. */''}
       </div>
     </div>`;
   };

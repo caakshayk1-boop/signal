@@ -319,16 +319,31 @@ try {
    * Poll the SECTION's own top rather than scrollY: it is the quantity the
    * assertion below reads, so the thing waited on and the thing measured
    * cannot disagree. */
-  await p.waitForTimeout(300);                 // let the smooth scroll begin
-  await p.evaluate(() => { window.__jt = null; });
-  await p.waitForFunction(() => {
+  /* ── DON'T WAIT OUT THE ANIMATION, REMOVE IT ─────────────────────────────
+   *
+   * The previous two attempts both tuned the WAIT — a 300ms lead-in, then a
+   * poll for two identical readings. Both are races. Math.round() of a value
+   * easing slowly can repeat across two 200ms polls, so "settled" fires
+   * mid-flight: measured 163 (pass), 457 and 4000 (fail) on the same
+   * unchanged site.
+   *
+   * AND THIS ONE ASSERTION TOOK THE PIPELINE DOWN. newspaper.yml runs this
+   * suite, so it went red every 20 minutes; the watchdog reads a failed run as
+   * "slot not covered" and re-dispatched — 90 runs in 30 hours — until the
+   * workflow was disabled to stop it. With the newspaper disabled nothing
+   * writes docs/screen.json, so the site froze. One flaky check, a stale feed,
+   * and 90 wasted builds.
+   *
+   * Smooth scrolling is a presentation choice; the assertion is about final
+   * geometry. Turning it off makes the jump instantaneous and the measurement
+   * deterministic, which is a stronger test than any timeout — it can no
+   * longer pass or fail on how loaded the runner is. */
+  await p.addStyleTag({ content: "*{scroll-behavior:auto !important}" });
+  await p.evaluate(() => {
     const e = document.getElementById("b-plan");
-    if (!e) return false;
-    const t = Math.round(e.getBoundingClientRect().top);
-    const settled = window.__jt === t;
-    window.__jt = t;
-    return settled;
-  }, null, { timeout: 15000, polling: 200 });
+    if (e) e.scrollIntoView({ behavior: "auto", block: "start" });
+  });
+  await p.waitForTimeout(400);
   const planTop = await p.locator("#b-plan").evaluate(e => Math.round(e.getBoundingClientRect().top));
   ok("a section jump clears the sticky stack", planTop > 90 && planTop < 240, planTop);
 
@@ -1466,7 +1481,30 @@ try {
     await dupP.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await dupP.waitForTimeout(SETTLE + 3000);
     const found = await dupP.evaluate(() => {
-      const txt = document.getElementById("main").innerText;
+      /* ── A REPEATED DATA FIELD IS NOT REPEATED PROSE ──────────────────────
+       * This check earns its place — it caught the management-rule caveat
+       * printing once per signal card, twenty times down /signals. But it
+       * scans every word in #main, so it also flags a per-row FIELD whose
+       * value happens to coincide across rows, and that is a different thing.
+       *
+       * On /ipo four upcoming books all read "Book has not opened — no demand
+       * evidence exists yet." They are all unopened. On / two live books both
+       * read "0.9x so far, with time left"; both are at 0.9x. The rows are in
+       * the same state, so the field says the same thing, and there is nothing
+       * to fix: a verdict that changed per row when the facts did not would be
+       * the defect.
+       *
+       * These two slots are excluded BY CLASS rather than the threshold being
+       * loosened, so the check keeps full strength everywhere it matters —
+       * .hint, .sec-note and section copy, which is exactly where the real
+       * duplication was found. */
+      const main = document.getElementById("main");
+      const scan = main.cloneNode(true);
+      scan.querySelectorAll(".ipo-why, .ipo-caveat").forEach(e => e.remove());
+      document.body.appendChild(scan);
+      scan.style.position = "absolute"; scan.style.left = "-99999px";
+      const txt = scan.innerText;
+      scan.remove();
       const seen = new Map();
       for (const raw of txt.split(/(?<=[.!?])\s+|\n+/)) {
         const t = raw.trim().replace(/\s+/g, " ");
