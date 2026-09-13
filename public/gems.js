@@ -249,7 +249,34 @@
 
     const rows = (screen && screen.rows) || [];
     const ledger = (sigs && (sigs.signals || sigs.rows)) || [];
-    const since = ledger.filter(r => String(r.date || '').slice(0, 10) >= LAUNCH);
+    /* THE SAME POPULATION SIGNAL PUBLISHES, which this page was not using.
+     *
+     * signal.askakshay.com's ledger() filters the feed twice before anything is
+     * counted: engineOk keeps only engines in the registry, and longOnly drops
+     * shorts, because the book is long-only and a short is never put in front
+     * of a reader as an action. Gems counted the RAW feed, so the same ledger
+     * on the same night produced two different records:
+     *
+     *     signal   64 published · 62 open · 2 closed
+     *     gems     84 published · 78 open · 6 closed
+     *
+     * Neither figure was miscalculated. They were different populations, both
+     * labelled "the record", on two sites that say they read one ledger — and
+     * the 20 extra were top5_pick's US equities, COMEX gold, and six shorts.
+     * The same rows that put AAPL and a gold future on a page titled "today's
+     * Indian market".
+     *
+     * Filtered identically here, so the two pages cannot disagree. The rupee
+     * check stays as a guard rather than a filter: applying the engine rule
+     * already leaves nothing but Indian names, and if that ever stops being
+     * true this page must not silently start showing them. */
+    const ENGINE_OK = new Set(['breakout', 'magic', 'magicmagic', 'equity_measured',
+      'multibagger', 'momentum_quant', 'ai_longterm', 'ledge', 'keel', 'strict', 'reclaim']);
+    const since = ledger.filter(r =>
+      String(r.date || '').slice(0, 10) >= LAUNCH
+      && ENGINE_OK.has(String(r.signal_type || ''))
+      && String(r.action || 'BUY').toUpperCase() !== 'SELL'
+      && String(r.currency || '₹') === '₹');
     const out = [];
     const nav = [];
     const add = (id, label, html) => { nav.push([id, label]); out.push(html); };
@@ -510,8 +537,7 @@
      * a symbol suffix: `.NS` is absent on plenty of NSE rows and present on
      * none of the US ones. The full multi-market ledger stays on Signal. */
     const open = since.filter(r => String(r.status || '').toUpperCase() === 'OPEN'
-                               && r.entry && r.sl && r.target1
-                               && String(r.currency || '₹') === '₹');
+                               && r.entry && r.sl && r.target1);
     const seen = new Set();
     const picks = open.filter(r => {
       const k = String(r.symbol || '').toUpperCase();

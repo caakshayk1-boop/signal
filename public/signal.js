@@ -5812,6 +5812,18 @@
   /* The other three axes of the signals table. Status stays in `sigFilter`
    * because the chips that carry it also carry the counts. */
   let SIGF = { eng: 'all', dir: 'all', tf: 'all' };
+  /* The alerts ledger sorts too. Its header was aria-hidden decoration and the
+     rows came out in feed order, so the one question a ledger is opened with —
+     which of these is furthest along, which is worst — could not be asked. */
+  let sgSort = '', sgDir = 'desc';
+  const SG_SORT = {
+    symbol: r => String(r.symbol || '').toUpperCase(),
+    entry:  r => Number(r.entry),
+    sl:     r => Number(r.sl),
+    target1: r => Number(r.target1),
+    rr:     r => Number(r.rr),
+    result: r => (r.pnl_pct == null ? null : Number(r.pnl_pct)),
+  };
   const sigDir = r => /SELL|SHORT/i.test(r.action || '') ? 'short' : 'long';
 
   /* ── WHICH ENGINES ARE ALLOWED TO PUBLISH ────────────────────────────────
@@ -6463,6 +6475,18 @@
 
     const draw = () => {
       const rows = all.filter(sigPass);
+      if (sgSort && SG_SORT[sgSort]) {
+        const get = SG_SORT[sgSort], dir = sgDir === 'asc' ? -1 : 1;
+        rows.sort((a, b) => {
+          const va = get(a), vb = get(b);
+          // Blanks sink in both directions — an unpriced row is not a small one.
+          const na = va == null || (typeof va === 'number' && !Number.isFinite(va));
+          const nb = vb == null || (typeof vb === 'number' && !Number.isFinite(vb));
+          if (na !== nb) return na ? 1 : -1;
+          if (na) return 0;
+          return dir * (typeof va === 'string' ? String(vb).localeCompare(va) : vb - va);
+        });
+      }
       if (!all.length) {
         main.innerHTML = base + `<div class="note">
           <b>No signals yet — the record starts today.</b> This page counts only what the
@@ -6552,8 +6576,15 @@
          * and it was the second thing on a page whose subject is the signals
          * themselves, pushing the table below two screens of engine cards. */
         sec('Alerts', rows.length
-          ? `<div class="sg-head" aria-hidden="true"><span></span><span>Signal</span>
-               <span>Entry</span><span>Stop</span><span>Target 1</span><span>R:R</span><span>Result</span></div>
+          ? `<div class="sg-head" role="row"><span></span>${
+               [['symbol', 'Signal'], ['entry', 'Entry'], ['sl', 'Stop'],
+                ['target1', 'Target 1'], ['rr', 'R:R'], ['result', 'Result']]
+                 .map(([k, l]) => {
+                   const on = sgSort === k;
+                   return `<span class="sg-h${on ? ' on' : ''}" data-sg="${k}" role="button"
+                     tabindex="0" aria-sort="${on ? (sgDir === 'asc' ? 'ascending' : 'descending') : 'none'}"
+                     title="Sort by ${esc(l)}">${esc(l)}${on ? `<i class="scr-ar">${sgDir === 'asc' ? '▲' : '▼'}</i>` : ''}</span>`;
+                 }).join('')}</div>
              <div class="rank sg-t">${rows.map(r => sigRow(r, px, card(r))).join('')}</div>
              <p class="hint">Tap any row for its full ladder, trailing rule and brief.</p>` + TRAIL_NOTE
           : `<div class="empty">No signal matches those filters.<br>
@@ -6567,6 +6598,18 @@
       main.querySelectorAll('.chip[data-s]').forEach(b => b.addEventListener('click', () => {
         sigFilter = b.dataset.s; draw();
       }));
+      main.querySelectorAll('.sg-h[data-sg]').forEach(h => {
+        const hit = () => {
+          const k = h.dataset.sg;
+          if (sgSort === k) sgDir = sgDir === 'desc' ? 'asc' : 'desc';
+          else { sgSort = k; sgDir = k === 'symbol' ? 'asc' : 'desc'; }
+          draw();
+        };
+        h.addEventListener('click', hit);
+        h.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hit(); }
+        });
+      });
       main.querySelectorAll('select[data-sgf]').forEach(s => s.addEventListener('change', () => {
         SIGF[s.dataset.sgf] = s.value; draw();
       }));

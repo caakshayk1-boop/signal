@@ -4966,3 +4966,9 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
    since the last build. Both were in the payload and neither was shown. */
 .scr-prov{margin:-4px 0 14px;font-size:var(--t-2);color:var(--muted);line-height:1.6}
 .scr-prov b{color:var(--text);font-weight:600}
+
+/* The alerts ledger's headings sort, same as the screen's. */
+.sg-h{cursor:pointer;user-select:none;transition:color .14s var(--ease,ease)}
+.sg-h:hover{color:var(--text)}
+.sg-h:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sg-h.on{color:var(--text);font-weight:600}
