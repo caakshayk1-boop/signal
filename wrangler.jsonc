@@ -72,7 +72,13 @@
   // its retries, so the signals and Telegram alerts for the day never fired.
   // src/watchdog.js compares what ran against what should have and dispatches
   // only the difference; on a healthy day it does nothing at all.
-  "triggers": { "crons": ["*/20 * * * *"] },
+  // Every ten minutes, not twenty. The watchdog's grace is 12 minutes, so a
+  // 20-minute tick made the worst case 32 minutes past a slot — on the 08:00
+  // MYT brief that is 08:32, and the whole point of the slot is 08:00. At ten
+  // the worst case is 22 minutes. Cron triggers are not billed per fire and
+  // each tick is four conditional GitHub reads, so the cost of halving the
+  // latency is nil.
+  "triggers": { "crons": ["*/10 * * * *"] },
 
   "observability": { "enabled": true },
 
