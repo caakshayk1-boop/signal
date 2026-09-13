@@ -2333,8 +2333,20 @@ main.route-in{animation:routeIn 200ms var(--ease-out) both}
    that reuses this row grammar. Cells and tracks are counted together in one
    place, which is the only way the two stay in step. */
 .scr-r.scr-call{
-  grid-template-columns:24px minmax(0,1fr) 62px 70px 62px 62px 62px 50px 66px;
+  /* The call track is 96px, not 62. VERDICT was unified so the screen and the
+     radar speak one vocabulary, and the screen's "Wait" became the radar's
+     "Wait for entry" — but the track it renders into stayed 62px, so the badge
+     ran straight over the price beside it. "WAIT FOR ENTRY209.50" was on the
+     live page. The words were right; the column never followed them. */
+  grid-template-columns:24px minmax(0,1fr) 96px 70px 62px 62px 62px 50px 66px;
 }
+/* A cell can never paint outside its own track again, whatever lands in it.
+   Fixed tracks plus white-space:nowrap means any label longer than its column
+   spills over the next one instead of being clipped — silent, and it looks
+   like corrupt data rather than a layout fault. */
+.scr-r > *{min-width:0}
+.scr-r .vtag{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  display:inline-block;vertical-align:bottom}
 .rank-r.lvl-r{
   grid-template-columns:24px minmax(0,1fr) 70px 62px 62px 62px 50px 66px;
   gap:0 10px;

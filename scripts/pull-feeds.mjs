@@ -33,7 +33,11 @@ const FEEDS = ["alerts", "conviction", "data-health", "edition", "ipo",
                // trading-dashboard repo; absent until that job has run, and a
                // missing feed leaves the committed copy alone rather than
                // replacing it with a 404 page named buoy.json.
-               "buoy", "alerts_log", "research"];
+               "buoy", "alerts_log", "research",
+               // SWOT alone, three per quadrant — 0.6MB against the 4.1MB
+               // detail file the brief will not load. This is the only place
+               // the brief can get Strengths/Weaknesses/Opportunities/Threats.
+               "swot"];
 
 const stampOf = (o) => {
   if (!o || Array.isArray(o)) return null;

@@ -8093,6 +8093,13 @@
           * was never meant to be there. */''}
       <section class="b-sec b-reveal" id="b-fund">
         <div class="b-lab">The business</div>
+        ${/* SWOT is filled in after paint. It lives in its own 0.6MB feed —
+            the only other copy is the 4.1MB detail file this site declines to
+            load — so fetching it inline would hold up the whole brief for a
+            panel below the fold. An empty placeholder that never fills is
+            invisible, which is the right failure: the rest of the section
+            stands on its own. */''}
+        <div id="b-swot" data-sym="${esc(sig.symbol || '')}"></div>
         ${window.BriefFundamentals
           ? window.BriefFundamentals.render(row, {
               symbol: sig.symbol,
@@ -12600,4 +12607,53 @@
   document.addEventListener('click', () => setTimeout(mark, 0));
   setTimeout(mark, 400);
   setTimeout(mark, 1500);
+})();
+
+/* ── SWOT INTO THE BRIEF ──────────────────────────────────────────────────────
+ * The brief's Business section had ratios and flags but no Strengths /
+ * Weaknesses / Opportunities / Threats, because the only copy of them lived in
+ * screen-detail.json — 4.1MB, which signal.js deliberately never loads. They
+ * are now published as their own slim feed (three per quadrant, ~0.6MB) and
+ * filled in here after the brief has painted.
+ *
+ * Fetched ONCE per session and cached: a reader opening six briefs should pull
+ * the feed once, not six times. A failure leaves the placeholder empty rather
+ * than printing an error — the rest of the section is unaffected and a panel
+ * that silently does not appear is better than one that shouts about a feed.
+ *
+ * setTimeout rather than an observer, for the reason recorded elsewhere in this
+ * file: this site is read in hidden tabs often enough that observer-driven and
+ * rAF-driven work has been the wrong tool here before. */
+(function briefSwot() {
+  let cache = null, inflight = null;
+
+  const load = () => {
+    if (cache) return Promise.resolve(cache);
+    if (inflight) return inflight;
+    inflight = fetch('/swot.json', { cache: 'force-cache' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => { cache = (j && j.swot) || {}; return cache; })
+      .catch(() => { cache = {}; return cache; });
+    return inflight;
+  };
+
+  const fill = () => {
+    const box = document.getElementById('b-swot');
+    if (!box || box.dataset.done === '1') return;
+    const sym = (box.getAttribute('data-sym') || '').toUpperCase();
+    if (!sym) return;
+    const BF = window.BriefFundamentals;
+    if (!BF || typeof BF.swot !== 'function') return;   // older mirrored copy
+    box.dataset.done = '1';
+    load().then((all) => {
+      const sw = all[sym];
+      if (!sw) return;                                   // not on the screen
+      const html = BF.swot(sw);
+      if (html) box.innerHTML = html;
+    });
+  };
+
+  document.addEventListener('click', () => setTimeout(fill, 60));
+  setTimeout(fill, 500);
+  setTimeout(fill, 1600);
 })();
