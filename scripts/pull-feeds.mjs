@@ -33,11 +33,29 @@ const FEEDS = ["alerts", "conviction", "data-health", "edition", "ipo",
                // trading-dashboard repo; absent until that job has run, and a
                // missing feed leaves the committed copy alone rather than
                // replacing it with a 404 page named buoy.json.
-               "buoy", "alerts_log", "research",
+               // buoy was mirrored and read by NOTHING: R['/buoy'] redirects to
+               // /research and no page fetches buoy.json. A feed nobody reads
+               // is dead weight that rots into a wrong answer the day somebody
+               // wires it up, so it is not mirrored. scan_buoy.py still writes
+               // it upstream; add it back here the day a page reads it.
+               "alerts_log", "research",
                // SWOT alone, three per quadrant — 0.6MB against the 4.1MB
                // detail file the brief will not load. This is the only place
                // the brief can get Strengths/Weaknesses/Opportunities/Threats.
-               "swot"];
+               "swot",
+               // THE LITE TABLE, WHICH WAS NEVER SYNCED. Every light route on
+               // the site reads screen-lite.json, and it was absent from this
+               // list — so it was frozen at whatever commit last happened to
+               // carry it. Measured tonight: screen.json served 989 rows with
+               // 325 Ahimsa constituents while screen-lite.json, on the same
+               // origin, served 748 rows and zero. Home and the light routes
+               // were rendering a universe that no longer existed.
+               "screen-lite",
+               // engines and funds were in sync-data.yml's list and not in
+               // this one. TWO LISTS FOR ONE JOB, and they had drifted in both
+               // directions — this file also carried buoy and swot, which that
+               // one lacked. Whichever ran last decided what the site served.
+               "engines", "funds"];
 
 const stampOf = (o) => {
   if (!o || Array.isArray(o)) return null;

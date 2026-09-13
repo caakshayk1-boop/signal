@@ -791,6 +791,37 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      !/run: npx wrangler deploy\s*$/m.test(DEP));
 }
 
+/* ── EVERY FEED THE FRONTEND FETCHES MUST BE SYNCED ─────────────────────────
+ * screen-lite.json is read by nine light routes and was absent from FEEDS, so
+ * it froze at whatever commit last carried it: screen.json served 989 rows and
+ * 325 Ahimsa constituents while screen-lite.json, same origin, served 748 and
+ * zero. A feed the site fetches and the sync does not pull is stale by
+ * construction, and it looks like working data. */
+{
+  const PULL = readFileSync("scripts/pull-feeds.mjs", "utf8");
+  const fetched = [...JS.matchAll(/['"]\/([a-z-]+)\.json['"]/g)].map(m => m[1]);
+  /* Two exceptions, both produced HERE rather than synced: build.json is
+     stamped at deploy time by scripts/stamp-build.mjs, and institutional.json
+     is built by this repo's own institutional.yml from exchange filings. */
+  const LOCAL = new Set(["build", "institutional"]);
+  const missing = [...new Set(fetched)]
+    .filter(f => !LOCAL.has(f) && !PULL.includes(`"${f}"`));
+  ok("every /*.json the frontend fetches is in the feed sync list",
+     missing.length === 0, missing);
+
+  /* TWO LISTS FOR ONE JOB. pull-feeds.mjs runs on deploy, sync-data.yml runs
+     on a schedule, and they had drifted in BOTH directions — engines and funds
+     in one, buoy and swot in the other. Whichever ran last decided what the
+     site served, which is how screen-lite.json sat at 748 rows and zero Ahimsa
+     constituents while screen.json beside it served 989 and 325. */
+  const SYNC_YML = readFileSync(new URL("../.github/workflows/sync-data.yml", import.meta.url), "utf8");
+  const syncList = ((SYNC_YML.match(/FEEDS="([^"]+)"/) || [])[1] || "").split(/\s+/).filter(Boolean).sort();
+  const pullList = [...PULL.matchAll(/"([a-z][a-z_-]*)"/g)].map(m => m[1])
+    .filter(f => syncList.includes(f) || /^(buoy|swot|screen-lite|engines|funds)$/.test(f));
+  const onlySync = syncList.filter(f => !PULL.includes(`"${f}"`));
+  ok("the deploy and the scheduled sync pull the same feeds", onlySync.length === 0, onlySync);
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);
