@@ -4933,3 +4933,19 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   color:var(--down);letter-spacing:.04em}
 .rd-row.is-void .rd-sc em, .rdc.is-void .rdc-m em{
   color:var(--dim);font-style:italic}
+
+/* Sortable column headings on the screen grid. The affordance has to be
+   visible before the click: a heading that only reveals it is sortable after
+   you have already sorted it is a control nobody finds. */
+.scr-h{cursor:pointer;user-select:none;border-radius:4px;transition:color .14s var(--ease,ease)}
+.scr-h:hover{color:var(--text)}
+.scr-h:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.scr-h.on{color:var(--text);font-weight:600}
+.scr-ar{font-style:normal;font-size:.8em;opacity:.7;margin-left:.25em}
+
+/* The filter chips scrolled sideways with the scrollbar hidden, so on a mouse
+   there was NOTHING saying more filters existed — "Nifty500 Ahimsa" sat off
+   the right edge and read as missing. They wrap now wherever there is room,
+   and keep the swipe-scroll only on phones where wrapping costs more height
+   than it is worth. */
+@media(min-width:701px){ .chips{flex-wrap:wrap;overflow-x:visible} }

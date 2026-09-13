@@ -4138,6 +4138,10 @@
    * predicates are ANDed. Empty means everything, which is what "All" now
    * does rather than being a filter that happens to return true. */
   let scrQ = '', scrPresets = new Set(), scrSort = 'comp', scrPage = 0, SCRDIV = null;
+  /* Every screen sort was hardcoded descending, which is right for a rank and
+     wrong for a column: cheapest-first and worst-performer-first are the
+     questions a reader actually clicks a heading to ask. */
+  let scrDir = 'desc';
 
   /* ── A FILTERED SCREEN IS A PLACE, AND A PLACE NEEDS AN ADDRESS ───────────
    *
@@ -4402,6 +4406,15 @@
   };
   const SORTS = { comp: 'Composite', q: 'Quality', g: 'Growth', v: 'Value',
                   tech: 'Technical', r1m: '1M return', roce: 'ROCE', mcap_cr: 'Size',
+                  // The columns the headings sort by, listed here too so the
+                  // dropdown and the headings speak one vocabulary. Without
+                  // this the select still read "Rank by Composite" while the
+                  // page was sorted by Price — a control disagreeing with the
+                  // thing it controls. They are also the only way to reach
+                  // these sorts on a narrow screen, where the headings are
+                  // tight enough to be awkward targets.
+                  sym: 'Name (A-Z)', price: 'Price', r1d: 'Today', v50: 'vs 50-day',
+                  v200: 'vs 200-day', rsi: 'RSI',
                   // Institutional sorts read from institutional.json rather than
                   // from the row, so they go through sortVal() below. They are
                   // listed last deliberately: institutional movement is one
@@ -4417,6 +4430,12 @@
    * keeps unmeasured companies at the BOTTOM of an institutional sort instead
    * of in the middle of it pretending to be flat. */
   const sortVal = (r, k) => {
+    /* Columns the HEADER offers. `vs 50D` and `vs 200D` are rendered as a
+     * distance computed per row, not stored, so sorting on the raw sma would
+     * rank by price level instead of by distance — the opposite of what the
+     * column shows. `sym` is text and is handled by the comparator, not here. */
+    if (k === 'v50')  return r.sma50  ? (r.price - r.sma50)  / r.sma50  * 100 : null;
+    if (k === 'v200') return r.sma200 ? (r.price - r.sma200) / r.sma200 * 100 : null;
     if (!k.startsWith('i_')) return r[k];
     const x = instiOf(r.sym);
     if (!x) return null;
@@ -4731,7 +4750,20 @@
                         || (r.name || '').toLowerCase().includes(q)
                         || (r.sector || '').toLowerCase().includes(q))
         .filter(instiPass)
-        .sort((a, b) => (sortVal(b, scrSort) ?? -1e9) - (sortVal(a, scrSort) ?? -1e9));
+        .sort((a, b) => {
+          const dir = scrDir === 'asc' ? -1 : 1;
+          if (scrSort === 'sym') {
+            return dir * String(b.sym || '').localeCompare(String(a.sym || ''));
+          }
+          const va = sortVal(a, scrSort), vb = sortVal(b, scrSort);
+          /* Missing values sink in BOTH directions. Falling back to -1e9 put
+             every unpriced row at the top of an ascending sort, which reads as
+             "cheapest" and is simply "unknown". */
+          if (va == null && vb == null) return 0;
+          if (va == null) return 1;
+          if (vb == null) return -1;
+          return dir * (vb - va);
+        });
 
       main.innerHTML = shell(
         screenSnap(SCREEN) +
@@ -4832,7 +4864,31 @@
         inp._t = setTimeout(() => { scrQ = inp.value; scrPage = 0; const at = inp.selectionStart; draw();
           const n = main.querySelector('#scrq'); n.focus(); n.setSelectionRange(at, at); }, 160);
       });
-      main.querySelector('#scrs').addEventListener('change', e => { scrSort = e.target.value; draw(); });
+      main.querySelector('#scrs').addEventListener('change', e => {
+        scrSort = e.target.value; scrDir = 'desc'; draw();
+      });
+      /* Headings. Delegated from main because draw() replaces the grid whole,
+         and bound for the keyboard as well: a span with role=button that only
+         answers a mouse is a control half the readers cannot use. */
+      main.addEventListener('click', (e) => {
+        const h = e.target.closest && e.target.closest('.scr-h');
+        if (!h || !main.contains(h)) return;
+        const k = h.getAttribute('data-s');
+        if (!k) return;
+        // Same column toggles direction; a new column starts descending, which
+        // is "best first" for every column except the name.
+        if (scrSort === k) scrDir = scrDir === 'desc' ? 'asc' : 'desc';
+        else { scrSort = k; scrDir = k === 'sym' ? 'asc' : 'desc'; }
+        scrPage = 0;
+        draw();
+      });
+      main.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const h = e.target.closest && e.target.closest('.scr-h');
+        if (!h) return;
+        e.preventDefault();
+        h.click();
+      });
       /* [data-p], not every .chip on the page. This handler bound itself to
        * ALL chips, so adding two unrelated ones to the Screen's toolbar made
        * them behave as filter presets: b.dataset.p was undefined, undefined
@@ -5209,12 +5265,24 @@
    * already RUNS from the 52-week low to the 52-week high — labelling its two
    * ends is what those two numbers are for, it removes two columns from an
    * eleven-column table, and it makes the line legible without a key. */
+  /* A heading that sorts. The screen is a div grid rather than a <table> — it
+     has to be, because each row carries a 52-week bar under it — so the
+     generic table sorter does not reach it and the columns needed wiring to
+     the ranking the page already had. */
+  const hCol = (k, label, cls = 'x') => {
+    const on = scrSort === k;
+    return `<span class="${cls} scr-h${on ? ' on' : ''}" data-s="${k}" role="button"
+      tabindex="0" aria-sort="${on ? (scrDir === 'asc' ? 'ascending' : 'descending') : 'none'}"
+      title="Sort by ${esc(label)}">${esc(label)}${
+        on ? `<i class="scr-ar">${scrDir === 'asc' ? '▲' : '▼'}</i>` : ''}</span>`;
+  };
+
   const screenTable = (rows, offset) => `<div class="rank">
     <div class="rank-r rank-head scr-r scr-call">
-      <span class="i">#</span><span class="s">Name</span>
+      <span class="i">#</span>${hCol('sym', 'Name', 's')}
       <span class="x">Call ${tip('call')}</span>
-      <span class="x">Price</span><span class="x">Today</span><span class="x">vs 50D</span>
-      <span class="x">vs 200D</span><span class="x">RSI 14D</span><span class="m">1M</span>
+      ${hCol('price', 'Price')}${hCol('r1d', 'Today')}${hCol('v50', 'vs 50D')}
+      ${hCol('v200', 'vs 200D')}${hCol('rsi', 'RSI 14D')}${hCol('r1m', '1M', 'm')}
     </div>
     ${rows.map((r, i) => {
       const v50 = r.sma50 ? (r.price - r.sma50) / r.sma50 * 100 : null;
