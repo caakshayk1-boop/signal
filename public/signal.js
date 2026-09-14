@@ -7117,7 +7117,30 @@
    * Done in the DOM after paint rather than by restructuring a 700-line
    * template: the sections are already siblings, and moving them is a smaller
    * and far more reversible change than rewriting how they are built. */
-  const BRIEF_KEEP = ['b-chart', 'b-plan'];
+  /* ── WHAT A ONE-PAGER IS, CORRECTED ──────────────────────────────────────
+   *
+   * The first cut kept levels, chart and plan — "how to trade it" — and folded
+   * the other ten. That buried the company's own financials and the SWOT, and
+   * Akshay's read was exactly right: from the front, the brief had no
+   * fundamentals. The fold's summary named them, but a reader scanning the
+   * page sees no fundamentals, and a summary is not a substitute for the
+   * thing.
+   *
+   * For a swing trade on a single company, what you would OWN is not the
+   * workup. It is half the case. Five sections now, and they answer the
+   * questions in the order anyone actually asks them:
+   *
+   *   the levels      where price sits against the plan
+   *   b-chart         where it has been
+   *   b-business      what the company earns — P/E, ROCE, Piotroski, margins
+   *   b-fund          what you would own, and what could go wrong (the SWOT)
+   *   b-plan          what to do, and when to stop
+   *
+   * What stays folded is genuinely internal: how the score is composed, which
+   * factors agree, the regime test, the three scenarios, the cost if wrong,
+   * the paper trail and the engine's record. Every one is worth reading and
+   * none is worth scrolling past to reach a stop-loss. */
+  const BRIEF_KEEP = ['b-chart', 'b-business', 'b-fund', 'b-plan'];
   function foldBrief(main) {
     try {
       const secs = [...main.querySelectorAll('.b-sec')];
@@ -7132,8 +7155,9 @@
       const d = document.createElement('details');
       d.className = 'b-fold';
       d.innerHTML = `<summary><span>The full workup</span>
-        <i>${rest.length} sections — scoring, confluence, fundamentals, regime,
-        scenarios, what it costs if it is wrong, and the record</i></summary>`;
+        <i>${rest.length} sections — how the score is composed, which factors agree,
+        the regime test, the three scenarios, what it costs if it is wrong, the paper
+        trail and this engine's record</i></summary>`;
       rest[0].parentNode.insertBefore(d, rest[0]);
       rest.forEach(el => d.appendChild(el));
       /* The reveal animation is driven by an observer that has already run on
@@ -8105,7 +8129,7 @@
           Tap a row for the reason.</p>
       </section>
 
-      <section class="b-sec b-reveal">
+      <section class="b-sec b-reveal" id="b-business">
         <div class="b-lab">The business</div>
         <h2 class="b-h2">What the company behind the trade actually earns.</h2>
         ${(() => {

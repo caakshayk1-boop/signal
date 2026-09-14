@@ -175,8 +175,18 @@ try {
   ok("the brief folds its workup", await p.locator(".b-fold > summary").count() === 1);
   const folded = await p.locator(".b-fold .b-sec").count();
   ok("the fold holds the sections it names", folded >= 3, folded);
+  /* Five, not four. The first cut kept levels, chart and plan and folded the
+   * rest — which buried the company's financials and the SWOT, so the brief
+   * read as having no fundamentals at all. What you would OWN is not the
+   * workup on a single-stock trade, it is half the case. The cap exists to
+   * stop the fold quietly emptying back onto the page, so it tracks the
+   * decision rather than being a number of its own. */
   const above = await p.locator(".brief > .b-wrap > .b-sec").count();
-  ok("only the essentials sit above the fold", above <= 4, above);
+  ok("only the essentials sit above the fold", above <= 5, above);
+  ok("the fundamentals are not behind a click",
+     await p.locator(".brief > .b-wrap > #b-business").count() === 1);
+  ok("the SWOT is not behind a click",
+     await p.locator(".brief > .b-wrap > #b-fund").count() === 1);
   await openWorkup(p);
 
   // The count-up must land on its value even where rAF never runs.
