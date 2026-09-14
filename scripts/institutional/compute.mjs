@@ -267,6 +267,23 @@ export function institutionalFor(filings, threshold = MATERIAL_PP) {
   const quality = !adjacent ? 'partial'
                 : (fii_pp == null || dii_pp == null) ? 'partial' : 'complete';
 
+  /* ── A PARTIAL READING PUBLISHES NEITHER A CHANGE NOR A SCORE ────────────
+   *
+   * quality was computed and then every figure was returned regardless, so a
+   * row could say "partial" in one field and carry a confident quarter-on-
+   * quarter change and a 0-100 strength score in the next. Live on 2026-09-14:
+   * RPEL scored 58 on a partial reading, ATALREAL 41, SILVERTUC 33.
+   *
+   * The change is the problem, not just the label. `adjacent` false means the
+   * previous filing is not the quarter before this one — so fii_pp is a move
+   * across a GAP of unknown length being presented as one quarter's flow. A
+   * score built on it inherits that, and a reader has no way to tell.
+   *
+   * Withheld rather than flagged, because a number beside a caveat is still a
+   * number people act on. The LEVELS stay: this quarter's holdings are a
+   * filing, and a filing is true whether or not the previous one lines up. */
+  const partial = quality !== 'complete';
+
   return {
     quality,
     reason: quality === 'partial'
@@ -279,13 +296,22 @@ export function institutionalFor(filings, threshold = MATERIAL_PP) {
     insti: instiCur == null ? null : Math.round(instiCur * 100) / 100,
     promoter: cur.promoter, publicHold: cur.publicHold,
     mf: cur.mf, insurance: cur.insurance,
-    // Movement, in percentage points
-    fii_pp, dii_pp, insti_pp, insti_prev_pp, fii_accel_pp, dii_accel_pp,
+    // Movement, in percentage points — null on a partial reading, see above.
+    fii_pp:       partial ? null : fii_pp,
+    dii_pp:       partial ? null : dii_pp,
+    insti_pp:     partial ? null : insti_pp,
+    insti_prev_pp: partial ? null : insti_prev_pp,
+    fii_accel_pp: partial ? null : fii_accel_pp,
+    dii_accel_pp: partial ? null : dii_accel_pp,
     // Trend
     fii_streak, dii_streak, insti_streak,
     // Verdict
     signal: sig.code, signal_label: sig.label, signal_direction: sig.direction || null,
-    score, band: scoreBand(score)?.code || null, band_label: scoreBand(score)?.label || null,
+    // The band is the score read in words. Nulling the score and keeping the
+    // band would publish the same claim in the field nobody thought to check.
+    score:      partial ? null : score,
+    band:       partial ? null : (scoreBand(score)?.code || null),
+    band_label: partial ? null : (scoreBand(score)?.label || null),
     // Provenance — every calculation names the two periods it used
     period: cur.period, period_end: cur.periodEnd,
     prev_period: adjacent ? prev.period : null,

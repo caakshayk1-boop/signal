@@ -1217,6 +1217,19 @@
   const engineWords = t => ENGINE_WORDS.reduce(
     (acc, [k, n]) => acc.replace(new RegExp('\\b' + k + '\\b', 'g'), n), String(t || ''));
 
+  /* ── THE UNIVERSE SIZE IS A FACT, NOT A STRING ───────────────────────────
+   * Three user-facing sentences said "750 names". The screen carries 989 rows
+   * from a 1,000-name universe and has for some time — the universe was
+   * widened and the copy was not, so the site advertised a smaller screen than
+   * it runs. Read from the feed, so it cannot go stale again; the fallback is
+   * only for the moment before any feed has loaded. */
+  const universeN = () => {
+    const n = (window.__PULSE && (window.__PULSE.universe || window.__PULSE.universe_size))
+      || (Array.isArray(SCREEN) && SCREEN.length)
+      || (window.__SCREEN_META && window.__SCREEN_META.count);
+    return Number.isFinite(Number(n)) && Number(n) > 0 ? Math.round(Number(n)) : 989;
+  };
+
   const engineOk = r => ENGINES.has(String(r.signal_type || ''));
 
   /* ── AND NOTHING SHORT ────────────────────────────────────────────────────
@@ -2018,6 +2031,9 @@
     if (!t.ok && !p.ok) { paint(out + fail('Today', t.error || p.error)); return; }
 
     const d = t.ok ? t.data : {}, pu = p.ok ? p.data : {}, br = pu.breadth || {};
+    // universeN() reads this — see the note on it. Set wherever pulse lands so
+    // the count is never a literal in a sentence.
+    if (pu && pu.universe) window.__PULSE = pu;
     const mk = m.ok ? m.data : null;
     const nifty = mk && (mk.markets || []).find(x => /nifty 50/i.test(x.name || ''));
 
@@ -3183,6 +3199,7 @@
     const [m, p] = await Promise.all([get('/api/markets'), get('/pulse.json')]);
     let out = head('Markets', 'The board live, and what the NSE screen underneath it did.', 'The board');
     const pu = p.ok ? p.data : {};
+    if (pu && pu.universe) window.__PULSE = pu;
     /* The page opened on a sector heatmap and left the reader to work out the
      * state of the market from it. These are the four numbers that heatmap is
      * an elaboration of. */
@@ -3562,6 +3579,7 @@
       `${picks.length} ranked`, 'A different engine, on a different clock — names that cleared every floor, and the levels that define each one.');
 
     const pu = p.ok ? p.data : {};
+    if (pu && pu.universe) window.__PULSE = pu;
     /* ── WHAT THE SCREEN FOUND, NOT WHAT IS TRUE NOW ────────────────────────
      * These prices come off the overnight screen and are not live. The book
      * section thirty lines below already fetches quotes "so the page shows
@@ -11092,7 +11110,7 @@
    * they answer a question rather than alphabetically. */
   const DISCOVER = [
     ['/radar',   'Signal radar',  'The market score, and the eight names carrying it',
-                 'Breadth over 750 names, with every term of the score printed.'],
+                 `Breadth over ${universeN()} names, with every term of the score printed.`],
     ['/research', 'The research floor', 'Three engines, none of them cleared',
                  'BUOY, ANCHOR and BEDROCK — each published with the measurement that rejects it.'],
     ['/screen',  'Screen',        'All names, filterable',
@@ -11153,7 +11171,7 @@
 
 
   R['/discover'] = async () => {
-    paint(head('Discover', 'Seven ways into the same 750 names. Each answers a different question.',
+    paint(head('Discover', `Seven ways into the same ${universeN()} names. Each answers a different question.`,
                'Discover') +
       `<div class="disc">${DISCOVER.map(([href, name, sub, why]) => `
         <a class="disc-c" href="${esc(href)}">
@@ -11831,7 +11849,7 @@
                      'Every name in the universe on price, trend, quality, value and institutional flow. FII and DII holding quarter on quarter, from the company’s own filings.'],
     '/signals':     ['Signals — the public ledger, wins and losses both',
                      'Every call this book has published, open and closed, with the entry, stop and targets it was sent with and what it actually did.'],
-    '/discover':    ['Discover — seven ways into the 750 names',
+    '/discover':    ['Discover — seven ways into the screened names',
                      'Radar, screen, ideas, markets, IPO, news and funds — what each one answers.'],
     '/radar':       ['Signal radar — the market, and the names carrying it',
                      'A breadth-based market score with every term printed, and the eight highest-scoring names ranked on trend, momentum, volume and institutional flow.'],
