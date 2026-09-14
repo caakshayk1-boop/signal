@@ -1368,6 +1368,30 @@ try {
   }
   ok("no route threw", thrown.length === 0, thrown.slice(0, 3));
 
+  /* A WITHDRAWN SIGNAL MUST NOT READ "OPEN". The ledger row's outcome pill
+   * chose its label from the wrong branch of a ternary, so any row that was
+   * not open and had no price mark printed the literal word "open" —
+   * TATAINVEST was cancelled in the database, reported cancelled by the API,
+   * and still read open on the page. Cross-checks the rendered label against
+   * what the API says, so the two cannot drift again. */
+  await sw.goto(SITE + "#/signals", { waitUntil: "domcontentloaded" });
+  await sw.waitForTimeout(SETTLE + 4000);
+  const mislabelled = await sw.evaluate(async () => {
+    const res = await fetch("/api/signals?limit=400");
+    const rows = (await res.json()).signals || [];
+    const notOpen = new Set(rows.filter(r => (r.badge || "") !== "open")
+                                .map(r => String(r.symbol || "").replace(".NS", "")));
+    const bad = [];
+    document.querySelectorAll(".sg-r").forEach(el => {
+      const sym = (el.getAttribute("data-sgsym") || "").replace(".NS", "");
+      const pill = el.querySelector(".sg-r-out .pill");
+      if (sym && pill && notOpen.has(sym) && /^open$/i.test(pill.textContent.trim())) bad.push(sym);
+    });
+    return bad;
+  });
+  ok("a withdrawn signal is not labelled open", mislabelled.length === 0,
+     mislabelled.slice(0, 4));
+
   /* THE REPORTER ITSELF HAS TO WORK, and it is the one piece of code that
    * cannot announce its own failure. A deliberate throw is injected and the
    * POST it should produce is intercepted — asserting the wiring end to end

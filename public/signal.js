@@ -6149,8 +6149,23 @@
       <span class="sg-n dn" title="Stop">${price(r.sl, cur)}</span>
       <span class="sg-n up" title="First target">${lvl(r.target1) == null ? '—' : price(r.target1, cur)}</span>
       <span class="sg-n" title="Reward to risk, measured to ${which}">${rr == null ? '—' : rr.toFixed(2)}</span>
+      ${/* ── THE TWO LABELS WERE THE WRONG WAY ROUND ──────────────────────
+          * This read:  move == null ? (open ? 'no mark' : 'open') : …
+          *
+          * So a signal with no price mark showed "no mark" when it was OPEN —
+          * correct — and the literal word "open" when it was NOT. Every
+          * withdrawn or closed row without a mark was labelled open on the
+          * public ledger. TATAINVEST was cancelled in the database, reported
+          * cancelled by /api/signals, and still read "open" here.
+          *
+          * A row that is not open has a state worth naming, and the API
+          * already computes it: badgeOf(status, lifecycle_status). Use it,
+          * rather than a word chosen by the wrong branch of a ternary. */''}
       <span class="sg-r-out"><span class="pill ${mcls}">${
-        move == null ? (open ? 'no mark' : 'open') : pct(move) + (open ? ' live' : '')}</span>
+        move == null
+          ? (open ? 'no mark' : esc(String(r.badge || r.status || 'closed')
+                                      .replace(/_/g, ' ').toLowerCase()))
+          : pct(move) + (open ? ' live' : '')}</span>
         <em>${esc(String(r.alert_date || r.date || '').slice(0, 10))}</em></span>`;
     return xrow(summary, detail, { cls: 'sg-r', attrs: `data-sgsym="${esc(r.symbol || '')}"` });
   };
