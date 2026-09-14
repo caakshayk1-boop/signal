@@ -1,5 +1,5 @@
 {
- "build_id": "20260914T024241",
+ "build_id": "20260914T075220",
  "date": "2026-09-14",
  "date_str": "Monday, September 14 2026",
  "picks": [
@@ -439,7 +439,7 @@
    "sector": "Energy"
   },
   "BRNUSD": {
-   "price": 104.61,
+   "price": 107.47,
    "sector": ""
   },
   "CAPLIPOINT": {
@@ -539,7 +539,7 @@
    "sector": "Industrials"
   },
   "GOLD": {
-   "price": 4408.8999,
+   "price": 4378.1001,
    "sector": ""
   },
   "GRANULES": {
@@ -779,7 +779,7 @@
    {
     "dataset": "Careers feed",
     "status": "DEGRADED",
-    "age": "9h old",
+    "age": "14h old",
     "note": "partial coverage \u2014 12/22 records"
    }
   ]
@@ -1327,7 +1327,7 @@
    "shows": 20,
    "source": "each channel's public Atom feed",
    "built_on": "2026-09-13",
-   "age_days": 0.0,
+   "age_days": 0.2,
    "is_fallback": false
   },
   "smart_reads": [
@@ -1338,17 +1338,7 @@
     "link": "https://www.livemint.com/money/personal-finance/3-flexi-cap-funds-hold-52-per-cent-of-the-categorys-aum-are-the-biggest-schemes-also-leading-in-performance-11789322092496.html",
     "summary": "Three flexi-cap funds account for more than half of the category's total AUM. But does their dominance in assets also translate into stronger returns? A comparison of one-year and five-year performance reveals a different picture for investors.",
     "date": "Sep 13, 2026",
-    "_sort": "2026-09-13T18:33:51+00:00",
-    "smart": {
-     "what_happened": [
-      "Three flexi-cap funds together account for more than half of the category's total assets under management.",
-      "A comparison of one\u2011year and five\u2011year returns shows that their size does not necessarily translate into superior performance."
-     ],
-     "why_it_matters": "The concentration of assets in a few large flexi-cap funds means that investors' exposure to the sector is heavily weighted toward these schemes, yet the performance data suggests that smaller or less\u2011dominant funds may deliver comparable or better returns over different horizons. This disconnect between size and returns highlights the importance of evaluating fund performance on its own merits rather than assuming that larger AUM guarantees better outcomes.",
-     "what_to_watch": "Monitor the next quarterly performance reports of the three dominant flexi-cap funds to see if their returns converge with or diverge from the broader category averages.",
-     "headline": "Three flexi-cap funds hold 52% of category AUM",
-     "read_seconds": 20
-    }
+    "_sort": "2026-09-13T18:33:51+00:00"
    },
    {
     "source": "ET Opinion",
@@ -1360,12 +1350,12 @@
     "_sort": "2026-09-13T18:11:20+00:00",
     "smart": {
      "what_happened": [
-      "Xi Jinping's visit to India was described as managed competition rather than reconciliation.",
-      "Both countries said they are seeking mechanisms to control rivalry and avoid escalation."
+      "Xi Jinping's visit to India highlighted managed competition rather than reconciliation",
+      "Both countries discussed mechanisms to control rivalry and avoid escalation while emphasizing mutual respect and boundary settlement"
      ],
-     "why_it_matters": "The meeting signals a cautious reopening of diplomatic and economic channels between the world's two most populous nations, but the lack of strategic trust means that future cooperation remains fragile and any misstep could quickly revive tensions, affecting regional stability and global supply chains.",
-     "what_to_watch": "Whether the two governments announce a concrete mechanism to manage competition, such as a formal crisis\u2011management protocol.",
-     "headline": "India and China resume engagement amid lingering strategic mistrust",
+     "why_it_matters": "The meeting underscores the fragile balance between India and China, where diplomatic and economic ties are being cautiously restored but deep strategic mistrust remains, making any progress vital for regional stability and the avoidance of conflict.",
+     "what_to_watch": "any official joint statement released by India and China after the visit",
+     "headline": "Xi Jinping visits India, signaling managed competition",
      "read_seconds": 26
     }
    },
@@ -1451,7 +1441,7 @@
     "moves": 19,
     "termination": "Resignation",
     "speed": "Blitz",
-    "analysis": "Focus on early king safety: after 9\u2026Nf6, avoid 10\u2026g5? (weakens f6\u2011e5 squares). Instead play \u2026e6, develop bishop to\u202fBd6, then castle\u2014reducing tactical threats and limiting opponent\u2019s attack.",
+    "analysis": "Focus on early king safety: after 9\u2026Qb6, avoid queen\u2011side pawn pushes; develop knights first, castle before initiating attacks.",
     "is_upset": false,
     "is_collapse": true,
     "is_long": false,
@@ -1546,7 +1536,7 @@
     "moves": 57,
     "termination": "Checkmate",
     "speed": "Blitz",
-    "analysis": "",
+    "analysis": "Study and memorize the critical lines after 1.d4\u202fNf6\u202f2.c4\u202fe6\u202f3.Nf3\u202fb6; avoid early queen sorties\u2014your queen moved 5 times in the first 12 moves, costing 0.8\u202fpawn\u2011value.",
     "is_upset": false,
     "is_collapse": false,
     "is_long": true,
@@ -1644,14 +1634,14 @@
    "upsets": 0,
    "collapses": 1,
    "long_games": 1,
-   "session_summary": "",
+   "session_summary": "Your 0\u20112 record shows you\u2019re playing openings you don\u2019t understand; you\u2019re either flailing into the Sicilian Dragon or dumping into the early queen sortie without a plan\u2014both are killing your chances. The single collapse proves you can\u2019t even hold a simple Caro\u2011Kann or French structure against a lower\u2011rated opponent, so stop chasing novelty and master the fundamental pawn breaks and piece\u2011placement ideas of one solid opening (e.g., the London System). From now on, study 10\u201115 key positions of that opening, drill the main tactical motifs daily, and only play it until you can finish a game without blundering a piece.",
    "session_date": "2026-09-12",
    "is_yesterday": false,
    "token_missing": false
   },
   "lichess_puzzle": {
    "pid": "t0lgs",
-   "rating": 1998,
+   "rating": 1838,
    "level": "\ud83d\udd34 stretch",
    "themes": "Very Long \u00b7 Endgame \u00b7 Attraction",
    "tip": "King activity and pawn structure dominate. Technique over tactics here.",
