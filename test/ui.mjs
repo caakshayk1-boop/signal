@@ -875,13 +875,17 @@ try {
     await p.goto(SITE + "/stock/NOTAREALTICKER", { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(SETTLE + 5000);
     const txt = await p.locator("main").innerText();
-    return /not in the 750-name screen/i.test(txt);
+    // NOT "750-name": the copy correctly stopped naming a size when the
+    // universe was widened, and this regex kept the old number — so the
+    // assertion failed on a page that was behaving exactly as intended. An
+    // assertion should not encode a figure the sentence no longer carries.
+    return /is not in the .*screen/i.test(txt);
   })());
 
   /* THE .NS SUFFIX. Symbols reach the card from feeds that carry the exchange
    * suffix; SCREEN stores bare ones. The mismatch reported itself as "not in
-   * the 750-name screen", a sentence about the universe used for a string
-   * format problem. */
+   * the screen", a sentence about the universe used for a string format
+   * problem. */
   await p.goto(SITE + "/stock/PAYTM.NS", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 6000);
   ok("a .NS symbol resolves to the bare one",
