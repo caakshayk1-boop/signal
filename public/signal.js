@@ -274,11 +274,45 @@
     // Every quote this page fetches is also an alert check. No worker, no
     // push, no server — an alert fires while you are looking at the site,
     // which is the honest limit of a static front end over a read-only API.
-    const list = [...new Set((syms || []).filter(Boolean))].slice(0, 40);
+
+    /* ── .slice(0, 40) WAS SILENTLY THROWING AWAY THE TAIL ─────────────────
+     *
+     * The endpoint takes 40 symbols a call, and this respected that by
+     * TRUNCATING the list — so the 41st symbol onward was never asked about,
+     * and the page rendered "no mark" beside it as though no price existed.
+     *
+     * Measured on the live ledger: 58 open signals, 40 quoted, and exactly
+     * 18 rows reading "no mark" — CEMPRO, ASHOKLEY, MINDACORP and fifteen
+     * others. MINDACORP is the proof it was never a data gap: asked for on
+     * its own, /api/signals?px=MINDACORP returns ₹707. The quote existed the
+     * whole time; the request for it was cut off.
+     *
+     * "No mark" is a real state and still has to exist — a US equity, a
+     * commodity or a crypto pair in this ledger genuinely has no NSE quote,
+     * and saying so is honest. But it must mean "there is no price for this",
+     * never "I stopped asking at forty".
+     *
+     * So: chunk instead of truncate, and run the chunks in parallel — two
+     * requests for 58 symbols, not one request and a shrug. */
+    const list = [...new Set((syms || []).filter(Boolean))];
     if (!list.length) return {};
-    const r = await get('/api/signals?px=' + encodeURIComponent(list.join(',')));
-    if (r.ok && r.data.quotes) { try { checkAlerts(r.data.quotes); } catch (e) { /* never break a quote fetch */ } }
-    return (r.ok && r.data && r.data.quotes) ? r.data.quotes : {};
+    const BATCH = 40;
+    const batches = [];
+    for (let i = 0; i < list.length; i += BATCH) batches.push(list.slice(i, i + BATCH));
+
+    const parts = await Promise.all(batches.map(b =>
+      get('/api/signals?px=' + encodeURIComponent(b.join(',')))));
+
+    const all = {};
+    for (const r of parts) {
+      if (r.ok && r.data && r.data.quotes) Object.assign(all, r.data.quotes);
+    }
+    /* One alert pass over the whole set, not one per batch: checkAlerts
+       dedupes by symbol, and firing it twice re-notifies the first 40. */
+    if (Object.keys(all).length) {
+      try { checkAlerts(all); } catch (e) { /* never break a quote fetch */ }
+    }
+    return all;
   }
   // Unrealised move on an unfilled order or an open signal. Direction-aware:
   // a SELL signal that falls is winning, and treating every position as long
@@ -318,6 +352,131 @@
    * state, both of which say more than a grey box. Exactly once: after any
    * non-skeleton paint the flag drops and paint() behaves normally forever. */
   let preIntact = !!main.querySelector('.pre');
+  /* ── SORTING, ON EVERY LIST, WITHOUT REWRITING EVERY LIST ────────────────
+   *
+   * Akshay: "Research floor page etc — sorting on table allow, all pages
+   * sorting option enable."
+   *
+   * The signals page already sorts, because its route owns its rows and can
+   * re-sort the DATA and redraw. Every other list on this site — the research
+   * floor's two grids, the alert log, the engine lists — renders straight to
+   * HTML and had no sort at all. Writing a bespoke sorter into each route
+   * would be the same forty lines copied eight times, and each copy would
+   * drift.
+   *
+   * So this sorts the RENDERED ROWS instead: one enhancer, run after every
+   * paint, over any `.sg-head` grid on the page. It is a view operation, which
+   * is exactly what sorting a list is.
+   *
+   * THREE THINGS IT HAS TO GET RIGHT, and each is a bug if missed:
+   *
+   * 1. A ROW IS NOT ONE ELEMENT. xrow() emits the row AND a sibling `.xd`
+   *    detail panel holding its ladder and brief. Sorting the rows alone
+   *    shuffles summaries over other rows' details — every expanded fold
+   *    would then show another signal's numbers. Rows move as pairs.
+   *
+   * 2. A PRICE IS NOT A STRING. "₹1,189.60", "-2.30%" and "4.52R" must order
+   *    as numbers or the sort is alphabetical nonsense — ₹9 above ₹1,189.
+   *    Strip the currency, commas, percent and trailing R, then fall back to
+   *    locale string compare for genuinely textual columns.
+   *
+   * 3. BLANKS SINK IN BOTH DIRECTIONS. An unpriced row is not a small one —
+   *    the same rule the signals route already applies to its own sort, kept
+   *    identical here so the two cannot disagree.
+   *
+   * Routes that own their sort keep it: a `.sg-head` whose cells already
+   * carry data-sg is skipped, so the signals page still sorts its full data
+   * set rather than only the rows currently in the DOM. */
+  const GRID_NUM = /^[₹$€£\s]*-?[\d,]+(\.\d+)?\s*[%RrxX]?$/;
+  const gridVal = (cell) => {
+    const raw = (cell ? cell.textContent : '').trim();
+    if (!raw || raw === '—' || /^no mark$/i.test(raw)) return null;
+    if (GRID_NUM.test(raw)) {
+      const n = Number(raw.replace(/[₹$€£,\s%RrxX]/g, ''));
+      if (Number.isFinite(n)) return n;
+    }
+    return raw.toLowerCase();
+  };
+
+  const sortableGrids = (scope) => {
+    scope.querySelectorAll('.sg-head').forEach(head => {
+      // The route owns this one — leave it alone.
+      if (head.querySelector('[data-sg]')) return;
+      const body = head.nextElementSibling;
+      if (!body || !body.children.length) return;
+
+      const cells = [...head.children];
+      // Pair each row with its detail panel so they travel together.
+      const units = [];
+      for (const el of [...body.children]) {
+        if (el.classList.contains('xd')) {
+          if (units.length) units[units.length - 1].push(el);
+          continue;
+        }
+        units.push([el]);
+      }
+      if (units.length < 2) return;
+
+      cells.forEach((cell, i) => {
+        const label = cell.textContent.trim();
+        if (!label) return;               // spacer column (the direction dot)
+        cell.setAttribute('role', 'button');
+        cell.tabIndex = 0;
+        cell.classList.add('sg-h');
+        cell.setAttribute('aria-sort', 'none');
+        cell.title = `Sort by ${label}`;
+
+        const hit = () => {
+          const was = cell.dataset.dir;
+          /* FIRST CLICK GOES THE WAY THE COLUMN IS READ. A name column wants
+             A-Z; a price or a score wants the biggest first. Decided from the
+             column's own first non-blank value, so it is right for a column
+             this sorter has never seen. Same rule the signals route uses for
+             its own header. */
+          let dir;
+          if (was) dir = was === 'desc' ? 'asc' : 'desc';
+          else {
+            let probe = null;
+            for (const u of units) {
+              probe = gridVal(u[0].children[i]);
+              if (probe != null) break;
+            }
+            dir = typeof probe === 'number' ? 'desc' : 'asc';
+          }
+          cells.forEach(c => {
+            delete c.dataset.dir;
+            c.setAttribute('aria-sort', 'none');
+            c.classList.remove('on');
+            const ar = c.querySelector('.scr-ar'); if (ar) ar.remove();
+          });
+          cell.dataset.dir = dir;
+          cell.classList.add('on');
+          cell.setAttribute('aria-sort', dir === 'asc' ? 'ascending' : 'descending');
+          cell.insertAdjacentHTML('beforeend',
+            `<i class="scr-ar">${dir === 'asc' ? '▲' : '▼'}</i>`);
+
+          const sign = dir === 'asc' ? 1 : -1;
+          units.sort((ua, ub) => {
+            const va = gridVal(ua[0].children[i]), vb = gridVal(ub[0].children[i]);
+            const na = va == null, nb = vb == null;
+            if (na !== nb) return na ? 1 : -1;   // blanks sink either way
+            if (na) return 0;
+            if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * sign;
+            return String(va).localeCompare(String(vb)) * sign;
+          });
+          const frag = document.createDocumentFragment();
+          units.forEach(u => u.forEach(el => frag.appendChild(el)));
+          body.appendChild(frag);
+        };
+
+        cell.addEventListener('click', hit);
+        cell.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hit(); }
+        });
+      });
+    });
+  };
+
   const paint = html => {
     if (preIntact) {
       // A skeleton-only payload is not an improvement on the snapshot.
@@ -326,6 +485,10 @@
     }
     main.dispatchEvent(new CustomEvent('sig:teardown'));
     main.innerHTML = html;
+    /* After the route has written its markup, never before: the grids do not
+       exist until it has. Guarded because a sorter must never be the reason a
+       page fails to render. */
+    try { sortableGrids(main); } catch (e) { /* a list that cannot sort still reads */ }
   };
 
   // A mono eyebrow, a serif headline, one line of standfirst — the brief's
@@ -2083,6 +2246,9 @@
       return h == null ? '' : `daily · ${ageWord(h)}`;
     })();
     const cal = cl.ok && cl.data && cl.data.ok ? cl.data : null;
+    /* The world clock needs this list too, and this is the one place the site
+       already pays for it. Handed over rather than fetched twice. */
+    if (cal && cal.holidays) setHolidays(cal.holidays.rows);
     const wireTop = (() => {
       const uni = sr.ok ? (sr.data.rows || []) : [];
       if (!wire.length) return null;
@@ -2786,11 +2952,37 @@
    * Intl.DateTimeFormat, so daylight saving is handled by the platform rather
    * than by a table in this file that would be wrong twice a year.
    *
-   * What this does NOT know is holidays. Diwali, Thanksgiving and Boxing Day
-   * will each show a market as open when it is shut. The strip says so in
-   * words rather than quietly being wrong — a market-hours widget that claims
-   * more precision than it has is worse than none.
+   * HOLIDAYS USED TO BE THE HOLE, AND THE DATA WAS ALREADY IN THE BUILDING.
+   *
+   * Akshay, 2026-09-14: "NSE shows open on market page but today is holiday."
+   * He was right. 14 September 2026 is Ganesh Chaturthi, NSE was shut all day,
+   * and this strip read "NSE · OPEN · Closes in 5h 12m" through the entire
+   * session, because the only thing it knew was the clock and the weekday.
+   *
+   * The fix needed no new source. /api/calendar has fetched NSE's own
+   * holiday-master since it was written, and returns exactly this:
+   *     { date: "2026-09-14", day: "Monday", why: "Ganesh Chaturthi" }
+   * The clock simply never asked it. It asks now, and a matching date makes
+   * the exchange shut with the holiday's name shown instead of a countdown to
+   * an open that will not happen.
+   *
+   * SCOPE, STATED HONESTLY. NSE is the only exchange this covers, because
+   * NSE's list is the only one the site fetches. Thanksgiving and Boxing Day
+   * will still show NYSE and LSE as open, so the strip keeps saying so — for
+   * those five, not for all six. A widget that overstates its own coverage is
+   * the bug being fixed here, and replacing it with a quieter version of the
+   * same overstatement would not be a fix.
    */
+  /* Filled by whichever route has already loaded /api/calendar. Empty until
+     then, and an empty table simply means no holiday is known — never that a
+     market is open. */
+  let NSE_HOLIDAYS = Object.create(null);
+  const setHolidays = (rows) => {
+    for (const r of rows || []) if (r && r.date) NSE_HOLIDAYS[r.date] = r.why || 'Exchange holiday';
+  };
+  // Today's date in a zone, as YYYY-MM-DD — the key the calendar feed uses.
+  const zoneDay = (tz) => new Intl.DateTimeFormat('en-CA', { timeZone: tz,
+    year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   const EXCHANGES = [
     ['Mumbai',    'NSE',   'Asia/Kolkata',   9.25, 15.5,  72.83],
     ['Hong Kong', 'HKEX',  'Asia/Hong_Kong', 9.5,  16.0,  114.16],
@@ -2813,10 +3005,18 @@
     return d >= 60 ? `${Math.floor(d / 60)}h ${d % 60}m` : `${d}m`;
   };
 
-  function exchangeState(tz, open, close) {
+  function exchangeState(tz, open, close, code) {
     const t = zoneNow(tz);
     const now = t.h + t.m / 60 + t.s / 3600;
     const weekend = t.wd === 'Sat' || t.wd === 'Sun';
+    /* A holiday outranks the clock. Checked against the exchange's OWN local
+       date, not the reader's — in MYT it is already tomorrow in New York's
+       evening, and comparing against the wrong day is how a holiday widget
+       goes wrong in the other direction. */
+    if (code === 'NSE') {
+      const why = NSE_HOLIDAYS[zoneDay(tz)];
+      if (why) return { open: false, label: esc(why), holiday: true, t };
+    }
     if (!weekend && now >= open && now < close)
       return { open: true, label: 'Closes in ' + fmtGap((close - now) * 60), t };
     // Next open: later today on a weekday, otherwise the next weekday morning.
@@ -2876,7 +3076,7 @@
   </svg>`;
 
   function worldClocksHtml() {
-    const st = EXCHANGES.map(([, , tz, o, c]) => exchangeState(tz, o, c));
+    const st = EXCHANGES.map(([, code, tz, o, c]) => exchangeState(tz, o, c, code));
     const openCount = st.filter(x => x.open).length;
     return { openCount, html: `<div class="wc">
       <div class="wc-g">${globe(st.map(x => x.open))}</div>
@@ -2887,7 +3087,8 @@
           <div class="wc-x">
             <span class="wc-c">${esc(city)}</span>
             <span class="wc-t">${String(x.t.h).padStart(2, '0')}:${String(x.t.m).padStart(2, '0')}</span>
-            <span class="wc-e">${esc(code)} · <b>${x.open ? 'Open' : 'Closed'}</b></span>
+            <span class="wc-e">${esc(code)} · <b>${
+              x.holiday ? 'Holiday' : x.open ? 'Open' : 'Closed'}</b></span>
             <span class="wc-n">${esc(x.label)}</span>
           </div>
         </div>`;
@@ -3196,7 +3397,16 @@
       sec('Sector heat', `<div class="sk" style="height:120px"></div>`) +
       sec('The board', `<div class="board">${skel('sk-row', 8)}</div>`));
 
-    const [m, p] = await Promise.all([get('/api/markets'), get('/pulse.json')]);
+    /* The calendar comes along for the holiday list. A reader who lands
+       straight on /markets never runs the front page, so without this the
+       world strip would be holiday-blind on the one page it appears — which
+       is exactly how it showed NSE open on Ganesh Chaturthi. Fetched
+       alongside, never awaited on its own: a holiday name is worth a slot in
+       an existing round trip, not a delay to the whole board. */
+    const [m, p, cl] = await Promise.all([
+      get('/api/markets'), get('/pulse.json'), get('/api/calendar').catch(() => ({ ok: false })),
+    ]);
+    if (cl && cl.ok && cl.data && cl.data.ok && cl.data.holidays) setHolidays(cl.data.holidays.rows);
     let out = head('Markets', 'The board live, and what the NSE screen underneath it did.', 'The board');
     const pu = p.ok ? p.data : {};
     if (pu && pu.universe) window.__PULSE = pu;
@@ -3357,6 +3567,43 @@
     const mbRows = (mbSeg && mbSeg.items) || [];
     const picked = mbRows.find(r => r.pick_date) || {};
 
+    /* ── ONE NAME IS THE NEWEST SCAN, NOT THE WHOLE BOOK ──────────────────
+     *
+     * Akshay: "multibagger just shows 1 item namindia?"
+     *
+     * Nothing was broken. This block takes the NEWEST scan date only, and
+     * Saturday 2026-09-12's run qualified exactly one name — NAM-INDIA. The
+     * section was telling the truth and reading like a fault, which for a
+     * page of ideas is the same thing as being wrong: a reader sees one card
+     * and concludes the engine has stopped.
+     *
+     * What it left out is that the engine's earlier picks are still LIVE.
+     * The ledger carries 27 open multibagger tickets — MINDACORP, OFSS,
+     * FEDERALBNK and two dozen more — each with its own entry, stop and
+     * target, none of which had closed. A scan is a weekly event; the book is
+     * the standing position, and only the event was on the page.
+     *
+     * Both now show, and they are labelled as the different things they are:
+     * this week's scan, then what is still open from the ones before it. The
+     * scan cards keep their full treatment because they carry the score and
+     * the pick price; the open book is a compact list, because for those the
+     * question is only "what is still running and at what levels".
+     *
+     * Deduped by symbol: a name picked this Saturday that is also open from
+     * an earlier scan is ONE idea, and the scan card is the one that shows —
+     * same keep-the-latest rule the ledger itself now runs on. */
+    const MB_FAMILY = /^multibagger/i;
+    const mbSeen = new Set(mbRows.map(r => bareSym(r.name)));
+    const mbOpen = (lg.ok ? lg.rows : [])
+      .filter(r => MB_FAMILY.test(String(r.signal_type || ''))
+                && (r.badge || '').toLowerCase() === 'open'
+                && !mbSeen.has(bareSym(r.symbol)))
+      .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+
+    /* Live marks for the open book. quotes() batches internally now, so 27
+       names is two requests rather than a truncated one. */
+    const MB_PX = mbOpen.length ? await quotes(mbOpen.map(r => r.symbol)) : {};
+
     /* FIVE LISTS, ORDERED BY CLOCK.
      *
      * This page carries five different idea sources — the book, the daily
@@ -3374,7 +3621,8 @@
     const parts = {};
     parts.mbg = sec('Multibaggers this week', mbRows.length ? foldBody(
       `${mbRows.length} name${mbRows.length === 1 ? '' : 's'} from Saturday's scan${
-        picked.pick_date ? `, picked ${picked.pick_date}` : ''}`,
+        picked.pick_date ? `, picked ${picked.pick_date}` : ''}${
+        mbOpen.length ? ` · ${mbOpen.length} still open from earlier scans` : ''}`,
       `<div class="mbg">${mbRows.map(r => {
         const since = r.pick_entry && Number.isFinite(Number(r.price_raw))
           ? (r.price_raw - r.pick_entry) / r.pick_entry * 100 : null;
@@ -3416,7 +3664,29 @@
       }).join('')}</div>
       <p class="hint">The scan runs on a Saturday and this list is the newest run — it does not
         change between runs, and the prices beside the names are live, which is what makes a
-        stalled-looking list look like a bug rather than the design.</p>`)
+        stalled-looking list look like a bug rather than the design.</p>
+      ${mbOpen.length ? `<div class="mb-open">
+        <h4 class="mb-oh">Still open from earlier scans<span>${mbOpen.length} name${
+          mbOpen.length === 1 ? '' : 's'}</span></h4>
+        <div class="sg-head" role="row"><span>Name</span><span>Picked</span><span>Entry</span
+          ><span>Stop</span><span>Target</span><span>Now</span></div>
+        <div class="rank mb-ot">${mbOpen.map(r => {
+          const q = MB_PX[bareSym(r.symbol)];
+          const mv = q ? pnlOf(r.entry, q.price, r.action) : null;
+          return `<div class="rank-r mb-or">
+            <span class="mb-on"><b>${esc(bareSym(r.symbol))}</b></span>
+            <span class="mono">${esc(String(r.date || '').slice(0, 10))}</span>
+            <span class="mono">${price(r.entry, r.currency || '₹')}</span>
+            <span class="mono dn">${price(r.sl, r.currency || '₹')}</span>
+            <span class="mono up">${lvl(r.target1) == null ? '—' : price(r.target1, r.currency || '₹')}</span>
+            <span class="mono">${q ? price(q.price, r.currency || '₹') : '—'}${
+              mv == null ? '' : ` <i class="${dir(mv)}">${pct(mv)}</i>`}</span>
+          </div>`;
+        }).join('')}</div>
+        <p class="hint">These were filed by the same scan on earlier Saturdays and have not hit a
+          stop or a target yet, so they are still live. A name appears once: if this week's scan
+          picked it again, it is in the cards above and not here.</p>
+      </div>` : ''}`)
       : `<div class="empty">The weekly scan has not written a list in the last month, so there is
          nothing current to show. Stale ideas presented as current would be worse.</div>`,
       mbRows.length ? `${mbRows.length} names${picked.pick_date ? ` · ${esc(picked.pick_date)}` : ''}` : '',
@@ -6128,6 +6398,39 @@
     return true;
   };
 
+  /* ── THE SAME NAME, FILED BY TWO DIFFERENT ENGINES ───────────────────────
+   *
+   * Akshay: "entire site no duplicacy."
+   *
+   * The duplicates he means are gone: the ledger now carries ONE open ticket
+   * per name per engine — measured on the live feed the day this was written,
+   * 133 open rows and zero repeated (symbol, engine) pairs.
+   *
+   * What is left is NOT duplication and must not be deleted. Two kinds:
+   *
+   *   1. A closed trade and a later re-entry. STLTECH shows twice because the
+   *      first was booked at target 2 for +17.7% on 3 September and the engine
+   *      re-entered on the 12th. That is a record doing its job.
+   *
+   *   2. Seven names open under TWO engines — CGCL under BREACH and ASCENT,
+   *      OFSS under NORTH and ASCENT, five more. Two engines independently
+   *      reaching the same name is a signal in itself, and deleting one would
+   *      erase a real filing by a real screen.
+   *
+   * But the reader's hazard is real: sized off both rows, those seven carry
+   * twice the intended risk on one company. So the row says so — once, on
+   * each side — and nothing is removed. */
+  let OPEN_TWICE = new Map();
+  const alsoOpen = (r) => {
+    const others = OPEN_TWICE.get(bareSym(r.symbol));
+    if (!others) return '';
+    const rest = others.filter(e => e !== engName(r.signal_type));
+    if (!rest.length) return '';
+    return `<span class="sg-dbl" title="Open under ${esc(rest.join(' and '))} as well — one position, not ${
+      rest.length + 1}. Sizing both is ${rest.length + 1}x the intended risk on one company."
+      >also ${esc(rest.join(', '))}</span>`;
+  };
+
   const sigRow = (r, px, detail) => {
     const cur = r.currency || '₹';
     const b = (r.badge || '').toLowerCase();
@@ -6144,7 +6447,8 @@
     const short = sigDir(r) === 'short';
     const summary = `<span class="sg-d ${short ? 'dn' : 'up'}" title="${short ? 'Short' : 'Long'}"></span>
       <span class="sg-id"><b>${esc(r.symbol || '')}</b>
-        <span>${esc(engName(r.signal_type))}${r.timeframe ? ' · ' + esc(r.timeframe) : ''}</span></span>
+        <span>${esc(engName(r.signal_type))}${r.timeframe ? ' · ' + esc(r.timeframe) : ''}${
+          open ? alsoOpen(r) : ''}</span></span>
       <span class="sg-n" title="Entry">${price(r.entry, cur)}</span>
       <span class="sg-n dn" title="Stop">${price(r.sl, cur)}</span>
       <span class="sg-n up" title="First target">${lvl(r.target1) == null ? '—' : price(r.target1, cur)}</span>
@@ -6425,8 +6729,31 @@
      * as positions close. The pre-launch history is not deleted — it is
      * summarised below with its own dates attached, so nothing is hidden and
      * nothing is passed off as this site's own result. */
+    /* ── A WITHDRAWN SETUP IS NOT A SIGNAL, SO IT IS NOT ON THE LIST ──────
+     *
+     * Akshay, on seeing TATAINVEST sitting in the list under a "cancelled"
+     * pill: "why — better dont show, take it off".
+     *
+     * He is right, and the reason is that the row answers a question nobody
+     * reading this page is asking. This list exists to be acted on and to be
+     * scored. A withdrawn setup can be neither: it was pulled BEFORE it could
+     * be taken — TATAINVEST's first target sat at 4.52R against a book whose
+     * best trade ever is 4.43R — and every expectancy query already excludes
+     * it, so it can never close into the win rate either.
+     *
+     * NOTHING IS HIDDEN BY THIS. The row stays in the ledger, keeps its
+     * CANCELLED status and its written reason, and /api/signals still reports
+     * it. What changes is that a list of live calls no longer opens with a
+     * call that is not live. The count of withdrawals is stated under the
+     * record, where a reader can see the book pulled setups without having
+     * one presented to them as an idea.
+     *
+     * Matched on the badge the API computes, not on a symbol. */
+    const withdrawn = r => (r.badge || '').toLowerCase() === 'cancelled'
+                        || String(r.status || '').toUpperCase() === 'CANCELLED';
     const CURVE = rCurve(every.filter(sinceLaunch));
-    const all = every.filter(sinceLaunch);   // same rule as the curve above
+    const WITHDRAWN_N = every.filter(r => sinceLaunch(r) && withdrawn(r)).length;
+    const all = every.filter(r => sinceLaunch(r) && !withdrawn(r));
 
     // Filter on the row's OWN badge, not on arithmetic over pnl_pct.
     // `Number(null) <= 0` is true, so the first version put all 138 open
@@ -6437,6 +6764,21 @@
     const wins = all.filter(r => (r.badge || '').toLowerCase() === 'win').length;
     const losses = all.filter(r => (r.badge || '').toLowerCase() === 'loss').length;
     const opens = all.filter(isOpen);
+
+    /* Which names are open under more than one engine. Built from the open
+       rows of THIS page's population, so the note can never point at a row the
+       reader cannot see. */
+    {
+      const by = new Map();
+      for (const r of opens) {
+        const k = bareSym(r.symbol);
+        if (!by.has(k)) by.set(k, new Set());
+        by.get(k).add(engName(r.signal_type));
+      }
+      OPEN_TWICE = new Map([...by.entries()]
+        .filter(([, v]) => v.size > 1)
+        .map(([k, v]) => [k, [...v]]));
+    }
 
     // One request for every open signal's mark, not one per card.
     const px = await quotes(opens.map(r => r.symbol));

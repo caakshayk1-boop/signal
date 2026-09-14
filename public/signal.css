@@ -5013,3 +5013,37 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .sec-h{margin-bottom:10px}
 /* A note directly under a stat strip is a caption, not a paragraph. */
 .snap-n{margin-top:6px}
+
+/* ── THE OPEN MULTIBAGGER BOOK ───────────────────────────────────────────
+ * "Multibaggers this week" showed only the newest scan, which on 2026-09-12
+ * qualified one name — so a section about a 27-position book rendered a
+ * single card and read as broken. The scan cards keep their treatment; the
+ * standing book is a compact six-column list underneath, because for an
+ * already-open ticket the only live question is the levels.
+ *
+ * Its own grid: .sg-head's default columns are the signals ledger's seven,
+ * and borrowing them for six would misalign every heading from the column it
+ * names. Same class, so the generic sorter still enhances it. */
+.mb-open{margin-top:20px;padding-top:18px;border-top:1px solid var(--line)}
+.mb-oh{display:flex;align-items:baseline;gap:9px;margin:0 0 11px;
+  font:600 var(--t-1)/1.2 var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.mb-oh span{font-weight:500;letter-spacing:0;text-transform:none;color:var(--text);opacity:.75}
+.mb-open .sg-head,.rank-r.mb-or{grid-template-columns:minmax(0,1.2fr) 88px repeat(3,74px) minmax(96px,1fr)}
+.mb-open .sg-head span:nth-child(n+2),.rank-r.mb-or>span:nth-child(n+2){text-align:right}
+.rank-r.mb-or{display:grid;gap:11px;padding:9px 13px;align-items:center}
+.mb-on b{font-weight:600}
+.mb-or .mono{font-variant-numeric:tabular-nums}
+.mb-or i{font-style:normal;font-size:.92em;opacity:.85;margin-left:.3em}
+@media (max-width:720px){
+  /* Six columns do not fit a phone. The list scrolls sideways inside its own
+     container rather than widening the page — same rule the board follows. */
+  .mb-ot,.mb-open .sg-head{min-width:560px}
+  .mb-open{overflow-x:auto}
+}
+
+/* A name open under two engines. Quiet — it qualifies the row, it is not an
+   alert — but present on both rows so neither reads as the only one. */
+.sg-dbl{display:inline-block;margin-left:7px;padding:1px 6px;border-radius:999px;
+  border:1px solid var(--line);background:var(--bg-2,transparent);
+  font:600 var(--t-2)/1.5 var(--sans);letter-spacing:.04em;text-transform:uppercase;
+  color:var(--dim);cursor:help;vertical-align:1px}
