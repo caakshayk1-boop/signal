@@ -4149,6 +4149,7 @@
     const io = await get('/ipo.json');
     IPO_STAMP = io.ok ? String(feedStamp(io.data) || '').slice(0, 16).replace('T', ' ') : '';
     IPO_AGE_H = io.ok ? ageHours(feedStamp(io.data)) : null;
+    if (io.ok) noteFresh('IPO book', feedStamp(io.data));
     let out = head('IPO', 'Books open now, what is coming, and how the last year of listings actually did.', 'Primary market');
     if (!io.ok) { paint(out + fail('The IPO radar', io.error)); return; }
     const d = io.data, c = d.counts || {};
@@ -10164,6 +10165,7 @@
       'Fund screen');
     paint(head0 + sec('Loading', `<div class="sk" style="height:280px"></div>`));
     const fr = await get('/funds.json');
+    if (fr.ok && fr.data) noteFresh('Fund screen', feedStamp(fr.data));
     if (!fr.ok || !fr.data || !fr.data.ok) {
       paint(head0 + fail('The fund screen', (fr.data && fr.data.error) || fr.error
         || 'the weekly screen has not published yet'));
@@ -10297,6 +10299,10 @@
     const [n, sc, pu, ed, lw] = await Promise.all(
       [get('/news.json'), getScreen(false).then(g => g.r), get('/pulse.json'), get('/edition.json'),
        get('/api/wire')]);
+    /* The wire and the daily edition age at different rates and the page
+       carries both, which is the case the per-feed bar exists for. */
+    if (ed.ok && ed.data) noteFresh('Edition', feedStamp(ed.data));
+    if (lw.ok && lw.data) noteFresh('Wire', lw.data.at || feedStamp(lw.data));
     const live = lw.ok && lw.data && lw.data.ok ? lw.data : null;
     /* Same reasoning as the front page: the wire carries no timestamp of its
      * own, so it borrows the build stamp of the edition it was written with. */
