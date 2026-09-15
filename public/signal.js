@@ -4212,7 +4212,12 @@
      * is the thing this site refuses. */
     out += `<div id="ipoExtra"></div>`;
 
-    if ((d.upcoming || []).length) out += sec('Upcoming', `<div class="cards-2">${d.upcoming.map(ipoCard).join('')}</div>`);
+    /* The note goes wherever ipoCard goes. Moving the timestamp off the cards
+       and into one note only works if every block that renders a card also
+       renders the note — this block did not, so its cards said "Morning
+       build" with the actual morning surviving in a title attribute nobody
+       on a phone can hover. */
+    if ((d.upcoming || []).length) out += sec('Upcoming', `<div class="cards-2">${d.upcoming.map(ipoCard).join('')}</div>` + ipoStaleNote());
     if ((d.awaiting_listing || []).length)
       out += sec('Awaiting listing', `<div class="cards-2">${d.awaiting_listing.map(ipoCard).join('')}</div>`);
 
