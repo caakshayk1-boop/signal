@@ -477,6 +477,63 @@
     });
   };
 
+  /* ── WHEN WHAT YOU ARE READING WAS LAST WRITTEN ──────────────────────────
+   *
+   * Akshay: "add last refresh time page on each page, small details."
+   *
+   * He asked immediately after the ledger handed him a copy that predated a
+   * scan he knew had run — 61 published, no sign of the two filed minutes
+   * earlier. The edge was serving a cached copy and the page said nothing,
+   * so the only reading available was "the site is broken".
+   *
+   * FRESHNESS IS PER FEED, NOT PER PAGE, and that is the whole point. This
+   * site draws one route from as many as four sources — the ledger over
+   * Turso, a nightly screen file, an hourly wire, the exchange calendar —
+   * and they age at completely different rates. A single "updated 5m ago"
+   * would be a lie about three of them. Each route reports the feeds it
+   * actually read, with each one's own stamp.
+   *
+   * "Loaded" is always shown and is deliberately the LAST item: it is the
+   * one timestamp that says nothing about the data, and a reader who sees
+   * only that knows the route reported no feed rather than being told
+   * something fresh. */
+  let FRESH = [];
+  const freshFmt = (ts) => {
+    const h = ageHours(ts);
+    if (h == null) return null;
+    const m = Math.round(h * 60);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm ago';
+    if (h < 36) return Math.round(h) + 'h ago';
+    return Math.round(h / 24) + 'd ago';
+  };
+  const renderFresh = () => {
+    const el = document.getElementById('freshBar');
+    if (!el) return;
+    const loaded = new Date();
+    const hhmm = String(loaded.getHours()).padStart(2, '0') + ':'
+               + String(loaded.getMinutes()).padStart(2, '0');
+    const parts = FRESH
+      .map(([label, ts]) => {
+        const w = freshFmt(ts);
+        return w ? `<span><i>${esc(label)}</i> ${esc(w)}</span>` : null;
+      })
+      .filter(Boolean);
+    parts.push(`<span><i>Loaded</i> ${hhmm}</span>`);
+    el.innerHTML = parts.join('');
+  };
+  /* Called by a route once it knows what it read. Later calls for the same
+     label replace the earlier one rather than stacking a second copy. */
+  const noteFresh = (label, ts) => {
+    if (!ts) return;
+    const i = FRESH.findIndex(x => x[0] === label);
+    if (i >= 0) FRESH[i] = [label, ts]; else FRESH.push([label, ts]);
+    try { renderFresh(); } catch (e) { /* never break a route over a timestamp */ }
+  };
+  // Cleared on NAVIGATION, not on paint: one route paints several times as
+  // its feeds land, and clearing per paint would blank what it just reported.
+  const resetFresh = () => { FRESH = []; try { renderFresh(); } catch (e) {} };
+
   const paint = html => {
     if (preIntact) {
       // A skeleton-only payload is not an improvement on the snapshot.
@@ -545,17 +602,39 @@
 
   /* Wins, losses and expectancy over an arbitrary set of ledger rows. The site
    * used /api/stats for this, which is all-time and cannot be filtered. */
+  /* ── WHAT COUNTS AS A SCORED TRADE — ONE DEFINITION, THREE CALLERS ───────
+   *
+   * r_multiple != null FIRST: Number(null) is 0 and 0 is finite, so an
+   * ungraded row would otherwise be counted as a closed trade booked at
+   * exactly 0R — in the trade count, the win rate and the expectancy this
+   * site publishes.
+   *
+   * THIS WAS FIXED HERE AND NOWHERE ELSE, WHICH IS WHY IT CAME BACK. Three
+   * places asked the same question and two of them dropped the null guard:
+   * the per-engine roster and the equity curve. On 2026-09-15 the roster's
+   * columns summed to SIX closed trades under a header that said FIVE, and
+   * the sixth was TATAINVEST — a WITHDRAWN setup, never taken, ungraded —
+   * entering the table as a closed trade at 0R and pulling TIDAL's win rate
+   * down with it. The equity curve had the same hole, under a comment
+   * promising "rows without one are skipped rather than assumed flat".
+   *
+   * A predicate copied into three files is three chances to fix two of them.
+   * This is the definition; everything that counts closed trades calls it. */
+  /* A withdrawn setup is not a signal: pulled before it could be taken, and
+   * excluded from every expectancy query upstream. It is kept in the ledger
+   * and reported by the API — it just never appears as an idea or a trade.
+   * Defined here, beside isScored, because /signals was hiding it while the
+   * FRONT PAGE still counted it: Akshay saw TATAINVEST on the home record
+   * the day after it came off the ledger page. */
+  const withdrawn = r => (r.badge || '').toLowerCase() === 'cancelled'
+                      || String(r.status || '').toUpperCase() === 'CANCELLED';
+
+  const isScored = r => r != null && r.r_multiple != null
+    && Number.isFinite(Number(r.r_multiple))
+    && (r.badge || '') !== 'open';
+
   const recordOf = rows => {
-    const closed = rows.filter(
-      /* r_multiple != null FIRST: Number(null) is 0 and 0 is finite, so an
-       * ungraded row would otherwise be counted as a closed trade booked at
-       * exactly 0R — in the trade count, the win rate and the expectancy this
-       * site publishes. Measured on the live feed the day this was found: 184
-       * rows carry a null grade and every one of them is also badge=open, so
-       * the clause below already excluded them and no published figure moves.
-       * It is the ordering that was load-bearing, and it was accidental. */
-      r => r.r_multiple != null && Number.isFinite(Number(r.r_multiple))
-        && (r.badge || '') !== 'open');
+    const closed = rows.filter(isScored);
     if (!closed.length) return { trades: 0, wins: 0, losses: 0, win_rate: null, expectancy_r: null };
     const wins = closed.filter(r => Number(r.r_multiple) > 0).length;
     const sum = closed.reduce((a, r) => a + Number(r.r_multiple), 0);
@@ -1423,13 +1502,20 @@
     if (live.ok) {
       const all = live.data.signals || live.data.rows || [];
       const rows = all.filter(engineOk).filter(longOnly);
-      if (all.length) return { ok: true, rows, live: true, at: live.data.generated_at,
-                               dropped: all.length - rows.length };
+      if (all.length) {
+        noteFresh('Ledger', live.data.generated_at);
+        return { ok: true, rows, live: true, at: live.data.generated_at,
+                 dropped: all.length - rows.length };
+      }
     }
     const snap = await get('/alerts.json');
     if (!snap.ok) return { ok: false, error: live.error || snap.error };
     const all = Array.isArray(snap.data) ? snap.data : (snap.data.rows || []);
     const rows = all.filter(engineOk).filter(longOnly);
+    /* Named differently on purpose. This is the build-time snapshot, not the
+       live book, and a reader comparing two tabs deserves to know which one
+       they are looking at. */
+    noteFresh('Ledger (snapshot)', (snap.data && snap.data.generated_at) || null);
     return { ok: true, rows, live: false, error: live.error, dropped: all.length - rows.length };
   }
 
@@ -1999,7 +2085,10 @@
      * has to come from calling the same function. ledger() also carries the
      * alerts.json fallback, so the front page now degrades the way the signals
      * page does instead of showing nothing. */
-    const lrRows = sgx.ok ? (sgx.rows || []).filter(sinceLaunch) : [];
+    /* Same exclusion the ledger page applies. Without it the front page
+       counted a withdrawn setup as published, and — through the roster's
+       missing null guard — as a closed trade too. */
+    const lrRows = sgx.ok ? (sgx.rows || []).filter(r => sinceLaunch(r) && !withdrawn(r)) : [];
     const LR = recordOf(lrRows);
     LR.published = lrRows.length;
     LR.open = lrRows.filter(r => (r.badge || '').toLowerCase() === 'open').length;
@@ -2309,7 +2398,7 @@
         const f = fam.get(label);
         if (!f) continue;
         f.pub += 1;
-        if ((r.badge || '') !== 'open' && Number.isFinite(Number(r.r_multiple))) {
+        if (isScored(r)) {
           f.closed += 1;
           if (Number(r.r_multiple) > 0) f.wins += 1;
         }
@@ -2760,23 +2849,46 @@
         /* THE VINTAGE IS THE CARD'S; THE CAVEAT IS THE PAGE'S.
          * "and a book moves fastest on its last day" is a fact about IPO
          * books, not about this issue, and it printed on every card still
-         * reading from the morning mirror. The stamp and the age stay — those
-         * differ per card and are the honest marker — and the sentence is
-         * said once, under the block. See ipoStaleNote(). */
-        : (IPO_AGE_H != null ? `<span class="subs-age${IPO_AGE_H > 6 ? ' is-old' : ''}">
-            as at ${esc(IPO_STAMP)}${IPO_AGE_H > 6 ? ` · <b>${esc(ageWord(IPO_AGE_H))}</b>` : ''}</span>` : '')}
+         * reading from the morning mirror. The sentence is said once, under
+         * the block. See ipoStaleNote().
+         *
+         * ── AND THE STAMP WAS NOT PER-CARD EITHER ──────────────────────
+         * The note above kept the stamp on each card because "those differ
+         * per card". They do not. IPO_STAMP and IPO_AGE_H are module-level
+         * globals read from ONE morning build, so every card that misses a
+         * live NSE read prints a byte-identical sentence — four copies of
+         * "as at 2026-09-13 23:56 · 1d 14h old" down one column, which is
+         * what the duplicate-sentence check caught.
+         *
+         * It reads as flaky because it is data-dependent: a card that gets a
+         * live read shows "Live from NSE" instead, so the number of copies
+         * changes with how many live reads succeed. That is a latent fault
+         * that happens to be invisible on a good day.
+         *
+         * What is per-card is WHICH SOURCE the card used, and that is all
+         * this now says. The timestamp it refers to is stated once, below. */
+        : (IPO_AGE_H != null ? `<span class="subs-age${IPO_AGE_H > 6 ? ' is-old' : ''}"
+            title="From the morning build, as at ${esc(IPO_STAMP)}">Morning build</span>` : '')}
       ${cats.length ? `<span class="subs-cat">${cats.slice(0, 4).map(c =>
           `<i><u>${esc(c.cat)}</u><b>${Number(c.x).toFixed(2)}×</b></i>`).join('')}</span>` : ''}`;
   };
 
   /* Said once, under whichever block is showing mirrored figures, instead of
    * on every card that happens to be reading from the morning build. */
-  const ipoStaleNote = () => IPO_AGE_H != null && IPO_AGE_H > 6
-    ? `<p class="hint">Figures marked <b>as at ${esc(IPO_STAMP)}</b> come from the morning build,
-       not from NSE just now — and a book moves fastest on its last day, so treat a subscription
-       figure that old as a floor rather than a reading. Anything marked <b>Live from NSE</b> was
-       read on this page load.</p>`
-    : '';
+  const ipoStaleNote = () => {
+    if (IPO_AGE_H == null) return '';
+    /* The stamp lives HERE now, not on each card — it is one value from one
+       build, so printing it per card was the same sentence repeated. Stated
+       whatever the age, because a card saying "Morning build" has to be able
+       to tell you WHICH morning; the staleness warning is the part that is
+       conditional on the figure actually being old. */
+    return `<p class="hint">Figures marked <b>Morning build</b> are as at
+       <b>${esc(IPO_STAMP)}</b>${IPO_AGE_H > 6 ? ` — <b>${esc(ageWord(IPO_AGE_H))}</b>` : ''},
+       not read from NSE just now.${IPO_AGE_H > 6
+         ? ' A book moves fastest on its last day, so treat a subscription figure that old as a'
+           + ' floor rather than a reading.' : ''}
+       Anything marked <b>Live from NSE</b> was read on this page load.</p>`;
+  };
 
   /* Fetch the live book once and patch every card on screen. A targeted DOM
    * update, not a re-render: re-entering a route when a deferred fetch
@@ -4444,6 +4556,11 @@
                      'universe_core', 'universe_ext', 'built_on']) {
       if (d[k] !== undefined) SCREEN_META[k] = d[k];
     }
+    /* The screen is a NIGHTLY file and the ledger is live, so a route reading
+       both is reading two different moments. price_date is the close the
+       table was built on, which is the figure a reader is actually comparing
+       a live quote against. */
+    noteFresh('Screen', d.price_date || d.built_on || null);
     return d;
   };
   /* ── WHICH TABLE IS IN THE CACHE ─────────────────────────────────────────
@@ -6749,8 +6866,6 @@
      * one presented to them as an idea.
      *
      * Matched on the badge the API computes, not on a symbol. */
-    const withdrawn = r => (r.badge || '').toLowerCase() === 'cancelled'
-                        || String(r.status || '').toUpperCase() === 'CANCELLED';
     const CURVE = rCurve(every.filter(sinceLaunch));
     const WITHDRAWN_N = every.filter(r => sinceLaunch(r) && withdrawn(r)).length;
     const all = every.filter(r => sinceLaunch(r) && !withdrawn(r));
@@ -10364,7 +10479,9 @@
      * Every count on this page now says which window it belongs to. */
     const pubBy = {}, closedBy = {};
     if (sg.ok) for (const r of (sg.data.rows || sg.data.signals || [])) {
-      if (!sinceLaunch(r)) continue;
+      /* A withdrawn setup is not a publication. Same exclusion as the front
+         page and the ledger — this was the third surface still counting it. */
+      if (!sinceLaunch(r) || withdrawn(r)) continue;
       const k = r.signal_type;
       pubBy[k] = (pubBy[k] || 0) + 1;
       if (String(r.status || '').toUpperCase() === 'OPEN') openBy[k] = (openBy[k] || 0) + 1;
@@ -10407,9 +10524,16 @@
             * times down the page. The COUNT is per engine and stays on the
             * card; what "0 closed" means is the same for all of them and is
             * stated once under the roster. */''}
+        ${/* THE SAME FIX, NOW APPLIED TO THE OTHER BRANCH.
+            * The note above says it: the COUNT is per engine, what the count
+            * MEANS is the same for all of them. That was only ever true of
+            * the zero case, so the moment two engines closed the same number
+            * of trades the 16 words came back — twice for "2 closed", twice
+            * for "1 closed", which is what the duplicate-sentence check
+            * caught on 2026-09-15. The bar itself is stated once, under the
+            * roster, where it belongs. */''}
         ${shut === 0 ? `<p class="ef-thin">No win rate yet.</p>`
-          : `<p class="ef-thin">${shut} closed — below the 30 this book requires before
-             a win rate is treated as evidence.</p>`}
+          : `<p class="ef-thin">${shut} closed</p>`}
       </div>`;
       // THE SAMPLE GATE. Under 20 closed trades a win rate is a coin-flip
       // reading of a coin flipped a few times, and printing it as a percentage
@@ -10499,7 +10623,11 @@
        * expectancy on this site" appeared on nine cards; "Published under an
        * earlier configuration, on a ledger that has been re-graded twice"
        * on five. Neither is about any one engine. */
-      `<p class="hint" style="margin-top:16px">An engine showing <b>no win rate yet</b> has closed
+      `<p class="hint" style="margin-top:16px">Every closed count on these cards is
+        <b>below the 30 closed trades this book requires before a win rate is treated as
+        evidence</b> — said once here rather than repeated under each card, because the count
+        is the engine's and the bar is the same for all of them. An engine showing
+        <b>no win rate yet</b> has closed
         nothing since ${esc(LAUNCH)} — that is the honest state of a record that restarted, not a
         missing figure, and it gets one when a position closes. Where a card also shows an
         <b>earlier ledger</b>, those trades were published under a different configuration on a
@@ -11786,7 +11914,7 @@
    */
   const rCurve = rows => {
     const closed = rows
-      .filter(r => Number.isFinite(Number(r.r_multiple)) && (r.badge || '') !== 'open')
+      .filter(isScored)
       .sort((a, b) => String(a.closed_at || a.date || '').localeCompare(String(b.closed_at || b.date || '')));
     if (closed.length < 5) return null;
     let cum = 0;
@@ -12226,7 +12354,14 @@
                      'Nifty breadth, sector heat, IPO books open now, ranked trade ideas and a public signal ledger. India’s markets in one screen, rebuilt before every open.'],
     '/markets':     ['Markets — the board, 71 instruments with a year of context',
                      'Indices, sectors, commodities and currencies on one board, each against its own 52-week range. Sector heat, breadth and what moved today.'],
-    '/screen':      ['Screen — all 1,000 NSE names, filterable',
+    /* NO COUNT IN THE TITLE. It said "all 1,000 NSE names" while the feed
+       reported 989 — the same defect Akshay caught as "still shows 750
+       stocks", in a place the earlier fix did not reach. The home page tile
+       reads the real number from pulse.json and this map cannot, because it
+       is static and written before any feed loads. A title that cannot stay
+       in sync must not assert a figure; the page itself states the exact
+       universe, sourced. */
+    '/screen':      ['Screen — every NSE name we track, filterable',
                      'Every name in the universe on price, trend, quality, value and institutional flow. FII and DII holding quarter on quarter, from the company’s own filings.'],
     '/signals':     ['Signals — the public ledger, wins and losses both',
                      'Every call this book has published, open and closed, with the entry, stop and targets it was sent with and what it actually did.'],
@@ -12342,6 +12477,7 @@
 
   async function render() {
     const path = routeOf();
+    resetFresh();
     // Title, description, canonical and the social card, every navigation.
     setHead(path);
     const where = document.getElementById('barWhere');

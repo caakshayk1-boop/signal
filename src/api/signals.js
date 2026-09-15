@@ -333,7 +333,15 @@ async function handleWallet(res) {
     // ~450 KB on the wire up to 1,440 times a day. The sync-budget test caught
     // this one — the first pass raised the response above and missed that this
     // handler has its own.
-    json(res, 200, { ok: true, generated_at: new Date().toISOString(), ...result }, 600);
+    /* 600 -> 120. The helper turns this into s-maxage plus FOUR TIMES it as
+       stale-while-revalidate, so 600 meant the edge could hand a reader a
+       ledger up to fifty minutes old, instantly and invisibly. Akshay opened
+       the site minutes after a scan filed RBLBANK and WELSPUNLIV and saw
+       neither: "alerts are still 61, no new added".
+       120 keeps the stale window under ten minutes while still absorbing the
+       load this was added for — the ledger only changes a few times a day,
+       and the minutes right after it changes are exactly when it is read. */
+    json(res, 200, { ok: true, generated_at: new Date().toISOString(), ...result }, 120);
   } catch (e) {
     fail(res, 500, `paper_wallet query failed: ${e.message}`);
   }

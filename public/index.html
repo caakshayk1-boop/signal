@@ -227,6 +227,16 @@
 <!--/PRERENDER-->
 </main>
 
+<!-- ── WHEN WHAT YOU ARE READING WAS LAST WRITTEN ────────────────────────
+     Akshay: "add last refresh time page on each page, small details."
+
+     He asked after the ledger served him a copy up to fifty minutes stale
+     with nothing on screen to say so. Freshness was already tracked per feed
+     and shown only as a badge in the header of some routes; this states it in
+     words, on every route, for the feeds THAT route actually read. Filled by
+     the router after each paint — see freshBar() in signal.js. -->
+<div id="freshBar" class="freshbar" role="status" aria-live="polite"></div>
+
 <footer class="foot">
   <p>Built by <b>Akshay Kothari</b> · CA · FP&amp;A · Data from NSE, Yahoo Finance and company filings.</p>
   <p class="foot-link">
