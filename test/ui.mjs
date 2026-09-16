@@ -1330,7 +1330,7 @@ try {
    * rendered failure panel. The second is the one that would have caught it. */
   console.log("\n  every route — thrown errors and rendered failures");
   const ROUTES = ["/", "/markets", "/signals", "/brief", "/screen", "/ideas",
-                  "/news", "/ipo", "/funds", "/watch", "/engines", "/radar", "/join",
+                  "/news", "/ipo", "/funds", "/watch", "/engines", "/radar", "/reads", "/join",
                   "/methodology", "/sources", "/terms", "/privacy"];
   const swCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const sw = await swCtx.newPage();
@@ -1444,7 +1444,7 @@ try {
   const colMobP = await colMobCtx.newPage();
   for (const [label, pg] of [["desktop", colP], ["phone", colMobP]])
   for (const route of ["/", "/signals", "/screen", "/ideas", "/markets", "/ipo",
-                       "/brief", "/watch", "/engines", "/radar", "/news", "/funds",
+                       "/brief", "/watch", "/engines", "/radar", "/news", "/funds", "/reads",
                        "/research"]) {
     await pg.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await pg.waitForTimeout(SETTLE + 3000);
@@ -1514,7 +1514,7 @@ try {
   const dupCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const dupP = await dupCtx.newPage();
   for (const route of ["/", "/signals", "/screen", "/ideas", "/markets", "/ipo",
-                       "/brief", "/engines", "/radar", "/news", "/funds", "/watch",
+                       "/brief", "/engines", "/radar", "/news", "/funds", "/reads", "/watch",
                        "/research"]) {
     await dupP.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await dupP.waitForTimeout(SETTLE + 3000);
@@ -1581,7 +1581,7 @@ try {
   // the defect this whole block exists to catch, and it was unmeasured exactly
   // where it was most likely.
   for (const route of ["/", "/markets", "/screen", "/ideas", "/news", "/ipo",
-                       "/funds", "/watch", "/engines", "/radar", "/signals", "/brief", "/methodology"]) {
+                       "/funds", "/watch", "/engines", "/radar", "/reads", "/signals", "/brief", "/methodology"]) {
     await mp.goto(SITE + route, { waitUntil: "domcontentloaded" });
     // The screen fetches 1.4 MB before it lays out; the shorter settle used by
     // the other routes measured it mid-skeleton and would have passed anything.

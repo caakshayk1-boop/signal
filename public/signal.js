@@ -11629,6 +11629,8 @@
    * is the thing a reader needs to choose between them. Ordered by how often
    * they answer a question rather than alphabetically. */
   const DISCOVER = [
+    ['/reads',   'Weekly reads',  'Seven companies, studied properly',
+                 'One per sector, written every Saturday — what they sell, how the money works, and what would break it.'],
     ['/radar',   'Signal radar',  'The market score, and the eight names carrying it',
                  `Breadth over ${universeN()} names, with every term of the score printed.`],
     ['/research', 'The research floor', 'Three engines, none of them cleared',
@@ -11689,6 +11691,158 @@
     null,
     'Every figure above is produced by a run that can be repeated. These say how.');
 
+
+  /* ── WEEKLY READS ────────────────────────────────────────────────────────
+   *
+   * Akshay, 2026-09-16: seven companies out of the thousand-name screen,
+   * studied properly, for the weekend — "know in & out of any company", and
+   * good enough to speak from afterwards.
+   *
+   * This is the one surface on the site that is not about a trade. Everything
+   * else answers "what should I do"; this answers "what IS this business".
+   * They are different questions and the second one compounds, which is why
+   * the archive matters more here than anywhere else on the site: fifty of
+   * these a year is an education, and a page that only ever shows this
+   * Saturday would throw away forty-nine of them.
+   *
+   * A STUDY IS LONG, SO IT OPENS ON DEMAND. Seven of them inline is fifteen
+   * minutes of scrolling before the reader has chosen anything. The list is
+   * the choice; the study is the read.
+   */
+  // Minimal markdown, scoped to exactly what the generator emits: headings,
+  // bold, bullets, tables and paragraphs. Not a general renderer — a general
+  // renderer is a security surface, and this input is written by a model.
+  const mdBits = (t) => esc(t)
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    /* An UNMATCHED marker is left behind when a line is bolded and then
+       wrapped in quotes, and it renders as literal asterisks mid-sentence.
+       The prompt now forbids the construction; this makes the page robust to
+       it anyway, because prose is generated and will surprise us again. */
+    .replace(/\*\*/g, '')
+    .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:]|$)/g, '$1<i>$2</i>');
+
+  const mdToHtml = (src) => {
+    const out = [];
+    let list = null, table = null;
+    const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+    const closeTable = () => {
+      if (!table) return;
+      out.push(`<div class="rd-tw"><table class="rd-t"><thead><tr>${
+        table.head.map(h => `<th>${mdBits(h)}</th>`).join('')}</tr></thead><tbody>${
+        table.rows.map(r => `<tr>${r.map(c => `<td>${mdBits(c)}</td>`).join('')}</tr>`).join('')
+      }</tbody></table></div>`);
+      table = null;
+    };
+    for (const raw of String(src || '').split('\n')) {
+      const line = raw.replace(/\s+$/, '');
+      const cells = line.trim().startsWith('|') && line.trim().endsWith('|')
+        ? line.trim().slice(1, -1).split('|').map(c => c.trim()) : null;
+      if (cells) {
+        // The divider row under a header is formatting, not data.
+        if (cells.every(c => /^:?-{2,}:?$/.test(c))) continue;
+        closeList();
+        if (!table) table = { head: cells, rows: [] };
+        else table.rows.push(cells);
+        continue;
+      }
+      closeTable();
+      if (!line.trim()) { closeList(); continue; }
+      const h = /^(#{2,4})\s+(.*)$/.exec(line);
+      if (h) { closeList(); out.push(`<h3 class="rd-h">${mdBits(h[2])}</h3>`); continue; }
+      const li = /^\s*[-*]\s+(.*)$/.exec(line);
+      if (li) {
+        if (list !== 'ul') { closeList(); out.push('<ul class="rd-l">'); list = 'ul'; }
+        out.push(`<li>${mdBits(li[1])}</li>`); continue;
+      }
+      const ol = /^\s*\d+[.)]\s+(.*)$/.exec(line);
+      if (ol) {
+        if (list !== 'ol') { closeList(); out.push('<ol class="rd-l">'); list = 'ol'; }
+        out.push(`<li>${mdBits(ol[1])}</li>`); continue;
+      }
+      closeList();
+      out.push(`<p>${mdBits(line)}</p>`);
+    }
+    closeList(); closeTable();
+    return out.join('');
+  };
+
+  let READS_WEEK = null;      // which edition the reader is looking at
+
+  R['/reads'] = async () => {
+    const intro = 'Seven companies a week, one per sector, studied for what they are rather than '
+                + 'what they might do next. Five to seven minutes each.';
+    paint(head('Weekly reads', intro, 'Weekly reads') + skel('sk-card', 3));
+    const r = await get('/weekly_reads.json');
+    let out = head('Weekly reads', intro, 'Weekly reads');
+    if (!r.ok || !r.data || !r.data.ok) {
+      paint(out + fail('The weekly reads', (r.data && r.data.error) || r.error
+        || 'no edition has been written yet'));
+      return;
+    }
+    noteFresh('Weekly reads', r.data.generated_at);
+    const eds = r.data.editions || [];
+    if (!eds.length) {
+      paint(out + `<div class="empty">The first edition is written this Saturday.</div>`);
+      return;
+    }
+
+    const draw = () => {
+      const ed = eds.find(e => e.week === READS_WEEK) || eds[0];
+      const studies = ed.studies || [];
+      const mins = studies.reduce((a, s) => a + (s.read_minutes || 0), 0);
+      let body = head('Weekly reads', intro, 'Weekly reads');
+
+      body += snap([
+        ['This edition', studies.length, 'companies'],
+        ['Sectors', new Set(studies.map(s => s.sector)).size, 'one study each'],
+        ['Reading time', mins + ' min', 'for the set'],
+        ['In the archive', eds.length, eds.length === 1 ? 'edition' : 'editions'],
+      ], 'Not signals. No entry, no target, no call — these exist so a name on the '
+       + '<a href="/screen">screen</a> stops being a ticker.');
+
+      if (eds.length > 1) {
+        body += `<div class="sgf-bar"><label class="sgf"><span>Edition</span>
+          <select data-reads-week aria-label="Choose an edition">${eds.map(e =>
+            `<option value="${esc(e.week)}"${e.week === ed.week ? ' selected' : ''}>${
+              esc(e.week)} · ${(e.studies || []).length} studies</option>`).join('')}</select>
+          </label></div>`;
+      }
+
+      body += sec(`Saturday ${esc(ed.week)}`, studies.map(s => {
+        const facts = (s.facts || []).slice(0, 4);
+        return `<details class="rd-c"><summary class="rd-s">
+            <span class="rd-sym"><b>${esc(s.sym)}</b><em>${esc(s.sector || '')}</em></span>
+            <span class="rd-nm">${esc(s.name || '')}</span>
+            <span class="rd-meta">${s.mcap_cr ? '₹' + fmtN(s.mcap_cr) + ' cr' : ''}
+              ${s.read_minutes ? ` · ${s.read_minutes} min read` : ''}</span>
+            <span class="xr-caret" aria-hidden="true"></span>
+          </summary>
+          <div class="rd-b">
+            ${facts.length ? `<div class="rd-f">${facts.map(f =>
+              `<span>${esc(f)}</span>`).join('')}</div>` : ''}
+            <article class="rd-a">${mdToHtml(s.study)}</article>
+            <p class="hint">Written from the screen's own figures for
+              ${esc(s.sym)} — every number in it is checked back against them.
+              ${(s.approximate_figures || []).length
+                ? `${(s.approximate_figures || []).length} figure${
+                    (s.approximate_figures || []).length === 1 ? ' is' : 's are'} rounded or
+                   derived rather than quoted directly.` : ''}
+              <a href="/stock/${encodeURIComponent(s.sym)}">${esc(s.sym)} on the screen →</a></p>
+          </div>
+        </details>`;
+      }).join(''), `${studies.length} studies`, null, { lead: true });
+
+      body += `<p class="hint">A new edition is written every Saturday morning and no company
+        repeats inside eight weeks, so the archive builds into a library rather than a rotation.
+        Nothing here is advice — the studies deliberately carry no entry, stop or target, because
+        understanding a business and trading it are different jobs.</p>`;
+
+      paint(body);
+      const sel = main.querySelector('select[data-reads-week]');
+      if (sel) sel.addEventListener('change', () => { READS_WEEK = sel.value; draw(); });
+    };
+    draw();
+  };
 
   R['/discover'] = async () => {
     paint(head('Discover', `Seven ways into the same ${universeN()} names. Each answers a different question.`,
@@ -12376,6 +12530,8 @@
                      'Every name in the universe on price, trend, quality, value and institutional flow. FII and DII holding quarter on quarter, from the company’s own filings.'],
     '/signals':     ['Signals — the public ledger, wins and losses both',
                      'Every call this book has published, open and closed, with the entry, stop and targets it was sent with and what it actually did.'],
+    '/reads':       ['Weekly reads — seven companies, studied properly',
+                     'One company per sector, written every Saturday: what it sells, how the money actually arrives, what the returns say about the business, and what would break it.'],
     '/discover':    ['Discover — seven ways into the screened names',
                      'Radar, screen, ideas, markets, IPO, news and funds — what each one answers.'],
     '/radar':       ['Signal radar — the market, and the names carrying it',
@@ -12483,6 +12639,7 @@
   const WHERE = { '/': '', '/markets': 'Markets', '/ideas': 'Ideas', '/ipo': 'IPO',
                   '/screen': 'Screen', '/signals': 'Signals', '/brief': 'Brief', '/watch': 'Watchlist',
                   '/engines': 'The floor', '/radar': 'Radar', '/discover': 'Discover', '/buoy': 'BUOY', '/research': 'Research',
+                  '/reads': 'Weekly reads',
                   '/join': 'The brief', '/methodology': 'Methodology',
                   '/sources': 'Data sources', '/terms': 'Terms', '/privacy': 'Privacy' };
 
