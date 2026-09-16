@@ -61,6 +61,24 @@
    headlines), never body copy, so the download is small and the page still
    paints its text on the first frame from the system stack. next.html
    preloads the 400 weight for the same reason it preloads the other two. */
+/* ── THE NEW FACE ────────────────────────────────────────────────────────
+ * Akshay: "100% new look, fonts styles widgets animations everywhere."
+ *
+ * The typography was the real reason this still read as a newspaper after the
+ * palette changed: EVERY heading was Newsreader, a serif, on a site whose two
+ * reference points — Groww and Tickertape — are geometric sans throughout.
+ * A serif headline over a blue-grey fintech page is two products arguing.
+ *
+ * Plus Jakarta Sans carries everything now. It is a VARIABLE font: one 27KB
+ * file covers 200-800, where the five static weights Google offers are the
+ * same 27KB file five times over — 136KB for the identical glyphs. Declared
+ * once with a weight RANGE so every weight below resolves from it.
+ *
+ * Newsreader's @font-face stays declared but nothing calls --serif any more;
+ * the file is no longer preloaded, so it costs a reader nothing. */
+@font-face{font-family:'Jakarta';font-style:normal;font-weight:200 800;font-display:swap;
+  src:url('/fonts/PlusJakarta-var-latin.woff2') format('woff2-variations')}
+
 @font-face{font-family:'Newsreader';font-style:normal;font-weight:400;font-display:swap;
   src:url('/fonts/Newsreader-400-latin.woff2') format('woff2')}
 @font-face{font-family:'Newsreader';font-style:normal;font-weight:600;font-display:swap;
@@ -86,7 +104,12 @@
   --t-1:10px;  --t-2:11px;  --t-3:12px;  --t-4:13px;  --t-5:14px;
   --t-6:16px;  --t-7:18px;  --t-8:21px;  --t-9:25px;  --t-10:30px;
 
-  --r-1:4px;   --r-2:6px;   --r-3:8px;   --r-4:12px;  --r-5:16px;
+  /* RADII MOVED UP, because roundness is most of what reads as "modern" on
+     both reference sites: Groww's cards are 22px and Tickertape's feature
+     panels 32px, against this site's 12px. The small steps stay for chips and
+     hairline elements — a 22px pill is a blob. */
+  --r-1:6px;   --r-2:10px;  --r-3:14px;  --r-4:18px;  --r-5:24px;
+  --r-6:32px;
   --r-pill:999px;
   /* Hairline elements a 4px radius would visibly deform. */
   --r-hair:1px;
@@ -125,10 +148,14 @@
      the data face, which is a three-role system with one job each. The token
      is kept rather than deleted so the wordmark can stay deliberately
      geometric — a logotype is allowed to be its own thing. */
-  --disp:'Manrope',system-ui,sans-serif;
-  --ui:'Manrope',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  /* ONE FAMILY, TWO ROLES. Jakarta for everything a person reads, JBMono for
+     figures that must line up in a column. --serif and --disp keep their
+     names so the ~200 sites that reference them need no edit, but both now
+     resolve to the new face — a token is a place to be right once. */
+  --disp:'Jakarta',system-ui,sans-serif;
+  --ui:'Jakarta',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --mono:'JBMono',ui-monospace,SFMono-Regular,Menlo,monospace;
-  --serif:'Newsreader',Georgia,'Times New Roman',serif;
+  --serif:'Jakarta',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
 
   /* One motion vocabulary for the whole site. Three durations, two curves.
      Everything that moves picks from here, so nothing on the page animates at
@@ -142,21 +169,50 @@
      wear. Dark is still one tap away on the toggle — a markets page gets
      opened at 6am and at midnight, and taking that away to match a marketing
      site would be copying the wrong thing. */
-  --bg:#FFFFFF; --surface:#FFFFFF; --raised:#F6F7F8;
-  --line:rgba(0,0,0,.09); --line2:rgba(0,0,0,.14);
+  /* ── THE LIGHT-BLUE REBUILD ───────────────────────────────────────────
+   *
+   * Akshay: "a clean look, a fresh look, light blueish theme, make it
+   * modern... take inspiration from groww.in & tickertape.in."
+   *
+   * MEASURED OFF BOTH SITES RATHER THAN IMAGINED. Read from their live
+   * computed styles:
+   *     groww        text #44475B · card border #E9E9EB · radius 22px
+   *                  accent #5669FF · positive #04B488 · NO shadows
+   *     tickertape   text #535B62 · surfaces #F1F4F8 and #F9FAFC
+   *                  radius 12px on data cards, 32px on feature panels
+   *
+   * Three things make that look the way it does, and only one of them is
+   * "blue":
+   *   1. THE TEXT IS NOT BLACK. Both use a blue-grey around #44-53. Pure
+   *      #0A0A0A against white is the single biggest reason this site read
+   *      as severe rather than calm.
+   *   2. THE PAGE IS WHITE AND THE PANELS ARE TINTED. #F1F4F8 is where the
+   *      blue actually lives — a surface tint, not an accent splashed about.
+   *   3. FLAT, WITH HAIRLINES. Neither site uses a single box-shadow.
+   *
+   * The data colours stay legible rather than copied: Groww's #04B488 is
+   * beautiful and fails contrast on white for small figures, so the up/down
+   * pair below is tuned toward their hue and kept at a readable depth. */
+  --bg:#FFFFFF; --surface:#FFFFFF; --raised:#F1F4F8; --raised2:#F9FAFC;
+  --line:#E7EAF0; --line2:#D8DEE8;
   /* --warn carried nine meanings and three of them are not warnings: the
      200-day average is a price level, a starred row is a thing you saved, and
      the trailing-stop block is a rule. Amber for those taught the reader that
      amber means caution and then used it for three things that are not. */
   --ma:#8A6A1F; --saved:#7A5CC4;
-  --text:#0A0A0A; --muted:#3E3E3E; --dim:#6B6B6B;
+  --text:#1A2233; --muted:#44475B; --dim:#707A8C;
 
   /* The primary action is BLACK, as theirs is — not a brand hue. Accent is
      kept for links and live data only. */
-  --ink-btn:#111111; --on-ink:#FFFFFF;
-  --accent:#1B5FD9; --accent-soft:rgba(27,95,217,.07); --on-accent:#FFFFFF;
-  --up:#0E7C48; --down:#C23B2E; --warn:#8A6208;
-  --up-soft:rgba(14,124,72,.09); --down-soft:rgba(194,59,46,.08); --warn-soft:rgba(138,98,8,.09);
+  /* The primary action is the accent now, not black. A black button on a
+     blue-grey page is the one element that still belonged to the old look. */
+  --ink-btn:#5669FF; --on-ink:#FFFFFF;
+  --accent:#5669FF; --accent-soft:rgba(86,105,255,.08); --on-accent:#FFFFFF;
+  /* Toward Groww's hue, held at a depth that stays readable at 11px on white:
+     their #04B488 measures 2.4:1 against white and this site prints gains at
+     small sizes all day. */
+  --up:#0A9D74; --down:#E0483D; --warn:#B07A08;
+  --up-soft:rgba(10,157,116,.10); --down-soft:rgba(224,72,61,.09); --warn-soft:rgba(176,122,8,.10);
 
   /* ── ALIASES FOR NAMES THAT WERE NEVER DEFINED ──────────────────────────
    *
@@ -184,7 +240,10 @@
   --dn:var(--down); --dn-soft:var(--down-soft);
   --surface2:var(--raised);
 
-  --r:8px;
+  /* The default card radius every component reaches for. 8 -> 16: this one
+     token is the largest single change in how the page reads, because almost
+     every panel on the site resolves its corners through it. */
+  --r:16px;
   --gut:clamp(20px,5vw,40px);
   --barh:64px; --tkrh:33px; --tabh:58px;
 }
@@ -199,15 +258,19 @@
 :root{color-scheme:light}
 :root[data-theme="dark"]{color-scheme:dark}
 
+/* DARK FOLLOWS THE SAME BLUE FAMILY, or the toggle changes more than the
+   brightness. Light is built on a blue-grey neutral, so a dark theme on a
+   neutral grey would read as a different product at midnight. Every surface
+   here is that same hue rotated to the dark end. */
 :root[data-theme="dark"]{
-  --bg:#0B0F14; --surface:#141A22; --raised:#1B222C;
-  --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.16);
+  --bg:#0C1017; --surface:#141B25; --raised:#1A2230; --raised2:#151C27;
+  --line:#242E3E; --line2:#33404F;
   --ma:#C6A24E; --saved:#A98CF0;
-  --text:#F2F5F9; --muted:#B3BDCA; --dim:#8D97A5;
-  --ink-btn:#F2F5F9; --on-ink:#0B0F14;
-  --accent:#5B9CFF; --accent-soft:rgba(91,156,255,.13); --on-accent:#06101F;
-  --up:#2BD07C; --down:#FF6B6B; --warn:#F0B429;
-  --up-soft:rgba(43,208,124,.13); --down-soft:rgba(255,107,107,.13); --warn-soft:rgba(240,180,41,.13);
+  --text:#EEF2F8; --muted:#AEB9C9; --dim:#7E8AA0;
+  --ink-btn:#5669FF; --on-ink:#FFFFFF;
+  --accent:#8091FF; --accent-soft:rgba(128,145,255,.15); --on-accent:#0C1017;
+  --up:#2ECC93; --down:#FF6B60; --warn:#F0B429;
+  --up-soft:rgba(46,204,147,.14); --down-soft:rgba(255,107,96,.14); --warn-soft:rgba(240,180,41,.13);
 }
 /* The old light-theme block is gone. Light IS :root now, so a separate
    [data-theme="light"] block could only ever disagree with it — and it did:
@@ -5258,3 +5321,175 @@ a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,
 .mk-sc.up b{color:var(--up)} .mk-sc.dn b{color:var(--down)}
 @media(max-width:719px){ .mk-sc{flex-direction:row;align-items:baseline;gap:5px;
   justify-content:flex-end;margin-top:4px} }
+
+/* ═══ THE REBUILD: FLAT PANELS, ROUND CORNERS, LIVE WIDGETS ═════════════════
+ *
+ * Akshay: "widgets animations info graphs wherever required" — and a light
+ * blueish, modern look taken from groww.in and tickertape.in.
+ *
+ * ONE RULE GOVERNS EVERY ANIMATION BELOW, and it comes from a trap already on
+ * file in this estate: rAF does not run in a hidden tab and IntersectionObserver
+ * never fires there either. So NOTHING here is parked at opacity:0 waiting to
+ * be revealed. Every widget renders its finished state in plain CSS and the
+ * animation only ever moves it FROM that state — which means a reader whose
+ * tab was in the background still sees a complete page, and the preview pane
+ * (permanently visibilityState:hidden) shows real content rather than a blank.
+ */
+
+/* ── PANELS ───────────────────────────────────────────────────────────────
+   Neither reference site uses a single box-shadow on a card. Depth comes from
+   a tinted surface and a hairline, which is why they read as calm. */
+.sec > .grid,.card,.rd-c,.foldb,.baro-acc,.szr,.disc-c,.mk-d,.rank{
+  border-radius:var(--r);
+}
+.card,.disc-c{box-shadow:none;background:var(--surface);border:1px solid var(--line)}
+.card:hover,.disc-c:hover{border-color:var(--line2);background:var(--raised2)}
+.rank{background:var(--surface);border:1px solid var(--line);overflow:hidden}
+.foldb{background:var(--raised2)}
+.foldb[open]{background:var(--surface)}
+
+/* Tiles: the numbers a page is about. Tinted, flat, generous. */
+.grid > .tile,.snap > *{background:var(--raised);border:1px solid transparent;
+  border-radius:var(--r);transition:background var(--t-fast) var(--ease)}
+.grid > .tile:hover,.snap > *:hover{background:var(--raised2);border-color:var(--line)}
+
+/* ── COUNT-UP ─────────────────────────────────────────────────────────────
+   The final value is IN THE MARKUP and styled normally; countUp() only
+   rewrites the text while it runs. If the script never runs — hidden tab, a
+   thrown error, JS off — the reader sees the real number, not a zero. */
+.cnum{font-variant-numeric:tabular-nums;transition:color var(--t-fast) var(--ease)}
+.cnum.is-run{color:var(--accent)}
+
+/* ── RING GAUGE ───────────────────────────────────────────────────────────
+   For a 0-100 score. The arc's finished length is set inline as a style, so
+   the ring is CORRECT before any animation; the keyframe only sweeps it in. */
+.ring{display:block;width:var(--ring-sz,116px);height:var(--ring-sz,116px);
+  transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:var(--line);stroke-width:9}
+.ring-fg{fill:none;stroke:var(--accent);stroke-width:9;stroke-linecap:round;
+  animation:ringsweep var(--t-slow) var(--ease-out) backwards}
+.ring-fg.up{stroke:var(--up)} .ring-fg.dn{stroke:var(--down)}
+@keyframes ringsweep{from{stroke-dashoffset:var(--circ)}}
+.ringw{position:relative;display:inline-grid;place-items:center}
+.ringw .ring-c{position:absolute;display:grid;place-items:center;text-align:center;
+  transform:none}
+.ring-c b{font:700 var(--t-9)/1 var(--serif);font-variant-numeric:tabular-nums}
+.ring-c span{font:600 var(--t-1)/1.3 var(--ui);letter-spacing:var(--ls-wider);
+  text-transform:uppercase;color:var(--dim)}
+
+/* ── SPLIT BAR (breadth, advancers vs decliners) ──────────────────────────
+   An infographic that says one thing: who won today, and by how much. */
+.splitb{display:flex;height:34px;border-radius:var(--r-2);overflow:hidden;
+  border:1px solid var(--line);background:var(--raised)}
+.splitb i{display:flex;align-items:center;justify-content:center;font-style:normal;
+  font:700 var(--t-2)/1 var(--ui);color:#fff;min-width:0;overflow:hidden;
+  animation:grow var(--t-slow) var(--ease-out) backwards}
+.splitb .sb-u{background:var(--up)} .splitb .sb-f{background:var(--dim)}
+.splitb .sb-d{background:var(--down)}
+@keyframes grow{from{flex-basis:0 !important;opacity:.4}}
+.splitl{display:flex;justify-content:space-between;margin-top:6px;
+  font-size:var(--t-2);color:var(--dim)}
+
+/* ── METER ROW ────────────────────────────────────────────────────────────
+   Reused by the barometer inputs and anywhere a 0-100 needs a shape. */
+.meter{height:8px;border-radius:999px;background:var(--line);overflow:hidden}
+.meter i{display:block;height:100%;width:var(--w);border-radius:999px;
+  background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 55%,var(--up)));
+  animation:mgrow var(--t-slow) var(--ease-out) backwards}
+.meter.up i{background:var(--up)} .meter.dn i{background:var(--down)}
+@keyframes mgrow{from{width:0}}
+
+/* ── SPARK CARD ───────────────────────────────────────────────────────────
+   A small infographic tile: label, big number, trend line, delta. */
+.spk{display:flex;flex-direction:column;gap:6px;padding:14px 16px;
+  background:var(--raised);border-radius:var(--r);border:1px solid transparent;
+  transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
+.spk:hover{background:var(--surface);border-color:var(--line)}
+.spk-k{font:600 var(--t-2)/1 var(--ui);letter-spacing:var(--ls-wide);
+  text-transform:uppercase;color:var(--dim)}
+.spk-v{font:700 var(--t-8)/1.05 var(--serif);font-variant-numeric:tabular-nums;
+  letter-spacing:var(--ls-tight)}
+.spk-f{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.spk-d{font:600 var(--t-2)/1 var(--mono);font-variant-numeric:tabular-nums}
+.spk svg{display:block;width:100%;height:30px;overflow:visible}
+.spk svg path{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round;
+  stroke-linecap:round}
+/* The line draws itself in. dasharray is set inline from the real path length,
+   so a path that never animates is still a complete, correct line. */
+.spk svg path.draw{animation:drawin var(--t-slow) var(--ease-out) backwards}
+@keyframes drawin{from{stroke-dashoffset:var(--len)}}
+
+@media(prefers-reduced-motion:reduce){
+  .ring-fg,.splitb i,.meter i,.spk svg path.draw{animation:none}
+}
+
+/* The barometer ring replaces the big number, so the column that held it no
+   longer needs a fixed minimum — the ring sets its own size. */
+.baro-s{min-width:0}
+.baro-s b,.baro-s em,.baro-b{all:unset}
+.baro-i{grid-template-columns:minmax(0,1fr) 96px 34px}
+@media(max-width:640px){ .baro-i{grid-template-columns:minmax(0,1fr) 64px 30px} }
+
+/* ═══ TYPE TREATMENT FOR A GEOMETRIC SANS ══════════════════════════════════
+ * Swapping the family is half the job. A serif headline and a geometric-sans
+ * headline want opposite settings: the serif carried its weight in the
+ * letterforms and could sit at 600 with neutral tracking, and the same size
+ * and weight in Jakarta reads soft and wide. Modern fintech display type is
+ * HEAVIER and TIGHTER, and that is most of the remaining difference between
+ * this page and the two it is modelled on. */
+h1,.route-h h1{font-family:var(--ui);font-weight:800;letter-spacing:-.033em;
+  line-height:1.04}
+h2,.sec-h h2{font-family:var(--ui);font-weight:700;letter-spacing:-.022em}
+h3,h4,.rd-h{font-family:var(--ui);font-weight:700;letter-spacing:-.016em}
+.hero h1{font-weight:800;letter-spacing:-.038em}
+.hero-sub,.route-h p{font-weight:450;letter-spacing:-.003em;color:var(--muted)}
+
+/* Big figures: heavier and tighter than body, and always tabular so a column
+   of them lines up. */
+.tile .v,.spk-v,.ring-c b,.baro-s b,.t5-v{font-family:var(--ui);font-weight:800;
+  letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+
+/* Uppercase labels need the opposite treatment — a geometric caps setting
+   collapses without tracking. */
+.eyebrow,.spk-k,.baro-k,.sec-n,.mk-sc i,.ring-c span,.rd-sym em{
+  font-family:var(--ui);font-weight:650}
+
+/* Body copy sits a touch looser than the old serif did, because a sans at the
+   same measure reads tighter than it looks. */
+.hint,.sec-note,.rd-a p,.baro-acc p{line-height:1.62}
+
+/* The wordmark is allowed to be its own thing, and now it is the one place
+   with real optical character: heavy, tight, in the accent. */
+.brand-name{font-weight:800;letter-spacing:-.04em}
+
+/* ── ALIGNMENT AND RHYTHM ─────────────────────────────────────────────────
+ * Akshay: "wordings explanations writeups alignments all re-new."
+ *
+ * The copy is simpler now; these are the settings that let it read that way.
+ * Three faults the old rhythm had, all of them the kind you feel rather than
+ * notice:
+ *   · explanatory paragraphs ran the full width of a desktop container, so a
+ *     line of body copy could hit 120 characters — roughly twice the measure
+ *     at which the eye stops tracking reliably;
+ *   · a bold lead-in ("What goes into it.") sat on the same line weight as
+ *     the sentence after it, so the structure the words were carrying was
+ *     invisible;
+ *   · section standfirsts and the notes under them used the same size, which
+ *     flattened the hierarchy the page was trying to state.
+ */
+.hint,.sec-note,.baro-acc p{max-width:68ch}
+.hint b:first-child,.sec-note b:first-child{color:var(--text);font-weight:700}
+.sec-lead{max-width:60ch;font-size:var(--t-5);line-height:1.55;color:var(--muted);
+  font-weight:450;letter-spacing:-.005em}
+.route-h p{max-width:56ch}
+
+/* Numbers and their labels share a baseline. A figure set in a heavier weight
+   than its label sits optically high against it unless it is aligned to the
+   baseline rather than the box. */
+.tile,.spk,.snap > *{align-items:start}
+.tile .k,.spk-k{margin-bottom:6px}
+.tile .v{line-height:1.08}
+.tile .sub{margin-top:5px;line-height:1.45}
+
+/* Lists inside explanations were tight enough to read as one block. */
+.acc-l li,.rd-l li{margin-bottom:.4em}

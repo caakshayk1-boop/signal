@@ -546,6 +546,10 @@
        exist until it has. Guarded because a sorter must never be the reason a
        page fails to render. */
     try { sortableGrids(main); } catch (e) { /* a list that cannot sort still reads */ }
+    /* Decoration on top of figures that are ALREADY correct on screen. If this
+       throws, or never runs because the tab is hidden, the page is unchanged —
+       which is the whole reason the widgets render their finished state. */
+    try { runWidgets(main); } catch (e) { /* never break a page over an animation */ }
   };
 
   // A mono eyebrow, a serif headline, one line of standfirst — the brief's
@@ -852,8 +856,13 @@
    * evidence, then method. A tile is the answer; its explanation must not
    * compete with it for the eye, so the control sits on the small grey label
    * and opens the same tip card every other help mark on the site uses. */
+  /* Every tile's figure counts up. `cnum` is added HERE rather than at each of
+     the ~60 call sites: one place to add it is one place it can be removed
+     again, and it means a tile written next week gets the behaviour without
+     anyone remembering to ask for it. The value in the markup is the true one
+     — see countUp() for why that matters in a hidden tab. */
   const tile = (v, k, sub, cls, tipKey) =>
-    `<div class="tile"><div class="k">${esc(k)}${tipKey ? ' ' + tip(tipKey) : ''}</div><div class="v ${cls || ''}">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+    `<div class="tile"><div class="k">${esc(k)}${tipKey ? ' ' + tip(tipKey) : ''}</div><div class="v cnum ${cls || ''}">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
 
   /* ── ANIMATED NUMBER ─────────────────────────────────────────────────────
    * One implementation, used everywhere a figure is worth watching arrive.
@@ -1852,7 +1861,7 @@
           const ix = indexScore(r);
           return ix ? `<span class="mk-sc ${esc(ix.call.c)}"
             title="Where it sits in its own 52-week range, and the direction of its published trend">
-            <b>${ix.score}</b><i>${esc(ix.call.t)}</i></span>` : '';
+            <b class="cnum">${ix.score}</b><i>${esc(ix.call.t)}</i></span>` : '';
         })()}
       </button>
       <div class="mk-d" id="${id}"><div></div></div>`;
@@ -1997,10 +2006,15 @@
         <span style="color:var(--dim);font:400 11px/1 var(--mono)">${b.counted} names screened</span>
         <span><b class="dn">${b.down}</b> <span style="color:var(--dim)">down</span></span>
       </div>
-      <div class="breadth-bar"><i class="bu" style="width:${up.toFixed(1)}%"></i><i class="bd" style="width:${dn.toFixed(1)}%"></i></div>
+      ${/* THE UNCHANGED NAMES WERE MISSING FROM THE PICTURE. Two bars for up
+           and down leave a gap that reads as nothing when it is in fact every
+           name that did not move — 11 of 989 the day this was written. The
+           split bar carries all three, so the widths add to the universe and
+           a reader can check the arithmetic on the page. */''}
+      ${splitBar(b.up, b.down, b.counted)}
       <div class="breadth-sub">Median name ${pct(b.median)} on the week ·
-        <b style="color:var(--muted)">${b.above_200dma}</b> hold their 200-day ·
-        <b style="color:var(--muted)">${b.at_52w_high}</b> at a 52-week high</div>
+        <b style="color:var(--muted)" class="cnum">${b.above_200dma}</b> hold their 200-day ·
+        <b style="color:var(--muted)" class="cnum">${b.at_52w_high}</b> at a 52-week high</div>
     </div>`;
   };
 
@@ -2068,7 +2082,7 @@
   const R = {};
 
   R['/'] = async () => {
-    paint(head('Today', 'India’s markets, in one screen — rebuilt every morning before the open.', 'The morning edition') +
+    paint(head('Today', 'Everything that moved today, in one screen. Rebuilt before every open.', 'The morning edition') +
       sec('The tape', `<div class="grid">${skel('sk-tile', 4)}</div>`) +
       sec('Where the money went', `<div class="sk" style="height:104px"></div>`) +
       sec('The wire', skel('sk-card', 3)));
@@ -2178,6 +2192,7 @@
      * Every figure in it is one this page already loaded. No photograph, no
      * illustration, no number that is not measured elsewhere on the site. */
     n2.ok = n.ok; n2.data = n.ok ? n.data : null;
+    let recordSec = '';            // filled below, placed after the day's news
     const heroMk = m.ok ? (m.data.markets || []) : [];
     const heroNifty = heroMk.find(x => /nifty 50/i.test(x.name || ''));
     const heroSensex = heroMk.find(x => /sensex/i.test(x.name || ''));
@@ -2338,10 +2353,10 @@
         ${heroVix ? (() => {
           const v = lvl(heroVix.price_raw != null ? heroVix.price_raw : heroVix.price);
           const band = v == null ? ''
-            : v < 12 ? 'calm — the market is pricing very little movement'
-            : v < 16 ? 'normal — the usual range for this index'
-            : v < 22 ? 'jumpy — wider daily swings priced in'
-            : 'stressed — the market is paying up for protection';
+            : v < 12 ? 'calm — very little movement expected'
+            : v < 16 ? 'normal — the usual range'
+            : v < 22 ? 'jumpy — bigger daily swings expected'
+            : 'stressed — people are paying up for protection';
           return `<div class="hero-q hero-vix">
             <span class="k">India VIX</span>
             <span class="v">${esc(heroVix.price ?? '—')}</span>
@@ -2496,7 +2511,22 @@
       const rows = [...fam.values()].sort((a, b) => b.closed - a.closed || b.pub - a.pub);
       const anyClosed = rows.some(r => r.closed);
       const neg = LR.expectancy_r != null && LR.expectancy_r < 0;
-      out += sec('The record', `
+      /* ── THE RECORD MOVED DOWN, AND THE HERO KEPT THE HONESTY ────────
+       * Akshay: "only relevant things first, rest all placements of
+       * sections, make it more organic, chronologically filled."
+       *
+       * This led the page because leading with the record — especially a bad
+       * one — is the argument this site is built on. That argument is not
+       * lost by moving it: the HERO still opens with it in words, in the
+       * largest type on the site ("Every signal, graded. Including the N
+       * that lost."), which is where a first-time reader actually meets it.
+       *
+       * What the page owes a DAILY reader underneath that is the day, in the
+       * order the day happened: what moved, where the money went, what was
+       * written, then the ideas, then the reference. A ledger summary between
+       * the headline and the market was the reference arriving before the
+       * thing it qualifies. */
+      recordSec = sec('The record', `
         <div class="grid">
           ${tile(LR.published, 'Published', `since ${esc(LAUNCH)}`, LR.published ? 'ac' : '')}
           ${tile(LR.trades, 'Closed and scored', LR.open + ' still open')}
@@ -2741,7 +2771,7 @@
          * ledger reading −0.556R a recommendation is not what this can
          * honestly be. Renaming the section would have hidden the history;
          * saying plainly what it is, directly under the name, does not. */
-        'Ranked candidates, not positions to take. No engine has cleared the 30-trade bar.');
+        'Names worth a look, not trades to take. No engine here has proved itself yet.');
     } else {
       const pk = (d.picks || [])[0];
       if (pk) out += sec('This week’s top idea', ideaCard(pk, true), null,
@@ -2780,6 +2810,8 @@
     // exactly the case fillIpoLive() is for, so give it somewhere to render.
     if (!ipoOpen.length) out += '<div id="ipoExtraHome"></div>';
     out += wireSec;
+    /* The reference, after the day it qualifies. */
+    out += recordSec;
     paint(out);
     // The front page renders the same IPO card as the IPO route, so it needs
     // the same upgrade to the live book. Wiring it to one route and not the
@@ -3635,7 +3667,7 @@
   });
 
   R['/markets'] = async () => {
-    paint(head('Markets', 'The board live, and what the NSE screen underneath it did.', 'The board') +
+    paint(head('Markets', 'Live prices, and how the wider market did underneath them.', 'The board') +
       sec('Breadth', `<div class="sk" style="height:104px"></div>`) +
       sec('Sector heat', `<div class="sk" style="height:120px"></div>`) +
       sec('The board', `<div class="board">${skel('sk-row', 8)}</div>`));
@@ -3654,7 +3686,7 @@
       get('/api/ticker'),
     ]);
     if (cl && cl.ok && cl.data && cl.data.ok && cl.data.holidays) setHolidays(cl.data.holidays.rows);
-    let out = head('Markets', 'The board live, and what the NSE screen underneath it did.', 'The board');
+    let out = head('Markets', 'Live prices, and how the wider market did underneath them.', 'The board');
     const pu = p.ok ? p.data : {};
     if (pu && pu.universe) window.__PULSE = pu;
     /* The page opened on a sector heatmap and left the reader to work out the
@@ -3700,14 +3732,13 @@
         out += sec('The barometer', `
           <div class="baro">
             <div class="baro-s ${esc(B.band.c)}">
-              <b>${B.score}</b><em>/100</em>
-              <span class="baro-b">${esc(B.band.t)}</span>
+              ${ringGauge(B.score, B.band.t, B.band.c, 132)}
             </div>
             <div class="baro-p">${B.parts.map(pt => `
               <div class="baro-i">
                 <span class="baro-k">${esc(pt.label)}<i>${pt.weight}%</i></span>
-                <span class="baro-bar"><i style="--w:${pt.score.toFixed(0)}%"></i></span>
-                <span class="baro-v">${pt.score.toFixed(0)}</span>
+                ${meter(pt.score, pt.score >= 55 ? 'up' : pt.score <= 30 ? 'dn' : '')}
+                <span class="baro-v cnum">${pt.score.toFixed(0)}</span>
                 <span class="baro-d">${esc(pt.detail)}</span>
               </div>`).join('')}</div>
           </div>
@@ -3718,19 +3749,19 @@
               `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
           </div>` : ''}
           ${foldBody('How this number is made', `
-            <p class="hint">Five measures, weighted as shown, every one of them already
-              published on this site: where Nifty sits in its own 52-week range, how many of
-              ${B.counted} screened names hold their 200-day average, how many advanced today,
-              India VIX banded rather than scaled — 11 and 13 are the same market, 13 and 30 are
-              not — and how many names sit at a 52-week high.</p>
-            <p class="hint"><b>The two readings move against each other, deliberately.</b>
-              A barometer alone calls conditions poor at exactly the moment the second reading
-              should be saying this is the entry. March 2020 scored terribly on every trend
-              measure ever built and was the best entry in a decade, so this publishes both.</p>
-            <p class="hint"><b>Not backtested, and carrying no record.</b> It is a framework for
-              reading conditions, held to the same bar as every engine here: nothing on this site
-              claims an edge it has not measured. The weights are in the open because nothing has
-              earned the right to hide them.</p>`)}`,
+            <p class="hint"><b>What goes into it.</b> Five measures, weighted as shown.
+              Where Nifty sits in its own year. How many of ${B.counted} names are above their
+              200-day average. How many rose today. India VIX, grouped into bands rather than
+              scaled, because 11 and 13 are the same market but 13 and 30 are not. And how many
+              names are at a one-year high.</p>
+            <p class="hint"><b>Why there are two numbers, not one.</b> They are meant to
+              disagree. When conditions look worst is usually when buying pays best — March 2020
+              scored badly on every trend measure there is, and was the best entry in a decade.
+              One number cannot say both things, so you get both.</p>
+            <p class="hint"><b>This has not been backtested.</b> It is a way to read
+              conditions, not a signal, and it has no track record. Nothing here claims an edge it
+              has not measured. The weights are shown because nothing has earned the right to
+              hide them.</p>`)}`,
           `${B.score}/100 · ${esc(B.band.t)}`, null, { lead: true });
       }
     }
@@ -3832,7 +3863,7 @@
          <div data-mv-p="up">${levelTable(up)}</div>
          <div data-mv-p="dn" hidden>${levelTable(dn)}</div>`,
         `${up.length} up · ${dn.length} down`,
-        'What actually moved, over a week rather than a day.');
+        'The biggest moves of the week — a day is mostly noise.');
     };
     const before = out;
     paint(out + movers());
@@ -3849,7 +3880,7 @@
   };
 
   R['/ideas'] = async () => {
-    paint(head('Ideas', 'Ranked names, and the orders a fully-sized book would place against them. Sizes are shown as a share of the book, so they scale to whatever you run.', 'Ranked ideas') +
+    paint(head('Ideas', 'Today’s best-ranked names, with the exact entry, stop and targets for each. Sizes are shown as a share of your account, so they work at any size.', 'Ranked ideas') +
       sec('Trade ideas', skel('sk-card', 3)));
     const [t, mn, p, tk, lg, sc] = await Promise.all(
       [get('/today.json'), get('/mandate.json'), get('/pulse.json'), get('/api/ticker'), ledger(),
@@ -3861,7 +3892,7 @@
       noteScreenMeta(sc.data); if (!SCREEN) setScreen((sc.data.rows || []).filter(x => x && x.sym), LITE_GOT);
       SCREEN_DATE = SCREEN_DATE || sc.data.price_date || null;
     }
-    let out = head('Ideas', 'Ranked names, and the orders a fully-sized book would place against them. Sizes are shown as a share of the book, so they scale to whatever you run.', 'Ranked ideas');
+    let out = head('Ideas', 'Today’s best-ranked names, with the exact entry, stop and targets for each. Sizes are shown as a share of your account, so they work at any size.', 'Ranked ideas');
     if (!t.ok) { paint(out + fail('Ideas', t.error)); return; }
     /* What is on this page, before the cards. A reader arriving here cannot
      * otherwise tell whether "ideas" means five names or fifty, nor which of
@@ -7052,7 +7083,7 @@
 
 
   R['/signals'] = async () => {
-    const intro = 'Every alert this site has sent since it launched, with the levels it was sent at. Scored when it closes — losers included, which is the point of publishing it.';
+    const intro = 'Every call this site has made, with the price it was made at. Each one is scored when it closes — the losses too. That is the point.';
     paint(head('Signals', intro, 'The public ledger') + skel('sk-card', 4));
     const [a, engRes] = await Promise.all([ledger(), get('/engines.json'), loadResearchN()]);
     const ENG_TABLE = (engRes && engRes.ok && engRes.data && engRes.data.ok) ? engRes.data : null;
@@ -7464,6 +7495,130 @@
     <b>held</b> for carrying the whole position to the last target — the difference is what
     taking money off the table costs, and what the certainty of having taken it buys.</p>`;
 
+  /* ══ WIDGETS ═════════════════════════════════════════════════════════════
+   *
+   * Akshay: "widgets animations info graphs wherever required."
+   *
+   * THE ONE RULE ALL OF THESE FOLLOW. Every widget renders its FINISHED state
+   * in markup and CSS. The animation only ever moves it from there. That is
+   * not a stylistic preference — rAF does not run in a hidden tab and
+   * IntersectionObserver does not fire in one either, both of which are on
+   * file in this estate, so a widget that starts at zero and waits to be
+   * animated is a widget that is permanently blank for a reader whose tab was
+   * in the background. Correct first, animated second.
+   */
+
+  /* A number that counts up to the value already printed in it.
+   *
+   * The ELEMENT CARRIES THE FINAL TEXT. This only rewrites it while running
+   * and puts the original back at the end, so a thrown error, a hidden tab or
+   * no JS at all leaves the true figure on screen. */
+  const countUp = (el) => {
+    if (!el || el.dataset.ran) return;
+    const finalText = el.textContent;
+    const m = finalText.match(/-?[\d,]+\.?\d*/);
+    if (!m) return;
+    const target = Number(m[0].replace(/,/g, ''));
+    if (!Number.isFinite(target) || Math.abs(target) < 1) return;
+    el.dataset.ran = '1';
+    const dp = (m[0].split('.')[1] || '').length;
+    const dur = 620;
+    const t0 = performance.now();
+    el.classList.add('is-run');
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / dur);
+      // easeOutCubic — fast then settling, which reads as a figure arriving
+      // rather than a slot machine.
+      const e = 1 - Math.pow(1 - k, 3);
+      const v = target * e;
+      el.textContent = finalText.replace(m[0],
+        v.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp }));
+      if (k < 1) { requestAnimationFrame(step); return; }
+      el.textContent = finalText;          // exact, always
+      el.classList.remove('is-run');
+    };
+    requestAnimationFrame(step);
+  };
+
+  /* A 0-100 ring. The arc length is computed here and written INLINE, so the
+     ring is already correct before the sweep keyframe touches it. */
+  const ringGauge = (score, label, cls = '', size = 116) => {
+    const v = Math.max(0, Math.min(100, Number(score) || 0));
+    const r = (size / 2) - 6;
+    const circ = 2 * Math.PI * r;
+    const off = circ * (1 - v / 100);
+    return `<span class="ringw">
+      <svg class="ring" viewBox="0 0 ${size} ${size}" style="--ring-sz:${size}px"
+           role="img" aria-label="${esc(label)}: ${v} out of 100">
+        <circle class="ring-bg" cx="${size / 2}" cy="${size / 2}" r="${r}"></circle>
+        <circle class="ring-fg ${esc(cls)}" cx="${size / 2}" cy="${size / 2}" r="${r}"
+          style="--circ:${circ.toFixed(1)};stroke-dasharray:${circ.toFixed(1)};
+                 stroke-dashoffset:${off.toFixed(1)}"></circle>
+      </svg>
+      <span class="ring-c"><b class="cnum">${Math.round(v)}</b><span>${esc(label)}</span></span>
+    </span>`;
+  };
+
+  /* Advancers / unchanged / decliners as one bar. The widths are real
+     percentages written inline; `grow` only animates from zero-basis. */
+  const splitBar = (up, down, total) => {
+    const u = Number(up) || 0, d = Number(down) || 0, t = Number(total) || 0;
+    if (!t) return '';
+    const flat = Math.max(0, t - u - d);
+    const pc = (n) => (n / t * 100);
+    const seg = (n, cls, txt) => n <= 0 ? '' :
+      `<i class="${cls}" style="flex:0 0 ${pc(n).toFixed(1)}%">${pc(n) > 11 ? esc(txt) : ''}</i>`;
+    return `<div class="splitb" role="img"
+        aria-label="${u} advanced, ${flat} unchanged, ${d} declined of ${t}">
+        ${seg(u, 'sb-u', u + ' up')}${seg(flat, 'sb-f', flat)}${seg(d, 'sb-d', d + ' down')}
+      </div>
+      <div class="splitl"><span>${u} advancing</span><span>${d} declining</span></div>`;
+  };
+
+  /* A labelled 0-100 meter. */
+  const meter = (v, cls = '') =>
+    `<div class="meter ${esc(cls)}"><i style="--w:${Math.max(0, Math.min(100, Number(v) || 0)).toFixed(0)}%"></i></div>`;
+
+  /* A small infographic tile: label, figure, its own trend line, and the move.
+     The path is real data; its length is measured and written inline so the
+     draw-in has something true to animate from. */
+  const sparkCard = (label, value, series, deltaPct) => {
+    const pts = (series || []).map(Number).filter(Number.isFinite);
+    let svg = '';
+    if (pts.length > 2) {
+      const lo = Math.min(...pts), hi = Math.max(...pts), span = (hi - lo) || 1;
+      const W = 120, H = 30;
+      const d = pts.map((p, i) =>
+        `${i ? 'L' : 'M'}${(i / (pts.length - 1) * W).toFixed(1)},${(H - (p - lo) / span * H).toFixed(1)}`
+      ).join(' ');
+      // Rough path length: enough for a dasharray that always exceeds the
+      // real one, which makes the draw-in start fully hidden and end exact.
+      const len = Math.round(W * 1.6 + H);
+      svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+        <path class="draw" d="${d}" style="--len:${len};stroke-dasharray:${len};
+          stroke-dashoffset:0"></path></svg>`;
+    }
+    const dcls = deltaPct == null ? '' : dir(deltaPct);
+    return `<div class="spk ${esc(dcls)}">
+      <span class="spk-k">${esc(label)}</span>
+      <span class="spk-v cnum">${esc(value)}</span>
+      ${svg}
+      <span class="spk-f"><span class="spk-d ${esc(dcls)}">${
+        deltaPct == null ? '' : pct(deltaPct)}</span></span>
+    </div>`;
+  };
+
+  /* Run the count-ups after a paint. Called from paint(), guarded, and
+     deliberately NOT observer-gated: the numbers are already on screen and
+     this is decoration on top of them. */
+  const runWidgets = (scope) => {
+    const els = scope.querySelectorAll('.cnum:not([data-ran])');
+    // A cap, because a page with 300 figures animating at once is a page
+    // that stutters. The rest simply keep the value they already show.
+    let n = 0;
+    for (const el of els) { if (n++ > 40) break; countUp(el); }
+  };
+
   /* ── THE BAROMETER, AND WHEN A BAD MARKET BECOMES AN OPPORTUNITY ─────────
    *
    * Akshay: "market barometer — use historical figures, imp. supports etc to
@@ -7584,20 +7739,20 @@
       const real = dd >= 15 && aboveP <= 40;
       const early = dd >= 10;
       const stage = deep ? {
-        k: 'deep', t: 'Deep value on offer', c: 'up',
+        k: 'deep', t: 'Genuinely cheap', c: 'up',
         say: 'The conditions that marked March 2020 and March 2009 — a fall this deep with '
            + 'participation this washed out. Nobody rings a bell at the low, so this is an '
            + 'argument for buying in tranches on a schedule, not for calling the bottom.' }
         : real ? {
-        k: 'real', t: 'Worth accumulating', c: 'up',
+        k: 'real', t: 'Worth buying in instalments', c: 'up',
         say: 'A real correction rather than a wobble. Historically the zone where staged '
            + 'buying has paid — in instalments, because it can always go further.' }
         : early ? {
-        k: 'early', t: 'First discount', c: '',
+        k: 'early', t: 'Slightly cheaper', c: '',
         say: 'Cheaper than it was, and nowhere near the levels that have marked a bottom. '
            + 'Worth a first tranche at most.' }
         : {
-        k: 'none', t: 'Nothing on discount', c: '',
+        k: 'none', t: 'Nothing on sale', c: '',
         say: 'No meaningful fall to buy. Accumulating here is paying up, which is a different '
            + 'decision from the one this reading is about.' };
       return { stage, hits, dd, aboveP };
@@ -7710,7 +7865,7 @@
            <b>${Math.round(raw * e / cap * 100)}%</b> of the book in one name. Capped at
            ${MAX_POS_PCT}%.`
         : `${money(perShare)} a share at risk · stop is ${(perShare / e * 100).toFixed(1)}% away.`}
-        Kept in this browser only. Nothing here is advice, and no engine has cleared the 30-trade bar.</p>
+        Your account size stays in this browser. Nothing here is advice.</p>
     </div>`;
   };
 
@@ -10978,7 +11133,7 @@
    * small a sample says so instead of showing a number. */
   R['/engines'] = async () => {
     const shell = body => head('The floor',
-      'Every engine, what makes it fire, and what it has actually done.',
+      'Every engine here: what it looks for, and what it has actually returned.',
       'Engines') + body;
     paint(shell(`<div class="sk" style="height:340px"></div>`));
 
@@ -12145,17 +12300,17 @@
     ['/reads',   'Weekly reads',  'Seven companies, studied properly',
                  'One per sector, written every Saturday — what they sell, how the money works, and what would break it.'],
     ['/radar',   'Signal radar',  'The market score, and the eight names carrying it',
-                 `Breadth over ${universeN()} names, with every term of the score printed.`],
+                 `How broad the move is across ${universeN()} names, with the full working shown.`],
     ['/research', 'The research floor', 'Three engines, none of them cleared',
-                 'BUOY, ANCHOR and BEDROCK — each published with the measurement that rejects it.'],
+                 'Three engines still being tested, each shown with the numbers that reject it.'],
     ['/screen',  'Screen',        'All names, filterable',
-                 'Price, trend, quality, value — and FII/DII holding quarter on quarter.'],
+                 'Price, trend, quality and value for every name — plus who is buying.'],
     ['/ideas',   'Ideas',         'Ranked names and the orders behind them',
-                 'Entry, stop and a three-stage ladder, sized as a share of the book.'],
+                 'Entry, stop and three targets, sized as a share of your account.'],
     ['/markets', 'Markets',       'The board — 71 instruments',
-                 'Each against its own 52-week range, not against each other.'],
+                 'Each one measured against its own year, not against the others.'],
     ['/ipo',     'IPO',           'Books open now, and how last year listed',
-                 'Demand, valuation and peers — plus 60 listings measured from issue price.'],
+                 'Demand, pricing and peers — plus how last year’s listings have done.'],
     ['/news',    'News',          'The wire, filtered to names you screen',
                  'Every story carries the screened companies it touches.'],
     ['/funds',   'Funds',         'SIP screen over AMFI NAV',
@@ -12345,10 +12500,10 @@
         </details>`;
       }).join(''), `${studies.length} studies`, null, { lead: true });
 
-      body += `<p class="hint">A new edition is written every Saturday morning and no company
-        repeats inside eight weeks, so the archive builds into a library rather than a rotation.
-        Nothing here is advice — the studies deliberately carry no entry, stop or target, because
-        understanding a business and trading it are different jobs.</p>`;
+      body += `<p class="hint">A new set is written every Saturday, and no company comes back inside
+        eight weeks — so this builds into a library rather than going round in circles. There are
+        no entries, stops or targets here on purpose: understanding a business and trading it are
+        two different jobs.</p>`;
 
       paint(body);
       const sel = main.querySelector('select[data-reads-week]');
@@ -13044,7 +13199,7 @@
     '/signals':     ['Signals — the public ledger, wins and losses both',
                      'Every call this book has published, open and closed, with the entry, stop and targets it was sent with and what it actually did.'],
     '/reads':       ['Weekly reads — seven companies, studied properly',
-                     'One company per sector, written every Saturday: what it sells, how the money actually arrives, what the returns say about the business, and what would break it.'],
+                     'One company per sector, every Saturday. What it sells, how the money arrives, and what would break it.'],
     '/discover':    ['Discover — seven ways into the screened names',
                      'Radar, screen, ideas, markets, IPO, news and funds — what each one answers.'],
     '/radar':       ['Signal radar — the market, and the names carrying it',
