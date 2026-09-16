@@ -5493,3 +5493,7 @@ h3,h4,.rd-h{font-family:var(--ui);font-weight:700;letter-spacing:-.016em}
 
 /* Lists inside explanations were tight enough to read as one block. */
 .acc-l li,.rd-l li{margin-bottom:.4em}
+
+/* A feed over a day old is the one thing on this strip worth noticing. */
+.freshbar .is-old{color:var(--warn)}
+.freshbar .is-old i{opacity:1}

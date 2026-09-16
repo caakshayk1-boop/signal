@@ -112,6 +112,44 @@
    * rather than a rejected promise being handed to every future caller. */
   const INFLIGHT = new Map();
 
+  /* ── WHAT EVERY FEED IS CALLED, IN ONE PLACE ─────────────────────────────
+   *
+   * Akshay: "I need for all pages freshness widgets animations presentations
+   * for each & every line section page entirely."
+   *
+   * Freshness was reported by six loaders and therefore by whichever routes
+   * happened to call them — /research, /engines, /radar, /watch and the stock
+   * pages said only "Loaded HH:MM", which is worse than silence because it
+   * looks like an answer.
+   *
+   * Adding a noteFresh() call to twenty routes would be twenty places to
+   * forget. get() already sees every fetch the site makes, so the label lives
+   * beside the URL and a route reports whatever it touches without knowing
+   * this exists. A feed added next year gets one line here and is covered
+   * everywhere at once. */
+  const FEED_NAMES = {
+    '/pulse.json': 'Market pulse', '/today.json': 'Trade ideas',
+    '/screen.json': 'Screen', '/screen-lite.json': 'Screen',
+    '/engines.json': 'Engine floor', '/research.json': 'Research',
+    '/conviction.json': 'Conviction', '/mandate.json': 'The book',
+    '/ipo.json': 'IPO book', '/funds.json': 'Fund screen',
+    '/news.json': 'News', '/edition.json': 'Edition',
+    '/swot.json': 'Company notes', '/alerts.json': 'Ledger (snapshot)',
+    '/alerts_log.json': 'Alert log', '/weekly_reads.json': 'Weekly reads',
+    '/data-health.json': 'Pipeline health', '/buoy.json': 'BUOY research',
+    '/api/markets': 'Markets', '/api/ticker': 'Live prices',
+    '/api/wire': 'Wire', '/api/flows': 'FII & DII', '/api/calendar': 'Calendar',
+    '/api/stats': 'All-time stats', '/api/ipo-live': 'IPO demand',
+  };
+  /* The stamp a feed carries is not the same field twice: a build writes
+     generated_at, a mirror writes built_on, the screen writes price_date.
+     Asked in the order a reader would trust them. */
+  const feedStampOf = (d) => {
+    if (!d || typeof d !== 'object') return null;
+    return d.generated_at || d.at || d.built_at || d.built_on
+        || d.price_date || d.date || d.fetched_at || null;
+  };
+
   async function get(url) {
     routeUrls.add(url);
     const micro = MICRO.get(url);
@@ -137,6 +175,14 @@
       const ct = r.headers.get('content-type') || '';
       if (ct.includes('text/html')) throw new Error('not JSON — got an HTML page');
       const j = await r.json();
+      /* Named here, so a route reports every feed it touched without having to
+         know which ones those were. Guarded: a missing label or a feed with no
+         stamp is simply not reported, never an error. */
+      try {
+        const base = String(url).split('?')[0];
+        const label = FEED_NAMES[base];
+        if (label) noteFresh(label, feedStampOf(j));
+      } catch (e) { /* freshness must never break a fetch */ }
       // Content, not timestamps: two fetches a minute apart with identical
       // bodies are the same edition and must not trigger a repaint.
       const body = JSON.stringify(j);
@@ -513,12 +559,27 @@
     const loaded = new Date();
     const hhmm = String(loaded.getHours()).padStart(2, '0') + ':'
                + String(loaded.getMinutes()).padStart(2, '0');
-    const parts = FRESH
-      .map(([label, ts]) => {
-        const w = freshFmt(ts);
-        return w ? `<span><i>${esc(label)}</i> ${esc(w)}</span>` : null;
-      })
-      .filter(Boolean);
+    /* ── OLDEST FIRST, AND NOT ALL OF THEM ────────────────────────────────
+     * Reporting every feed a route touched turned out to be ten items on
+     * /research, which is a paragraph of small print nobody reads — and the
+     * one number that matters is buried in it.
+     *
+     * The risk is always the OLDEST feed, so that leads. Six are shown and
+     * the rest are counted, because a reader who wants to know whether the
+     * page is current needs the worst case, not an inventory. */
+    const scored = FRESH
+      .map(([label, ts]) => ({ label, ts, w: freshFmt(ts), h: ageHours(ts) }))
+      .filter((x) => x.w);
+    scored.sort((a, b) => (b.h || 0) - (a.h || 0));
+    const SHOW = 6;
+    const parts = scored.slice(0, SHOW).map((x) => {
+      // Anything past a day is worth marking, not just stating.
+      const old = (x.h || 0) >= 24;
+      return `<span${old ? ' class="is-old"' : ''}><i>${esc(x.label)}</i> ${esc(x.w)}</span>`;
+    });
+    if (scored.length > SHOW) {
+      parts.push(`<span><i>+${scored.length - SHOW}</i> fresher</span>`);
+    }
     parts.push(`<span><i>Loaded</i> ${hhmm}</span>`);
     el.innerHTML = parts.join('');
   };
@@ -833,7 +894,7 @@
     return `<div class="snap" role="group" aria-label="Summary">
       <div class="snap-r">${live.map(([k, v, sub, cls]) => `<div class="snap-i">
         <span class="snap-k">${esc(k)}</span>
-        <span class="snap-v ${cls || ''}">${v == null || v === '' ? '—' : v}</span>
+        <span class="snap-v cnum ${cls || ''}">${v == null || v === '' ? '—' : v}</span>
         ${sub ? `<span class="snap-s">${esc(sub)}</span>` : ''}
       </div>`).join('')}</div>
       ${note ? `<p class="snap-n">${note}</p>` : ''}
