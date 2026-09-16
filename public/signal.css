@@ -5497,3 +5497,7 @@ h3,h4,.rd-h{font-family:var(--ui);font-weight:700;letter-spacing:-.016em}
 /* A feed over a day old is the one thing on this strip worth noticing. */
 .freshbar .is-old{color:var(--warn)}
 .freshbar .is-old i{opacity:1}
+
+/* Progress toward the 30-trade bar, on each engine card. */
+.ef-prog{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.ef-prog span{font-size:var(--t-2);color:var(--dim);line-height:1.4}

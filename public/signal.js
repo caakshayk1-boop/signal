@@ -2658,6 +2658,30 @@
         `${LR.published} published · ${LR.trades} closed`);
     }
 
+    /* ── THE DAY, AS A PICTURE, BEFORE THE DAY AS A LIST ─────────────────
+     * The widgets were built and wired into /markets only, so every other
+     * page had the library and none of the shapes. This is the front page:
+     * the one reading that says what kind of day it is belongs here, above
+     * the five tiles that itemise it. Same barometer and same breadth bar as
+     * the board — built from feeds this route has already loaded, so it costs
+     * no extra request. */
+    {
+      const hv = heroVix ? Number(heroVix.price_raw != null ? heroVix.price_raw : heroVix.price) : null;
+      const HB = barometer(heroNifty, pu.breadth || {}, hv);
+      if (HB) {
+        out += sec('Where the market stands', `
+          <div class="baro">
+            <div class="baro-s ${esc(HB.band.c)}">${ringGauge(HB.score, HB.band.t, HB.band.c, 118)}</div>
+            <div class="baro-p">
+              ${splitBar((pu.breadth || {}).up, (pu.breadth || {}).down, (pu.breadth || {}).counted)}
+              ${HB.acc ? `<p class="hint" style="margin-top:12px"><b>${esc(HB.acc.stage.t)}.</b>
+                ${esc(HB.acc.stage.say)}</p>` : ''}
+            </div>
+          </div>`,
+          `${HB.score}/100`, null, { lead: true });
+      }
+    }
+
     out += sec('Today', `<div class="grid grid-5">
         ${t5('news', wireTop && wireTop.n ? wireTop.n : (wire.length ? '—' : '0'),
              'Most-connected story',
@@ -5548,6 +5572,39 @@
       })(), 'daily range'],
     ]))(v => { if (v == null || v === '') return null;
                const x = Number(v); return Number.isFinite(x) ? x : null; });
+
+    /* ── WHAT THE SCREEN ACTUALLY SAYS, AS A SHAPE ────────────────────────
+     * 989 rows and four summary tiles, and no picture of what the verdicts
+     * add up to. The screen already publishes a call on every name — BUY,
+     * WAIT, WATCH, AVOID — and the one thing a reader wants before scrolling
+     * a thousand rows is how many fall into each. That is a split bar, not a
+     * table: the widths ARE the answer.
+     * Colours follow the calls rather than the palette: buy is the up colour,
+     * avoid the down one, and the two middle states share the neutral, since
+     * "wait" and "watch" are both "not yet". */
+    const verdictBar = (rows) => {
+      const c = { BUY: 0, WAIT: 0, WATCH: 0, AVOID: 0 };
+      for (const r of rows) {
+        const v = String((r.vd && r.vd.c) || '').toUpperCase();
+        if (v in c) c[v] += 1;
+      }
+      const total = c.BUY + c.WAIT + c.WATCH + c.AVOID;
+      if (!total) return '';
+      const seg = (n, cls, label) => n <= 0 ? '' :
+        `<i class="${cls}" style="flex:0 0 ${(n / total * 100).toFixed(1)}%"
+            title="${label}: ${n} of ${total}">${(n / total * 100) > 9 ? n : ''}</i>`;
+      return `<div class="splitb" role="img"
+          aria-label="${c.BUY} buy, ${c.WAIT} wait, ${c.WATCH} watch, ${c.AVOID} avoid">
+          ${seg(c.BUY, 'sb-u', 'Buy')}${seg(c.WAIT, 'sb-f', 'Wait')}
+          ${seg(c.WATCH, 'sb-f', 'Watch')}${seg(c.AVOID, 'sb-d', 'Avoid')}
+        </div>
+        <div class="splitl"><span><b class="up">${c.BUY}</b> buy</span>
+          <span>${c.WAIT + c.WATCH} wait or watch</span>
+          <span><b class="dn">${c.AVOID}</b> avoid</span></div>
+        <p class="hint">The screen's own call on every name it can judge. A call is
+          not a recommendation — no engine here has proved itself yet.</p>`;
+    };
+
     const shell = body => head('Screen',
       'Every name on the screen, searchable. Tap any row for the full card.',
       'The full universe') + body;
@@ -5594,6 +5651,9 @@
 
       main.innerHTML = shell(
         screenSnap(SCREEN) +
+        /* The shape of the screen's verdicts, before the thousand rows. */
+        (verdictBar(SCREEN) ? sec('What the screen says', verdictBar(SCREEN),
+                                  `${SCREEN.length} names`, null, { lead: true }) : '') +
         /* THE PROVENANCE LINE. Both halves were in the payload and neither was
            rendered: a reader could rank by Composite without being told what
            the composite weighs, and could not see that a quarter of the table
@@ -7448,7 +7508,22 @@
                                   : 'nothing closed yet',
                  wrShown ? (wr >= 50 ? 'up' : 'dn') : '', 'winrate')}
           ${tile(closed.length, 'Closed and scored', 'expiries counted as losses')}
-        </div>` + (CURVE ? '' : curveNote)) +
+        </div>
+        ${/* ── THE BOOK AS A SHAPE ──────────────────────────────────────────
+            * Four tiles state the record and none of them shows its
+            * proportions — how much of the book is still open, and of what
+            * has closed, how much won. That is one bar, and on a book reading
+            * 20% it is a more honest picture than a percentage is: the losses
+            * take up the room they actually occupy. */''}
+        ${(() => {
+          const openN = opens.length;
+          if (!openN && !closed.length) return '';
+          return `<div style="margin-top:14px">${
+            splitBar(wins, losses, wins + losses + openN)}</div>
+            <p class="hint"><b>${wins}</b> won and <b>${losses}</b> lost of what has
+              closed, with <b>${openN}</b> still open. The grey is the part of the
+              book that has not answered yet.</p>`;
+        })()}` + (CURVE ? '' : curveNote)) +
         /* NO PRE-LAUNCH RECORD ON THIS PAGE. A second block used to sit here
          * carrying 80 trades closed before LAUNCH. Removed on instruction: the
          * site is a fresh start, and until a published signal closes this page
@@ -11274,6 +11349,14 @@
             * roster, where it belongs. */''}
         ${shut === 0 ? `<p class="ef-thin">No win rate yet.</p>`
           : `<p class="ef-thin">${shut} closed</p>`}
+        ${/* HOW FAR THROUGH THE BAR EACH ENGINE IS. Every card states a
+            closed count against a requirement of 30, and a reader has to do
+            the division to know whether an engine is nearly there or has
+            barely started. The meter does it: 2 of 30 LOOKS like 2 of 30. */''}
+        ${shut > 0 ? `<div class="ef-prog">
+            ${meter(Math.min(100, shut / 30 * 100), shut >= 30 ? 'up' : '')}
+            <span>${shut} of the 30 closed trades this book needs</span>
+          </div>` : ''}
       </div>`;
       // THE SAMPLE GATE. Under 20 closed trades a win rate is a coin-flip
       // reading of a coin flipped a few times, and printing it as a percentage
