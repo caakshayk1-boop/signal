@@ -822,6 +822,14 @@ try {
   console.log("\n  expanding rows");
   await p.goto(SITE + "/ipo", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE + 5000);
+  /* The listings table moved behind a disclosure when /ipo was decluttered —
+     it was 1,823px of a 6.7-screen page. The rows still expand; they are one
+     tap further in. Opening every fold on the route rather than naming this
+     one, so the next section that folds does not break this test too. */
+  await p.evaluate(() => {
+    document.querySelectorAll("details.foldb").forEach((d) => { d.open = true; });
+  });
+  await p.waitForTimeout(400);
   const xrN = await p.locator("#ipotbl .xr").count();
   ok("the listing rows expand", xrN > 10, xrN);
 
@@ -1456,14 +1464,38 @@ try {
       });
       const out = [];
       for (const head of document.querySelectorAll("#main .rank-head")) {
-        if (!head.offsetParent && getComputedStyle(head).display === "none") continue;
+        /* Skip anything not actually rendered. offsetParent alone is not the
+           test — an element inside a `hidden` container has a grid display of
+           its own — so ask whether it occupies any space at all. A panel the
+           reader has not switched to has no laid-out columns to check. */
+        if (!head.getClientRects().length) continue;
         let row = head.nextElementSibling;
         while (row && !row.classList.contains("rank-r")) row = row.nextElementSibling;
         if (!row) continue;
         const hc = inflow(head), rc = inflow(row);
         if (!hc.length) continue;                 // a header hidden by design
         const grid = getComputedStyle(head).display.includes("grid");
-        const tracks = getComputedStyle(head).gridTemplateColumns.split(" ").filter(Boolean).length;
+        /* COUNTING TRACKS BY SPLITTING ON SPACES IS WRONG FOR A GRID THAT
+           HAS NOT BEEN LAID OUT. A rendered grid resolves every track to a
+           concrete px value, so "24px 714px 70px..." splits cleanly. A grid
+           inside a hidden panel keeps its authored value — and
+           "minmax(0px, 1fr)" CONTAINS A SPACE, so the naive split counted it
+           as two tracks and reported nine where the CSS declares eight.
+           Latent until the markets board grew a hidden Risers/Fallers panel,
+           at which point it failed a layout that was correct.
+           Split on top-level spaces only: depth tracks parentheses so any
+           function — minmax(), repeat(), clamp() — counts as one track. */
+        const tracks = (() => {
+          const v = getComputedStyle(head).gridTemplateColumns;
+          let depth = 0, n = 0, seen = false;
+          for (const ch of v) {
+            if (ch === "(") depth++;
+            else if (ch === ")") depth--;
+            else if (ch === " " && depth === 0) { if (seen) { n++; seen = false; } }
+            else seen = true;
+          }
+          return n + (seen ? 1 : 0);
+        })();
         /* A HEADER THAT WRAPS IS A HEADER WHOSE COLUMNS ARE NOT COLUMNS.
          * Cells are baseline-aligned, so a few pixels apart is one line; a
          * whole line apart is a wrap, and that is what the phone fault was. */

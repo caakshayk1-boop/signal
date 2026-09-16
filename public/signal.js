@@ -729,6 +729,20 @@
       + `<button type="button" class="chip cap-more" data-cap="${id}">`
       + `Show the other ${parts.length - n} ${esc(noun)}</button>`;
   };
+  /* Risers / fallers on the markets board. Delegated at the document for the
+     same reason every other handler here is: the markets route repaints on a
+     live tick, and a listener bound to the button would be gone after the
+     first one. Toggles `hidden` rather than display, per the shell's reset. */
+  document.addEventListener('click', (ev) => {
+    const b = ev.target.closest && ev.target.closest('button[data-mv]');
+    if (!b) return;
+    const want = b.dataset.mv;
+    const scope = b.closest('section') || document;
+    scope.querySelectorAll('button[data-mv]').forEach(x =>
+      x.classList.toggle('is-on', x.dataset.mv === want));
+    scope.querySelectorAll('[data-mv-p]').forEach(x => { x.hidden = x.dataset.mvP !== want; });
+  });
+
   /* Bound once at the document, like the row toggle — survives every repaint. */
   document.addEventListener('click', (ev) => {
     const b = ev.target.closest && ev.target.closest('button[data-cap]');
@@ -1139,6 +1153,16 @@
    * `hunts` is the one line that has to survive a reader who knows nothing:
    * what does this thing go looking for. */
   const ENGINE_REGISTRY = {
+    /* PIVOT is the newest and the only one built outward from a framework
+       rather than from a pattern: location, then context, then confirmation,
+       in that order, with a name that is not AT a level never scored on its
+       trend. Its confirmation stage is DAILY-BAR PROXIES — this site has no
+       depth feed, so there is no delta, no CVD and no footprint, and the
+       engine says so on every signal it files rather than borrowing the
+       vocabulary of data it does not have. */
+    pivot:           { name: 'PIVOT',  role: 'Reaction at a level', band: null,
+                       hunts: 'Price AT a level the market has already reacted to — its 200-day, the top of a multi-week shelf, or a swing high being retested — with the higher timeframe agreeing and the session confirming it.',
+                       tf: 'Daily → weeks' },
     breakout:        { name: 'BREACH', role: 'Breakouts',        band: null,
                        hunts: 'Price clearing a level it has been under — 52-week, 20-week and 6-month highs, confirmed on volume.',
                        tf: 'Daily → weeks' },
@@ -1353,6 +1377,12 @@
     equity_measured: 'PAPER', breakout: 'PAPER', magic: 'PAPER',
     magicmagic: 'PAPER', momentum_quant: 'PAPER', multibagger: 'RESEARCH',
     ai_longterm: 'RESEARCH', ledge: 'PAPER', keel: 'RESEARCH',
+    /* RESEARCH on day one and for a long while after. PIVOT has no closed
+       trade and no measured expectancy, so it is logged, shown, and never
+       alerted. The bar is 30 closed at t >= 2 and it will be held to it like
+       everything else — a new engine promoting itself on the day it was
+       written is the claim this whole record exists to refuse. */
+    pivot: 'RESEARCH',
   };
 
   /* Backtested records for the engines that have no live sample yet. Kept
@@ -1809,6 +1839,21 @@
         <span class="mk-rng">${rangeBar(r)}</span>
         <span class="mk-p">${esc(r.price ?? '—')}</span>
         <span class="mk-c ${dir(r.change_pct) || 'fl'}">${pct(r.change_pct)}</span>
+        ${/* EVERY INDEX CARRIES ITS OWN SCORE, and only an index does.
+            * Akshay: "score engine for market, each indexes, each 1000 stock."
+            * The market has the barometer above and each stock has the
+            * screen's composite; this is the middle one that did not exist.
+            * Two inputs, both the instrument's own: where it sits in its
+            * 52-week range, and which way its published trend has gone. NOT
+            * breadth — that is a market-wide figure and mixing it in would
+            * print the same number beside every index on the board. */''}
+        ${(() => {
+          if (String(r.kind || '').toUpperCase() !== 'INDEX') return '';
+          const ix = indexScore(r);
+          return ix ? `<span class="mk-sc ${esc(ix.call.c)}"
+            title="Where it sits in its own 52-week range, and the direction of its published trend">
+            <b>${ix.score}</b><i>${esc(ix.call.t)}</i></span>` : '';
+        })()}
       </button>
       <div class="mk-d" id="${id}"><div></div></div>`;
   };
@@ -2062,10 +2107,15 @@
      * one of the two calls from cache. /api/stats is still fetched, but only
      * for engine_floors — a property of the engines, not of this site's
      * record, and labelled as such where it is shown. */
-    const [t, p, n, m, fl, ed, lw, sgx] = await Promise.all(
+    const [t, p, n, m, fl, ed, lw, sgx, tk] = await Promise.all(
       [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets'),
        get('/api/flows'), get('/edition.json'), get('/api/wire'),
        ledger(),
+       /* The ticker, for India VIX — /api/markets does not carry it, which is
+        * why it was only ever visible on the board. In this Promise.all and
+        * not awaited after it: the hero must not wait on a second round trip
+        * for one reading. */
+       get('/api/ticker'),
        /* The research count, so the roster below can name the engines that do
         * NOT publish. In the same Promise.all rather than awaited separately:
         * it must not add a round trip to first paint, and a reader who never
@@ -2131,6 +2181,23 @@
     const heroMk = m.ok ? (m.data.markets || []) : [];
     const heroNifty = heroMk.find(x => /nifty 50/i.test(x.name || ''));
     const heroSensex = heroMk.find(x => /sensex/i.test(x.name || ''));
+    /* ── INDIA VIX, BESIDE THE INDEX RATHER THAN BURIED IN THE TAPE ────────
+     * Akshay: "india vix need to be added on signal site, near hero."
+     *
+     * /api/markets does not carry it — the ticker's INDIA segment does, which
+     * is why it appeared on the board and nowhere a reader looks first. It
+     * belongs next to Nifty because it QUALIFIES Nifty: the same index move
+     * means different things at 11 and at 22, and a reader deciding whether
+     * to act on a setup today is really asking what the next few sessions are
+     * likely to do to it. */
+    const heroVix = (() => {
+      if (!tk.ok) return null;
+      for (const seg of (tk.data.segments || [])) {
+        const hit = (seg.items || []).find(x => /india vix/i.test(x.name || ''));
+        if (hit) return hit;
+      }
+      return null;
+    })();
     // FII and DII net cash flows, straight from NSE. Not in any mirrored feed
     // — see src/api/flows.js. ok:false means NSE would not answer, and the
     // block says "Not published" rather than showing a zero.
@@ -2261,6 +2328,29 @@
           <span class="v">${esc(heroSensex.price ?? '—')}</span>
           <span class="c ${dir(heroSensex.change_pct)}">${pct(heroSensex.change_pct)}</span>
         </div>` : ''}
+        ${/* A NUMBER NOBODY CAN READ IS NOT INFORMATION.
+            * "India VIX 13.17" tells a reader who already knows the bands
+            * exactly what they already knew, and everyone else nothing. The
+            * band is stated in words beside it, and the direction is the
+            * OPPOSITE of the index colour on purpose: rising volatility is
+            * not a rising market, and colouring it green on a +7% day would
+            * be the single most misleading thing on this page. */''}
+        ${heroVix ? (() => {
+          const v = lvl(heroVix.price_raw != null ? heroVix.price_raw : heroVix.price);
+          const band = v == null ? ''
+            : v < 12 ? 'calm — the market is pricing very little movement'
+            : v < 16 ? 'normal — the usual range for this index'
+            : v < 22 ? 'jumpy — wider daily swings priced in'
+            : 'stressed — the market is paying up for protection';
+          return `<div class="hero-q hero-vix">
+            <span class="k">India VIX</span>
+            <span class="v">${esc(heroVix.price ?? '—')}</span>
+            <span class="c ${heroVix.change_pct > 0 ? 'dn' : heroVix.change_pct < 0 ? 'up' : ''}"
+              title="Rising volatility is not a rising market — this reads inverse to the index">${
+              pct(heroVix.change_pct)}</span>
+            <span class="fl-n">${esc(band)}</span>
+          </div>`;
+        })() : ''}
         <div class="hero-q hero-fl">
           <span class="k">FII &amp; DII${flow && flow.date ? ` · ${esc(flow.date)}` : ''}</span>
           ${flow ? `<span class="fl-r">
@@ -2439,6 +2529,16 @@
             * repeating, in dashes, the one thing the reader was just told.
             * The two columns appear the moment any engine has something to
             * put in them, and not before. */''}
+        ${/* THE ROSTER FOLDS; THE FOUR TILES DO NOT.
+            * The tiles above already answer "what is the record" — published,
+            * closed, win rate, expectancy. This table answers "and which
+            * engine", which is the second question and only some readers'
+            * first. Nine rows of it sat open under every visit and made the
+            * section 610px on a phone.
+            * The record itself stays open, because it is the thing this site
+            * leads with and folding it would be the one declutter that
+            * changed what the page CLAIMS rather than how much it shows. */''}
+        ${foldBody(`Which engine — all ${rows.length}, published and closed`, `
         <div class="rank">
           <div class="rank-r eng${anyClosed ? '' : ' eng-2'} eng-h">
             <span class="s">Engine</span><span class="x">Published</span>
@@ -2457,7 +2557,7 @@
             <span class="x">${r.closed
               ? (Math.round(r.wins / r.closed * 1000) / 10) + '%' : '—'}</span>` : ''}
           </a>`).join('')}
-        </div>
+        </div>`)}
         <p class="hint">${engineTallyNote()} This roster groups by name, so the two TIDAL bands
           share a row; the floor on <a href="/signals">the ledger</a> lists them separately.
           An engine is trusted with capital at 30 closed trades and t&nbsp;≥&nbsp;2, and none is
@@ -2560,7 +2660,7 @@
               ? `<i class="w-also" title="${esc(x._also.join(', '))}">+${x._also.length} more</i>` : ''}${
             x.at ? `<i class="w-at">${esc(storyAge(x.at))}</i>` : ''}</span>
           <span class="wt">${esc(x.title || '')}</span>
-        </a>`), 5, 'stories')}</div>
+        </a>`), 3, 'stories')}</div>
         <p class="hint">${wireIsLive
           ? `Read live from <b>${liveWire.sources}</b> newswires, refreshed every fifteen minutes,
              newest first. The four touching the most screened names are pinned; the rest rotate.`
@@ -2612,8 +2712,24 @@
         if (sr) for (const k of ['sd1y', 'r3y_cagr', 'roce_trend', 'next_earnings'])
           if (x[k] == null && sr[k] != null) x[k] = sr[k];
       });
-      out += sec('Today’s conviction', `<div class="cards-2">${capList(c.picks.map(convictionCard), 2, 'conviction picks')}</div>` +
-        TRAIL_NOTE +
+      /* ── FOLDED ON THE FRONT PAGE, WHOLE ON ITS OWN ──────────────────────
+       * Akshay: "currently a cluttered website... I need a clean website."
+       *
+       * Measured before changing it: the home page ran 9.3 screens on a
+       * phone, and this block was the single largest at 875px — two cards
+       * that each carry a ladder, a facts strip and a trailing rule. All of
+       * that is worth having and none of it is worth having BEFORE the
+       * reader has decided they want it.
+       *
+       * The heading, the count and the lead still render, so the page still
+       * SAYS a ranked slate exists and how many names are in it. What moves
+       * behind one tap is the working. Nothing is deleted and no content
+       * moved to another page — a front page is a table of contents that
+       * happens to open in place. */
+      out += sec('Today’s conviction', foldBody(
+        `Open the ${c.picks.length} ranked names, with levels and the reasoning`,
+        `<div class="cards-2">${capList(c.picks.map(convictionCard), 2, 'conviction picks')}</div>`
+        + TRAIL_NOTE) +
         `<details class="meth"><summary>How these five were chosen</summary>
            <p>${esc(c.method)}</p>
            <p class="hint">Ranked ${esc(c.date)} over ${esc(c.universe)} screened names. The slate is
@@ -2648,7 +2764,13 @@
       const ranked = ipoOpen.slice().sort((a, b) =>
         vR(a) - vR(b) || (Number(b.subscription_x) || 0) - (Number(a.subscription_x) || 0));
       const nApply = ranked.filter(r => vR(r) === 0).length;
-      out += sec('Open right now', ranked.slice(0, 2).map(ipoCard).join('') + ipoStaleNote(),
+      /* 703px of IPO cards on a page whose subject is the market. Same rule
+         as the slate above: the count and the verdict stay visible in the
+         lead, the cards open on request. */
+      out += sec('Open right now', foldBody(
+        `Open ${Math.min(2, ranked.length)} of ${ranked.length} book${
+          ranked.length === 1 ? '' : 's'}, with demand and valuation`,
+        ranked.slice(0, 2).map(ipoCard).join('') + ipoStaleNote()),
         `${ranked.length} book${ranked.length === 1 ? '' : 's'} open`,
         /* Plain text: sec() escapes the lead, so markup here would render as
          * its own tags. The tab bar already links to the IPO page. */
@@ -2875,8 +2997,17 @@
 
   /* Said once, under whichever block is showing mirrored figures, instead of
    * on every card that happens to be reading from the morning build. */
+  /* ── SAID ONCE PER PAGE, WHICHEVER BLOCK ASKS FIRST ──────────────────────
+   * Moving the stamp off the cards created the opposite bug the moment a
+   * SECOND block rendered the note: /ipo showed the identical three sentences
+   * twice, once under the open books and once under the upcoming ones. Both
+   * call sites are correct — each needs its cards explained — so the guard
+   * belongs in the note, not in the callers. First caller per render gets it;
+   * the rest get nothing. Reset by the route before it paints. */
+  let ipoNoteShown = false;
   const ipoStaleNote = () => {
-    if (IPO_AGE_H == null) return '';
+    if (IPO_AGE_H == null || ipoNoteShown) return '';
+    ipoNoteShown = true;
     /* The stamp lives HERE now, not on each card — it is one value from one
        build, so printing it per card was the same sentence repeated. Stated
        whatever the age, because a card saying "Morning build" has to be able
@@ -3515,8 +3646,12 @@
        is exactly how it showed NSE open on Ganesh Chaturthi. Fetched
        alongside, never awaited on its own: a holiday name is worth a slot in
        an existing round trip, not a delay to the whole board. */
-    const [m, p, cl] = await Promise.all([
+    const [m, p, cl, tk] = await Promise.all([
       get('/api/markets'), get('/pulse.json'), get('/api/calendar').catch(() => ({ ok: false })),
+      /* The ticker carries every index's 52-week range and its own trend
+         series, which /api/markets does not — and the barometer leads this
+         page, so it cannot wait for the board's own fetch further down. */
+      get('/api/ticker'),
     ]);
     if (cl && cl.ok && cl.data && cl.data.ok && cl.data.holidays) setHolidays(cl.data.holidays.rows);
     let out = head('Markets', 'The board live, and what the NSE screen underneath it did.', 'The board');
@@ -3536,6 +3671,68 @@
         Number.isFinite(Number(br.at_52w_high)) ? ['At 52-week high', br.at_52w_high, 'names', 'ac'] : null,
         ['Screened', pu.universe || 1000, 'names re-run daily'],
       ]);
+    }
+
+    /* ── THE BAROMETER LEADS THE BOARD ───────────────────────────────────
+     * It is the one reading on this page that is ABOUT the page — every
+     * number below it is an instrument, and this says what they add up to.
+     * Published with every input and weight visible, because a score whose
+     * derivation is hidden is a horoscope. */
+    {
+      const bmVix = (() => {
+        if (!tk || !tk.ok) return null;
+        for (const seg of (tk.data.segments || [])) {
+          const h = (seg.items || []).find(x => /india vix/i.test(x.name || ''));
+          if (h) return Number(h.price_raw != null ? h.price_raw : h.price);
+        }
+        return null;
+      })();
+      const bmNifty = (() => {
+        if (!tk || !tk.ok) return null;
+        for (const seg of (tk.data.segments || [])) {
+          const h = (seg.items || []).find(x => /nifty 50/i.test(x.name || ''));
+          if (h) return h;
+        }
+        return null;
+      })();
+      const B = barometer(bmNifty, pu.breadth || {}, bmVix);
+      if (B) {
+        out += sec('The barometer', `
+          <div class="baro">
+            <div class="baro-s ${esc(B.band.c)}">
+              <b>${B.score}</b><em>/100</em>
+              <span class="baro-b">${esc(B.band.t)}</span>
+            </div>
+            <div class="baro-p">${B.parts.map(pt => `
+              <div class="baro-i">
+                <span class="baro-k">${esc(pt.label)}<i>${pt.weight}%</i></span>
+                <span class="baro-bar"><i style="--w:${pt.score.toFixed(0)}%"></i></span>
+                <span class="baro-v">${pt.score.toFixed(0)}</span>
+                <span class="baro-d">${esc(pt.detail)}</span>
+              </div>`).join('')}</div>
+          </div>
+          ${B.acc ? `<div class="baro-acc acc-${esc(B.acc.stage.k)}">
+            <span class="acc-h ${esc(B.acc.stage.c)}">${esc(B.acc.stage.t)}</span>
+            <p>${esc(B.acc.stage.say)}</p>
+            ${B.acc.hits.length ? `<ul class="acc-l">${B.acc.hits.map(h =>
+              `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
+          </div>` : ''}
+          ${foldBody('How this number is made', `
+            <p class="hint">Five measures, weighted as shown, every one of them already
+              published on this site: where Nifty sits in its own 52-week range, how many of
+              ${B.counted} screened names hold their 200-day average, how many advanced today,
+              India VIX banded rather than scaled — 11 and 13 are the same market, 13 and 30 are
+              not — and how many names sit at a 52-week high.</p>
+            <p class="hint"><b>The two readings move against each other, deliberately.</b>
+              A barometer alone calls conditions poor at exactly the moment the second reading
+              should be saying this is the entry. March 2020 scored terribly on every trend
+              measure ever built and was the best entry in a decade, so this publishes both.</p>
+            <p class="hint"><b>Not backtested, and carrying no record.</b> It is a framework for
+              reading conditions, held to the same bar as every engine here: nothing on this site
+              claims an edge it has not measured. The weights are in the open because nothing has
+              earned the right to hide them.</p>`)}`,
+          `${B.score}/100 · ${esc(B.band.t)}`, null, { lead: true });
+      }
     }
 
     /* The world strip goes FIRST, above breadth. Whether the exchange behind a
@@ -3560,7 +3757,7 @@
     // ticker returns all 71 across eleven segments — Asia, India, Europe, US,
     // commodities, FX (USD/INR, MYR/INR, USD/MYR, AED/INR), crypto. The board
     // was showing a twelfth of what the origin already computes.
-    const tk = await get('/api/ticker');
+    /* Already fetched at the top of the route for the barometer. */
     if (tk.ok) {
       const segs = (tk.data.segments || []).filter(sg => (sg.items || []).length);
       MKDATA = new Map();   // one map per paint; the route repaints every 60s
@@ -3581,7 +3778,17 @@
        * be tidiness at the cost of the point. The Nifty gainers and losers
        * open with it, because "which names moved" is the question the Indian
        * indices immediately raise. */
-      const OPEN_SEGS = new Set(['india', 'gainers', 'losers']);
+      /* ── ONE SEGMENT OPEN, NOT THREE ─────────────────────────────────
+       * Measured: this section rendered 2,472px — over three phone screens
+       * of a page that is already seven. India, gainers and losers all
+       * opened by default, and the gainers and losers are the SAME sixteen
+       * Indian names the India segment above them just listed, re-sorted.
+       * A reader scrolled past the Nifty constituents three times before
+       * reaching Asia.
+       * India stays open because this is an Indian market site and it is
+       * what the page is for. Every other segment keeps its count in the
+       * summary, so the page still says what is behind each one. */
+      const OPEN_SEGS = new Set(['india']);
       out += sec('The board',
         segs.map(sg => {
           const up = sg.items.filter(x => x.up).length;
@@ -3607,11 +3814,26 @@
          ${segs.length} segments, each with the year behind it.`);
     } else { out += sec('The board', fail('The live board', tk.error)); }
 
-    const movers = () =>
-      sec('Biggest movers, one week', levelTable((pu.movers_up || []).slice(0, 8)),
-        '', 'What actually moved, over a week rather than a day.') +
-      sec('Biggest fallers, one week', levelTable((pu.movers_dn || []).slice(0, 8)),
-        '', 'The other half of the same week.');
+    /* ── ONE SECTION, BOTH DIRECTIONS ──────────────────────────────────────
+     * These were two sections of eight rows, 798px and 764px, stacked — and
+     * they are not two subjects. They are one week's moves, sorted twice, and
+     * the second heading ("The other half of the same week") said so.
+     * One block, one table, a chip to flip the direction. Half the height and
+     * the comparison is now possible rather than being two screens apart. */
+    const movers = () => {
+      const up = (pu.movers_up || []).slice(0, 8);
+      const dn = (pu.movers_dn || []).slice(0, 8);
+      if (!up.length && !dn.length) return '';
+      return sec('Biggest moves, one week',
+        `<div class="chips mv-t" role="group" aria-label="Direction">
+           <button type="button" class="chip is-on" data-mv="up">Risers</button>
+           <button type="button" class="chip" data-mv="dn">Fallers</button>
+         </div>
+         <div data-mv-p="up">${levelTable(up)}</div>
+         <div data-mv-p="dn" hidden>${levelTable(dn)}</div>`,
+        `${up.length} up · ${dn.length} down`,
+        'What actually moved, over a week rather than a day.');
+    };
     const before = out;
     paint(out + movers());
     wireWorldClocks();          // starts the one-second tick; teardown clears it
@@ -4220,7 +4442,14 @@
        on a phone can hover. */
     if ((d.upcoming || []).length) out += sec('Upcoming', `<div class="cards-2">${d.upcoming.map(ipoCard).join('')}</div>` + ipoStaleNote());
     if ((d.awaiting_listing || []).length)
-      out += sec('Awaiting listing', `<div class="cards-2">${d.awaiting_listing.map(ipoCard).join('')}</div>`);
+      /* 1,238px of cards for issues nobody can act on — the book has closed
+         and the shares are not trading. Real information, and the least
+         urgent on the page: the count stays in the heading, the cards open on
+         request. */
+      out += sec('Awaiting listing', foldBody(
+        `Open ${d.awaiting_listing.length} issue${d.awaiting_listing.length === 1 ? '' : 's'} — closed, not yet trading`,
+        `<div class="cards-2">${d.awaiting_listing.map(ipoCard).join('')}</div>`),
+        `${d.awaiting_listing.length}`);
 
     /* ── THE LISTINGS TABLE, WITH ITS LABELS ─────────────────────────────
      *
@@ -4352,7 +4581,8 @@
       <span class="x">Off high</span><span class="m">Since listing</span></div>`;
     const up = rec.filter(r => Number(r.since_listing_pct) >= 0).length;
     out += sec('How recent listings have done', rec.length
-      ? `<div class="chips" id="ipoflt">
+      ? foldBody(`Open the table — ${rec.length} listings, filterable and sortable`,
+        `<div class="chips" id="ipoflt">
            <button type="button" class="chip" data-f="all" aria-pressed="true">All ${rec.length}</button>
            <button type="button" class="chip" data-f="up" aria-pressed="false">Above issue ${up}</button>
            <button type="button" class="chip" data-f="dn" aria-pressed="false">Below issue ${rec.length - up}</button>
@@ -4373,6 +4603,15 @@
                <option value="365">1 year</option>
              </select></label>
          </div>
+         ${/* NOT capList HERE, AND THE REASON IS WORTH KEEPING.
+              * Capping this table looked identical to capping the others and
+              * would have broken it: applySort() re-orders by calling
+              * tbl.appendChild(row) on every row it finds, and appendChild
+              * MOVES a node. The first sort would have lifted all forty-eight
+              * hidden rows out of capList's wrapper, revealed them, and left
+              * the "show the other 48" button pointing at an empty div.
+              * The whole section folds instead — controls and all — so the
+              * sort still owns a flat table when it is open. */''}
          <div class="rank" id="ipotbl">${ipoHead}${rec.map(ipoRow).join('')}</div>
          ${/* ── TWENTY-FIVE SCREENS IS NOT A PAGE ────────────────────────────
              * Measured on a 375x812 phone: /ipo was 20,780px, 25.6 screens.
@@ -4416,7 +4655,7 @@
            listing gain computed off a guessed one is fabricated, so this site measures from
            the first price the market actually set. <b>Range since</b> is the high and low it
            has traded between since. A book that never traded above its band is the case this
-           table exists to make visible.</p>`
+           table exists to make visible.</p>`)
       : `<div class="empty">No listings in the window.</div>`,
       `${rec.length} listings`);
     paint(out);
@@ -7006,6 +7245,7 @@
         </div>
         ${open && live && isFinite(Number(r.sl)) && isFinite(Number(r.target1))
           ? progressToTarget(Number(r.entry), Number(r.sl), Number(r.target1), live.price, r.action) : ''}
+        ${open ? sizerHtml(r.entry, r.sl, r.target1, r.target2, r.target3, r.action, cur) : ''}
         ${open ? trailPlan(r.entry, r.sl, r.target1, r.target2, r.target3, r.action) : ''}
         <div class="card-foot">
           <span class="mono" style="font-size:var(--t-2);color:var(--dim)">${esc(String(r.alert_date || r.date || '').slice(0, 10))}
@@ -7223,6 +7463,279 @@
     <b>laddered</b> figure is what the scale-out banks if every target prints, against
     <b>held</b> for carrying the whole position to the last target — the difference is what
     taking money off the table costs, and what the certainty of having taken it buys.</p>`;
+
+  /* ── THE BAROMETER, AND WHEN A BAD MARKET BECOMES AN OPPORTUNITY ─────────
+   *
+   * Akshay: "market barometer — use historical figures, imp. supports etc to
+   * arrive at a figure... also suggest if it's too bad, even at bad when can
+   * we start investing — for eg covid market was bad but at those lows
+   * whoever invested became rich."
+   *
+   * TWO READINGS, BECAUSE THEY ANSWER OPPOSITE QUESTIONS AND MOVE TOGETHER.
+   * A barometer alone says "conditions are poor" at exactly the moment the
+   * second reading should be saying "this is the entry". March 2020 scored
+   * terribly on every trend measure ever built, and it was the best entry in
+   * a decade. A single number cannot hold both, so this publishes both and
+   * says plainly that they are inversely related by design.
+   *
+   * EVERY INPUT IS MEASURED ON THIS SITE ALREADY. No new feed, no history
+   * this site does not hold:
+   *   · where the index sits in its OWN 52-week range        (ticker)
+   *   · how many of 989 names hold their 200-day average     (pulse breadth)
+   *   · how many advanced today                              (pulse breadth)
+   *   · India VIX                                            (ticker)
+   *   · how many names are at a 52-week high                 (pulse breadth)
+   *
+   * WHAT IT IS NOT. It is not backtested and it does not carry a record, so
+   * it is a FRAMEWORK, not a signal — the same bar every engine on this site
+   * is held to. The weights below are stated in the open precisely because
+   * nothing has earned the right to hide them. */
+  const BARO_W = { trend: 30, breadth: 30, participation: 15, volatility: 15, highs: 10 };
+
+  const barometer = (nifty, breadth, vix) => {
+    const n = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+    const counted = n(breadth && breadth.counted);
+    if (!counted) return null;
+
+    const parts = [];
+    const add = (key, label, score, detail) => {
+      if (score == null) return;
+      parts.push({ key, label, score: Math.max(0, Math.min(100, score)),
+                   weight: BARO_W[key], detail });
+    };
+
+    /* WHERE THE INDEX SITS IN ITS OWN YEAR, not against a round number. A
+       level means nothing without the range it sits in. */
+    const pos = n(nifty && nifty.range_pos);
+    if (pos != null) {
+      add('trend', 'Where the index sits', pos,
+          `Nifty is ${pos.toFixed(0)}% up its own 52-week range, ${
+            Math.abs(n(nifty.from_high_pct) || 0).toFixed(1)}% below the high`);
+    }
+
+    /* THE 200-DAY IS THE LINE THIS MEASURES AGAINST, across 989 names rather
+       than one index — an index can hold its average while most of the market
+       does not, and that divergence is the thing worth knowing. */
+    const above = n(breadth.above_200dma);
+    const aboveP = above == null ? null : above / counted * 100;
+    if (aboveP != null) {
+      add('breadth', 'Names above their 200-day', aboveP,
+          `${above} of ${counted} hold their 200-day average`);
+    }
+
+    const up = n(breadth.up);
+    if (up != null) {
+      add('participation', 'Advancing today', up / counted * 100,
+          `${up} of ${counted} advanced`);
+    }
+
+    /* VIX INVERTED, AND BANDED RATHER THAN SCALED. 11 and 13 are the same
+       market; 13 and 30 are not. The bands are where behaviour changes, not
+       an arithmetic stretch between two arbitrary ends. */
+    const v = n(vix);
+    if (v != null) {
+      const sc = v < 12 ? 85 : v < 16 ? 70 : v < 20 ? 50 : v < 26 ? 28 : 10;
+      add('volatility', 'Volatility', sc,
+          `India VIX at ${v.toFixed(2)} — ${v < 12 ? 'very calm' : v < 16 ? 'normal'
+            : v < 20 ? 'unsettled' : v < 26 ? 'jumpy' : 'stressed'}`);
+    }
+
+    /* Leadership. A market making new highs somewhere is a different animal
+       from one where nothing is. Capped: 5% of names at a 52-week high is
+       already broad, so the scale tops out there rather than at 100%. */
+    const hi = n(breadth.at_52w_high);
+    if (hi != null) {
+      add('highs', 'Names at a 52-week high', Math.min(100, hi / counted * 100 / 5 * 100),
+          `${hi} of ${counted} at a 52-week high`);
+    }
+
+    const wsum = parts.reduce((a, p) => a + p.weight, 0);
+    if (!wsum) return null;
+    const score = Math.round(parts.reduce((a, p) => a + p.score * p.weight, 0) / wsum);
+    const band = score >= 70 ? { k: 'strong', t: 'Strong', c: 'up' }
+               : score >= 55 ? { k: 'firm', t: 'Firm', c: 'up' }
+               : score >= 40 ? { k: 'mixed', t: 'Mixed', c: '' }
+               : score >= 25 ? { k: 'weak', t: 'Weak', c: 'dn' }
+               : { k: 'poor', t: 'Poor', c: 'dn' };
+
+    /* ── THE SECOND READING ───────────────────────────────────────────────
+     * What a fall has actually PUT ON OFFER. Three conditions, because any
+     * one of them alone is a bull trap: a deep drawdown with breadth intact
+     * is a rotation, washed-out breadth without a drawdown is a narrow
+     * market, and high VIX without either is a scare.
+     *
+     * The thresholds are the ones that have historically marked a bottom
+     * rather than a dip — and they are NOT a promise about this one. A
+     * market 25% off its high has always eventually recovered on the index;
+     * an individual name has not, which is why the wording is about tranches
+     * and never about timing the low. */
+    const dd = nifty ? Math.abs(n(nifty.from_high_pct) || 0) : null;
+    const acc = (() => {
+      if (dd == null || aboveP == null) return null;
+      const hits = [];
+      if (dd >= 25) hits.push(`the index is ${dd.toFixed(0)}% off its high`);
+      else if (dd >= 15) hits.push(`the index is ${dd.toFixed(0)}% off its high`);
+      else if (dd >= 10) hits.push(`the index is ${dd.toFixed(0)}% off its high`);
+      if (aboveP <= 20) hits.push(`only ${aboveP.toFixed(0)}% of the market holds its 200-day`);
+      else if (aboveP <= 35) hits.push(`${aboveP.toFixed(0)}% of the market holds its 200-day`);
+      if (v != null && v >= 25) hits.push(`VIX at ${v.toFixed(0)} is pricing real fear`);
+
+      const deep = dd >= 25 && aboveP <= 25;
+      const real = dd >= 15 && aboveP <= 40;
+      const early = dd >= 10;
+      const stage = deep ? {
+        k: 'deep', t: 'Deep value on offer', c: 'up',
+        say: 'The conditions that marked March 2020 and March 2009 — a fall this deep with '
+           + 'participation this washed out. Nobody rings a bell at the low, so this is an '
+           + 'argument for buying in tranches on a schedule, not for calling the bottom.' }
+        : real ? {
+        k: 'real', t: 'Worth accumulating', c: 'up',
+        say: 'A real correction rather than a wobble. Historically the zone where staged '
+           + 'buying has paid — in instalments, because it can always go further.' }
+        : early ? {
+        k: 'early', t: 'First discount', c: '',
+        say: 'Cheaper than it was, and nowhere near the levels that have marked a bottom. '
+           + 'Worth a first tranche at most.' }
+        : {
+        k: 'none', t: 'Nothing on discount', c: '',
+        say: 'No meaningful fall to buy. Accumulating here is paying up, which is a different '
+           + 'decision from the one this reading is about.' };
+      return { stage, hits, dd, aboveP };
+    })();
+
+    return { score, band, parts, acc, counted };
+  };
+
+  /* Each index, scored the same way on the two things an index can tell you
+     about itself: where it sits in its own year, and which way it has been
+     going. Breadth is a market-wide figure and deliberately NOT mixed in
+     here — it would make every index carry the same number. */
+  const indexScore = (it) => {
+    const pos = Number(it && it.range_pos);
+    const tr = Number(it && it.trend_pct);
+    if (!Number.isFinite(pos)) return null;
+    const trendScore = !Number.isFinite(tr) ? null
+      : Math.max(0, Math.min(100, 50 + tr * 4));   // ±12.5% over the window spans the scale
+    const score = trendScore == null ? Math.round(pos)
+                : Math.round(pos * 0.6 + trendScore * 0.4);
+    return {
+      score,
+      pos,
+      trend: Number.isFinite(tr) ? tr : null,
+      call: score >= 70 ? { t: 'Leading', c: 'up' }
+          : score >= 55 ? { t: 'Firm', c: 'up' }
+          : score >= 40 ? { t: 'Mixed', c: '' }
+          : score >= 25 ? { t: 'Lagging', c: 'dn' }
+          : { t: 'Weak', c: 'dn' },
+    };
+  };
+
+  /* ── THE SIZER ───────────────────────────────────────────────────────────
+   * Akshay: "convert signal website into a smart website with smart tools."
+   *
+   * Every signal on this site publishes an entry, a stop and three targets,
+   * and then leaves the only question a reader actually has to answer —
+   * HOW MUCH — as mental arithmetic done on a phone. That is the gap a tool
+   * should fill: not another chart, not another score, the one calculation
+   * that stands between reading a setup and acting on it.
+   *
+   * IT SIZES OFF THE STOP, WHICH IS THE ONLY HONEST WAY. Risk per share is
+   * entry minus stop; shares are the rupees you are willing to lose divided
+   * by that. A sizer that works backwards from "how much do I want to buy"
+   * is a tool for talking yourself into a position, and this site's own
+   * ledger is the argument against building one.
+   *
+   * THE CAP IS PART OF THE ANSWER. A 1.5%-risk position on a stop that sits
+   * 2% away is 75% of the account in one name, which is arithmetically
+   * correct and ruinous. When the sizer would exceed a quarter of the book it
+   * says so and shows the capped number instead.
+   *
+   * Account size lives in localStorage and never leaves the browser — it is
+   * nobody's business, least of all this site's. */
+  const SIZER_KEY = 'sig.sizer.v1';
+  const sizerRead = () => {
+    try {
+      const v = JSON.parse(localStorage.getItem(SIZER_KEY) || '{}');
+      return { cap: Number(v.cap) > 0 ? Number(v.cap) : 500000,
+               risk: Number(v.risk) > 0 ? Number(v.risk) : 1 };
+    } catch (e) { return { cap: 500000, risk: 1 }; }
+  };
+  const sizerWrite = (cap, risk) => {
+    try { localStorage.setItem(SIZER_KEY, JSON.stringify({ cap, risk })); } catch (e) {}
+  };
+
+  const MAX_POS_PCT = 25;        // of the book, in one name
+
+  const sizerHtml = (entry, sl, t1, t2, t3, action, cur = '₹') => {
+    const e = lvl(entry), st = lvl(sl);
+    if (e == null || st == null || e === st) return '';
+    const short = /SELL|SHORT/i.test(String(action || ''));
+    const perShare = Math.abs(e - st);
+    const { cap, risk } = sizerRead();
+    const rupees = cap * (risk / 100);
+    let qty = Math.floor(rupees / perShare);
+    const raw = qty;
+    const capped = Math.floor((cap * MAX_POS_PCT / 100) / e);
+    const hitCap = qty > capped;
+    if (hitCap) qty = capped;
+    const value = qty * e;
+    const payAt = (t) => {
+      const v = lvl(t);
+      if (v == null || !qty) return null;
+      const move = short ? e - v : v - e;
+      return move * qty;
+    };
+    const money = (v) => cur + Math.round(v).toLocaleString('en-IN');
+    const rung = (label, t) => {
+      const p = payAt(t);
+      return p == null ? '' : `<span><i>${label}</i><b class="${p >= 0 ? 'up' : 'dn'}">${
+        (p >= 0 ? '+' : '') + money(p)}</b></span>`;
+    };
+    return `<div class="szr" data-szr>
+      <div class="szr-in">
+        <label><span>Account</span><input type="text" inputmode="numeric" data-szr-cap
+          value="${esc(String(cap))}" aria-label="Account size in rupees"></label>
+        <label><span>Risk %</span><input type="text" inputmode="decimal" data-szr-risk
+          value="${esc(String(risk))}" aria-label="Percent of the account risked on this trade"></label>
+      </div>
+      <div class="szr-out">
+        <span class="szr-q"><i>Size</i><b>${qty.toLocaleString('en-IN')}</b><em>shares</em></span>
+        <span><i>Costs</i><b>${money(value)}</b></span>
+        <span><i>Risks</i><b class="dn">${money(Math.min(rupees, qty * perShare))}</b></span>
+      </div>
+      <div class="szr-r">${rung('At T1', t1)}${rung('At T2', t2)}${rung('At T3', t3)}</div>
+      <p class="szr-n">${hitCap
+        ? `Sized down from <b>${raw.toLocaleString('en-IN')}</b>: risking ${risk}% with a stop
+           ${(perShare / e * 100).toFixed(1)}% away would put
+           <b>${Math.round(raw * e / cap * 100)}%</b> of the book in one name. Capped at
+           ${MAX_POS_PCT}%.`
+        : `${money(perShare)} a share at risk · stop is ${(perShare / e * 100).toFixed(1)}% away.`}
+        Kept in this browser only. Nothing here is advice, and no engine has cleared the 30-trade bar.</p>
+    </div>`;
+  };
+
+  /* One delegated handler for every sizer on the page. Recomputes by asking
+     the row to re-render itself is not possible here — the card is a string —
+     so it patches the numbers in place, which is also why the inputs keep
+     focus while you type. */
+  document.addEventListener('input', (ev) => {
+    const el = ev.target.closest && ev.target.closest('[data-szr] input');
+    if (!el) return;
+    const box = el.closest('[data-szr]');
+    const capEl = box.querySelector('[data-szr-cap]');
+    const riskEl = box.querySelector('[data-szr-risk]');
+    const cap = Number(String(capEl.value).replace(/[^\d.]/g, ''));
+    const risk = Number(String(riskEl.value).replace(/[^\d.]/g, ''));
+    if (!(cap > 0) || !(risk > 0)) return;
+    sizerWrite(cap, risk);
+    /* Every other sizer on the page is now stale — they all read the same
+       account. Repaint the route rather than patch nine of them by hand. */
+    clearTimeout(window.__szrT);
+    window.__szrT = setTimeout(() => {
+      const box2 = document.querySelector('[data-szr] input:focus');
+      if (!box2) render();
+    }, 700);
+  });
 
   const trailPlan = (entry, sl, t1, t2, t3, action) => {
     /* EVERY NUMBER HERE IS A PRICE, SO ZERO MEANS ABSENT.
@@ -12646,6 +13159,10 @@
   async function render() {
     const path = routeOf();
     resetFresh();
+    /* Both the home page and /ipo render IPO cards, so this cannot reset in
+       one route: a reader who opened Home first would find /ipo's stamp
+       already "shown" and see no vintage at all. */
+    ipoNoteShown = false;
     // Title, description, canonical and the social card, every navigation.
     setHead(path);
     const where = document.getElementById('barWhere');
