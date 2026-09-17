@@ -244,6 +244,41 @@
       <i class="lv-dot ${esc(cls || '')}" style="left:${at.toFixed(1)}%"></i></span>`;
   };
 
+  /* ── THE HEATMAP, THE SAME ONE SIGNAL DRAWS ──────────────────────────────
+   *
+   * Akshay asked for it here too. It is NOT re-implemented: heatcore.js owns
+   * the arithmetic and the tile and is loaded by both products, and heat.css
+   * owns the ramp. This file supplies only the screen rows the core needs —
+   * the average range, the sector and the standing call, which live on
+   * screen.json — and the sentence around the grid.
+   *
+   * IT NEEDS THE SCREEN, and on this page the screen is the slowest feed. The
+   * live board boots ahead of the brief on one small request, so the strip is
+   * absent on that first pass and appears when the screen lands. A grid whose
+   * brightness channel has not arrived is a heatmap drawing one channel while
+   * advertising two — absent for a beat beats wrong for a beat. */
+  let HEAT_IDX_ROWS = null, HEATSTRIP = '';
+
+  const heatStripFor = (t, n = 18) => {
+    if (!window.HEAT || !HEAT_IDX_ROWS) return '';
+    const idx = {};
+    for (const r of HEAT_IDX_ROWS) if (r && r.sym) idx[r.sym] = r;
+    const rows = HEAT.rows((t && t.ledger) || {}, idx, WIRE_ROWS || []);
+    const big = rows.filter(x => x.h && x.h.sig != null)
+      .sort((a, b) => b.h.sig - a.h.sig).slice(0, n);
+    if (!big.length) return '';
+    const notable = rows.filter(x => x.h && x.h.k >= 3).length;
+    return `<h3 class="lv-sh">Today, in each name's own units</h3>
+      <p class="lv-note"><b>${notable}</b> of ${rows.length} are having a genuinely unusual
+        day <i>for themselves</i>. Brightness is the move divided by that name's own average
+        daily range — not a percentage, which is the one number every other heatmap colours
+        by and the reason they are all a wall of dramatic smallcaps. The outline is the
+        screen's standing call; a dot means the name is in today's wire.</p>
+      <div class="hgrid hgrid-s">${big.map(HEAT.tile).join('')}</div>`;
+  };
+
+  let WIRE_ROWS = null;
+
   const liveHtml = (t) => {
     const segs = (t && t.segments) || [];
     const segOf = (k) => (segs.find(x => x.key === k) || {}).items || [];
@@ -341,6 +376,8 @@
           : Math.round(x.day_range_pos) + '%'}</span>
       </div>`).join('')}</div>
 
+      ${HEATSTRIP || ''}
+
       ${led.length ? `<h3 class="lv-sh">This site's own names, marked live</h3>
         <p class="lv-note"><b>${ledUp}</b> of the ${led.length} names this site has published a
           signal on are up right now. Not a portfolio — every one of them is on paper, and no
@@ -367,6 +404,9 @@
       return null;                       // keep the last good board on a blip
     }
     host.dataset.ok = '1';
+    /* Rebuilt on every tick from the same ticker payload the board renders, so
+       the tiles cannot lag the numbers above them by a refresh. */
+    try { HEATSTRIP = heatStripFor(t); } catch (e) { HEATSTRIP = ''; }
     host.innerHTML = liveHtml(t);
     return t;
   }
@@ -653,6 +693,18 @@
       d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }).toUpperCase();
 
     const rows = (screen && screen.rows) || [];
+    /* HAND THE HEATMAP WHAT ONLY THIS PASS HAS. The live board boots first on
+       one small request; the average range, the sector and the standing call
+       each tile needs arrive here, with the screen. Setting them and asking
+       the board to redraw is what makes the strip appear — without it the
+       board renders forever without its heatmap and looks, from outside,
+       exactly like a feature that was never built. */
+    HEAT_IDX_ROWS = rows;
+    WIRE_ROWS = Array.isArray(news) ? news : [];
+    try {
+      const lh = document.getElementById('live');
+      if (lh && lh.dataset.ok) liveTick(lh);
+    } catch (e) { /* the brief must not fail over a decoration */ }
     const ledger = (sigs && (sigs.signals || sigs.rows)) || [];
     /* THE SAME POPULATION SIGNAL PUBLISHES, which this page was not using.
      *

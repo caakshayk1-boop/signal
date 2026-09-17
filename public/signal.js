@@ -6943,13 +6943,58 @@
    * than as a reason; and the full numeric card last, for anyone who wants to
    * check the assembly against its parts.
    */
-  const stockPage = (r) => {
+  /* ── THE LIVE MARK, BECAUSE THE PAGE WAS THE ONLY SURFACE WITHOUT ONE ────
+   *
+   * Akshay, with four screenshots: "pure mismatch everywhere — if the heatmap
+   * is right the inside is wrong, if the inside is right the chart is wrong.
+   * All should be related and correctly flown."
+   *
+   * He was right about the flow. The numbers he compared were the heatmap at
+   * ACMESOLAR ₹410, the chart at ₹410, and this page at ₹420.40 — one stock,
+   * two answers, and the page a reader lands on FROM the heatmap was the one
+   * disagreeing.
+   *
+   * NEITHER FIGURE WAS WRONG. ₹420.40 is the close the screen was BUILT from,
+   * and every level under it — the entry, the stop, all three targets — is
+   * measured from that close. ₹410 is where it trades now. The fault was that
+   * the page showed only the first, labelled it "Screen close" in 11px at the
+   * bottom of a card, and left the reader to find the other number elsewhere.
+   *
+   * So the live mark goes at the TOP, the gap between the two is stated in
+   * words rather than left to be inferred, and the levels say out loud which
+   * of the two they were set from. A page showing one price while the heatmap
+   * shows another is a bug even when both figures are accurate. */
+  const liveMark = (r, q) => {
+    const close = lvl(r.price);
+    if (!q || sn(q.price) == null) {
+      return close == null ? '' : `<div class="lmk lmk-na">
+        <span class="lmk-l">Screen close</span><b>${price(close, '₹')}</b>
+        <span class="lmk-w">The live mark did not load. Everything below is measured from
+          this close, which is what the screen was built on.</span></div>`;
+    }
+    const live = sn(q.price), chg = sn(q.change_pct);
+    const gap = (close != null && live != null && close > 0)
+      ? (live - close) / close * 100 : null;
+    return `<div class="lmk ${chg > 0 ? 'is-up' : chg < 0 ? 'is-dn' : ''}">
+      <span class="lmk-l">Trading now</span><b>${price(live, '₹')}</b>
+      ${chg == null ? '' : `<span class="lmk-c ${dir(chg)}">${pct(chg)} today</span>`}
+      ${close == null ? '' : `<span class="lmk-w">
+        The screen was built at <b>${price(close, '₹')}</b>${
+          gap == null || Math.abs(gap) < 0.05 ? ', which is where it still trades'
+            : `, ${Math.abs(gap).toFixed(1)}% ${gap > 0 ? 'below' : 'above'} this`}.
+        <b>Every level below — entry, stop and all three targets — is measured from that
+        close, not from this price.</b></span>`}
+    </div>`;
+  };
+
+  const stockPage = (r, q) => {
     const { body } = stockCard(r);
     return `<div class="route-h stock-h">
         <span class="eyebrow">Company · ${esc(r.sector || 'NSE')}${r.ind ? ' · ' + esc(r.ind) : ''}</span>
         <h1>${watchBtn(r.sym)}${esc(r.sym)}</h1>
         <p>${esc(r.name || '')}</p>
       </div>
+      ${liveMark(r, q)}
       ${/* NOT { lead: true }. That flag gives a section the route's hero
             treatment — display size, the full standfirst measure — and this
             page already has a hero: the ticker and the company name directly
@@ -7057,7 +7102,11 @@
       ${verdictBlock(r)}
       ${ladderBlock(r)}
       <div class="cardmeta">
-        <span><i>Screen close</i><b>₹${esc(r.price)}</b></span>
+        ${/* Named for what it IS. "Screen close" reads as a rival to the live
+              mark above it; "the close the levels were set from" is the same
+              figure doing its actual job, and stops a reader treating a
+              difference between the two as an error. */''}
+        <span><i>Close the levels use</i><b>₹${esc(r.price)}</b></span>
         <span><i>Market cap</i><b>₹${r.mcap_cr != null
           ? Math.round(r.mcap_cr).toLocaleString('en-IN') : '—'} cr</b></span>
         <span><i>Industry</i><b>${esc(r.ind || r.sector || '—')}</b></span>
@@ -12216,7 +12265,18 @@
        the session, and it only happens on this route. */
     await seasonality();
 
-    paint(stockPage(r));
+    /* THE LIVE MARK, FETCHED FOR THIS ONE NAME. One request, the same route
+       the ledger and the heatmap quote from, so the three surfaces cannot
+       report different prices for the same stock in the same minute — which
+       is exactly what they were doing. A failure here costs the mark and
+       nothing else; the page still renders from the screen. */
+    let q = null;
+    try {
+      const qr = await get('/api/signals?px=' + encodeURIComponent(sym));
+      q = (qr.ok && qr.data && qr.data.quotes && qr.data.quotes[sym]) || null;
+    } catch (e) { /* the page must not fail over a decoration */ }
+
+    paint(stockPage(r, q));
     wireStockPage(r);
   };
 
@@ -13388,50 +13448,24 @@
    */
   const HEAT_MS = 60000;
 
-  /* ── THE MOVE, IN UNITS OF HOW MUCH THIS NAME NORMALLY MOVES ─────────────
-   *
-   * The ratio is today's change over that stock's average true range, so 1.0
-   * means it has travelled its ENTIRE typical daily range in one direction.
-   * That framing matters for the cuts: a directional change is naturally much
-   * smaller than a high-to-low range, so anything calibrated as if they were
-   * the same scale puts the whole book in the bottom step.
-   *
-   * WHICH IS EXACTLY WHAT THE FIRST VERSION DID. Cuts of 0.35/0.75/1.25/2.0
-   * measured against the live book: median 0.38, p90 1.02, p100 1.97 — so
-   * 46 of 97 tiles sat at step 0, two reached step 3 and NOTHING ever reached
-   * step 4. The brightest colours on a page whose entire point is brightness
-   * were unreachable, which is worse than a bad ramp: it is a ramp that lies
-   * about how unusual a day is.
-   *
-   * These cuts are absolute rather than fitted to a day's percentiles — a
-   * percentile ramp re-scales itself every morning, so the same tile means
-   * something different on a quiet day and the page stops being comparable
-   * with itself. Each step is a sentence instead:
-   *
-   *   < 0.25   barely moved
-   *   0.25-0.5 an ordinary drift
-   *   0.5-1.0  a real move for this name
-   *   1.0-1.5  travelled its whole typical daily range
-   *   >= 1.5   an outsized day, whatever the percentage says
-   */
-  const HEAT_CUTS = [0.25, 0.5, 1.0, 1.5];
-  const HEAT_WORDS = ['barely moved', 'an ordinary drift for this name',
-                      'a real move for this name',
-                      'its whole typical daily range, in one direction',
-                      'an outsized day'];
-  const heatStep = (chg, atr) => {
-    const c = sn(chg), a = lvl(atr);
-    if (c == null) return null;
-    if (a == null) return { k: 0, sig: null };          // cannot scale it
-    const sig = Math.abs(c) / a;
-    const k = sig >= HEAT_CUTS[3] ? 4 : sig >= HEAT_CUTS[2] ? 3
-            : sig >= HEAT_CUTS[1] ? 2 : sig >= HEAT_CUTS[0] ? 1 : 0;
-    return { k, sig };
-  };
+  /* ── THE ARITHMETIC AND THE TILE LIVE IN heatcore.js ─────────────────────
+   * Loaded by this page and by gems.askakshay.com, which is a separate bundle
+   * sharing no runtime with it. Keeping a second copy here would mean the same
+   * stock rendering as a different green on the two sites, with each page
+   * internally consistent and no way to tell which was wrong. */
+  const HEAT_WORDS = HEAT.WORDS;
+  const heatStep = HEAT.step;
+  const heatTile = HEAT.tile;
+  const heatRows = (t, idx) => HEAT.rows((t && t.ledger) || {}, idx, WIRE_CACHE || []);
+
+  const heatClock = (it) => ({ open: HEAT.isOpen(it) });
 
   /* Where the screen's sectors line up with a LIVE index, and only where that
      is honest. Industrials and Utilities have no Nifty sector index on the
-     ticker, so they head their band with nothing rather than with a proxy. */
+     ticker, so they head their band with nothing rather than with a proxy.
+     (This was deleted along with the block the shared core replaced, and
+     /heat threw "HEAT_IDX is not defined" and rendered its error panel — the
+     front page kept working, because the strip does not group by sector.) */
   const HEAT_IDX = {
     'Technology': 'Nifty IT', 'Financial Services': 'Nifty Fin Svc',
     'Healthcare': 'Nifty Pharma', 'Basic Materials': 'Nifty Metal',
@@ -13439,52 +13473,9 @@
     'Real Estate': 'Nifty Realty', 'Consumer Cyclical': 'Nifty Auto',
   };
 
-  const TIER_SPAN = { mega: 3, large: 2, mid: 2, small: 1, micro: 1 };
-
-  /* ── ONE ENRICHMENT AND ONE TILE, USED BY BOTH SURFACES ──────────────────
-   * The heatmap appears in two places — the full page at /heat and the strip
-   * below the hero on the front page. They render from these, so the same
-   * name cannot be a different colour in the two places, which is the fault
-   * this repo has now recorded against four engines and three target ladders.
-   */
-  const heatRows = (t, idx) => {
-    const blob = ((WIRE_CACHE || []).map(n => `${n.title || ''} ${n.summary || ''}`)
-      .join(' ')).toUpperCase();
-    const inNews = (sym, name) => {
-      if (!blob) return false;
-      if (blob.includes(sym)) return true;
-      const w = String(name || '').split(/\s+/)[0].toUpperCase();
-      return w.length >= 6 && blob.includes(w);
-    };
-    return Object.entries((t && t.ledger) || {})
-      .map(([sym, v]) => ({ sym, ...v }))
-      .filter(x => sn(x.change_pct) != null)
-      .map(x => {
-        const r = idx[x.sym] || {};
-        return { ...x, r, h: heatStep(x.change_pct, r.atr_pct),
-                 sector: r.sector || 'Unclassified',
-                 span: TIER_SPAN[r.tier] || 1, news: inNews(x.sym, r.name) };
-      });
-  };
-
-  const heatTile = (x) => {
-    const k = x.h ? x.h.k : 0;
-    const d = x.change_pct > 0 ? 'u' : x.change_pct < 0 ? 'd' : 'f';
-    const vd = String((x.r.vd || {}).c || '').toUpperCase();
-    const sigTxt = x.h && x.h.sig != null
-      ? `${x.h.sig.toFixed(2)}× its average range — ${HEAT_WORDS[x.h.k]}`
-      : 'no average range on file, so this move could not be scaled';
-    return `<button type="button" class="ht ht-${d}${k} ht-s${x.span}${
-        x.h && x.h.sig == null ? ' ht-na' : ''}${vd ? ` ht-v${esc(vd.toLowerCase())}` : ''}"
-        data-hsym="${esc(x.sym)}"
-        title="${esc(x.sym)} ${pct(x.change_pct)} · ${esc(sigTxt)}${
-          vd ? ` · the screen says ${esc(vd)}` : ''}${x.news ? ' · in today’s wire' : ''}">
-      <span class="ht-s">${esc(x.sym)}</span>
-      <span class="ht-c">${pct(x.change_pct)}</span>
-      <span class="ht-x">${x.h && x.h.sig != null ? x.h.sig.toFixed(1) + '×' : '—'}</span>
-      ${x.news ? '<i class="ht-n" aria-hidden="true"></i>' : ''}
-    </button>`;
-  };
+  /* The wire, fetched once for the dots. Its absence costs the page a channel
+     and nothing else — every tile still renders. */
+  let WIRE_CACHE = null;
 
   /* ── THE STRIP THAT SITS BELOW THE HERO ──────────────────────────────────
    *
@@ -13502,7 +13493,7 @@
     const rows = heatRows(t, idx);
     if (!rows.length) return '';
     const india = ((t.segments || []).find(x => x.key === 'india') || {}).items || [];
-    const clock = heatClock(india.find(x => x.name === 'Nifty 50') || india[0]);
+    const open = HEAT.isOpen(india.find(x => x.name === 'Nifty 50') || india[0]);
     const big = rows.filter(x => x.h && x.h.sig != null)
       .sort((a, b) => b.h.sig - a.h.sig).slice(0, n);
     if (!big.length) return '';
@@ -13510,8 +13501,8 @@
     const notable = rows.filter(x => x.h && x.h.k >= 3).length;
     return sec('Moving, in their own units', `
       <div class="ht-bar ht-bar-s">
-        <span class="ht-live ${clock.open ? 'is-open' : 'is-shut'}"><i></i>${
-          clock.open ? 'Live' : 'Market closed'}</span>
+        <span class="ht-live ${open ? 'is-open' : 'is-shut'}"><i></i>${
+          open ? 'Live' : 'Market closed'}</span>
         <span class="ht-meta"><b>${up}</b> of ${rows.length} up ·
           <b>${notable}</b> having a genuinely unusual day for themselves</span>
         <a class="ht-more" href="/heat">All ${rows.length}, by sector →</a>
@@ -13535,17 +13526,6 @@
     const india = ((t.segments || []).find(x => x.key === 'india') || {}).items || [];
     const byName = (n) => india.find(x => x.name === n);
     const clock = heatClock(byName('Nifty 50') || india[0]);
-
-    /* NAMES IN TODAY'S WIRE. Matched on the ticker itself and on the first
-       word of the registered name when that word is long enough to be
-       distinctive — "SBI" would match half the wire, "GRANULES" would not. */
-    const blob = ((WIRE_CACHE || []).map(n => `${n.title || ''} ${n.summary || ''}`).join(' ')).toUpperCase();
-    const inNews = (r) => {
-      if (!blob) return false;
-      if (blob.includes(r.sym)) return true;
-      const w = String(r.name || '').split(/\s+/)[0].toUpperCase();
-      return w.length >= 6 && blob.includes(w);
-    };
 
     const rows = heatRows(t, idx);
 
@@ -13592,17 +13572,6 @@
       </div>
       ${order.map(band).join('')}`;
   };
-
-  const heatClock = (it) => {
-    const st = Number(it && it.session_start), en = Number(it && it.session_end);
-    const now = Date.now() / 1000;
-    return { open: String((it && it.session) || '').toLowerCase() === 'open'
-                   && isFinite(st) && isFinite(en) && now >= st && now < en };
-  };
-
-  /* The wire, fetched once for the dots. Its absence costs the page a channel
-     and nothing else — every tile still renders. */
-  let WIRE_CACHE = null;
 
   const heatLegend = () => sec('How to read it', `
     <div class="hleg">

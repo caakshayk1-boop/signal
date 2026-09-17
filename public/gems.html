@@ -28,6 +28,9 @@
 <link rel="preload" href="/fonts/PlusJakarta-var-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/JetBrainsMono-500-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/gems.css">
+<!-- The same tile stylesheet signal.askakshay.com loads, so the heatmap is
+     one ramp across both products rather than two that look alike. -->
+<link rel="stylesheet" href="/heat.css">
 <script>
 /* Theme before first paint, so the page never flashes the wrong ground.
    LIGHT IS THE DEFAULT NOW, matching the full site. It shares the `sig:theme`
@@ -85,6 +88,7 @@
      Not investment advice.</p>
 </footer>
 
+<script src="/heatcore.js" defer></script>
 <script src="/gems.js" defer></script>
 </body>
 </html>

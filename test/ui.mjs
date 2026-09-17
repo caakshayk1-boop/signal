@@ -1718,6 +1718,49 @@ try {
      { body: heat.bodyL, tile: heat.tileSurfaceL });
   await hCtx.close();
 
+  /* ── ONE STOCK, ONE PRICE, ACROSS EVERY SURFACE ──────────────────────────
+   * The heatmap said ₹410, the chart said ₹410 and the company page said
+   * ₹420.40 — the close the levels were built from, shown alone and labelled
+   * in 11px at the bottom of a card. Both figures were right; showing only one
+   * of them on the page a reader reaches FROM the heatmap was not.
+   *
+   * The two live routes must also agree with each other: the heatmap quotes
+   * /api/ticker's ledger and the company page quotes /api/signals?px=, and if
+   * those ever diverge the site reports two prices for one stock in one
+   * minute, which is the complaint that started this. */
+  const px = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const pp = await px.newPage();
+  await pp.goto(SITE + "/api/ticker", { waitUntil: "domcontentloaded" });
+  const tickJson = await pp.evaluate(() => JSON.parse(document.body.innerText));
+  const someSym = Object.keys(tickJson.ledger || {})[0];
+  if (someSym) {
+    await pp.goto(SITE + "/api/signals?px=" + someSym, { waitUntil: "domcontentloaded" });
+    const pxJson = await pp.evaluate(() => JSON.parse(document.body.innerText));
+    const a = tickJson.ledger[someSym].price;
+    const b = ((pxJson.quotes || {})[someSym] || {}).price;
+    ok("the two live price routes agree on the same stock",
+       b != null && Math.abs(a - b) / b * 100 < 1, { sym: someSym, ticker: a, px: b });
+
+    await pp.goto(SITE + "/stock/" + someSym, { waitUntil: "domcontentloaded" });
+    await pp.waitForTimeout(SETTLE + 6000);
+    const mark = await pp.evaluate(() => {
+      const el = document.querySelector(".lmk");
+      if (!el) return null;
+      const n = el.querySelector("b");
+      return { text: el.innerText,
+               price: n ? Number(n.innerText.replace(/[^\d.]/g, "")) : null };
+    });
+    ok("the company page shows a live mark", mark && mark.price > 0, mark && mark.text);
+    ok("the page's mark agrees with the live route",
+       mark && mark.price != null && b != null
+         && Math.abs(mark.price - b) / b * 100 < 3, { page: mark && mark.price, api: b });
+    /* And it must say WHICH price the levels came from, or the two figures
+       read as a contradiction instead of as two different facts. */
+    ok("the page says which close its levels were set from",
+       mark && /measured from that close/i.test(mark.text), mark && mark.text.slice(0, 120));
+  }
+  await px.close();
+
   /* ── AND IT HAS TO BE REACHABLE FROM THE FRONT PAGE ──────────────────────
    * /heat shipped green, deployed, and reachable only through Discover — two
    * clicks from a page that linked it nowhere. It was live and, to anyone

@@ -51,6 +51,17 @@
      page reads. */
   --r:16px; --r2:12px; --r3:8px;
   --wrap:760px; --toph:122px;
+
+  /* ── WHAT heat.css ASKS FOR ────────────────────────────────────────────
+   * The heatmap's tiles are a shared stylesheet, loaded by this page and by
+   * signal.askakshay.com, so one ramp serves both products. It reads seven
+   * tokens under signal.css's names; this page spells four of them
+   * differently, so they are aliased rather than the shared file being
+   * forked. An alias is one place to be right and cannot drift from what it
+   * points at. The two rgb pairs are the up/down hues as bare channels — the
+   * ramp lays them over the surface at five alphas. */
+  --raised:var(--raise); --text:var(--ink); --accent:var(--acc);
+  --up-rgb:10 157 116; --down-rgb:224 72 61;
 }
 /* DARK FOLLOWS THE SAME BLUE FAMILY, or the toggle changes more than the
    brightness — signal.css's reasoning, and its values. */
@@ -61,6 +72,8 @@
   --acc:#8091FF; --acc-soft:rgba(128,145,255,.15); --on-acc:#0C1017;
   --up:#2ECC93; --dn:#FF6B60; --warn:#F0B429;
   --up-soft:rgba(46,204,147,.14); --dn-soft:rgba(255,107,96,.14); --warn-soft:rgba(240,180,41,.13);
+  --raised:var(--raise); --text:var(--ink); --accent:var(--acc);
+  --up-rgb:46 204 147; --down-rgb:255 107 96;
 }
 /* The user agent renders its own surfaces — form controls, scrollbars, a
    dialog in the top layer — against the OS setting unless told otherwise.
