@@ -5830,3 +5830,13 @@ main.is-nav{animation:routein var(--t-mid) var(--ease-out) backwards}
 }
 
 .hl-r{display:block;margin-top:6px;color:var(--dim);font-size:.82rem}
+
+/* The strip below the hero: the same tiles, a tighter grid, no sector bands. */
+.ht-bar-s{margin-bottom:12px;padding:10px 12px}
+.ht-more{margin-left:auto;font-size:.8rem;font-weight:700;color:var(--accent);white-space:nowrap}
+.hgrid-s{grid-template-columns:repeat(auto-fill,minmax(78px,1fr));grid-auto-rows:64px}
+.hgrid-s .ht{grid-column:span 1}
+@media(max-width:620px){
+  .hgrid-s{grid-template-columns:repeat(auto-fill,minmax(68px,1fr));grid-auto-rows:58px}
+  .ht-more{margin-left:0}
+}

@@ -1718,6 +1718,46 @@ try {
      { body: heat.bodyL, tile: heat.tileSurfaceL });
   await hCtx.close();
 
+  /* ── AND IT HAS TO BE REACHABLE FROM THE FRONT PAGE ──────────────────────
+   * /heat shipped green, deployed, and reachable only through Discover — two
+   * clicks from a page that linked it nowhere. It was live and, to anyone
+   * standing on the home page, it did not exist. Something shipped where
+   * nobody walks has not been shipped. */
+  const hHome = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const hh = await hHome.newPage();
+  await hh.goto(SITE + "/", { waitUntil: "domcontentloaded" });
+  await hh.waitForTimeout(SETTLE + 8000);
+  const strip = await hh.evaluate(() => {
+    const secs = [...document.querySelectorAll("section.sec")];
+    const i = secs.findIndex(s => s.querySelector(".hgrid-s"));
+    return {
+      present: i >= 0,
+      position: i,
+      total: secs.length,
+      tiles: document.querySelectorAll(".hgrid-s .ht[data-hsym]").length,
+      linksToFull: !!document.querySelector('.ht-more[href="/heat"]'),
+      // The strip's whole claim is the second channel; a grid of uniformly
+      // flat tiles means the average range never arrived and the heatmap is
+      // drawing one channel while advertising two.
+      steps: (() => {
+        const d = [0, 0, 0, 0, 0];
+        for (const t of document.querySelectorAll(".hgrid-s .ht[data-hsym]")) {
+          const c = [...t.classList].find(x => /^ht-[udf]\d$/.test(x));
+          if (c) d[Number(c.slice(-1))]++;
+        }
+        return d;
+      })(),
+    };
+  });
+  ok("the heatmap appears on the front page", strip.present === true, strip);
+  ok("it sits near the top, not buried",
+     strip.present && strip.position <= 2, strip);
+  ok("the front-page strip draws tiles", strip.tiles >= 10, strip.tiles);
+  ok("the front-page strip links to the full heatmap", strip.linksToFull === true);
+  ok("the front-page strip is not a flat grid",
+     strip.steps.filter(n => n > 0).length >= 2, strip.steps);
+  await hHome.close();
+
   /* ── EVERY CLIENT ROUTE MUST SURVIVE A COLD LOAD ─────────────────────────
    * /map and /reads had been live for days and returned 404 to anyone who
    * refreshed, bookmarked or shared them — they were missing from the Worker's

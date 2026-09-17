@@ -2755,6 +2755,35 @@
       }
     }
 
+    /* ── THE LIVE STRIP, DIRECTLY UNDER THE HERO ──────────────────────────
+     * This is where it was asked for, and where /heat alone was never going
+     * to be found: nothing on this page linked it. It renders from the ticker
+     * the page already fetched, so it costs no request; if that feed did not
+     * answer, heatStrip returns '' and the page reads exactly as before. */
+    /* WAITS FOR THE SCREEN, ON PURPOSE. Brightness is the move divided by the
+       name's own average range, and that range lives on the screen row. This
+       route renders in two passes and the screen only arrives in the second,
+       so drawing on the first would put up a grid of uniformly flat tiles —
+       a heatmap with its one meaningful channel switched off — and then
+       replace it. Absent for a beat beats wrong for a beat. */
+    /* READS `sr`, NOT THE `SCREEN` GLOBAL — and that distinction cost a build.
+       This route's heavy pass calls getScreen(), which RESOLVES the rows and
+       never calls setScreen(), so SCREEN stays null on the front page no
+       matter how many times the route re-enters. Guarding on it meant the
+       strip rendered nowhere and looked, from outside, exactly like a feature
+       that had not been deployed. `sr` is the screen this route already
+       fetched and is holding. */
+    const srRows = (sr && sr.ready && sr.ok && sr.data && sr.data.rows) || null;
+    if (tk && tk.ok && tk.data && srRows && srRows.length) {
+      /* The wire is already in hand from this page's own fetch; feeding it
+         here means the news dots work without a second request. */
+      if (WIRE_CACHE == null && n && n.ok && Array.isArray(n.data)) WIRE_CACHE = n.data;
+      const hidx = {};
+      for (const r of srRows) if (r && r.sym) hidx[r.sym] = r;
+      try { out += heatStrip(tk.data, hidx); }
+      catch (e) { /* a decoration must never be the reason a front page fails */ }
+    }
+
     out += sec('Today', `<div class="grid grid-5">
         ${t5('news', wireTop && wireTop.n ? wireTop.n : (wire.length ? '—' : '0'),
              'Most-connected story',
@@ -13412,6 +13441,90 @@
 
   const TIER_SPAN = { mega: 3, large: 2, mid: 2, small: 1, micro: 1 };
 
+  /* ── ONE ENRICHMENT AND ONE TILE, USED BY BOTH SURFACES ──────────────────
+   * The heatmap appears in two places — the full page at /heat and the strip
+   * below the hero on the front page. They render from these, so the same
+   * name cannot be a different colour in the two places, which is the fault
+   * this repo has now recorded against four engines and three target ladders.
+   */
+  const heatRows = (t, idx) => {
+    const blob = ((WIRE_CACHE || []).map(n => `${n.title || ''} ${n.summary || ''}`)
+      .join(' ')).toUpperCase();
+    const inNews = (sym, name) => {
+      if (!blob) return false;
+      if (blob.includes(sym)) return true;
+      const w = String(name || '').split(/\s+/)[0].toUpperCase();
+      return w.length >= 6 && blob.includes(w);
+    };
+    return Object.entries((t && t.ledger) || {})
+      .map(([sym, v]) => ({ sym, ...v }))
+      .filter(x => sn(x.change_pct) != null)
+      .map(x => {
+        const r = idx[x.sym] || {};
+        return { ...x, r, h: heatStep(x.change_pct, r.atr_pct),
+                 sector: r.sector || 'Unclassified',
+                 span: TIER_SPAN[r.tier] || 1, news: inNews(x.sym, r.name) };
+      });
+  };
+
+  const heatTile = (x) => {
+    const k = x.h ? x.h.k : 0;
+    const d = x.change_pct > 0 ? 'u' : x.change_pct < 0 ? 'd' : 'f';
+    const vd = String((x.r.vd || {}).c || '').toUpperCase();
+    const sigTxt = x.h && x.h.sig != null
+      ? `${x.h.sig.toFixed(2)}× its average range — ${HEAT_WORDS[x.h.k]}`
+      : 'no average range on file, so this move could not be scaled';
+    return `<button type="button" class="ht ht-${d}${k} ht-s${x.span}${
+        x.h && x.h.sig == null ? ' ht-na' : ''}${vd ? ` ht-v${esc(vd.toLowerCase())}` : ''}"
+        data-hsym="${esc(x.sym)}"
+        title="${esc(x.sym)} ${pct(x.change_pct)} · ${esc(sigTxt)}${
+          vd ? ` · the screen says ${esc(vd)}` : ''}${x.news ? ' · in today’s wire' : ''}">
+      <span class="ht-s">${esc(x.sym)}</span>
+      <span class="ht-c">${pct(x.change_pct)}</span>
+      <span class="ht-x">${x.h && x.h.sig != null ? x.h.sig.toFixed(1) + '×' : '—'}</span>
+      ${x.news ? '<i class="ht-n" aria-hidden="true"></i>' : ''}
+    </button>`;
+  };
+
+  /* ── THE STRIP THAT SITS BELOW THE HERO ──────────────────────────────────
+   *
+   * Akshay asked for a live board "below the hero" and I built it as its own
+   * route, reachable only through Discover — two clicks from a page nothing
+   * linked it from. It was deployed and green and, from the front page, it did
+   * not exist. Shipping something where nobody walks is the same as not
+   * shipping it.
+   *
+   * The strip is not the page. Twelve sector bands is a thing you go and
+   * study; what belongs above the fold is the handful of names having a day
+   * that is unusual FOR THEM, ranked by exactly that, with the door to the
+   * rest of it. */
+  const heatStrip = (t, idx, n = 24) => {
+    const rows = heatRows(t, idx);
+    if (!rows.length) return '';
+    const india = ((t.segments || []).find(x => x.key === 'india') || {}).items || [];
+    const clock = heatClock(india.find(x => x.name === 'Nifty 50') || india[0]);
+    const big = rows.filter(x => x.h && x.h.sig != null)
+      .sort((a, b) => b.h.sig - a.h.sig).slice(0, n);
+    if (!big.length) return '';
+    const up = rows.filter(x => x.change_pct > 0).length;
+    const notable = rows.filter(x => x.h && x.h.k >= 3).length;
+    return sec('Moving, in their own units', `
+      <div class="ht-bar ht-bar-s">
+        <span class="ht-live ${clock.open ? 'is-open' : 'is-shut'}"><i></i>${
+          clock.open ? 'Live' : 'Market closed'}</span>
+        <span class="ht-meta"><b>${up}</b> of ${rows.length} up ·
+          <b>${notable}</b> having a genuinely unusual day for themselves</span>
+        <a class="ht-more" href="/heat">All ${rows.length}, by sector →</a>
+      </div>
+      <div class="hgrid hgrid-s">${big.map(heatTile).join('')}</div>
+      <p class="hint">Brightness is the move measured against each name's <b>own</b> average
+        daily range, not in percent — so a quiet large cap having a violent day outshines a
+        smallcap having an ordinary one. The outline is the screen's standing call, and a dot
+        means the name is in today's wire.
+        <a href="/heat">The full heatmap →</a></p>`,
+      null, null, null);
+  };
+
   const heatHtml = (t, idx) => {
     const led = Object.entries((t && t.ledger) || {})
       .map(([sym, v]) => ({ sym, ...v }))
@@ -13434,12 +13547,7 @@
       return w.length >= 6 && blob.includes(w);
     };
 
-    const rows = led.map(x => {
-      const r = idx[x.sym] || {};
-      const h = heatStep(x.change_pct, r.atr_pct);
-      return { ...x, r, h, sector: r.sector || 'Unclassified',
-               span: TIER_SPAN[r.tier] || 1, news: inNews({ ...r, sym: x.sym }) };
-    });
+    const rows = heatRows(t, idx);
 
     const bySec = {};
     for (const x of rows) (bySec[x.sector] = bySec[x.sector] || []).push(x);
@@ -13453,24 +13561,7 @@
       return (c === 'AVOID' && x.change_pct > 0) || (c === 'BUY' && x.change_pct < 0);
     }).length;
 
-    const tile = (x) => {
-      const k = x.h ? x.h.k : 0;
-      const d = x.change_pct > 0 ? 'u' : x.change_pct < 0 ? 'd' : 'f';
-      const vd = String((x.r.vd || {}).c || '').toUpperCase();
-      const sigTxt = x.h && x.h.sig != null
-        ? `${x.h.sig.toFixed(2)}× its average range — ${HEAT_WORDS[x.h.k]}`
-        : 'no average range on file, so this move could not be scaled';
-      return `<button type="button" class="ht ht-${d}${k} ht-s${x.span}${
-          x.h && x.h.sig == null ? ' ht-na' : ''}${vd ? ` ht-v${esc(vd.toLowerCase())}` : ''}"
-          data-hsym="${esc(x.sym)}"
-          title="${esc(x.sym)} ${pct(x.change_pct)} · ${esc(sigTxt)}${
-            vd ? ` · the screen says ${esc(vd)}` : ''}${x.news ? ' · in today’s wire' : ''}">
-        <span class="ht-s">${esc(x.sym)}</span>
-        <span class="ht-c">${pct(x.change_pct)}</span>
-        <span class="ht-x">${x.h && x.h.sig != null ? x.h.sig.toFixed(1) + '×' : '—'}</span>
-        ${x.news ? '<i class="ht-n" aria-hidden="true"></i>' : ''}
-      </button>`;
-    };
+    const tile = heatTile;
 
     const band = ([name, items]) => {
       const ix = byName(HEAT_IDX[name] || '');
