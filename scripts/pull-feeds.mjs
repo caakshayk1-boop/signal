@@ -69,7 +69,10 @@ const FEEDS = ["alerts", "conviction", "data-health", "edition", "ipo",
                //   seasonality  — eleven years of monthly records for 626
                //                  names; the /stock page and /map both read it.
                //   weekly_reads — Saturday's seven studies.
-               "barometer", "seasonality", "weekly_reads"];
+               "barometer", "seasonality", "weekly_reads",
+               // The regime: what kind of market this is, and what the closed
+               // ledger says happened in it. Written by regime.py.
+               "regime"];
 
 const stampOf = (o) => {
   if (!o || Array.isArray(o)) return null;

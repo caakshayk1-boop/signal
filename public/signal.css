@@ -5736,3 +5736,37 @@ main.is-nav{animation:routein var(--t-mid) var(--ease-out) backwards}
 .lmk-w{flex:1 1 100%;color:var(--muted);font-size:.86rem;line-height:1.55;margin-top:2px}
 .lmk-w b{font-family:inherit;font-size:inherit;font-weight:700;color:var(--text)}
 .lmk-na{border-left-color:var(--line2)}
+
+/* ── THE REGIME ────────────────────────────────────────────────────────────
+ * What kind of market this is, and what this book's closed trades did in it.
+ * The reference this came from asserts a size multiplier per regime; this
+ * shows a measurement and a sample size, and nothing at all where the sample
+ * is too thin to read. */
+.rgm{padding:16px 18px;background:var(--raised2);border:1px solid var(--line);
+  border-left:3px solid var(--accent);border-radius:var(--r);margin:0 0 16px}
+.rgm-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.rgm-k{font-size:1.25rem;font-weight:800;letter-spacing:-.01em}
+.rgm-d{color:var(--dim);font-size:.8rem;font-variant-numeric:tabular-nums}
+.rgm-w{margin:6px 0 14px;color:var(--muted);line-height:1.6;max-width:62ch}
+.rgm-n{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.rgm-n span{display:grid;gap:1px}
+.rgm-n i{font-style:normal;font-size:.7rem;color:var(--dim);text-transform:uppercase;
+  letter-spacing:.05em}
+.rgm-n b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:1.1rem;font-weight:700}
+.rgm-n em{font-style:normal;font-size:.7rem;color:var(--dim);line-height:1.35}
+
+/* A year of sessions, by regime. One bar, because the question is "how much
+   of the year looked like today" and that is a proportion. */
+.rgm-bar{display:flex;height:14px;border-radius:999px;overflow:hidden;margin:0 0 10px;
+  border:1px solid var(--line)}
+.rgm-s{display:block;height:100%}
+.rgm-s.is-now{outline:2px solid var(--text);outline-offset:-2px}
+.rgm-calm_trend{background:var(--up)}
+.rgm-calm_range{background:var(--line2)}
+.rgm-highvol_trend{background:var(--warn)}
+.rgm-highvol_mr{background:var(--down);opacity:.75}
+.rgm-crisis{background:var(--down)}
+.rgm-key{display:flex;flex-wrap:wrap;gap:12px;margin:0 0 14px;color:var(--muted);font-size:.8rem}
+.rgm-key span{display:inline-flex;align-items:center;gap:6px}
+.rgm-key i{width:10px;height:10px;border-radius:3px;flex:none}
+.rgm-key b{font-variant-numeric:tabular-nums}

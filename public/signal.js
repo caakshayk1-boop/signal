@@ -138,6 +138,7 @@
     '/alerts_log.json': 'Alert log', '/weekly_reads.json': 'Weekly reads',
     '/data-health.json': 'Pipeline health', '/buoy.json': 'BUOY research',
     '/barometer.json': 'Barometer', '/seasonality.json': 'Seasonality',
+    '/regime.json': 'Regime',
     '/api/markets': 'Markets', '/api/ticker': 'Live prices',
     '/api/wire': 'Wire', '/api/flows': 'FII & DII', '/api/calendar': 'Calendar',
     '/api/stats': 'All-time stats', '/api/ipo-live': 'IPO demand',
@@ -2789,6 +2790,21 @@
       catch (e) { /* a decoration must never be the reason a front page fails */ }
     }
 
+    /* ── WHAT KIND OF MARKET THIS IS ──────────────────────────────────────
+     * Directly under the heatmap, because the heatmap says what moved and
+     * this says what sort of market it moved in — and, unlike every framework
+     * this was modelled on, what this book's own closed trades did in that
+     * market. Rendered from the feed's cache if it is already in hand, so the
+     * front page pays no extra request on first paint. */
+    const rgm = CACHED('/regime.json');
+    if (rgm.ready && rgm.ok && rgm.data && rgm.data.ok) {
+      try { out += regimeSec(rgm.data); }
+      catch (e) { /* never break the front page over a section */ }
+    } else if (!regimeTried) {
+      regimeTried = true;
+      get('/regime.json').then(() => { if (routeOf() === '/') R['/'](); });
+    }
+
     out += sec('Today', `<div class="grid grid-5">
         ${t5('news', wireTop && wireTop.n ? wireTop.n : (wire.length ? '—' : '0'),
              'Most-connected story',
@@ -3675,6 +3691,8 @@
    * again to show what is on screen is a request for nothing. */
   let TODAY5 = null;
   let heavyTried = false;
+  /* Same shape as heavyTried: one retry per visit, never a loop on failure. */
+  let regimeTried = false;
 
   // "2026-09-14" -> "14 Sep". Day first, because that is the part that
   // answers "how soon".
@@ -13481,6 +13499,102 @@
   /* The wire, fetched once for the dots. Its absence costs the page a channel
      and nothing else — every tile still renders. */
   let WIRE_CACHE = null;
+
+  /* ══ THE REGIME ═══════════════════════════════════════════════════════════
+   *
+   * What kind of market this is, and — the part that matters — what this
+   * book's own closed trades did in it.
+   *
+   * THE REFERENCE THIS CAME FROM ASSERTS ITS MAPPING. Calm 1.0, trending 0.7,
+   * crisis 3.0, with no sample behind any of it. regime.py measures instead,
+   * and this renders what it measured including when that is nothing: a cell
+   * under eight closed trades prints no figure at all, and the site's actual
+   * bar for believing one is thirty closed at t ≥ 2.
+   *
+   * THE HEADLINE IS THE HONEST NUMBER, NOT THE FLATTERING ONE. Before the
+   * population was restricted to NSE equities this read +0.163R at t=2.52 and
+   * looked like a discovery; 355 of those 617 trades were gold, crude and
+   * currency pairs, labelled by Indian equity volatility. On the 239 trades
+   * the label actually describes it reads −0.008R. That is what goes on the
+   * page.
+   */
+  const regimeSec = (d) => {
+    const t = d && d.today;
+    if (!t || !t.regime) return '';
+    const cell = ((d.measured || {}).cells || {})[t.regime];
+    const yr = d.last_year || {};
+    const tot = Object.values(yr).reduce((a, b) => a + b, 0) || 1;
+    const order = Object.entries(yr).sort((a, b) => b[1] - a[1]);
+    const NAMES = d.regimes || {};
+
+    const verdict = !cell ? `<p class="said"><b>This book has never closed a trade in this
+        regime.</b> Not a judgement about it — the dated ledger starts in June and this
+        market has not been in this state since. There is nothing to report and nothing is
+        invented to fill the space.</p>`
+      : !cell.readable ? `<p class="said">Only <b>${cell.n}</b> closed
+        ${cell.n === 1 ? 'trade' : 'trades'} in this regime, which is below the
+        ${(d.thresholds || {}).min_cell || 8} this page will read anything into. The figure
+        exists and is deliberately not shown: a handful of trades produces a confident
+        number and no evidence.</p>`
+      : `<div class="rgm-n">
+          <span><i>Closed here</i><b>${cell.n}</b></span>
+          <span><i>Per trade</i><b class="${cell.avg_r > 0 ? 'up' : cell.avg_r < 0 ? 'dn' : ''}">${
+            cell.avg_r > 0 ? '+' : ''}${cell.avg_r.toFixed(3)}R</b></span>
+          <span><i>Win rate</i><b>${cell.win_rate}%</b></span>
+          <span><i>t-statistic</i><b>${cell.t == null ? '—' : cell.t.toFixed(2)}</b></span>
+        </div>
+        <p class="said">${Math.abs(cell.t || 0) >= 2
+          ? `<b>That clears the significance bar</b>, on ${cell.n} trades.`
+          : `<b>Not significant.</b> A t of ${cell.t == null ? '—' : cell.t.toFixed(2)} over
+             ${cell.n} trades is indistinguishable from chance, which is the honest reading
+             of this book in this market and not a placeholder for a better one.`}</p>`;
+
+    return sec('What kind of market this is', `
+      <div class="rgm">
+        <div class="rgm-h">
+          <span class="rgm-k">${esc(t.t || t.regime)}</span>
+          <span class="rgm-d">day ${d.run_days} of it</span>
+        </div>
+        <p class="rgm-w">${esc(t.d || '')}</p>
+        <div class="rgm-n">
+          <span><i>Volatility</i><b>${t.vol_ann_pct == null ? '—' : t.vol_ann_pct + '%'}</b>
+            <em>${t.vol_pctile == null ? '' : Math.round(t.vol_pctile) + 'th percentile of its own two years'}</em></span>
+          <span><i>Off the year's high</i><b>${t.drawdown_pct == null ? '—' : t.drawdown_pct.toFixed(1) + '%'}</b></span>
+          <span><i>Above its 200-day</i><b>${t.above_200dma == null ? '—' : t.above_200dma ? 'Yes' : 'No'}</b></span>
+        </div>
+      </div>
+      <h3 class="sub">What this book has done in it</h3>
+      ${verdict}
+      ${/* `.inds/.ind-r`, not `.rank/.rank-r`: the rank row is two columns and
+           these are three — name, figure, working — so the engine name and its
+           R multiple overlapped. The company page's indicator grid already
+           solves this exact shape. */
+        (cell && cell.readable && cell.engines || []).filter(e => e.readable).length
+        ? `<div class="inds">${cell.engines.filter(e => e.readable).map(e => `<div class="ind-r">
+            <span class="ind-k">${esc(engName(e.engine))}</span>
+            <span class="ind-v ${e.avg_r > 0 ? 'up' : e.avg_r < 0 ? 'dn' : ''}">${
+              e.avg_r > 0 ? '+' : ''}${e.avg_r.toFixed(3)}R</span>
+            <span class="ind-w">${e.n} closed · ${e.win_rate}% won · t ${
+              e.t == null ? '—' : e.t.toFixed(2)}${e.trusted
+                ? ' · <b>clears the bar</b>' : ''}</span></div>`).join('')}</div>`
+        : ''}
+      <h3 class="sub">The last year, by regime</h3>
+      <div class="rgm-bar" role="img" aria-label="${order.map(([k, n]) =>
+        `${(NAMES[k] || {}).t || k} ${Math.round(n / tot * 100)}%`).join(', ')}">
+        ${order.map(([k, n]) => `<span class="rgm-s rgm-${esc(k)}${k === t.regime ? ' is-now' : ''}"
+          style="width:${(n / tot * 100).toFixed(1)}%" title="${esc((NAMES[k] || {}).t || k)}: ${n} sessions"></span>`).join('')}
+      </div>
+      <div class="rgm-key">${order.map(([k, n]) => `<span><i class="rgm-${esc(k)}"></i>${
+        esc((NAMES[k] || {}).t || k)} <b>${Math.round(n / tot * 100)}%</b></span>`).join('')}</div>
+      <p class="hint">Labelled from trend and trailing realised volatility only — the two
+        things computable for every past session. Breadth is not an input: it has no history,
+        and a regime that cannot be backfilled cannot be measured against the ledger.
+        Every window is trailing, so a label cannot change when later prices arrive.
+        <b>Only NSE equity trades are counted</b> — ${(d.measured || {}).excluded_non_nse || 0}
+        closed trades are COMEX commodities or FX pairs, which an Indian equity regime says
+        nothing about.</p>`,
+      `day ${d.run_days}`);
+  };
 
   /* ── THE STRIP THAT SITS BELOW THE HERO ──────────────────────────────────
    *
