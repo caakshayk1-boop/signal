@@ -745,8 +745,23 @@ try {
     // Compare the RESULT COUNTS, not the rows on screen: the table paginates at
     // 40, so a filter matching 59 names and no filter at all both render 40
     // rows and the original assertion was comparing two page sizes.
-    const matched = async () => (await p.locator(".sec-n").first().innerText()).trim();
+    //
+    // AND NOT THE FIRST .sec-n, WHICH IS THE UNIVERSE. /screen carries two of
+    // them: "989 names" on the summary section, which is the size of the
+    // screened universe and is CONSTANT BY DESIGN, and "71 of 989" on the
+    // table, which is the one that tracks the filter. Reading the first made
+    // this assertion unfalsifiable — it compared "989 names" with itself, so
+    // it could only ever fail, and it did, on production too. Measured while
+    // fixing it: the filter itself was always correct, 989 -> 71 -> 989.
+    //
+    // The "n of m" shape is asserted before it is relied on, so a future
+    // renaming breaks this test loudly instead of silently restoring the
+    // tautology it replaces.
+    const tableCount = p.locator("section.sec .sec-n").last();
+    const matched = async () => (await tableCount.innerText()).trim();
     const filteredCount = await matched();
+    ok("the table count reports a filtered subset", /^\d[\d,]* of \d[\d,]*$/.test(filteredCount),
+       filteredCount);
     await p.locator('.insti-g .chip[data-ic=""]').click();
     await p.waitForTimeout(900);
     const allCount = await matched();

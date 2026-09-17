@@ -10,13 +10,16 @@
  * whole site is built to avoid. Offline, the shell loads and the data areas
  * show their existing "did not load" states, which is the truth.
  */
-const CACHE = "signal-shell-v1";
+// Bumped with the typeface change. The fetch handler is network-first, so a
+// stale version never pinned anyone to old code — but the OFFLINE shell was
+// precaching seven faces the site stopped using and none of the one it now
+// loads, so an offline visit fell back to system fonts.
+const CACHE = "signal-shell-v2";
 const SHELL = [
   "/", "/index.html", "/signal.css", "/signal.js", "/icon.svg",
-  "/fonts/Manrope-400-latin.woff2", "/fonts/Manrope-500-latin.woff2",
-  "/fonts/Manrope-600-latin.woff2", "/fonts/Manrope-700-latin.woff2",
-  "/fonts/JetBrainsMono-400-latin.woff2", "/fonts/JetBrainsMono-500-latin.woff2",
-  "/fonts/Newsreader-400-latin.woff2",
+  // One variable face, weights 200-800, replacing the five static Manrope and
+  // Newsreader files the redesign retired.
+  "/fonts/PlusJakarta-var-latin.woff2",
 ];
 
 self.addEventListener("install", (e) => {

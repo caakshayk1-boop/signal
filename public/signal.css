@@ -5501,3 +5501,212 @@ h3,h4,.rd-h{font-family:var(--ui);font-weight:700;letter-spacing:-.016em}
 /* Progress toward the 30-trade bar, on each engine card. */
 .ef-prog{display:flex;flex-direction:column;gap:5px;margin-top:8px}
 .ef-prog span{font-size:var(--t-2);color:var(--dim);line-height:1.4}
+
+/* ═══ THE DASHBOARD LAYOUT ══════════════════════════════════════════════════
+ *
+ * Akshay: "complete new way of presenting... pro modern website proper space
+ * utilisation."
+ *
+ * THE REAL PROBLEM WAS NEVER COLOUR. Every route on this site is one column
+ * of full-width sections, stacked. At 1280px that means a breadth bar 1,200px
+ * wide carrying three numbers, a 40-character heading alone on a line, and a
+ * reader scrolling past whitespace to reach the next thing. Groww and
+ * Tickertape are not laid out that way and neither is any dashboard: they put
+ * related panels SIDE BY SIDE and let the eye compare them.
+ *
+ * So sections become a grid on wide screens. The rules are deliberately
+ * simple, because a layout with exceptions is a layout that breaks:
+ *   · the LEAD section of a route always spans full width — it is the answer
+ *     the page exists to give, and halving it would be the wrong economy;
+ *   · everything else flows into two columns above 1080px;
+ *   · anything carrying a wide table, a board or a chart opts out with
+ *     .sec-wide, because a 989-row table in half a column is unreadable.
+ *
+ * Below 1080px it is a single column exactly as before, so the phone layout
+ * that was measured and fixed earlier is untouched.
+ */
+@media(min-width:1080px){
+  main{max-width:1320px}
+  .secgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:var(--s-5) var(--s-5);align-items:start}
+  .secgrid > .sec{margin-top:0;min-width:0}
+  .secgrid > .sec.is-lead,.secgrid > .sec.sec-wide{grid-column:1/-1}
+}
+
+/* ── ROUTE TRANSITION ─────────────────────────────────────────────────────
+ * Routes swapped instantly, which on a client-rendered site reads as a flash
+ * rather than a move. One short fade-and-lift on the container — NOT on each
+ * section, which would stagger twice against the existing .sec rise and look
+ * like a stutter.
+ *
+ * `backwards` only, and no opacity:0 resting state: if the animation never
+ * runs — reduced motion, a hidden tab — the page is simply there. */
+@keyframes routein{from{opacity:0;transform:translateY(8px)}}
+main.is-nav{animation:routein var(--t-mid) var(--ease-out) backwards}
+@media(prefers-reduced-motion:reduce){ main.is-nav{animation:none} }
+
+/* ── SPACE ────────────────────────────────────────────────────────────────
+ * Sections were separated by the same gap used inside them, so the page had
+ * one rhythm and no hierarchy — everything looked equally related to
+ * everything else. Between sections is now a clear step above within them. */
+@media(min-width:1080px){
+  .sec{margin-top:var(--s-7)}
+  .sec-h{margin-bottom:var(--s-4)}
+  .route-h{margin-bottom:var(--s-6)}
+}
+/* A lead section earns more air above it than a following one. */
+.sec.is-lead{margin-top:var(--s-6)}
+
+/* The outcome record under the barometer: what the index did after each
+   reading. Five columns, and the two that carry a figure carry its sample
+   size under it — an average over three readings is not the same claim as one
+   over thirty, and the row should say which it is without being asked. */
+.bo-r{display:grid;grid-template-columns:minmax(0,1.3fr) 60px repeat(3,minmax(0,1fr));
+  gap:0 12px;padding:10px 14px;align-items:baseline}
+.bo-r span{min-width:0;font-variant-numeric:tabular-nums}
+.bo-r em{display:block;font-style:normal;font-size:var(--t-2);color:var(--dim);
+  margin-top:2px;letter-spacing:0}
+.bo-w{color:var(--dim);font-size:var(--t-2)}
+.baro-acc + div .sg-head{grid-template-columns:minmax(0,1.3fr) 60px repeat(3,minmax(0,1fr))}
+@media(max-width:640px){
+  .bo-r{grid-template-columns:minmax(0,1fr) 44px repeat(3,minmax(0,1fr));gap:0 6px;
+    font-size:var(--t-2)}
+}
+
+/* ═══ THE MAP ══════════════════════════════════════════════════════════════
+   989 cells that have to be readable at a glance and tappable on a phone.
+   A treemap sized by market cap was the obvious idea and the wrong one: the
+   ten largest names would take half the page and the other 979 would be
+   unreadable slivers. Equal cells give every name the same claim on the eye,
+   which is what makes the COLOUR the information. */
+.mapbar{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;margin-bottom:16px}
+.mapg{display:grid;gap:4px;
+  grid-template-columns:repeat(auto-fill,minmax(88px,1fr))}
+.mcell{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+  gap:1px;min-height:46px;padding:7px 8px;border:1px solid transparent;
+  border-radius:var(--r-2);cursor:pointer;text-align:left;overflow:hidden;
+  font:inherit;color:var(--text);
+  transition:transform var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease)}
+.mcell:hover{border-color:var(--text);z-index:1}
+.mcell:active{transform:scale(.97)}
+.mcell b{font:700 var(--t-2)/1.1 var(--ui);letter-spacing:-.01em;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcell i{font-style:normal;font:600 var(--t-1)/1.2 var(--mono);opacity:.8;
+  font-variant-numeric:tabular-nums}
+
+/* Five steps, not a gradient: the eye compares a cell to the legend, and
+   nobody reads an absolute value off a continuous ramp. Built from the up and
+   down tokens so the map obeys the same colour language as the rest of the
+   site — and so it follows the theme rather than carrying its own palette. */
+.mc-1{background:color-mix(in srgb,var(--down) 42%,var(--bg))}
+.mc-2{background:color-mix(in srgb,var(--down) 18%,var(--bg))}
+.mc-3{background:var(--raised)}
+.mc-4{background:color-mix(in srgb,var(--up) 20%,var(--bg))}
+.mc-5{background:color-mix(in srgb,var(--up) 45%,var(--bg))}
+/* NOT a low score — an absence of one, and it must not look like the bottom
+   of the ramp. Hatched so it reads as "nothing here" at a glance. */
+.mc-na{background:repeating-linear-gradient(45deg,var(--raised),var(--raised) 4px,
+  var(--bg) 4px,var(--bg) 8px);color:var(--dim)}
+.maplg{display:flex;align-items:center;gap:4px;font-size:var(--t-2);color:var(--dim)}
+.maplg i{width:18px;height:12px;border-radius:3px;display:inline-block}
+.maplg span{margin:0 4px}
+@media(max-width:620px){
+  .mapg{grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:3px}
+  .mcell{min-height:42px;padding:6px}
+}
+
+/* ══ THE STOCK PAGE: VERDICT, BIBLE, PLAN, SEASONALITY ═════════════════════
+ *
+ * Four surfaces that only exist on /stock/:sym. Everything here is built on
+ * the tokens declared in :root, never on a literal — the palette is redefined
+ * three times (bare :root, prefers-color-scheme, [data-theme]) and a hex here
+ * would render one theme's ink on the other theme's ground. That failure is
+ * already recorded against this estate once.
+ */
+
+/* ── The call ─────────────────────────────────────────────────────────────
+ * A verdict is a claim, so it gets the only heavy border on the page and
+ * carries its own colour. Everything below it is quieter by design; if the
+ * bible looked as loud as the call, neither would read as more important. */
+.bible-vd{border:1px solid var(--line2);border-left:4px solid var(--dim);
+  border-radius:var(--r);padding:16px 18px;margin:0 0 20px;background:var(--raised2)}
+.bible-vd.vd-buy{border-left-color:var(--up);background:var(--up-soft,var(--raised2))}
+.bible-vd.vd-avoid{border-left-color:var(--dn)}
+.bible-vd.vd-watch,.bible-vd.vd-wait{border-left-color:var(--accent)}
+.bvd-k{display:inline-block;font-weight:800;font-size:1.05rem;letter-spacing:.06em;
+  text-transform:uppercase;margin-right:10px}
+.vd-buy .bvd-k{color:var(--up)} .vd-avoid .bvd-k{color:var(--dn)}
+.vd-watch .bvd-k,.vd-wait .bvd-k{color:var(--accent)}
+.bvd-h{color:var(--muted);font-size:.9rem}
+.bible-vd p{margin:10px 0 0;color:var(--text);line-height:1.6}
+.bible-vd .bvd-t{color:var(--muted);font-size:.9rem}
+
+/* ── The written summary ──────────────────────────────────────────────────
+ * Set to a reading measure, not to the page width. Six paragraphs of joined
+ * prose across a 1200px column is a wall; 68 characters is a page. */
+.bible{max-width:68ch}
+.bible p{margin:0 0 14px;line-height:1.7;color:var(--text)}
+.bible p b{font-weight:700}
+.bible .hint-i{display:block;margin-top:6px;color:var(--dim);font-size:.85rem;font-style:normal}
+.bible-f{list-style:none;padding:0;margin:0 0 14px;display:grid;gap:6px}
+.bible-f li{padding:8px 12px;border-radius:10px;background:var(--raised2);
+  border-left:3px solid var(--line2);font-size:.92rem;line-height:1.5}
+.bible-f li.rf-high{border-left-color:var(--dn)}
+.bible-f li.rf-med{border-left-color:var(--dim)}
+.bible-f li em{display:block;color:var(--dim);font-style:normal;font-size:.85rem;margin-top:2px}
+
+/* ── The plan ─────────────────────────────────────────────────────────────
+ * Numbered because it IS a sequence — the stop is chosen before the size,
+ * and the size cannot be computed without it. The numbering is information,
+ * not decoration, which is the only reason it is here. */
+.plan{counter-reset:pl;list-style:none;padding:0;margin:0 0 14px;display:grid;gap:10px;max-width:72ch}
+.plan li{counter-increment:pl;position:relative;padding:12px 14px 12px 46px;
+  background:var(--raised2);border:1px solid var(--line);border-radius:12px;line-height:1.6}
+.plan li::before{content:counter(pl);position:absolute;left:14px;top:12px;
+  width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--on-accent);
+  font-size:.75rem;font-weight:700;display:grid;place-items:center;
+  font-variant-numeric:tabular-nums}
+
+/* ── What agrees and what does not ────────────────────────────────────────
+ * Three columns on desktop so the lean column forms a readable vertical
+ * strip; stacked on a phone, where a 3-track grid would give the reasoning
+ * eleven characters. */
+.inds{display:grid;gap:8px;margin:0 0 12px}
+.ind-r{display:grid;grid-template-columns:minmax(150px,1fr) 108px minmax(0,2.2fr);
+  gap:10px;align-items:baseline;padding:10px 12px;background:var(--raised2);
+  border-radius:10px;border:1px solid var(--line)}
+.ind-k{font-weight:650;font-size:.92rem}
+.ind-v{font-weight:800;font-variant-numeric:tabular-nums;font-size:.95rem;color:var(--muted)}
+.ind-v.up{color:var(--up)} .ind-v.dn{color:var(--dn)}
+.ind-w{color:var(--dim);font-size:.88rem;line-height:1.5}
+@media(max-width:720px){
+  .ind-r{grid-template-columns:1fr auto;row-gap:4px}
+  .ind-w{grid-column:1/-1}
+}
+
+/* ── Seasonality: twelve bars ─────────────────────────────────────────────
+ * The bar is the hit rate and the number under it repeats that hit rate, so
+ * the chart is never the only carrier of meaning — it reads in grayscale and
+ * it reads to a screen reader through the title. */
+.seas{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin:0 0 12px;
+  padding:12px;background:var(--raised2);border:1px solid var(--line);border-radius:var(--r)}
+.sx{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+  height:132px;border-radius:8px;padding:6px 2px 4px;position:relative;background:var(--bg)}
+.sx i{display:block;width:100%;max-width:26px;border-radius:4px 4px 0 0;background:var(--line2);
+  margin-top:auto;min-height:3px}
+.sx.sx-hi i{background:var(--up)} .sx.sx-lo i{background:var(--dn)}
+.sx.sx-mid i{background:var(--accent)} .sx.sx-na i{background:var(--line2);opacity:.5}
+.sx span{font-size:.65rem;color:var(--dim);margin-top:5px;letter-spacing:.02em}
+.sx em{font-size:.68rem;font-style:normal;font-weight:700;color:var(--muted);
+  font-variant-numeric:tabular-nums}
+.sx.sx-now{outline:2px solid var(--accent);outline-offset:-2px}
+.sx.sx-now span{color:var(--accent);font-weight:700}
+@media(max-width:620px){
+  .seas{grid-template-columns:repeat(6,1fr);gap:5px}
+  .sx{height:96px}
+}
+
+/* The clearance meter's label is a fraction, not a sentence — the sentence it
+   replaces appeared once per card and is now stated once under the roster. */
+.ef-frac{font-variant-numeric:tabular-nums;font-weight:800;font-size:.9rem;color:var(--muted)}
+.ef-frac i{font-style:normal;font-weight:600;color:var(--dim);font-size:.8rem}

@@ -129,7 +129,7 @@ jobs:
           # That was invisible while the upstream job was itself broken: it had
           # never once completed, so there was nothing newer to miss. Fixing the
           # harvest made the scan run and go nowhere.
-          FEEDS="alerts alerts_log conviction data-health edition engines funds ipo mandate news pulse research screen screen-lite swot today weekly_reads"
+          FEEDS="alerts alerts_log barometer conviction data-health edition engines funds ipo mandate news pulse research screen screen-lite seasonality swot today weekly_reads"
           # shellcheck disable=SC2086 -- word splitting is the point
           set -- $FEEDS; total=$#
           for j in $FEEDS; do

@@ -137,6 +137,7 @@
     '/swot.json': 'Company notes', '/alerts.json': 'Ledger (snapshot)',
     '/alerts_log.json': 'Alert log', '/weekly_reads.json': 'Weekly reads',
     '/data-health.json': 'Pipeline health', '/buoy.json': 'BUOY research',
+    '/barometer.json': 'Barometer', '/seasonality.json': 'Seasonality',
     '/api/markets': 'Markets', '/api/ticker': 'Live prices',
     '/api/wire': 'Wire', '/api/flows': 'FII & DII', '/api/calendar': 'Calendar',
     '/api/stats': 'All-time stats', '/api/ipo-live': 'IPO demand',
@@ -595,10 +596,81 @@
   // its feeds land, and clearing per paint would blank what it just reported.
   const resetFresh = () => { FRESH = []; try { renderFresh(); } catch (e) {} };
 
-  const paint = html => {
+  /* ── LAY THE SECTIONS OUT AS A GRID, AFTER THE ROUTE HAS WRITTEN THEM ────
+   *
+   * Done here rather than by changing twenty routes to emit a wrapper. Each
+   * route still returns a flat list of sections and knows nothing about the
+   * layout — which is what lets a route added later inherit it for free, and
+   * what lets the whole thing be removed by deleting this function.
+   *
+   * WHAT OPTS OUT, and why each one has to:
+   *   · the LEAD section — it is the answer the page exists to give;
+   *   · anything holding a table, a board, a chart or the full-width folds —
+   *     a 989-row screen or the 71-instrument board in half a column is not a
+   *     compromise, it is unreadable.
+   * Everything else pairs up, which is where the width on a desktop finally
+   * goes to work.
+   */
+  /* WHAT GENUINELY NEEDS THE FULL WIDTH — tables, boards and multi-column
+     card grids. NOT the widgets: a split bar, a ring and a meter were written
+     to work in a column and listing them here made "Breadth" a full-width
+     panel holding one bar, which then sat between two half-width sections and
+     stopped them pairing. A widget that fits is not an exception. */
+  const WIDE_SEL = '.rank,.board,table,.mkgrid,.sgrid,.scr-t,.cards-2,.mbg,.ipo-t,#ipotbl';
+  const gridSections = (scope) => {
+    const secs = [...scope.querySelectorAll(':scope > section.sec')];
+    if (secs.length < 3) return;                 // two panels is not a grid
+    for (const el of secs) {
+      if (el.classList.contains('is-lead')) continue;
+      /* A WIDE THING BEHIND A CLOSED FOLD IS NOT WIDE YET.
+       * The first version asked only "does this section contain a table", and
+       * on the front page three of the four opt-outs were tables inside
+       * COLLAPSED disclosures — a heading and one line of summary, claiming
+       * the full width for content nobody has opened. Only one pair formed
+       * out of seven sections, which is the layout doing the opposite of what
+       * it was added for.
+       * So the question is whether the wide content is currently VISIBLE.
+       * Open the fold and the section is still half a column, which is the
+       * one case this cannot fix from here — but a reader who opens a
+       * 989-row table has asked for it, and the table scrolls in its own
+       * container either way. */
+      const wide = [...el.querySelectorAll(WIDE_SEL)].some((w) => {
+        const fold = w.closest('details');
+        return !fold || fold.open;
+      });
+      if (wide) el.classList.add('sec-wide');
+    }
+    /* One wrapper around the run of sections, inserted where the first one
+       was, so nothing else on the page moves. */
+    const wrap = document.createElement('div');
+    wrap.className = 'secgrid';
+    secs[0].before(wrap);
+    for (const el of secs) wrap.appendChild(el);
+  };
+
+  /* `placeholder` is DECLARED BY THE CALLER, not sniffed out of the markup.
+   *
+   * THE BUG THIS FIXES, which had been live and invisible. The rule is right —
+   * a skeleton payload must not replace the prerendered snapshot, or a direct
+   * load flashes real content away and puts grey bars back. The TEST was
+   * wrong: it asked whether the html contained a skeleton class, and
+   * stockCard() legitimately ships one — `<div id="ccHost"><div class="sk">`
+   * is the slot the price chart is drawn into after the series arrives.
+   *
+   * So every DIRECT load of /stock/:sym — a refresh, a bookmark, a shared
+   * link, a search result — built 23 KB of company card, handed it to paint(),
+   * and had the whole thing discarded on account of one 150px chart slot. The
+   * reader was left looking at the prerendered front page under a title that
+   * said CRIZAC. In-app navigation worked, because preIntact was already false
+   * by then, which is exactly why it survived: the only way to see it was to
+   * arrive at the URL cold, and the suite navigates.
+   *
+   * A payload cannot tell you what it is FOR by what it contains. The ten
+   * call sites that paint a placeholder now say so, the heuristic is gone, and
+   * a real page carrying a skeleton slot renders. */
+  const paint = (html, placeholder) => {
     if (preIntact) {
-      // A skeleton-only payload is not an improvement on the snapshot.
-      if (/class="sk[ "]|class="sk-/.test(html)) return;
+      if (placeholder) return;
       preIntact = false;
     }
     main.dispatchEvent(new CustomEvent('sig:teardown'));
@@ -606,6 +678,7 @@
     /* After the route has written its markup, never before: the grids do not
        exist until it has. Guarded because a sorter must never be the reason a
        page fails to render. */
+    try { gridSections(main); } catch (e) { /* a single column still reads */ }
     try { sortableGrids(main); } catch (e) { /* a list that cannot sort still reads */ }
     /* Decoration on top of figures that are ALREADY correct on screen. If this
        throws, or never runs because the tab is hidden, the page is unchanged —
@@ -2146,7 +2219,7 @@
     paint(head('Today', 'Everything that moved today, in one screen. Rebuilt before every open.', 'The morning edition') +
       sec('The tape', `<div class="grid">${skel('sk-tile', 4)}</div>`) +
       sec('Where the money went', `<div class="sk" style="height:104px"></div>`) +
-      sec('The wire', skel('sk-card', 3)));
+      sec('The wire', skel('sk-card', 3)), true);
 
     /* ── TWO PHASES, BECAUSE ONE OF THESE IS 230 KB ───────────────────────
      *
@@ -3755,7 +3828,7 @@
     paint(head('Markets', 'Live prices, and how the wider market did underneath them.', 'The board') +
       sec('Breadth', `<div class="sk" style="height:104px"></div>`) +
       sec('Sector heat', `<div class="sk" style="height:120px"></div>`) +
-      sec('The board', `<div class="board">${skel('sk-row', 8)}</div>`));
+      sec('The board', `<div class="board">${skel('sk-row', 8)}</div>`), true);
 
     /* The calendar comes along for the holiday list. A reader who lands
        straight on /markets never runs the front page, so without this the
@@ -3812,7 +3885,24 @@
         }
         return null;
       })();
-      const B = barometer(bmNifty, pu.breadth || {}, bmVix);
+      /* ── PREFER THE PUBLISHED SCORE ──────────────────────────────────
+       * barometer.py owns the formula now and writes barometer.json daily,
+       * because a history recorded by one implementation and displayed by
+       * another drifts the first time either is touched — four engines with
+       * four target ladders is what that looks like.
+       * The client keeps its own barometer() as a FALLBACK for the window
+       * before the job first runs, and for a day the feed does not answer.
+       * When the file is there, the file wins. */
+      const bj = await get('/barometer.json').catch(() => ({ ok: false }));
+      const BP = (bj && bj.ok && bj.data && bj.data.ok) ? bj.data : null;
+      const B = BP ? (() => {
+        const t = BP.today;
+        return { score: t.score, band: t.band, counted: t.counted,
+                 parts: (t.parts || []).map(x => ({ ...x, score: Number(x.score) })),
+                 acc: t.stage ? { stage: t.stage, hits: [], dd: t.drawdown_pct,
+                                  aboveP: t.above_200dma_pct } : null,
+                 outcomes: BP.outcomes || null, history: BP.history || [] };
+      })() : barometer(bmNifty, pu.breadth || {}, bmVix);
       if (B) {
         out += sec('The barometer', `
           <div class="baro">
@@ -3833,6 +3923,43 @@
             ${B.acc.hits.length ? `<ul class="acc-l">${B.acc.hits.map(h =>
               `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
           </div>` : ''}
+          ${/* ── DOES THIS READING ACTUALLY WORK? ────────────────────────
+              * The site scores every signal it publishes and, until now, never
+              * scored this. Each day's reading is recorded and what the index
+              * did 3, 6 and 12 months later is written beside it.
+              * It starts EMPTY and says so, because the breadth this score
+              * needs is not published historically — computing past readings
+              * from the components that do exist would be a different formula
+              * wearing the same name. It fills forward from today. */''}
+          ${(() => {
+            const o = B.outcomes || {};
+            const rows = Object.entries(o).filter(([, r]) => r.readings > 0);
+            const anyScored = rows.some(([, r]) => r.m3 || r.m6 || r.m12);
+            if (!rows.length) {
+              return `<p class="hint" style="margin-top:14px"><b>This reading is being
+                scored.</b> Every day's value is recorded, and what the index did three,
+                six and twelve months later will be shown here. It starts empty because
+                the breadth figure it needs has never been published historically —
+                filling it with a back-computed number would be a different measure
+                wearing this one's name.</p>`;
+            }
+            return `<div style="margin-top:16px">
+              <div class="sg-head" role="row"><span>When it read</span><span>Times</span>
+                <span>3 months</span><span>6 months</span><span>12 months</span></div>
+              <div class="rank">${rows.map(([, r]) => {
+                const cell = (x) => x ? `<span class="${dir(x.avg)}">${pct(x.avg)}<em> ${
+                  x.hit}% up · n${x.n}</em></span>` : '<span class="bo-w">not yet</span>';
+                return `<div class="rank-r bo-r">
+                  <span><b>${esc(r.label)}</b></span>
+                  <span class="mono">${r.readings}</span>
+                  ${cell(r.m3)}${cell(r.m6)}${cell(r.m12)}
+                </div>`;
+              }).join('')}</div>
+              <p class="hint">What the index did after each reading, measured forward from
+                the day it was made. ${anyScored ? 'Only windows that have actually elapsed are counted.'
+                  : 'No window has elapsed yet.'}</p>
+            </div>`;
+          })()}
           ${foldBody('How this number is made', `
             <p class="hint"><b>What goes into it.</b> Five measures, weighted as shown.
               Where Nifty sits in its own year. How many of ${B.counted} names are above their
@@ -3966,7 +4093,7 @@
 
   R['/ideas'] = async () => {
     paint(head('Ideas', 'Today’s best-ranked names, with the exact entry, stop and targets for each. Sizes are shown as a share of your account, so they work at any size.', 'Ranked ideas') +
-      sec('Trade ideas', skel('sk-card', 3)));
+      sec('Trade ideas', skel('sk-card', 3)), true);
     const [t, mn, p, tk, lg, sc] = await Promise.all(
       [get('/today.json'), get('/mandate.json'), get('/pulse.json'), get('/api/ticker'), ledger(),
        /* Needed for the levels under each idea. Cached across routes, so this
@@ -4466,7 +4593,7 @@
 
   R['/ipo'] = async () => {
     paint(head('IPO', 'Books open now, what is coming, and how the last year of listings actually did.', 'Primary market') +
-      sec('Open now', skel('sk-card', 2)));
+      sec('Open now', skel('sk-card', 2)), true);
     /* THE BOOK AS IT STANDS, WITH THE MIRROR AS A FALLBACK.
      * ipo.json is a daily build; an IPO book moves fastest on its last day.
      * On 31 August the mirror showed ESDS at 1.54x while NSE's live book had
@@ -6379,16 +6506,441 @@
 
   /* The same card as a PAGE. The sheet is for keeping your place in a table;
    * this is for a link you can send someone. One builder, two frames. */
+  /* ══ INDICATORS, THE BIBLE, AND THE ACTION PLAN ═══════════════════════════
+   *
+   * Akshay: "verdict, bible summary, action plan, seasonality — unique
+   * indicators from tradingview that help decision making."
+   *
+   * WHAT AN INDICATOR IS FOR HERE. The screen already publishes ninety raw
+   * fields per name, and a reader still has to hold six of them in their head
+   * to reach a view. These are DERIVED: each answers a question the raw
+   * numbers only imply, and each says WHICH WAY IT LEANS, so a picture can be
+   * assembled rather than interpreted.
+   *
+   * Every one is computed from fields already on the row. No new feed, and no
+   * indicator that needs tick data this site does not have — the same limit
+   * the PIVOT engine states about orderflow applies here, for the same reason.
+   */
+
+  /* SIGNED, unlike lvl(). lvl() treats zero and below as absence because no
+     traded instrument has a price of zero — correct for a level, and WRONG for
+     a six-month return of −7.4%, which it would silently turn into "no data".
+     Returns, distances and spreads go through this one. */
+  const sn = (v) => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  /* ── THE BENCHMARK IS THE SCREEN'S OWN MEDIAN, NOT THE NIFTY ──────────────
+   * Relative strength needs something to be relative TO, and the obvious
+   * choice — the index — is the wrong one here. The Nifty is 50 names; this
+   * screen is 989, most of them outside it. Measuring a smallcap against the
+   * Nifty tells you about large-cap flows, not about whether this name beat
+   * its own peers.
+   *
+   * The median of the 989 is computed from the SAME rows being ranked, so it
+   * can never be stale relative to them and needs no second feed. Memoised
+   * because it walks the whole screen; invalidated by length, which changes
+   * whenever the screen is replaced.
+   */
+  let _bench = null, _benchN = -1;
+  const benchmark6m = () => {
+    if (!Array.isArray(SCREEN) || !SCREEN.length) return null;
+    if (_benchN === SCREEN.length) return _bench;
+    const v = SCREEN.map(r => sn(r.r6m)).filter(x => x != null).sort((a, b) => a - b);
+    _benchN = SCREEN.length;
+    _bench = v.length < 50 ? null : v[Math.floor(v.length / 2)];
+    return _bench;
+  };
+
+  const indicators = (r) => {
+    const out = [];
+    const add = (k, v, lean, why) => out.push({ k, v, lean, why });
+
+    const px = lvl(r.price), hi = lvl(r.high52), lo = lvl(r.low52);
+    const s50 = lvl(r.sma50), s200 = lvl(r.sma200), atr = lvl(r.atr_pct);
+
+    /* 1. RELATIVE STRENGTH — the comparative study TradingView users reach for
+          first, and the one thing a raw return cannot tell you. A stock up 4%
+          in a market up 12% is WEAK; printing "+4%" says the opposite. */
+    const bench = benchmark6m(), r6 = sn(r.r6m);
+    if (r6 != null && bench != null) {
+      const rs = r6 - bench;
+      add('Relative strength', (rs > 0 ? '+' : '') + rs.toFixed(1) + 'pp',
+          rs > 8 ? 'up' : rs < -8 ? 'dn' : '',
+          `Six months against the median of all ${SCREEN.length} names on the screen — ${
+            rs > 0 ? 'ahead of' : 'behind'} the typical stock by ${Math.abs(rs).toFixed(1)} points.`);
+    }
+
+    /* 2. DISTANCE TO THE 200-DAY, IN ATR. A percentage is not comparable
+          across names: a stock that moves 4% a day sitting 8% above its
+          average is closer, in the only unit that matters, than a quiet one
+          4% above. This is the unit every stop on this site is set in. */
+    if (px != null && s200 != null && atr != null) {
+      const d = (px - s200) / px * 100 / atr;
+      add('Distance to the 200-day', (d > 0 ? '+' : '') + d.toFixed(1) + ' ATR',
+          Math.abs(d) < 1.5 ? '' : d > 0 ? 'up' : 'dn',
+          Math.abs(d) < 1.5
+            ? 'Sitting on its own 200-day — the level a reaction is most likely from, either way.'
+            : d > 0 ? 'Well clear of its 200-day, so the obvious stop is a long way below.'
+                    : 'Below its 200-day, which becomes resistance from underneath.');
+    }
+
+    /* 3. WHERE IT SITS IN ITS OWN YEAR. */
+    if (px != null && hi != null && lo != null && hi > lo) {
+      const pos = (px - lo) / (hi - lo) * 100;
+      add('Position in its year', Math.round(pos) + '%',
+          pos > 80 ? 'up' : pos < 20 ? 'dn' : '',
+          pos > 80 ? 'Near the top of its 52-week range — where breakouts happen, and where they fail.'
+            : pos < 20 ? 'Near the bottom of its range. Cheap, or still falling; the range cannot tell them apart.'
+            : 'Mid-range, so there is no extreme to lean on in either direction.');
+    }
+
+    /* 4. THE SHAPE THE CHART OFFERS. Room to the year's high against the fall
+          to the 200-day — the closest thing a chart gives you to a reward-to-
+          risk before any engine is involved. Only computed when price is ABOVE
+          the 200-day; below it the denominator is a rise, not a risk. */
+    if (px != null && hi != null && s200 != null && px > s200 && hi > px) {
+      const rr = (hi - px) / (px - s200);
+      add('Chart reward to risk', rr.toFixed(1) + 'x',
+          rr >= 2 ? 'up' : rr < 1 ? 'dn' : '',
+          `Room to the 52-week high measured against the drop to its 200-day. Not a trade — the shape is ${
+            rr >= 2 ? 'favourable' : rr < 1 ? 'poor' : 'unremarkable'} before anything else is considered.`);
+    }
+
+    /* 5. PARTICIPATION. */
+    const vs = sn(r.vol_spike);
+    if (vs != null && vs > 0) {
+      add('Volume against its norm', vs.toFixed(2) + 'x',
+          vs >= 1.5 ? 'up' : vs < 0.7 ? 'dn' : '',
+          vs >= 1.5 ? 'Trading well above its own average — something is being acted on.'
+            : vs < 0.7 ? 'Quieter than usual. A move on thin volume convinces less.'
+            : 'Ordinary participation.');
+    }
+
+    /* 6. THE TREND STACK — one of the few places a three-state answer is the
+          honest one, and the screen already computes it as `stack`. */
+    if (px != null && s50 != null && s200 != null) {
+      const stacked = px > s50 && s50 > s200, broken = px < s200;
+      add('Trend alignment', stacked ? 'Aligned' : broken ? 'Broken' : 'Mixed',
+          stacked ? 'up' : broken ? 'dn' : '',
+          stacked ? 'Price over the 50-day over the 200-day — the textbook uptrend, stated plainly.'
+            : broken ? 'Price is under its 200-day: the long trend is down, whatever the last month did.'
+            : 'The two averages disagree with each other. Nothing to lean on.');
+    }
+
+    /* 7. WHAT THE BOOKS SAY, IN ONE NUMBER. Piotroski is nine yes/no tests of
+          profitability, leverage and efficiency — a fundamental counterweight
+          to six technical readings, and already on the row. */
+    const pio = sn(r.piotroski), pof = sn(r.piotroski_of) || 9;
+    if (pio != null) {
+      add('Piotroski score', pio + ' of ' + pof,
+          pio >= 7 ? 'up' : pio <= 3 ? 'dn' : '',
+          pio >= 7 ? 'Passes most of the nine accounting tests — the books agree with the chart or argue with it.'
+            : pio <= 3 ? 'Fails most of the nine accounting tests. A technical case here is fighting the statements.'
+            : 'Middling on the nine accounting tests.');
+    }
+
+    /* 8. HOW EXPENSIVE, AGAINST ITSELF. A PE means nothing across sectors; a
+          PE percentile against the name's OWN history means something. */
+    const pep = sn(r.pe_pctile);
+    if (pep != null) {
+      add('Valuation vs its own history', Math.round(pep) + 'th pct',
+          pep <= 30 ? 'up' : pep >= 80 ? 'dn' : '',
+          pep <= 30 ? 'Cheaper than it has usually traded on its own earnings.'
+            : pep >= 80 ? 'More expensive than it has usually been. Multiple expansion is doing the work.'
+            : 'Priced about where it normally is.');
+    }
+    return out;
+  };
+
+  /* ── SEASONALITY, AS TWELVE BARS ─────────────────────────────────────────
+   * The CURRENT month is outlined, because that is the only one a reader is
+   * deciding inside. Names without eight completed observations show "not
+   * enough history" rather than a number — a three-year hit rate would read
+   * exactly as confident as a ten-year one, which is the whole trap. */
+  const seasBlock = (sym) => {
+    const d = SEAS && SEAS.stocks && SEAS.stocks[sym];
+    if (!d || !d.m) {
+      return `<p class="hint">No seasonal record for this name. A calendar month needs
+        eight completed observations over eleven years to appear here at all, and this one
+        does not have them — shown as unknown rather than as a number.</p>`;
+    }
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const now = new Date().getMonth();
+    return `<div class="seas">${d.m.map((m, i) => {
+      const hit = m ? m[0] : null;
+      const cls = hit == null ? 'sx-na' : hit >= 67 ? 'sx-hi' : hit >= 50 ? 'sx-mid' : 'sx-lo';
+      return `<div class="sx ${cls}${i === now ? ' sx-now' : ''}" title="${esc(names[i])}: ${
+          m ? `rose in ${m[0]}% of ${m[2]} years, median ${m[1] > 0 ? '+' : ''}${m[1]}%` : 'not enough history'}">
+          <i style="height:${m ? Math.max(6, hit) : 4}%"></i>
+          <span>${esc(names[i])}</span><em>${m ? m[0] + '%' : '—'}</em>
+        </div>`;
+    }).join('')}</div>
+    <p class="hint">How often ${esc(bareSym(sym))} rose in each calendar month across ${d.y} years —
+      the bar is the hit rate, the tooltip carries the median move, and this month is outlined.
+      <b>Historical, not predictive.</b> A calendar has no claim on a price; this records what
+      repeatedly happened, which is a weaker and more honest statement than a forecast.</p>`;
+  };
+
+  /* ── THE ACTION PLAN ─────────────────────────────────────────────────────
+   *
+   * Akshay asked for both readings: the mechanical plan, and the diagnostic
+   * folded underneath it.
+   *
+   * THE HARD PART IS THAT THIS SITE'S OWN LEDGER SAYS NO ENGINE HAS EARNED
+   * TRUST — nothing has cleared 30 closed trades at t ≥ 2. So the plan states
+   * what the levels ARE and what acting on them would mean, and never says
+   * "buy". That is not hedging. It is the position every other surface here
+   * holds, and a page that dropped it to sound decisive would be contradicting
+   * the record two clicks away.
+   */
+  const actionPlan = (r) => {
+    const px = lvl(r.price), s200 = lvl(r.sma200), atr = lvl(r.atr_pct), hi = lvl(r.high52);
+    const vd = String((r.vd && r.vd.c) || '').toUpperCase();
+    const ind = indicators(r);
+    const agree = ind.filter(x => x.lean === 'up').length;
+    const against = ind.filter(x => x.lean === 'dn').length;
+
+    /* THE STOP IS A LEVEL, NOT A PERCENTAGE — the rule the PIVOT engine and
+       signals/indicators.py both hold. Below the 200-day when price is above
+       it, floored at 8% so a name 40% extended does not get a stop nobody
+       would ever honour. Otherwise an ATR band, because there is no structure
+       underneath to use. */
+    const stop = (px != null && s200 != null && px > s200)
+      ? Math.max(s200, px * 0.92)
+      : (px != null && atr != null ? px * (1 - Math.min(0.08, atr * 1.5 / 100)) : null);
+    const risk = (px != null && stop != null && px > stop) ? (px - stop) / px * 100 : null;
+
+    const seas = SEAS && SEAS.stocks && SEAS.stocks[r.sym];
+    const thisM = seas && seas.m ? seas.m[new Date().getMonth()] : null;
+
+    const L = [];
+    if (px != null && stop != null && risk != null) {
+      const onStop = stop === s200;
+      L.push(`<li><b>The level that says you were wrong</b> — ${price(stop, '₹')}${
+        onStop ? ', its 200-day average' : ''}, which is ${risk.toFixed(1)}% below today's price.
+        Everything else follows from that number rather than from the entry.</li>`);
+      /* Sized off the stop, not off the price — the same arithmetic sizerHtml()
+         does for an open signal, stated here for a name that has no ticket. */
+      const shares = Math.floor(5000 / (risk / 100) / px);
+      if (shares > 0) {
+        L.push(`<li><b>What one percent of risk buys.</b> On a ₹5,00,000 account, risking 1%
+          against a ${risk.toFixed(1)}% stop is <b>${shares.toLocaleString('en-IN')} shares</b>
+          — about ${price(shares * px, '₹')} of stock. Size comes off the stop distance; a wider
+          stop buys fewer shares, not a bigger loss.</li>`);
+      }
+    }
+    if (hi != null && px != null && hi > px) {
+      L.push(`<li><b>The first place sellers are known to have been</b> — the 52-week high at
+        ${price(hi, '₹')}, ${((hi - px) / px * 100).toFixed(1)}% away.</li>`);
+    }
+    if (thisM) {
+      L.push(`<li><b>This calendar month, historically.</b> Rose in <b>${thisM[0]}%</b> of the last
+        ${thisM[2]}, median <b>${thisM[1] > 0 ? '+' : ''}${thisM[1]}%</b>. ${
+        thisM[0] >= 67 ? 'A supportive month on the record — context, not a reason.'
+        : thisM[0] <= 40 ? 'A weak month on the record. Worth knowing before adding to it.'
+        : 'No seasonal tilt either way.'}</li>`);
+    }
+    L.push(`<li><b>What would end it.</b> A daily <i>close</i> below ${
+      stop != null ? price(stop, '₹') : 'the 200-day'} — not a dip toward it, a close through it.
+      Intraday wicks took 58% of the stop-outs this site has measured.</li>`);
+
+    return `<ol class="plan">${L.join('')}</ol>
+      <p class="hint"><b>No engine here has cleared 30 closed trades at t ≥ 2</b>, so none of this
+        is a recommendation. It is what the levels are and what acting on them would mean — a
+        different thing, and the only one the record supports.</p>
+      ${foldBody(`What agrees and what does not — ${agree} for, ${against} against`, `
+        <div class="inds">${ind.map(x => `<div class="ind-r">
+          <span class="ind-k">${esc(x.k)}</span>
+          <span class="ind-v ${esc(x.lean)}">${esc(String(x.v))}</span>
+          <span class="ind-w">${esc(x.why)}</span></div>`).join('')}</div>
+        <p class="hint">The screen's own call is <b>${esc(vd || 'not scored')}</b>. Where these
+          readings disagree with it, the disagreement is the interesting part — a name every
+          measure likes is rarely still cheap.</p>`)}`;
+  };
+
+  /* ── THE BIBLE ───────────────────────────────────────────────────────────
+   *
+   * Akshay: "each thing can be seen like a verdict, bible summary, action
+   * plan, seasonality."
+   *
+   * WHAT MAKES THIS A BIBLE RATHER THAN A FACTSHEET. The card below it already
+   * prints every number. What no surface on this site did was JOIN them into
+   * sentences — say what the company is, what it earns on the money it uses,
+   * whether the growth is real, what you are paying for it, and where the
+   * price sits — in the order a person actually forms a view.
+   *
+   * IT IS ASSEMBLED, NOT GENERATED. Every clause is a template over a field
+   * that exists on the row, so there is no model call, nothing to rate-limit,
+   * and no sentence that can assert a number the screen does not hold. A
+   * missing field drops its clause rather than reaching for a filler phrase —
+   * which is why the paragraphs vary in length between names, and should.
+   */
+  const bibleHtml = (r) => {
+    const n = sn, N = (v, d = 1) => Number(v).toFixed(d).replace(/\.0$/, '');
+    const nm = r.name || r.sym;
+    const P = [];
+
+    /* ─ What it is, and how big ─ */
+    /* lvl(), not sn(): 24 of the 989 rows carry mcap_cr 0.0, which is absence
+       written as a number — RELIANCE is one of them. sn() passes zero through
+       and the lead sentence read "valued at ₹0 crore". No listed company has
+       a market value of zero, so zero is missing here, and the clause drops. */
+    const mc = lvl(r.mcap_cr);
+    const tierWord = { mega: 'one of the largest companies on the exchange',
+      large: 'a largecap', mid: 'a midcap', small: 'a smallcap',
+      micro: 'a microcap — thinly traded, and the liquidity is part of the risk' }[r.tier];
+    /* A crore figure, in the units an Indian reader actually uses. The first
+       version divided by 1,000 and appended the string ",000 crore", which
+       printed CRIZAC's ₹3,281 crore as "₹3.3,000 crore" — a number that is
+       not wrong so much as not a number. Indian grouping does the work. */
+    const crore = (v) => v >= 100000
+      ? '₹' + (v / 100000).toFixed(2).replace(/\.?0+$/, '') + ' lakh crore'
+      : '₹' + Math.round(v).toLocaleString('en-IN') + ' crore';
+    P.push(`<p><b>${esc(nm)}</b> is ${esc(r.ind || r.sector || 'an NSE-listed company')}${
+      mc != null ? `, valued at ${crore(mc)}` : ''}${
+      tierWord ? ` — ${esc(tierWord)}` : ''}.</p>`);
+
+    /* ─ What it earns on the money it uses. The single most important
+         fundamental question, and the one a PE cannot answer. ─ */
+    const roce = n(r.roce), roce_med = n(r.roce_med), nm_margin = n(r.net_margin);
+    if (roce != null) {
+      const drift = (roce_med != null && Math.abs(roce - roce_med) >= 3)
+        ? ` Its own five-year median is ${N(roce_med)}%, so returns are ${
+            roce > roce_med ? 'better than usual right now' : 'below what it has typically managed'}.`
+        : '';
+      P.push(`<p><b>What it earns on the money it uses.</b> ${N(roce)}% return on capital employed${
+        roce >= 20 ? ' — genuinely high; a business that can reinvest at this rate compounds without needing to raise anything'
+        : roce >= 12 ? ' — respectable, roughly what a decent business earns'
+        : ' — low. Capital going in is not coming back at a rate that beats a fixed deposit by much'}.${drift}${
+        nm_margin != null ? ` It keeps ${N(nm_margin)}% of revenue as profit.` : ''}</p>`);
+    }
+
+    /* ─ Is the growth real, and is it funded by debt? ─ */
+    const rc = n(r.rev_cagr), ec = n(r.eps_cagr), de = n(r.de), cfp = n(r.cfo_pat);
+    if (rc != null || ec != null) {
+      const gap = (rc != null && ec != null)
+        ? (ec > rc + 5 ? ' Earnings are growing faster than sales, which is margin expansion — real, but it cannot repeat forever.'
+           : ec < rc - 5 ? ' Earnings are growing slower than sales, so margins are being squeezed on the way up.'
+           : ' Earnings and sales are growing at about the same rate, which is the healthiest version of growth.')
+        : '';
+      P.push(`<p><b>Growth.</b> ${rc != null ? `Revenue has compounded at ${N(rc)}% a year` : ''}${
+        rc != null && ec != null ? ', and earnings at ' + N(ec) + '%' : ec != null ? `Earnings have compounded at ${N(ec)}%` : ''}.${gap}${
+        cfp != null ? ` Cash from operations covers ${N(cfp, 2)}x of reported profit${
+          cfp >= 0.8 ? ' — the profit is arriving as cash' : ', so a meaningful part of the profit is not cash yet'}.` : ''}${
+        de != null ? ` Debt to equity is ${N(de, 2)}${
+          de <= 0.1 ? ' — effectively debt-free' : de >= 1.5 ? ', which is leveraged; earnings swing harder in both directions' : ''}.` : ''}</p>`);
+    }
+
+    /* ─ What you are paying ─ */
+    const pe = n(r.pe), pb = n(r.pb), pep = n(r.pe_pctile), dy = n(r.div_yield);
+    if (pe != null || pb != null) {
+      P.push(`<p><b>What it costs.</b> ${pe != null ? `${N(pe)}x earnings` : ''}${
+        pe != null && pb != null ? ' and ' : ''}${pb != null ? `${N(pb, 2)}x book` : ''}.${
+        pep != null ? ` Against its own history that is the ${Math.round(pep)}th percentile — ${
+          pep <= 30 ? 'cheaper than it usually trades' : pep >= 80 ? 'dearer than it usually trades'
+          : 'about where it normally sits'}.` : ''}${
+        dy != null && dy > 0.5 ? ` It pays ${N(dy, 2)}% as dividend.` : ''}
+        <span class="hint-i">A multiple is only ever a comparison. Against a different sector it means nothing;
+        against its own ten years it means something.</span></p>`);
+    }
+
+    /* ─ Who holds it ─ */
+    const ins = n(r.insiders), ist = n(r.instis);
+    if (ins != null) {
+      P.push(`<p><b>Who owns it.</b> Promoters hold ${N(ins)}%${
+        ins >= 60 ? ' — a controlling stake, so the family and the minority shareholder are in the same boat'
+        : ins <= 30 ? ' — a low promoter stake; no single owner has much at risk' : ''}${
+        ist != null ? `, institutions ${N(ist)}%` : ''}.${
+        ist != null && ist < 3 ? ' Almost no institutional ownership, which usually means nobody professional has looked, or they looked and passed.' : ''}</p>`);
+    }
+
+    /* ─ Where the price sits. Last, deliberately: the chart is the least
+         durable of these facts and reading it first anchors everything after. ─ */
+    const px = lvl(r.price), hi = lvl(r.high52), lo = lvl(r.low52);
+    const fh = n(r.from_high), y1 = n(r.r1y), rsi = n(r.rsi);
+    if (px != null) {
+      P.push(`<p><b>Where the price is.</b> ${price(px, '₹')}${
+        hi != null && lo != null ? `, inside a 52-week range of ${price(lo, '₹')} to ${price(hi, '₹')}` : ''}.${
+        fh != null ? ` It is ${N(Math.abs(fh))}% ${fh < 0 ? 'below' : 'above'} that high.` : ''}${
+        y1 != null ? ` Over a year it is ${y1 > 0 ? 'up' : 'down'} ${N(Math.abs(y1))}%.` : ''}${
+        rsi != null ? ` RSI ${Math.round(rsi)}${rsi >= 70 ? ' — overbought on the standard reading' : rsi <= 30 ? ' — oversold on the standard reading' : ''}.` : ''}</p>`);
+    }
+
+    /* ─ The risks the screen itself flagged. Not editorial — these come off
+         the row, and showing them here means the case and its objections sit
+         on one screen instead of the objections living three folds down. ─ */
+    /* A flag is {s: severity, t: what, k: the figure behind it} — an OBJECT,
+       not a string. Joining the array directly printed [object Object] on the
+       first name tested, which is the same shape of bug as printing a null
+       target: the page renders, and what it renders is meaningless. */
+    const flags = ((r.risk && r.risk.flags) || []).filter(f => f && f.t);
+    if (flags.length) {
+      P.push(`<p><b>What the screen holds against it.</b></p>
+        <ul class="bible-f">${flags.map(f => `<li class="rf-${esc(f.s || 'med')}">
+          ${esc(f.t)}${f.k ? ` <em>${esc(f.k)}</em>` : ''}</li>`).join('')}</ul>`);
+    }
+
+    /* THE VERDICT'S OWN KEYS, CHECKED AGAINST THE FEED RATHER THAN ASSUMED.
+       `h` is the horizon bucket ("swing"), not a headline, and there is no `w`
+       at all — the readable line is `l` and the reasoning is `o`. Guessing
+       those would have rendered an empty heading under every call. */
+    const vd = r.vd || {};
+    return `${vd.c ? `<div class="bible-vd vd-${esc(String(vd.c).toLowerCase())}">
+        <span class="bvd-k">${esc(vd.c)}</span>
+        <span class="bvd-h">${esc(vd.l || '')}</span>
+        ${vd.o ? `<p>${esc(vd.o)}.</p>` : ''}
+        ${vd.t ? `<p class="bvd-t"><b>What would trigger it:</b> ${esc(vd.t)}.</p>` : ''}</div>` : ''}
+      <div class="bible">${P.join('')}</div>
+      <p class="hint">Assembled from the screen's own fields — every figure above is on this
+        company's row and nothing here is written by a model. Where a number is missing, the
+        sentence that needed it is absent rather than guessed.</p>`;
+  };
+
+  /* ── THE PAGE, IN THE ORDER A VIEW IS ACTUALLY FORMED ─────────────────────
+   *
+   * The sheet and the page share stockCard() and always will. What the PAGE
+   * adds — and the sheet deliberately does not — is the four surfaces Akshay
+   * asked for: the call, the written summary, the plan, and the seasonal
+   * record. They are page-only because they are a five-minute read, and a
+   * bottom sheet opened from the middle of a 989-row table is not where anyone
+   * settles in for one.
+   *
+   * ORDER IS THE ARGUMENT. Verdict and written summary first, because they are
+   * what a reader came for; the plan next, because it is only meaningful once
+   * you know what the company is; seasonality after that, as context rather
+   * than as a reason; and the full numeric card last, for anyone who wants to
+   * check the assembly against its parts.
+   */
   const stockPage = (r) => {
     const { body } = stockCard(r);
     return `<div class="route-h stock-h">
-        <span class="eyebrow">Company · ${esc(r.sector || 'NSE')}</span>
+        <span class="eyebrow">Company · ${esc(r.sector || 'NSE')}${r.ind ? ' · ' + esc(r.ind) : ''}</span>
         <h1>${watchBtn(r.sym)}${esc(r.sym)}</h1>
         <p>${esc(r.name || '')}</p>
       </div>
-      <div class="stock-pg">${body}</div>
+      ${/* NOT { lead: true }. That flag gives a section the route's hero
+            treatment — display size, the full standfirst measure — and this
+            page already has a hero: the ticker and the company name directly
+            above. Two heroes stacked put a 60px sentence about assembly above
+            the verdict it was introducing. The standfirst is a standfirst. */''}
+      ${sec('The call, and the company behind it', bibleHtml(r), null,
+            'What it does, what it earns, what it costs, and where the price sits — '
+          + 'assembled from this company’s own row.')}
+      ${sec('If you were going to act on it', actionPlan(r), null,
+            'What the levels are, and what taking them would mean. Not a recommendation — '
+          + 'no engine here has earned one.')}
+      ${sec('What this month has historically done', seasBlock(r.sym), null,
+            'Eleven years of calendar months. A record of what repeatedly happened, which is '
+          + 'a weaker claim than a forecast and the only one the data supports.')}
+      ${sec('Every number on its row', `<div class="stock-pg">${body}</div>`, null,
+            'The card the screen opens, unchanged — so the summary above can be checked '
+          + 'against the figures it was built from.')}
       <p class="hint stock-back"><a href="/screen">← All names</a> ·
-        <a href="/signals">The ledger</a> · <a href="/engines">What fires a signal</a></p>`;
+        <a href="/map">The map</a> · <a href="/signals">The ledger</a> ·
+        <a href="/engines">What fires a signal</a></p>`;
   };
   /* The sheet wires its own chart on open; the page has to do the same. */
   const wireStockPage = (r) => { wireCardChart(r.sym); };
@@ -7123,7 +7675,7 @@
     const shell = body => head('The research floor',
       'Three engines that have not earned capital, each published with the record that says so.',
       'Research') + body;
-    paint(shell(skel('sk-card', 3)));
+    paint(shell(skel('sk-card', 3)), true);
     const [r, lg] = await Promise.all([get('/research.json'), get('/alerts_log.json')]);
     if (!r.ok || !r.data) { paint(shell(fail('The research floor', r.error || 'no scan yet')));  return; }
     const d = r.data, engines = d.engines || [];
@@ -7205,7 +7757,7 @@
 
   R['/signals'] = async () => {
     const intro = 'Every call this site has made, with the price it was made at. Each one is scored when it closes — the losses too. That is the point.';
-    paint(head('Signals', intro, 'The public ledger') + skel('sk-card', 4));
+    paint(head('Signals', intro, 'The public ledger') + skel('sk-card', 4), true);
     const [a, engRes] = await Promise.all([ledger(), get('/engines.json'), loadResearchN()]);
     const ENG_TABLE = (engRes && engRes.ok && engRes.data && engRes.data.ok) ? engRes.data : null;
     const base = head('Signals', intro, 'The public ledger')
@@ -11353,9 +11905,22 @@
             closed count against a requirement of 30, and a reader has to do
             the division to know whether an engine is nearly there or has
             barely started. The meter does it: 2 of 30 LOOKS like 2 of 30. */''}
-        ${shut > 0 ? `<div class="ef-prog">
+        ${/* A FRACTION, NOT A SENTENCE — AND THIS IS THE THIRD TIME.
+            * The two notes above record the same fix twice: the COUNT is per
+            * engine, what the count MEANS is the same for all of them and is
+            * stated once under the roster. This meter's label then said "1 of
+            * the 30 closed trades this book needs" on all four engines that
+            * have closed one, which is the identical sentence the note
+            * directly below the grid promises is not repeated under each card.
+            *
+            * The meter already shows the proportion and the roster already
+            * states the bar, so the label only has to name the two numbers.
+            * The full phrasing survives in aria-label, where it is read once
+            * per card by a reader who has no meter to look at. */''}
+        ${shut > 0 ? `<div class="ef-prog" role="img"
+              aria-label="${shut} of the 30 closed trades this book needs">
             ${meter(Math.min(100, shut / 30 * 100), shut >= 30 ? 'up' : '')}
-            <span>${shut} of the 30 closed trades this book needs</span>
+            <span class="ef-frac">${shut}<i>/30</i></span>
           </div>` : ''}
       </div>`;
       // THE SAMPLE GATE. Under 20 closed trades a win rate is a coin-flip
@@ -11575,7 +12140,7 @@
   R['/stock/:id'] = async () => {
     const sym = bareSym(routeParam());
     if (!sym) { go('/screen', { replace: true }); return; }
-    paint(head(sym, 'Loading the card…', 'Company') + skel('sk-card', 3));
+    paint(head(sym, 'Loading the card…', 'Company') + skel('sk-card', 3), true);
 
     /* `|| SCREEN_LITE` — a cache filled by a light route is missing the
      * per-company prose this surface exists to show, so it is re-fetched over
@@ -11614,6 +12179,13 @@
     set('meta[property="og:url"]', 'content', url);
     set('meta[name="twitter:title"]', 'content', title);
     set('meta[name="twitter:description"]', 'content', desc);
+
+    /* SEASONALITY IS AWAITED, NOT FIRED AND FORGOTTEN. Three of the four
+       sections on this page read SEAS, and a null SEAS renders "not enough
+       history" for a name that has eleven years of it — a wrong answer that
+       looks exactly like a right one. It is one 512 KB fetch, memoised for
+       the session, and it only happens on this route. */
+    await seasonality();
 
     paint(stockPage(r));
     wireStockPage(r);
@@ -12441,6 +13013,8 @@
    * is the thing a reader needs to choose between them. Ordered by how often
    * they answer a question rather than alphabetically. */
   const DISCOVER = [
+    ['/map',     'The map',       'Every NSE name on one screen',
+                 'Colour the whole market by the call, momentum, value, or what each month has historically done.'],
     ['/reads',   'Weekly reads',  'Seven companies, studied properly',
                  'One per sector, written every Saturday — what they sell, how the money works, and what would break it.'],
     ['/radar',   'Signal radar',  'The market score, and the eight names carrying it',
@@ -12583,7 +13157,7 @@
   R['/reads'] = async () => {
     const intro = 'Seven companies a week, one per sector, studied for what they are rather than '
                 + 'what they might do next. Five to seven minutes each.';
-    paint(head('Weekly reads', intro, 'Weekly reads') + skel('sk-card', 3));
+    paint(head('Weekly reads', intro, 'Weekly reads') + skel('sk-card', 3), true);
     const r = await get('/weekly_reads.json');
     let out = head('Weekly reads', intro, 'Weekly reads');
     if (!r.ok || !r.data || !r.data.ok) {
@@ -12652,6 +13226,156 @@
       paint(body);
       const sel = main.querySelector('select[data-reads-week]');
       if (sel) sel.addEventListener('change', () => { READS_WEEK = sel.value; draw(); });
+    };
+    draw();
+  };
+
+  /* ══ THE MAP — every NSE name on one screen ═══════════════════════════════
+   *
+   * Akshay: "a world map = NSE scrips & each thing can be seen — verdict,
+   * bible summary, action plan, seasonality — take unique ideas from
+   * tradingview, tickertape/screener.in, investtech.com."
+   *
+   * WHAT MAKES THIS DIFFERENT FROM THE SCREEN, which already lists the same
+   * 989 names: the screen is a TABLE, and a table answers "tell me about this
+   * name". A map answers "what does the whole market look like right now" —
+   * you see 989 cells at once and the colour IS the answer, before you have
+   * read a single label. Heatmaps elsewhere colour by one day's move; this
+   * colours by whichever dimension the reader picks, including two the
+   * screen has never carried.
+   *
+   * THE DIMENSION NOBODY ELSE PUBLISHES IS SEASONALITY. Investtech built a
+   * business on it and no Indian site does it properly: whether a name has a
+   * calendar month it has repeatedly risen or fallen in, over eleven years,
+   * with the hit rate printed beside the median so a single outlier year
+   * cannot masquerade as a pattern. 626 of 989 names clear the eight-year
+   * floor; the rest are drawn grey and say why.
+   *
+   * IT IS LOADED ON DEMAND. The seasonality feed is 512 KB and only this
+   * surface needs it, so it is fetched when the map opens rather than on
+   * every route like the screen was.
+   */
+  let SEAS = null;
+  const seasonality = async () => {
+    if (SEAS) return SEAS;
+    const r = await get('/seasonality.json');
+    SEAS = (r.ok && r.data && r.data.ok) ? r.data : { stocks: {}, ok: false };
+    return SEAS;
+  };
+
+  const MAP_DIMS = {
+    verdict: { label: 'The call',
+      help: 'The screen’s own verdict on each name.',
+      of: (r) => ({ BUY: 92, WAIT: 55, WATCH: 45, AVOID: 8 })[String((r.vd && r.vd.c) || '').toUpperCase()],
+      fmt: (r) => (r.vd && r.vd.c) || '—' },
+    momentum: { label: 'Momentum',
+      help: 'Six-month return, scaled across the universe.',
+      of: (r) => { const v = lvl(r.r6m); return v == null ? null : Math.max(0, Math.min(100, 50 + v * 1.2)); },
+      fmt: (r) => pct(r.r6m) },
+    value: { label: 'Value',
+      help: 'The screen’s value score — cheap is bright.',
+      of: (r) => lvl(r.v), fmt: (r) => lvl(r.v) == null ? '—' : Math.round(lvl(r.v)) },
+    quality: { label: 'Quality',
+      help: 'Return on capital, margins and balance sheet.',
+      of: (r) => lvl(r.q), fmt: (r) => lvl(r.q) == null ? '—' : Math.round(lvl(r.q)) },
+    year: { label: 'Where in its year',
+      help: 'Position between the 52-week low and high.',
+      of: (r) => { const p = lvl(r.price), lo = lvl(r.low52), hi = lvl(r.high52);
+        return (p == null || lo == null || hi == null || hi <= lo) ? null : (p - lo) / (hi - lo) * 100; },
+      fmt: (r) => { const p = lvl(r.price), lo = lvl(r.low52), hi = lvl(r.high52);
+        return (p == null || lo == null || hi == null || hi <= lo) ? '—' : Math.round((p - lo) / (hi - lo) * 100) + '%'; } },
+    season: { label: 'This month, historically',
+      help: 'How often this name has risen in the current calendar month, over eleven years. '
+          + 'Historical, not predictive — and grey means it has no decade to judge by.',
+      of: (r) => { const d = SEAS && SEAS.stocks && SEAS.stocks[r.sym];
+        const m = d && d.m && d.m[new Date().getMonth()];
+        return m ? m[0] : null; },
+      fmt: (r) => { const d = SEAS && SEAS.stocks && SEAS.stocks[r.sym];
+        const m = d && d.m && d.m[new Date().getMonth()];
+        return m ? m[0] + '%' : 'no record'; } },
+  };
+
+  let MAP_DIM = 'verdict', MAP_SECTOR = 'all';
+
+  /* The colour ramp. Five steps rather than a continuous gradient, because a
+     reader is comparing cells to each other and to a legend, not reading an
+     absolute value off a colour — and five is the most anyone can hold. */
+  const mapClass = (v) => v == null ? 'mc-na'
+    : v >= 75 ? 'mc-5' : v >= 58 ? 'mc-4' : v >= 42 ? 'mc-3' : v >= 25 ? 'mc-2' : 'mc-1';
+
+  R['/map'] = async () => {
+    const intro = 'Every name on the screen, on one page. Colour it by the call, by momentum, '
+                + 'by value, or by what each month has historically done.';
+    paint(head('The map', intro, 'The map') + skel('sk-card', 3), true);
+
+    const [sc] = await Promise.all([
+      SCREEN ? Promise.resolve({ ok: false }) : getScreen(false).then(g => (LITE_GOT = g.lite, g.r)),
+      seasonality(),
+    ]);
+    if (sc && sc.ok && sc.data) {
+      noteScreenMeta(sc.data);
+      if (!SCREEN) setScreen((sc.data.rows || []).filter(x => x && x.sym), LITE_GOT);
+    }
+    const rows = (SCREEN || []).filter(r => r && r.sym);
+    if (!rows.length) { paint(head('The map', intro, 'The map') + fail('The map', 'the screen did not load')); return; }
+
+    const sectors = [...new Set(rows.map(r => String(r.sector || '').trim()).filter(Boolean))].sort();
+
+    const draw = () => {
+      const D = MAP_DIMS[MAP_DIM];
+      const view = MAP_SECTOR === 'all' ? rows
+        : rows.filter(r => String(r.sector || '').trim() === MAP_SECTOR);
+      /* Ordered by the dimension being shown, so the map reads as a gradient
+         rather than as alphabetical noise — the shape of the distribution is
+         itself information. Unknowns sink. */
+      const scored = view.map(r => ({ r, v: D.of(r) }));
+      scored.sort((a, b) => (b.v == null ? -1 : b.v) - (a.v == null ? -1 : a.v));
+      const known = scored.filter(x => x.v != null).length;
+
+      let body = head('The map', intro, 'The map');
+      body += snap([
+        ['Names', view.length, MAP_SECTOR === 'all' ? 'the whole screen' : esc(MAP_SECTOR)],
+        ['Measured', known, `on ${esc(D.label.toLowerCase())}`],
+        ['Not measured', view.length - known, 'no data for this view', (view.length - known) ? 'dn' : ''],
+        ['Sectors', sectors.length, 'on the screen'],
+      ], esc(D.help));
+
+      body += `<div class="mapbar">
+        <div class="chips" role="group" aria-label="Colour by">
+          ${Object.entries(MAP_DIMS).map(([k, d]) =>
+            `<button type="button" class="chip${k === MAP_DIM ? ' is-on' : ''}" data-mapd="${k}">${esc(d.label)}</button>`).join('')}
+        </div>
+        <label class="sgf"><span>Sector</span>
+          <select data-maps aria-label="Filter by sector">
+            <option value="all">All sectors</option>
+            ${sectors.map(x => `<option value="${esc(x)}"${x === MAP_SECTOR ? ' selected' : ''}>${esc(x)}</option>`).join('')}
+          </select></label>
+        <div class="maplg" aria-hidden="true">
+          <span>low</span>${['mc-1','mc-2','mc-3','mc-4','mc-5'].map(c => `<i class="${c}"></i>`).join('')}<span>high</span>
+          <i class="mc-na"></i><span>no data</span>
+        </div>
+      </div>`;
+
+      body += `<div class="mapg">${scored.map(({ r, v }) => `
+        <button type="button" class="mcell ${mapClass(v)}" data-mapsym="${esc(r.sym)}"
+          title="${esc(r.name || r.sym)} · ${esc(D.label)}: ${esc(String(D.fmt(r)))}">
+          <b>${esc(bareSym(r.sym))}</b><i>${esc(String(D.fmt(r)))}</i>
+        </button>`).join('')}</div>`;
+
+      body += `<p class="hint">Every cell is a name; the colour is
+        <b>${esc(D.label.toLowerCase())}</b>. Tap one to open its full page — the call, the
+        levels, the fundamentals and its month-by-month record. Grey means this site has no
+        measurement for that name on this view, which is a different thing from a low score.</p>`;
+
+      paint(body);
+      main.querySelectorAll('[data-mapd]').forEach(b => b.addEventListener('click', () => {
+        MAP_DIM = b.dataset.mapd; draw();
+      }));
+      const sel = main.querySelector('[data-maps]');
+      if (sel) sel.addEventListener('change', () => { MAP_SECTOR = sel.value; draw(); });
+      main.querySelectorAll('[data-mapsym]').forEach(b => b.addEventListener('click', () => {
+        go('/stock/' + encodeURIComponent(b.dataset.mapsym));
+      }));
     };
     draw();
   };
@@ -13052,7 +13776,7 @@
   R['/watch'] = async () => {
     const syms = watchAll();
     paint(head('Watchlist', 'Names you starred and price levels you asked to be told about.',
-      'Yours, on this device') + skel('sk-row', 4));
+      'Yours, on this device') + skel('sk-row', 4), true);
 
     // The screen supplies every fundamental and level; live prices come from
     // the same quote route the rest of the site uses.
@@ -13342,6 +14066,8 @@
                      'Every name in the universe on price, trend, quality, value and institutional flow. FII and DII holding quarter on quarter, from the company’s own filings.'],
     '/signals':     ['Signals — the public ledger, wins and losses both',
                      'Every call this book has published, open and closed, with the entry, stop and targets it was sent with and what it actually did.'],
+    '/map':         ['The map — every NSE name on one screen',
+                     'The whole screened market as one picture, coloured by the call, momentum, value, quality, position in its year, or how often each name has risen in this calendar month over eleven years.'],
     '/reads':       ['Weekly reads — seven companies, studied properly',
                      'One company per sector, every Saturday. What it sells, how the money arrives, and what would break it.'],
     '/discover':    ['Discover — seven ways into the screened names',
@@ -13451,13 +14177,21 @@
   const WHERE = { '/': '', '/markets': 'Markets', '/ideas': 'Ideas', '/ipo': 'IPO',
                   '/screen': 'Screen', '/signals': 'Signals', '/brief': 'Brief', '/watch': 'Watchlist',
                   '/engines': 'The floor', '/radar': 'Radar', '/discover': 'Discover', '/buoy': 'BUOY', '/research': 'Research',
-                  '/reads': 'Weekly reads',
+                  '/map': 'The map', '/reads': 'Weekly reads',
                   '/join': 'The brief', '/methodology': 'Methodology',
                   '/sources': 'Data sources', '/terms': 'Terms', '/privacy': 'Privacy' };
 
   async function render() {
     const path = routeOf();
     resetFresh();
+    /* Restart the transition on every navigation. Removing the class and
+       forcing a reflow before re-adding is the only reliable way to replay a
+       CSS animation on an element that is not being replaced. */
+    try {
+      main.classList.remove('is-nav');
+      void main.offsetWidth;
+      main.classList.add('is-nav');
+    } catch (e) { /* motion is never a reason to fail a route */ }
     /* Both the home page and /ipo render IPO cards, so this cannot reset in
        one route: a reader who opened Home first would find /ipo's stamp
        already "shown" and see no vintage at all. */

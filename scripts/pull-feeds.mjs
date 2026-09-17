@@ -55,7 +55,21 @@ const FEEDS = ["alerts", "conviction", "data-health", "edition", "ipo",
                // this one. TWO LISTS FOR ONE JOB, and they had drifted in both
                // directions — this file also carried buoy and swot, which that
                // one lacked. Whichever ran last decided what the site served.
-               "engines", "funds"];
+               "engines", "funds",
+               // THE THREE NEW FEEDS, ADDED WITH THE PAGES THAT READ THEM.
+               // All three were sitting in public/ committed by hand and
+               // absent from this list — which is the exact fault this file's
+               // docstring describes, reproduced three more times. A feed that
+               // is served but never pulled does not fail; it FREEZES, and a
+               // frozen barometer keeps announcing a market stage that ended
+               // months ago with a fresh timestamp beside it.
+               //
+               //   barometer    — the daily market reading and its outcome
+               //                  history; written by barometer.py at 13:45.
+               //   seasonality  — eleven years of monthly records for 626
+               //                  names; the /stock page and /map both read it.
+               //   weekly_reads — Saturday's seven studies.
+               "barometer", "seasonality", "weekly_reads"];
 
 const stampOf = (o) => {
   if (!o || Array.isArray(o)) return null;
