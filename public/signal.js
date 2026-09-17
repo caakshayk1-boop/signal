@@ -2777,7 +2777,12 @@
     if (tk && tk.ok && tk.data && srRows && srRows.length) {
       /* The wire is already in hand from this page's own fetch; feeding it
          here means the news dots work without a second request. */
-      if (WIRE_CACHE == null && n && n.ok && Array.isArray(n.data)) WIRE_CACHE = n.data;
+      /* The front page already fetched the LIVE wire as `lw`; `n` is the
+         nightly news.json and is the wrong source for a dot that claims
+         "in today's wire". */
+      if (WIRE_CACHE == null && lw && lw.ok && lw.data && Array.isArray(lw.data.stories)) {
+        WIRE_CACHE = lw.data.stories;
+      }
       const hidx = {};
       for (const r of srRows) if (r && r.sym) hidx[r.sym] = r;
       try { out += heatStrip(tk.data, hidx); }
@@ -13617,8 +13622,15 @@
     for (const r of (SCREEN || [])) idx[r.sym] = r;
 
     if (WIRE_CACHE == null) {
-      const w = await get('/news.json');
-      WIRE_CACHE = (w.ok && Array.isArray(w.data)) ? w.data : [];
+      /* THE LIVE WIRE, NOT LAST NIGHT'S BUILD. news.json is written by the
+         nightly job, so a dot could only ever mark a name that was in
+         YESTERDAY'S news — on the day this was found it held 18 stories and
+         not one of them mentioned Tata, while the live wire held 60 and led
+         with the story that moved two Tata names 5-6%. The channel meant to
+         explain a move was reading a file written before the move happened.
+         /api/wire returns { stories: [...] }, not a bare array. */
+      const w = await get('/api/wire');
+      WIRE_CACHE = (w.ok && w.data && Array.isArray(w.data.stories)) ? w.data.stories : [];
     }
 
     const shell = (body) => head('Heatmap',

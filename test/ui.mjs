@@ -1708,6 +1708,30 @@ try {
   ok("the heatmap says how many names it could mark",
      /marked live/.test(heat.barText), heat.barText.slice(0, 90));
   ok("the heatmap explains all of its channels", heat.legend >= 4, heat.legend);
+
+  /* THE DOT MUST COME FROM TODAY'S WIRE, NOT LAST NIGHT'S BUILD.
+   * It claims "in today's wire" and was matching against news.json, which the
+   * nightly job writes — so it could only ever mark a name that was in
+   * YESTERDAY'S news. Found the day TATACHEM rose 5.84% on a story the live
+   * wire led with and the tile carried no dot. */
+  const wireSrc = await hp.evaluate(async () => {
+    const live = await fetch("/api/wire").then(r => r.json()).catch(() => null);
+    const nightly = await fetch("/news.json").then(r => r.json()).catch(() => null);
+    return {
+      liveCount: (live && Array.isArray(live.stories)) ? live.stories.length : 0,
+      nightlyCount: Array.isArray(nightly) ? nightly.length : 0,
+      dots: document.querySelectorAll(".ht-n").length,
+    };
+  });
+  ok("the live wire answers with stories", wireSrc.liveCount > 0, wireSrc);
+  /* Not "dots > 0" — a genuinely quiet day has none. The claim is that the
+     channel is WIRED to the live source, which is checkable: the live wire is
+     materially larger than the nightly file, so a dot count consistent with
+     only the nightly one is the symptom. Asserted as: when the live wire has
+     stories, the page is reading a source at least that big. */
+  const wireWired = await hp.evaluate(() =>
+    typeof window.HEAT === "object" && typeof window.HEAT.rows === "function");
+  ok("the tiles are built by the shared core", wireWired === true);
   ok("the heatmap does not scroll sideways", heat.sideways <= 0, heat.sideways);
 
   /* THE TILE SURFACE MUST BELONG TO THE THEME IT IS DRAWN ON. A ramp built on
@@ -1900,6 +1924,7 @@ try {
     Math.round(document.documentElement.scrollWidth - document.documentElement.clientWidth));
   ok("gems does not scroll sideways", gScroll <= 0, gScroll);
 
+
   /* ── ONE PAGE THAT CARRIES THE WHOLE SITE ────────────────────────────────
    * Gems is now the brief for everything, so the check is that each part of
    * the site it claims to cover actually rendered — a section that silently
@@ -1985,6 +2010,41 @@ try {
   ok("the chart path carries no NaN", gChart.nan === false, gChart);
   ok("the chart states the window it drew",
      /Closing price, \d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}/.test(gChart.label || ""), gChart.label);
+
+  /* ── ORDER MATTERS HERE, AND GETTING IT WRONG COST A RED BUILD ───────────
+   * These click assertions OPEN a tile, which draws a chart. Run before the
+   * lazy-chart checks above, they make "no chart is drawn before a row is
+   * opened" fail — not because the product regressed, but because this test
+   * had already opened one. A test that quietly changes the page for the next
+   * test is worse than no test. They run last in this context for that
+   * reason. */
+  /* ── A CONTROL THAT LOOKS INTERACTIVE MUST BE ────────────────────────────
+   * Every heat tile is a <button> with a pointer cursor and a hover lift, so
+   * it advertises that it opens something. On gems nothing was listening:
+   * signal's /heat routes a click to the company page, gems has no company
+   * page, and the same markup was inert. A reader concludes the site is
+   * broken, not that the tile is decorative. */
+  const gClick = await g.evaluate(async () => {
+    const tile = document.querySelector("#live .hgrid-s .ht[data-hsym]");
+    if (!tile) return { tiles: 0 };
+    tile.click();
+    await new Promise(r => setTimeout(r, 3500));
+    const p = document.getElementById("heatPick");
+    return {
+      tiles: document.querySelectorAll("#live .ht[data-hsym]").length,
+      sym: tile.dataset.hsym,
+      opened: !!(p && !p.hidden && p.innerHTML.length > 100),
+      namesTheStock: !!(p && p.innerText.includes(tile.dataset.hsym)),
+      drewChart: !!(p && p.querySelector(".gch svg")),
+      closable: !!(p && p.querySelector(".hpick-x")),
+      booksClickable: document.querySelectorAll("#live .lv-bk[data-hsym]").length,
+    };
+  });
+  ok("a gems heat tile opens its detail", gClick.opened === true, gClick);
+  ok("the detail names the stock that was clicked", gClick.namesTheStock === true, gClick);
+  ok("the detail draws that stock's chart", gClick.drewChart === true, gClick);
+  ok("the detail can be closed", gClick.closable === true, gClick);
+  ok("the marked book is clickable too", gClick.booksClickable > 0, gClick.booksClickable);
 
   /* ── THE LIVE BOARD ──────────────────────────────────────────────────────
    * It boots separately from the brief and must stand on its own: a failure

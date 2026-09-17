@@ -76,13 +76,35 @@
      distinctive — "SBI" would match half a wire, "GRANULES" would not. */
   function newsIndex(wire) {
     var blob = (wire || []).map(function (n) {
-      return (n && n.title || '') + ' ' + (n && n.summary || '');
+      return String((n && n.title) || '') + ' ' + String((n && n.summary) || '');
     }).join(' ').toUpperCase();
     return function (sym, name) {
       if (!blob) return false;
       if (blob.indexOf(String(sym).toUpperCase()) >= 0) return true;
-      var w = String(name || '').split(/\s+/)[0].toUpperCase();
-      return w.length >= 6 && blob.indexOf(w) >= 0;
+      /* ── ONE WORD IS NOT ENOUGH, AND IT IS ALSO TOO MANY ─────────────────
+       * The first version took the first word of the registered name and
+       * required six characters, which fails in both directions on the same
+       * day: "TATA" is four characters so every Tata name was skipped, and
+       * had it not been, one Tata headline would have dotted all nine of
+       * them.
+       *
+       * Measured on the day this was found: the wire's lead story was "Tata
+       * Group stocks on fire after N Chandrasekharan 5-yr term — Tata
+       * Chemicals, TIC, Tata Motors PV", TATACHEM was up 5.84% and TATAINVEST
+       * 5.38% BECAUSE of it, and neither carried a dot.
+       *
+       * Two words is the honest unit for an Indian listed name: "TATA
+       * CHEMICALS" and "TATA MOTORS" are distinct, and a story naming one
+       * does not dot the other. A name whose first word is already
+       * distinctive on its own (GRANULES, POLYCAB) still matches alone. */
+      var parts = String(name || '')
+        .replace(/\b(LTD|LIMITED|CORPORATION|CORP|INDIA|COMPANY|CO|PVT|PRIVATE|THE)\b/gi, ' ')
+        .split(/\s+/).filter(Boolean).map(function (w) { return w.toUpperCase(); });
+      if (parts.length >= 2) {
+        var two = parts[0] + ' ' + parts[1];
+        if (two.length >= 8 && blob.indexOf(two) >= 0) return true;
+      }
+      return parts.length && parts[0].length >= 6 && blob.indexOf(parts[0]) >= 0;
     };
   }
 

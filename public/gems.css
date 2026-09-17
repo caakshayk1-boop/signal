@@ -552,3 +552,25 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
   .lv-at{margin-left:0;width:100%}
   .lv-sec{grid-template-columns:minmax(64px,1fr) 56px minmax(44px,1.2fr) 32px}
 }
+
+/* ── THE TILE DETAIL, OPENED IN PLACE ──────────────────────────────────────
+ * Every tile is a <button> and advertises that it opens something. It opens
+ * here rather than on signal.askakshay.com, because this page's claim is that
+ * it ends here. */
+.hpick{position:relative;margin:var(--s3) 0 0;padding:var(--s4);
+  background:var(--raise2);border:1px solid var(--line2);border-radius:var(--r)}
+.hpick-x{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;
+  border:1px solid var(--line);background:var(--bg);color:var(--mut);cursor:pointer;
+  font-size:1.05rem;line-height:1}
+.hpick-x:hover{color:var(--ink);border-color:var(--line2)}
+.hpick-h{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--s3);
+  flex-wrap:wrap;padding-right:34px;margin-bottom:var(--s3)}
+.hpick-s{display:block;font-weight:800;font-size:1.05rem}
+.hpick-n{display:block;color:var(--dim);font-size:.8rem}
+.hpick-p{text-align:right}
+.hpick-p b{display:block;font-family:var(--mono);font-variant-numeric:tabular-nums;
+  font-size:1.2rem;font-weight:700}
+.hpick-p span{font-family:var(--mono);font-size:.78rem}
+.lv-bk[role="button"]{cursor:pointer}
+.lv-bk[role="button"]:hover{border-color:var(--line2)}
+.lv-bk[role="button"]:focus-visible{outline:2px solid var(--acc);outline-offset:2px}

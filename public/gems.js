@@ -264,6 +264,7 @@
     const idx = {};
     for (const r of HEAT_IDX_ROWS) if (r && r.sym) idx[r.sym] = r;
     const rows = HEAT.rows((t && t.ledger) || {}, idx, WIRE_ROWS || []);
+    HEAT_LAST = rows;                       // the panel resolves a symbol from these
     const big = rows.filter(x => x.h && x.h.sig != null)
       .sort((a, b) => b.h.sig - a.h.sig).slice(0, n);
     if (!big.length) return '';
@@ -274,8 +275,90 @@
         daily range — not a percentage, which is the one number every other heatmap colours
         by and the reason they are all a wall of dramatic smallcaps. The outline is the
         screen's standing call; a dot means the name is in today's wire.</p>
-      <div class="hgrid hgrid-s">${big.map(HEAT.tile).join('')}</div>`;
+      <div class="hgrid hgrid-s">${big.map(HEAT.tile).join('')}</div>
+      <div id="heatPick" class="hpick" hidden></div>`;
   };
+
+  /* ── A TILE HAS TO OPEN SOMETHING ────────────────────────────────────────
+   *
+   * Akshay: "gems site still cannot click on any share price to get details."
+   *
+   * He is right and it was mine: every tile is a <button> with a pointer
+   * cursor and a hover lift — it ADVERTISES that it opens something — and on
+   * this page nothing was listening. Signal's /heat wires a delegated click
+   * that routes to the company page; gems has no company page, so the same
+   * tile did nothing at all. A control that looks interactive and is inert is
+   * worse than a static tile, because the reader concludes the site is broken
+   * rather than that the tile is decorative.
+   *
+   * IT OPENS IN PLACE RATHER THAN LINKING OUT. This page's whole claim is
+   * "one page, and it ends here" — sending a reader to signal.askakshay.com
+   * for the detail is the table-of-contents product this file's own header
+   * says was abandoned. Everything the panel shows is already in hand: the
+   * screen row, the live mark, and the same chart route the expandable rows
+   * use. */
+  const heatPanel = (x) => {
+    const r = x.r || {};
+    const vd = r.vd || {};
+    const scaled = x.h && x.h.sig != null;
+    const fact = (l, v) => v == null || v === '' ? '' :
+      `<div class="fig"><span>${esc(l)}</span><b>${v}</b></div>`;
+    return `<button type="button" class="hpick-x" aria-label="Close">×</button>
+      <div class="hpick-h">
+        <div>
+          <span class="hpick-s">${esc(x.sym)}</span>
+          <span class="hpick-n">${esc(r.name || '')}</span>
+        </div>
+        <div class="hpick-p">
+          <b class="${dir(x.change_pct)}">${esc(x.ccy || '₹')}${Number(x.price).toLocaleString('en-IN')}</b>
+          <span class="${dir(x.change_pct)}">${pct(x.change_pct)} today</span>
+        </div>
+      </div>
+      <p class="said">${scaled
+        ? `That is <b>${x.h.sig.toFixed(2)}×</b> this name's own average daily range —
+           ${esc(HEAT.WORDS[x.h.k])}. The same move in a quieter stock would be a bigger
+           event, and in a wilder one, a smaller one; this is why the tile is that bright.`
+        : `This name has no average range on its row, so the move could not be scaled and the
+           tile is drawn flat rather than at an intensity nobody computed.`}
+        ${x.news ? ' It is named in <b>today\'s wire</b>, above.' : ''}</p>
+      ${vd.c ? `<p class="said"><b>The screen says ${esc(vd.c)}</b>${
+        vd.l ? ` · ${esc(vd.l)}` : ''}${vd.o ? `. ${esc(vd.o)}.` : '.'}
+        ${(x.change_pct > 0 && vd.c === 'AVOID') || (x.change_pct < 0 && vd.c === 'BUY')
+          ? ' <b>Today is moving against that call</b>, which is the interesting case.' : ''}</p>` : ''}
+      ${figs([
+        [num(r.mcap_cr) == null ? '—' : '₹' + Math.round(r.mcap_cr).toLocaleString('en-IN') + ' cr', 'market cap'],
+        [num(r.atr_pct) == null ? '—' : Number(r.atr_pct).toFixed(2) + '%', 'average daily range'],
+        [num(r.rsi) == null ? '—' : Number(r.rsi).toFixed(0), 'RSI'],
+        [num(r.from_high) == null ? '—' : Number(r.from_high).toFixed(1) + '%', 'off 52w high'],
+      ])}
+      ${chartSlot(x.sym)}
+      <p class="said">Every figure here is this company's own row on the screen, priced at the
+        last build; the mark above it is live. <b>Not a position and not advice</b> — no engine
+        on this site is cleared for capital.</p>`;
+  };
+
+  /* One delegated listener for the whole live board. Bound once at startup, so
+     it survives every refresh the board does — a per-tile handler would have
+     to be re-bound on each of them. */
+  let HEAT_LAST = [];
+  function wireHeatPicks() {
+    const host = document.getElementById('live');
+    if (!host || host.dataset.picks) return;
+    host.dataset.picks = '1';
+    host.addEventListener('click', (e) => {
+      const close = e.target.closest('.hpick-x');
+      const pick = document.getElementById('heatPick');
+      if (close && pick) { pick.hidden = true; pick.innerHTML = ''; return; }
+      const b = e.target.closest('[data-hsym]');
+      if (!b || !pick) return;
+      const x = HEAT_LAST.find(r => r.sym === b.dataset.hsym);
+      if (!x) return;
+      pick.innerHTML = heatPanel(x);
+      pick.hidden = false;
+      pick.querySelectorAll('[data-chart]').forEach(h => { fillChart(h); });
+      pick.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+  }
 
   let WIRE_ROWS = null;
 
@@ -383,7 +466,12 @@
           signal on are up right now. Not a portfolio — every one of them is on paper, and no
           engine here is cleared for capital. It is the book being marked in public, which is
           the part that does not exist anywhere else.</p>
-        <div class="lv-book">${ledMove.map(x => `<div class="lv-bk">
+        ${/* CLICKABLE TOO. "Cannot click on any share price" was about every
+             price on this board, not only the heatmap. These carry the same
+             data-hsym the tiles do, so the one delegated listener opens them
+             without a second code path. */''}
+        <div class="lv-book">${ledMove.map(x => `<div class="lv-bk" role="button" tabindex="0"
+            data-hsym="${esc(x.sym)}">
           <span class="lv-bs">${esc(x.sym)}</span>
           <b class="${dir(x.change_pct)}">${pct(x.change_pct)}</b>
           <span class="lv-bp">${esc(x.ccy || '₹')}${Number(x.price).toLocaleString(IST)}</span>
@@ -408,6 +496,7 @@
        the tiles cannot lag the numbers above them by a refresh. */
     try { HEATSTRIP = heatStripFor(t); } catch (e) { HEATSTRIP = ''; }
     host.innerHTML = liveHtml(t);
+    try { wireHeatPicks(); } catch (e) { /* a dead listener must not blank the board */ }
     return t;
   }
 
@@ -700,7 +789,18 @@
        board renders forever without its heatmap and looks, from outside,
        exactly like a feature that was never built. */
     HEAT_IDX_ROWS = rows;
-    WIRE_ROWS = Array.isArray(news) ? news : [];
+    /* THE LIVE WIRE, NOT news.json. The dot claims "in today's wire", and
+       news.json is written by the nightly job — so it could only ever mark a
+       name that was in YESTERDAY'S news. Measured: 18 stale stories with no
+       mention of Tata, against 60 live ones led by the story that moved two
+       Tata names 5-6% that morning. The wire section above still renders from
+       news.json, which is correct for a digest; the DOT is a claim about
+       today and needs today's source. */
+    try {
+      const lw = await get('/api/wire');
+      WIRE_ROWS = (lw && Array.isArray(lw.stories)) ? lw.stories
+                : (Array.isArray(news) ? news : []);
+    } catch (e) { WIRE_ROWS = Array.isArray(news) ? news : []; }
     try {
       const lh = document.getElementById('live');
       if (lh && lh.dataset.ok) liveTick(lh);
