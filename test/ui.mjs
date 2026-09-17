@@ -1644,6 +1644,96 @@ try {
   });
   ok("the tab bar fits the viewport", tabFit === true);
   await mCtx.close();
+
+  /* ── GEMS ────────────────────────────────────────────────────────────────
+   *
+   * THE SECOND PRODUCT HAD NO ASSERTIONS AT ALL. gems.askakshay.com ships
+   * from this repo, on this deploy, reading these feeds, and 268 checks ran
+   * past it without touching it once. It had been sitting on the palette and
+   * the typefaces the full site retired, and nothing here would have said so.
+   *
+   * These are deliberately few. The point is not to re-test the digest's
+   * arithmetic — it re-derives nothing, by design — but to hold the three
+   * things that actually broke: the design system agreeing with the site's,
+   * both themes resolving, and no sentence printed twice.
+   *
+   * Served at /gems here. In production the Worker maps gems.askakshay.com/
+   * to the same asset, but `wrangler dev` cannot be addressed by hostname —
+   * routing on url.hostname worked live and silently did nothing locally,
+   * which is why the Worker reads the Host header. The asset path is the one
+   * address that behaves identically in both. */
+  const gCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const g = await gCtx.newPage();
+  await g.goto(SITE + "/gems", { waitUntil: "domcontentloaded" });
+  await g.waitForTimeout(SETTLE + 4000);
+
+  const gInfo = await g.evaluate(() => {
+    const cs = getComputedStyle(document.body);
+    return {
+      theme: document.documentElement.getAttribute("data-theme"),
+      font: cs.fontFamily.split(",")[0].replace(/['"]/g, ""),
+      bg: cs.backgroundColor,
+      sections: [...document.querySelectorAll("section.sec")].map(x => x.id),
+      parts: document.querySelectorAll(".bpart").length,
+      score: (document.querySelector(".baro-v") || {}).textContent || "",
+    };
+  });
+  ok("gems renders its sections", gInfo.sections.length >= 5, gInfo.sections);
+  // ONE DESIGN SYSTEM, TWO PRODUCTS. The whole reason this block exists.
+  ok("gems uses the site's typeface", gInfo.font === "Jakarta", gInfo.font);
+  ok("gems opens light, as the site does", gInfo.theme === "light", gInfo.theme);
+  ok("gems paints an explicit background", gInfo.bg === "rgb(255, 255, 255)", gInfo.bg);
+  // The barometer is READ, never re-derived — so if the feed answered, the
+  // components it publishes must all be on the page.
+  ok("the barometer reads its components",
+     gInfo.parts === 0 || gInfo.parts >= 4, gInfo.parts);
+  ok("the barometer prints a score out of 100",
+     gInfo.parts === 0 || /\d+\/100/.test(gInfo.score), gInfo.score);
+
+  // A var() with no definition is invalid at computed-value time: the whole
+  // declaration is discarded, silently, with no console error. That is how
+  // 27 rules on the main site rendered as nothing for weeks. Porting a
+  // palette across files is exactly when it happens again.
+  const gVars = await g.evaluate(async () => {
+    const css = await fetch("/gems.css").then(r => r.text());
+    const defined = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map(m => m[1]));
+    const used = new Set([...css.matchAll(/var\((--[a-z0-9-]+)/g)].map(m => m[1]));
+    return [...used].filter(v => !defined.has(v));
+  });
+  ok("every custom property gems uses is defined", gVars.length === 0, gVars);
+
+  // Dark has to be designed, not inverted — and it is one tap away, so it is
+  // half of what a reader sees.
+  const gDark = await g.evaluate(async () => {
+    document.documentElement.setAttribute("data-theme", "dark");
+    await new Promise(r => setTimeout(r, 300));
+    const cs = getComputedStyle(document.body);
+    const el = document.querySelector(".bpart") || document.querySelector("section.sec");
+    return { bg: cs.backgroundColor, fg: cs.color,
+             panel: el ? getComputedStyle(el).color : null };
+  });
+  ok("gems dark theme resolves its own ground",
+     gDark.bg === "rgb(12, 16, 23)", gDark.bg);
+  ok("gems dark theme keeps its ink light",
+     gDark.fg === "rgb(238, 242, 248)", gDark.fg);
+
+  const gDupes = await g.evaluate(() => {
+    // Section staleness badges repeat by design — they are metadata on each
+    // section, not prose. Only sentences are counted.
+    const seen = {};
+    for (const el of document.querySelectorAll("p, li")) {
+      const t = el.innerText.trim();
+      if (t.split(/\s+/).length < 8) continue;
+      seen[t] = (seen[t] || 0) + 1;
+    }
+    return Object.entries(seen).filter(([, n]) => n > 1).map(([t, n]) => `x${n}: ${t.slice(0, 60)}`);
+  });
+  ok("gems prints no sentence twice", gDupes.length === 0, gDupes);
+
+  const gScroll = await g.evaluate(() =>
+    Math.round(document.documentElement.scrollWidth - document.documentElement.clientWidth));
+  ok("gems does not scroll sideways", gScroll <= 0, gScroll);
+  await gCtx.close();
 } finally {
   await browser.close();
 }

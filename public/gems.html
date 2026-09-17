@@ -14,24 +14,31 @@
 <meta property="og:description" content="Market state, the one setup worth reading, institutional flow, IPO books and the honest record. One page, every morning.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Gems — today's Indian market in one page">
-<meta name="theme-color" content="#0B0F14">
-<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C1017" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
 <link rel="icon" href="/icon.svg">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Gems">
-<!-- The body face first; the mono second. Same reasoning as the full site. -->
-<link rel="preload" href="/fonts/Manrope-500-latin.woff2" as="font" type="font/woff2" crossorigin>
+<!-- The body face first; the mono second. Same reasoning as the full site,
+     and now the same FILE: one variable face, weights 200-800, replacing the
+     three static Manrope weights this page used to pull. Preloading a font
+     the stylesheet no longer references costs a reader a download and buys
+     nothing, which is what the old pair had become. -->
+<link rel="preload" href="/fonts/PlusJakarta-var-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/JetBrainsMono-500-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/gems.css">
 <script>
-/* Theme before first paint. Gems is dark-first — it is read at 6am on a phone
-   — but an explicit light choice still wins, and it shares the key with the
-   main site so a reader's preference travels between the two. */
+/* Theme before first paint, so the page never flashes the wrong ground.
+   LIGHT IS THE DEFAULT NOW, matching the full site. It shares the `sig:theme`
+   key with signal.askakshay.com, so a reader who chose dark there arrives here
+   dark, and the two products stop looking unrelated to the same person.
+   An explicit stored choice always wins over the default. */
 (function(){try{
   var c=localStorage.getItem('sig:theme');
-  if(c!=='dark'&&c!=='light') c='dark';
+  if(c!=='dark'&&c!=='light') c='light';
   document.documentElement.setAttribute('data-theme',c);
-}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();
+}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
 </script>
 </head>
 <body>

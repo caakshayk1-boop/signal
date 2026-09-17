@@ -2,53 +2,77 @@
  *
  * A one-page daily digest. Not a compressed version of signal.askakshay.com —
  * a different product with a different job: answer "what do I need to know
- * today" in one scroll, and hand off to the full site for anything deeper.
+ * today" in one scroll.
  *
- * DARK FIRST, and that is a decision rather than a default: this is read at
- * 6am on a phone before the market opens. Light is fully designed, not an
- * inversion — the accent moves and the neutrals warm, because a blue that
- * reads as calm on black reads as cold on white.
+ * SAME DESIGN SYSTEM AS THE SITE, AND THAT IS THE POINT OF THIS REVISION.
+ * Gems shipped on the palette and the typefaces the full site has since
+ * retired — Manrope and JetBrains Mono on a near-black ground, against
+ * signal's Plus Jakarta Sans on a blue-grey white. Two products that share a
+ * repo, a deploy, a test suite and every feed do not get to look like two
+ * companies. The tokens below are signal.css's, copied value for value, which
+ * is also why they are worth copying rather than re-deriving: a second palette
+ * is a second answer to the same question, and this repo has already had two
+ * surfaces drift until one had to be frozen.
  *
- * The type carries the density. One family for the interface, one mono for
- * every figure, and tabular numerals everywhere digits stack — a digest is
- * mostly numbers, and numbers that jitter as they update are unreadable.
+ * LIGHT FIRST NOW, reversing the original decision. The old note argued
+ * dark-first because this is read at 6am on a phone, which was a real
+ * argument — but the full site moved to light and the reader's theme choice
+ * already travels between the two on the shared `sig:theme` key. A digest
+ * that opens black while the site it summarises opens white reads as a
+ * different product, which costs more than the 6am argument wins. Dark is
+ * fully designed, in the same blue family, and one tap away.
+ *
+ * The type still carries the density: one variable family for the interface,
+ * one mono for every figure, tabular numerals wherever digits stack.
  * ─────────────────────────────────────────────────────────────────────────── */
 
 :root{
-  --bg:#0B0F14; --surf:#141A22; --raise:#1B222C; --line:rgba(255,255,255,.09);
-  --line2:rgba(255,255,255,.16);
-  --ink:#F2F5F9; --mut:#B3BDCA; --dim:#8D97A5;
-  --acc:#5B9CFF; --acc-soft:rgba(91,156,255,.14);
-  --up:#2BD07C; --dn:#FF6B6B; --warn:#F0B429;
-  --up-soft:rgba(43,208,124,.13); --dn-soft:rgba(255,107,107,.13); --warn-soft:rgba(240,180,41,.13);
+  /* signal.css's light palette, copied exactly. Blue-grey neutrals, one
+     indigo accent, up/down tuned toward Groww's hue but held at a depth that
+     stays readable at 11px on white. */
+  --bg:#FFFFFF; --surf:#FFFFFF; --raise:#F1F4F8; --raise2:#F9FAFC;
+  --line:#E7EAF0; --line2:#D8DEE8;
+  --ink:#1A2233; --mut:#44475B; --dim:#707A8C;
+  --acc:#5669FF; --acc-soft:rgba(86,105,255,.08); --on-acc:#FFFFFF;
+  --up:#0A9D74; --dn:#E0483D; --warn:#B07A08;
+  --up-soft:rgba(10,157,116,.10); --dn-soft:rgba(224,72,61,.09); --warn-soft:rgba(176,122,8,.10);
 
-  --ui:'Manrope',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  /* One variable face, weights 200-800, in place of three static Manrope
+     files. --serif points at the same family: the redesign dropped the serif
+     headline, and a token pointing at a face nothing loads is how a heading
+     silently falls back to Georgia. */
+  --ui:'Jakarta',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --mono:'JBMono',ui-monospace,SFMono-Regular,Menlo,monospace;
-  --serif:'Newsreader',Georgia,serif;
+  --serif:var(--ui);
 
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:22px; --s6:32px; --s7:48px;
-  --r:14px; --r2:10px; --r3:6px;
+  /* 14 -> 16, matching the site. Almost every panel resolves its corners
+     through this one token, so it is the largest single change in how the
+     page reads. */
+  --r:16px; --r2:12px; --r3:8px;
   --wrap:760px; --toph:122px;
 }
-:root[data-theme="light"]{
-  --bg:#FFFFFF; --surf:#FFFFFF; --raise:#F5F6F8; --line:rgba(10,16,28,.10);
-  --line2:rgba(10,16,28,.17);
-  --ink:#0A0A0A; --mut:#3E3E3E; --dim:#6B6B6B;
-  --acc:#1B5FD9; --acc-soft:rgba(27,95,217,.07);
-  --up:#0E7C48; --dn:#C23B2E; --warn:#8A6208;
-  --up-soft:rgba(14,124,72,.10); --dn-soft:rgba(194,59,46,.09); --warn-soft:rgba(138,98,8,.11);
+/* DARK FOLLOWS THE SAME BLUE FAMILY, or the toggle changes more than the
+   brightness — signal.css's reasoning, and its values. */
+:root[data-theme="dark"]{
+  --bg:#0C1017; --surf:#141B25; --raise:#1A2230; --raise2:#151C27;
+  --line:#242E3E; --line2:#33404F;
+  --ink:#EEF2F8; --mut:#AEB9C9; --dim:#7E8AA0;
+  --acc:#8091FF; --acc-soft:rgba(128,145,255,.15); --on-acc:#0C1017;
+  --up:#2ECC93; --dn:#FF6B60; --warn:#F0B429;
+  --up-soft:rgba(46,204,147,.14); --dn-soft:rgba(255,107,96,.14); --warn-soft:rgba(240,180,41,.13);
 }
+/* The user agent renders its own surfaces — form controls, scrollbars, a
+   dialog in the top layer — against the OS setting unless told otherwise.
+   Without this, a dark-mode machine drew white UA text on this page's light
+   panels. */
+:root{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
 
-@font-face{font-family:'Manrope';src:url('/fonts/Manrope-500-latin.woff2') format('woff2');
-  font-weight:500;font-display:swap}
-@font-face{font-family:'Manrope';src:url('/fonts/Manrope-600-latin.woff2') format('woff2');
-  font-weight:600;font-display:swap}
-@font-face{font-family:'Manrope';src:url('/fonts/Manrope-700-latin.woff2') format('woff2');
-  font-weight:700;font-display:swap}
-@font-face{font-family:'JBMono';src:url('/fonts/JetBrainsMono-500-latin.woff2') format('woff2');
-  font-weight:500;font-display:swap}
-@font-face{font-family:'Newsreader';src:url('/fonts/Newsreader-400-latin.woff2') format('woff2');
-  font-weight:400;font-display:swap}
+@font-face{font-family:'Jakarta';font-style:normal;font-weight:200 800;font-display:swap;
+  src:url('/fonts/PlusJakarta-var-latin.woff2') format('woff2-variations')}
+@font-face{font-family:'JBMono';font-style:normal;font-weight:500;font-display:swap;
+  src:url('/fonts/JetBrainsMono-500-latin.woff2') format('woff2')}
 
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;scroll-padding-top:calc(var(--toph) + 12px)}
@@ -344,3 +368,33 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 /* Same reason as signal.css: this sheet sets display on .row and .fig, which
    defeats the UA [hidden] rule. */
 [hidden] { display: none !important; }
+
+/* ── THE BAROMETER ─────────────────────────────────────────────────────────
+ * One bar, one number. The components below it are ordinary meters; this is
+ * the headline, so it gets the height and nothing else on the page does. */
+.baro{display:flex;align-items:center;gap:var(--s3);margin:0 0 var(--s4)}
+.baro-t{flex:1;height:14px;border-radius:999px;background:var(--raise);
+  overflow:hidden;border:1px solid var(--line)}
+.baro-t i{display:block;height:100%;border-radius:999px;background:var(--dim);
+  transition:width .5s cubic-bezier(.22,.61,.36,1)}
+.baro-t i.up{background:var(--up)} .baro-t i.dn{background:var(--dn)}
+.baro-t i.flat{background:var(--acc)}
+.baro-v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;
+  font-size:1.35rem;color:var(--ink);flex:none}
+.baro-v u{text-decoration:none;font-size:.8rem;font-weight:500;color:var(--dim)}
+@media(prefers-reduced-motion:reduce){.baro-t i{transition:none}}
+
+/* One row per barometer component: the bar, its weight, its score and the
+   sentence behind it. Previously a meter list and a detail list, which
+   printed every label twice. */
+.bparts{display:grid;gap:var(--s3);margin:0 0 var(--s4)}
+.bpart{padding:var(--s3) var(--s4);background:var(--raise2);border:1px solid var(--line);
+  border-radius:var(--r2)}
+.bp-h{display:flex;align-items:baseline;gap:var(--s2);flex-wrap:wrap}
+.bp-l{font-weight:700;font-size:.95rem}
+.bp-w{color:var(--dim);font-size:.75rem;margin-right:auto}
+.bp-v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;color:var(--mut)}
+.bp-t{display:block;height:6px;border-radius:999px;background:var(--line);
+  overflow:hidden;margin:var(--s2) 0 var(--s2)}
+.bp-t i{display:block;height:100%;border-radius:999px;background:var(--acc)}
+.bp-d{margin:0;color:var(--dim);font-size:.85rem;line-height:1.5}

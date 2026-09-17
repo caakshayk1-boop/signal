@@ -133,6 +133,36 @@
 
   /* A 0–100 meter with its own midpoint marked, so 44% reads as "under half"
      without the reader doing arithmetic. */
+  /* ── WHAT THIS CALENDAR MONTH HAS HISTORICALLY DONE FOR ONE NAME ────────
+   *
+   * Investtech built a business on this and neither of these two products
+   * showed it. It is also the most misused statistic in retail investing, so
+   * the three guards the feed enforces are carried through to the sentence:
+   *
+   *   · A month needs eight completed observations to appear at all. Below
+   *     that the feed stores null and this prints nothing — a three-year hit
+   *     rate would read exactly as authoritative as a ten-year one.
+   *   · The HIT RATE and the MEDIAN always travel together. "+3.1% in
+   *     September" hides whether that is nine small gains or one +40% year
+   *     carrying nine losses.
+   *   · It says what it is. A calendar has no causal claim on a share price;
+   *     this records what repeatedly happened, which is a weaker and more
+   *     honest statement than a forecast.
+   */
+  const seasLine = (seas, sym) => {
+    const d = seas && seas.stocks && seas.stocks[sym];
+    const m = d && d.m && d.m[new Date().getMonth()];
+    if (!m) return '';
+    const month = new Date().toLocaleDateString('en-IN', { month: 'long' });
+    const tone = m[0] >= 67 ? 'up' : m[0] <= 40 ? 'dn' : '';
+    return `<p class="said"><b>${esc(month)}, historically.</b> Rose in
+      <b class="${tone}">${m[0]}%</b> of the last ${m[2]}, median
+      <b class="${m[1] > 0 ? 'up' : 'dn'}">${m[1] > 0 ? '+' : ''}${m[1]}%</b> —
+      over ${d.y} years. ${m[0] >= 67 ? 'A supportive month on the record.'
+        : m[0] <= 40 ? 'A weak month on the record.'
+        : 'No seasonal tilt either way.'} Historical, not predictive.</p>`;
+  };
+
   const meter = (label, v, good = 50) => {
     const n = num(v); if (n == null) return '';
     return `<div class="mt"><span class="mt-l">${esc(label)}</span>
@@ -231,7 +261,7 @@
 
   /* ── the page ───────────────────────────────────────────────────────────── */
   async function build() {
-    const [screen, stats, sigs, insti, ipo, ipoLive] = await Promise.all([
+    const [screen, stats, sigs, insti, ipo, ipoLive, baro, seas] = await Promise.all([
       get('/screen.json'), get('/api/stats'), get('/api/signals?limit=400'),
       get('/institutional.json'), get('/ipo.json'),
       /* THE SUBSCRIPTION BOOK HAS TO BE LIVE OR IT IS WORTHLESS.
@@ -241,6 +271,23 @@
        * current-issue endpoint behind a 15-minute edge cache; the full site
        * already used it and this page did not. */
       get('/api/ipo-live'),
+      /* TWO FEEDS THE FULL SITE PUBLISHES AND THIS PAGE DID NOT READ.
+       *
+       * barometer.json is the SINGLE DEFINITION of the market score. It used
+       * to be computed in the browser, and keeping a second copy here would
+       * be a second answer to one question — the fault this file's own header
+       * warns about and this repo has already paid for four times (four
+       * engines, four target ladders). The score is read, never re-derived.
+       *
+       * seasonality.json carries eleven years of calendar-month records. It
+       * is the one dimension neither product showed, and on a digest read at
+       * 6am it answers a question the screen cannot: is this a month this
+       * name has historically done anything in.
+       *
+       * Both are optional. get() resolves null on a miss, every reader below
+       * guards, and a section whose feed did not answer is absent rather than
+       * empty — which is this page's existing rule, not a new one. */
+      get('/barometer.json'), get('/seasonality.json'),
     ]);
 
     const d = new Date();
@@ -358,6 +405,80 @@
     /* ── 1. THE MARKET ─────────────────────────────────────────────────────
      * Breadth over 750 names, not an index level. An index says what fifty
      * weighted names did; breadth says what the market did. */
+    /* ── 0. THE READING, AND WHAT THE FALL HAS PUT ON OFFER ────────────────
+     *
+     * Akshay's question, in his words: "even at bad, when can we start
+     * investing — COVID was bad but whoever invested at those lows became
+     * rich." A breadth panel cannot answer that. It says conditions are poor
+     * at precisely the moment the answer should be "this is the entry".
+     *
+     * So TWO readings, and they move against each other on purpose. The
+     * barometer scores conditions now. The stage scores what the fall has put
+     * on sale — and the second one improves as the first one gets worse.
+     * Neither is computed here: barometer.py owns the arithmetic, publishes
+     * the weights so the derivation is visible, and this page renders it.
+     *
+     * IT IS SCORED AFTERWARDS, WHICH IS THE PART THAT MATTERS. Every reading
+     * is written down daily, and once a year has passed the file carries what
+     * the index actually DID after each one. Where that measurement exists it
+     * is printed, including when it is unflattering; where it does not, the
+     * page says the window has not closed yet rather than showing an average
+     * of the readings that happen to be old enough. */
+    const bt = baro && baro.today;
+    if (bt && bt.score != null) {
+      const band = bt.band || {}, stg = bt.stage || {};
+      const out = ((baro.outcomes || {})[stg.k] || {});
+      const m12 = out.m12;
+      add('reading', 'Reading', sec('reading', 'Where the market stands',
+        `<b>${bt.score}</b> out of 100 — <span class="${esc(band.c || '')}">${esc(band.t || '')}</span>.
+         On what has been put on sale: <b class="${esc(stg.c || '')}">${esc(stg.t || '—')}</b>.
+         These two move <i>against</i> each other, and that is the point.`,
+        `<div class="baro" role="img" aria-label="Barometer ${bt.score} of 100, ${esc(band.t || '')}">
+          <span class="baro-t"><i class="${esc(band.c || 'flat')}"
+            style="width:${clamp(bt.score, 0, 100)}%"></i></span>
+          <span class="baro-v">${bt.score}<u>/100</u></span>
+        </div>` +
+        figs([
+          [num(bt.drawdown_pct) == null ? '—' : `${Number(bt.drawdown_pct).toFixed(1)}%`,
+           'index off its high', bt.drawdown_pct >= 10 ? 'dn' : ''],
+          [num(bt.above_200dma_pct) == null ? '—' : `${Number(bt.above_200dma_pct).toFixed(0)}%`,
+           'above their 200-day'],
+          [num(bt.vix) == null ? '—' : Number(bt.vix).toFixed(2), 'India VIX'],
+          [`${bt.counted || '—'}`, 'names counted'],
+        ]) +
+        /* The components, with their weights, because a score whose
+           derivation you cannot see is a horoscope. The file publishes them
+           precisely so this does not have to assume them.
+           ONE ROW PER COMPONENT, not a meter list and then a detail list —
+           the first build stacked both and printed every label twice, which
+           is the exact complaint that started this pass. The bar, the weight,
+           the score and the sentence behind it belong to one component and
+           now sit in one block. */
+        `<div class="bparts">${(bt.parts || []).map(pt => `
+          <div class="bpart">
+            <div class="bp-h"><span class="bp-l">${esc(pt.label)}</span>
+              <span class="bp-w">${pt.weight}% of the score</span>
+              <span class="bp-v">${Number(pt.score).toFixed(0)}</span></div>
+            <span class="bp-t"><i style="width:${clamp(pt.score, 0, 100)}%"></i></span>
+            <p class="bp-d">${esc(pt.detail || '')}</p>
+          </div>`).join('')}</div>` +
+        (m12 && m12.n
+          ? `<p class="said"><b>Measured:</b> after ${m12.n} past ${
+              m12.n === 1 ? 'reading' : 'readings'} of
+             <b>${esc(stg.t || stg.k)}</b>, the index was <b class="${m12.avg > 0 ? 'up' : 'dn'}">${
+             m12.avg > 0 ? '+' : ''}${m12.avg}%</b> a year later, higher ${m12.hit}% of the time.
+             That is this framework marking its own homework, and it is published whether or
+             not it flatters the framework.</p>`
+          : `<p class="said">No measured outcome for this stage yet. The reading is written
+             down every day and scored once three, six and twelve months have actually
+             passed — a running average that quietly mixed unfinished windows would flatter
+             this page, so there is none until a window closes.</p>`) +
+        `<p class="said">Weights: ${Object.entries(baro.weights || {})
+          .map(([k, v]) => `${esc(k)} ${v}%`).join(' · ')}. Published rather than hidden,
+          because a score you cannot take apart is not evidence.</p>`,
+        baro.generated_at ? `scored ${String(baro.generated_at).slice(0, 10)}` : stale));
+    }
+
     const b = screen && screen.breadth;
     if (b) {
       const adv = b.counted ? b.advancing / b.counted * 100 : null;
@@ -425,6 +546,7 @@
                <ul class="flags">${r.vd.f.map(f =>
                  `<li><b>${esc(f.w)}</b>${f.e ? `<span>${esc(f.e)}</span>` : ''}</li>`).join('')}</ul>`
                : `<p class="said">The screen attached no warning flags to this name.</p>`}
+             ${seasLine(seas, r.sym)}
              <p class="said">Conviction <b>${esc(r.vd.k || '—')}</b>. A verdict is the screen's
                reading of price and statements — not a recommendation, and not a position.</p>`
           )).join('')}</div>` : '') +
