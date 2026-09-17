@@ -345,9 +345,12 @@
             [num(t.rr) ? Number(t.rr).toFixed(2) + 'R' : '—', 'reward:risk'],
           ])}
           ${ladder(t)}
-          <p class="said">Published ${esc(String(t.date || '').slice(0, 10))} by
+          <p class="said">Published ${esc(String(t.alert_date || t.date || '').slice(0, 10))} by
             <b>${esc(t.signal_type || 'an engine')}</b>${
-              t.timeframe ? ` on the ${esc(t.timeframe)}` : ''}.${
+              t.timeframe ? ` on the ${esc(t.timeframe)}` : ''}${
+            String(t.alert_date || t.date || '').slice(0, 10) < LAUNCH
+              ? ` — before ${esc(LAUNCH)}, so it is open but outside the window this
+                 site's published record counts` : ''}.${
             toStop != null ? ` It is trading <b>${toStop > 0 ? toStop.toFixed(1) + '% above'
               : Math.abs(toStop).toFixed(1) + '% below'}</b> its stop right now${
               risk != null ? `, against ${risk.toFixed(1)}% of risk when it was opened` : ''}.` : ''}
@@ -1214,7 +1217,19 @@
      * only what the move was worth in ATR. The levels are the whole reason
      * the name is on the board. Keyed bare because the ledger writes
      * NIACL.NS and the heat tiles key on NIACL. */
-    for (const r of open) OPEN_BY_SYM.set(bare(r.symbol), r);
+    /* FROM THE WHOLE OPEN BOOK, NOT THE LAUNCH WINDOW — and the first version
+       used `open`, which is `since`-filtered, so it missed 47 of the 103 live
+       tickets. TEGA's is dated 2026-08-15 and the panel found nothing for it
+       while TATACHEM's, dated 2026-09-15, worked; the difference was the
+       counting window and nothing about the position.
+       The launch filter exists so the RECORD counts one population. Whether
+       this book is currently holding a name is a different question, and every
+       open ticket answers it. */
+    for (const r of ledger) {
+      if (String(r.status || '').toUpperCase() !== 'OPEN') continue;
+      if (!(r.entry && r.sl && r.target1)) continue;
+      OPEN_BY_SYM.set(bare(r.symbol), r);
+    }
     const seen = new Set();
     const picks = open.filter(r => {
       const k = String(r.symbol || '').toUpperCase();
