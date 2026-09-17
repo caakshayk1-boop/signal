@@ -102,6 +102,81 @@
          <div class="xd">${detail}</div></details>`
     : `<div class="row">${summary}</div>`;
 
+  /* ── A PRICE CHART, ON EVERY SCRIP, DRAWN ONLY WHEN IT IS OPENED ─────────
+   *
+   * Akshay: "build view chart option entire site — each scrip can be clicked
+   * to view details."
+   *
+   * LAZY IS NOT AN OPTIMISATION HERE, IT IS THE ONLY WORKABLE DESIGN. This
+   * page carries roughly forty expandable scrips across its sections. Drawing
+   * them on load would be forty series requests before a reader has looked at
+   * anything, on a page whose whole promise is that it opens fast on a phone.
+   * A <details> announces exactly when someone wants one, so the fetch waits
+   * for that and the result is kept for the session.
+   *
+   * SVG, NOT A LIBRARY. It is a path, an area fill and two labels. Pulling a
+   * charting library onto a page that currently ships no dependency at all
+   * would cost more than every chart on it.
+   *
+   * The series is CLOSES, daily, from the same /api/signals?series= route the
+   * full site's card chart reads — so the two cannot disagree about what a
+   * stock did, which is the rule this whole file is built on. */
+  const CHARTS = new Map();
+
+  const chartSvg = (pts, w = 640, h = 150) => {
+    if (!pts || pts.length < 2) return '<div class="empty">Not enough history to draw.</div>';
+    const cs = pts.map(p => p.c).filter(c => typeof c === 'number' && isFinite(c));
+    if (cs.length < 2) return '<div class="empty">Not enough history to draw.</div>';
+    const lo = Math.min(...cs), hi = Math.max(...cs);
+    // A FLAT SERIES HAS NO RANGE, AND DIVIDING BY IT IS HOW A CHART BECOMES
+    // NaN. Pad by 1% of the level so a genuinely flat stock draws a flat line
+    // rather than disappearing.
+    const pad = (hi - lo) || (hi * 0.01) || 1;
+    const x = i => (i / (cs.length - 1)) * w;
+    const y = c => h - ((c - lo) / pad) * (h - 8) - 4;
+    const d = cs.map((c, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(c).toFixed(1)}`).join(' ');
+    const up = cs[cs.length - 1] >= cs[0];
+    const first = pts.find(p => typeof p.c === 'number'), last = pts[pts.length - 1];
+    const chg = ((cs[cs.length - 1] - cs[0]) / cs[0]) * 100;
+    return `<div class="gch">
+      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img"
+           aria-label="Closing price, ${esc(first.t)} to ${esc(last.t)}, ${chg > 0 ? 'up' : 'down'} ${Math.abs(chg).toFixed(1)}%">
+        <path d="${d} L${w} ${h} L0 ${h} Z" class="gch-a ${up ? 'up' : 'dn'}"/>
+        <path d="${d}" class="gch-l ${up ? 'up' : 'dn'}" fill="none"/>
+      </svg>
+      <div class="gch-f">
+        <span>${esc(String(first.t).slice(0, 7))}</span>
+        <span class="${up ? 'up' : 'dn'}"><b>${chg > 0 ? '+' : ''}${chg.toFixed(1)}%</b>
+          over the window</span>
+        <span>${inr(lo)} – ${inr(hi)}</span>
+      </div>
+    </div>`;
+  };
+
+  /* A placeholder the delegated listener fills in. `data-chart` carries the
+     symbol; the row is inert until someone opens it. */
+  const chartSlot = (sym) => sym
+    ? `<div class="gch-h" data-chart="${esc(sym)}">
+         <div class="sk" style="height:150px"></div></div>`
+    : '';
+
+  async function fillChart(host) {
+    const sym = host.getAttribute('data-chart');
+    if (!sym || host.dataset.done) return;
+    host.dataset.done = '1';                       // never fetch the same row twice
+    let pts = CHARTS.get(sym);
+    if (!pts) {
+      const r = await get(`/api/signals?series=${encodeURIComponent(sym)}&range=1y`);
+      pts = (r && r.points) || null;
+      if (!pts || !pts.length) {
+        host.innerHTML = '<div class="empty">Price history did not load for this name.</div>';
+        return;
+      }
+      CHARTS.set(sym, pts);
+    }
+    host.innerHTML = `<div class="gch-t">One year of daily closes</div>` + chartSvg(pts);
+  }
+
   const rowHead = (rank, name, sub, val, sub2, tag, sym) => `
     <span class="rk">${rank}</span>
     <span class="rn"><b>${esc(name)}</b><span>${esc(sub)}</span>
@@ -285,9 +360,13 @@
 
   /* ── the page ───────────────────────────────────────────────────────────── */
   async function build() {
-    const [screen, stats, sigs, insti, ipo, ipoLive, baro, seas,
-           news, pulse, reads, funds, health] = await Promise.all([
-      get('/screen.json'), get('/api/stats'), get('/api/signals?limit=400'),
+    const [screen, sigs, insti, ipo, ipoLive, baro, seas,
+           news, pulse, reads, health] = await Promise.all([
+      /* /api/stats went with the record section — it was the only reader.
+         A fetch nobody consumes is not harmless: it is a request on every
+         load, and the next person to see it in the list assumes a section
+         depends on it. */
+      get('/screen.json'), get('/api/signals?limit=400'),
       get('/institutional.json'), get('/ipo.json'),
       /* THE SUBSCRIPTION BOOK HAS TO BE LIVE OR IT IS WORTHLESS.
        * ipo.json is built once, around midnight, so its subscription_x was
@@ -332,13 +411,11 @@
        *             breadth section was reading only the screen's summary and
        *             throwing the sector cut away.
        *   reads   — the weekend studies, one line each.
-       *   funds   — where a monthly SIP goes. The only section here that is
-       *             not about a trade, which is exactly why it belongs.
        *   health  — whether the pipeline behind all of this actually ran. A
        *             footer line, not a section: it is a trust signal, and a
        *             trust signal that takes a whole screen is an apology. */
       get('/news.json'), get('/pulse.json'),
-      get('/weekly_reads.json'), get('/funds.json'), get('/data-health.json'),
+      get('/weekly_reads.json'), get('/data-health.json'),
     ]);
 
     const d = new Date();
@@ -644,6 +721,7 @@
           <div class="rows">${buys.map((r, i) => xr(
             rowHead(i + 1, r.sym, `${esc(r.sector || r.ind || '')}${r.vd.l ? ' · ' + esc(r.vd.l) : ''}`,
               inr(r.price), [pct(r.r1m) + ' 1M', dir(r.r1m)], ['Buy', 'up'], r.sym),
+            chartSlot(r.sym) +
             `<p class="xd-q">${esc(r.vd.o || '')}</p>
              ${figs([
                [pct(r.r1w), '1 week', dir(r.r1w)],
@@ -684,78 +762,25 @@
         stale));
     }
 
-    /* ── 3. THE RECORD, above any idea ─────────────────────────────────────
-     * A digest that leads with picks and buries the record is an advert. */
-    const T = stats && stats.totals;
-    const H = stats && stats.headline;
-    const eng = (stats && stats.by_signal_type) || [];
-    /* ── WHICH LEDGER IS THIS? ─────────────────────────────────────────────
-     * /api/stats is ALL TIME — it opens at 2026-08-03, weeks before this site
-     * started keeping its own record. The headline therefore read "85 closed
-     * trades, 14.1% winners, −0.516R" on a page whose every other section
-     * counts from LAUNCH, where TWO have closed. Both numbers are true and
-     * only one of them is this site's, so the crux now leads with the one it
-     * is accountable for and the older ledger is shown underneath, labelled.
-     * Same fault, and same fix, as the engine cards on /engines. */
-    const closedSince = since.filter(r => String(r.status || '').toUpperCase() !== 'OPEN'
-                                       && r.r_multiple != null);
-    const openSince = since.filter(r => String(r.status || '').toUpperCase() === 'OPEN');
-    const winSince = closedSince.filter(r => num(r.r_multiple) > 0).length;
-    /* The curve, drawn from this site's OWN closes in the order they closed.
-     * It used to render stats.equity_curve, which starts 2026-08-03 and is the
-     * pre-launch book. Below five points a line is noise with a trend through
-     * it, so it simply does not appear. */
-    const sinceCurve = (() => {
-      const cl = closedSince.slice().sort((a, b) =>
-        String(a.closed_at || a.date || '').localeCompare(String(b.closed_at || b.date || '')));
-      let cum = 0;
-      return cl.map((r, i) => ({ i: i + 1, date: String(r.closed_at || r.date || '').slice(0, 10),
-                                 r: num(r.r_multiple), cum_r: (cum += (num(r.r_multiple) || 0)) }));
-    })();
-    const sumR = closedSince.reduce((a, r) => a + (num(r.r_multiple) || 0), 0);
-    if (T && H) {
-      const maxAbs = Math.max(...eng.map(e => Math.abs(num(e.avg_r) || 0)), 0.001);
-      add('record', 'Record', sec('record', 'The record',
-        closedSince.length === 0
-          ? `<b>${since.length}</b> signals published since ${LAUNCH} and
-             <b>${openSince.length}</b> are still open — <b>none has closed</b>. This site has
-             <span class="dim">no win rate and no expectancy of its own yet</span>, and it will
-             not invent one from the older ledger below.`
-          : `<b>${closedSince.length}</b> closed since ${LAUNCH},
-             <b>${winSince}</b> of them winners, <b class="${dir(sumR)}">${rr(sumR / closedSince.length)}</b>
-             each. At ${closedSince.length} closed that is <span class="dim">far too few to mean
-             anything</span>. <b>No engine is cleared for capital.</b>`,
-        /* Written out by hand rather than through figs(); it has to carry the
-         * same order, or this one block reads upside down against every other
-         * on the page. */
-        `<div class="figs">
-          <div class="fig"><span>published since ${esc(LAUNCH)}</span><b>${since.length}</b></div>
-          <div class="fig"><span>still open</span><b>${openSince.length}</b></div>
-          <div class="fig"><span>closed and scored</span><b>${closedSince.length}</b></div>
-          <div class="fig"><span>per trade</span><b class="${closedSince.length ? dir(sumR) : ''}">${
-            closedSince.length ? rr(sumR / closedSince.length) : '—'}</b></div>
-        </div>` +
-        (closedSince.length >= 5 ? (curve(sinceCurve) || '') : '') +
-        `<div class="call dnb"><h3>Read this before the setups below</h3>
-          <p>Everything here is <b>paper</b>. The bar is <b>30 closed trades at t&nbsp;≥&nbsp;2</b>
-             and nothing has reached it${closedSince.length
-               ? ` — this site has <b>${closedSince.length}</b> closed` : ''}. These are setups
-             to examine, not calls to take.</p></div>
-        ${/* ── THE PRE-LAUNCH LEDGER IS NOT ON THIS PAGE ────────────────────
-            * It was: 86 trades closed before launch, a -40.4R curve, and an
-            * all-time table of every engine. All of it true, none of it this
-            * site's, and it dominated the section by volume — a reader saw a
-            * long red line and four figures from a configuration that no
-            * longer exists before reaching the two trades that are actually
-            * this book's record.
-            *
-            * Removed on instruction, and the same call already made on
-            * /signals. It is not deleted from anywhere: the full history is in
-            * the ledger and on the full site's own record. It is simply not
-            * what a page headed "the record" should lead with. */''}`,
-        `since ${esc(LAUNCH)}`));
-    }
-
+    /* ── THE RECORD IS NOT ON THIS PAGE ────────────────────────────────────
+     *
+     * Removed at Akshay's instruction. Worth writing down WHY it was here, so
+     * nobody re-adds it by accident and nobody thinks it was dropped to
+     * flatter the page: this section led with a losing number on purpose —
+     * "a digest that leads with picks and buries its own expectancy is an
+     * advertisement" — and that argument has not changed.
+     *
+     * What changed is the page's job. Gems is now the whole desk read in one
+     * sitting, and a performance ledger is a thing you AUDIT, not a thing you
+     * skim before the open. It is unchanged and in full at
+     * signal.askakshay.com/signals and /engines, losses included.
+     *
+     * ONE LINE HAD TO BE RESCUED FROM IT. "No engine is cleared for capital"
+     * lived in that crux and nowhere else, so deleting the section quietly
+     * deleted the single most important sentence on the page — the whole
+     * reason a reader is allowed to look at six open setups without treating
+     * them as instructions. It now sits on Setups, which is where someone is
+     * actually about to act. */
     /* ── 4. TODAY'S SETUPS ─────────────────────────────────────────────────
      * Open signals since launch, each opening onto its own ladder. */
     /* INDIAN ONLY, because this page says so at the top.
@@ -791,6 +816,7 @@
                 r.market && r.market !== 'NSE' ? ' · ' + esc(r.market) : ''}`,
               money(r.entry, r.currency), [`stop ${money(r.sl, r.currency)}`, 'dn'],
               num(r.rr) ? [`${Number(r.rr).toFixed(1)}R`, 'flat'] : null),
+            chartSlot(bare(r.symbol)) +
             ladder(r) +
             rangeBlock(screenOf(r.symbol), r.symbol, r.market) +
             figs([
@@ -804,7 +830,12 @@
             `<p class="said">Published ${esc(String(r.date || '').slice(0, 10))} by
               <b>${esc(r.signal_type || 'an engine')}</b>, which is on <b>paper</b>. The levels
               are the engine's; the outcome is recorded whichever way it goes.</p>`
-          )).join('')}</div>`
+          )).join('')}</div>
+          <p class="said"><b>No engine on this site is cleared for capital.</b> The bar is
+            30 closed trades at a t-statistic of 2 or better, and nothing has reached it —
+            so every setup above is a record of what an engine published, not a position
+            anyone took. The full ledger, wins and losses, is at
+            <a href="https://signal.askakshay.com/signals">signal.askakshay.com/signals</a>.</p>`
         : `<div class="empty">No open setup carries complete levels today.</div>`,
       `${open.length} open since launch`));
 
@@ -833,6 +864,7 @@
         (accum.length ? `<div class="rows">${accum.map(([sym, x], i) => xr(
             rowHead(i + 1, sym, nameOf(sym) || x.period, pp(x.insti_pp),
               [`FII ${pp(x.fii_pp)}`, dir(x.fii_pp)], ['Both adding', 'up']),
+            chartSlot(sym) +
             `<div class="db-w">${divBar(x.insti_pp, maxPp)}</div>
              ${figs([
                [pp(x.fii_pp), 'FII quarter', dir(x.fii_pp)],
@@ -984,6 +1016,7 @@
                 x.side === 'res' ? 'dn' : 'up'],
               [x.at ? `At its ${x.l.replace('-week', 'w')}` : x.side === 'res' ? 'Under resistance' : 'On support',
                x.at ? 'warn' : x.side === 'res' ? 'warn' : 'up'], x.r.sym),
+            chartSlot(x.r.sym) +
             `<p class="xd-q">${esc(x.r.sym)} trades ${x.at
                ? `right at its <b>${esc(x.l)}</b> of ${inr(x.v)}`
                : `${x.d.toFixed(1)}% ${x.v > num(x.r.price) ? 'below' : 'above'}
@@ -1007,6 +1040,77 @@
         : `<div class="empty">Nothing is at a level worth naming today.</div>`,
       stale));
 
+    /* ── 9. THE CALENDAR ───────────────────────────────────────────────────
+     *
+     * Akshay: "map related summary if possible, for month specific."
+     *
+     * THE MAP ITSELF DOES NOT BELONG ON A BRIEF — 989 cells is a tool you go
+     * and use, not something you read past. Its most useful DIMENSION does:
+     * which names have a record in the month you are standing in, and in the
+     * one about to start. That is the one cut of the map that answers a
+     * question rather than inviting exploration.
+     *
+     * BOTH MONTHS, because mid-September the current month is mostly spent
+     * and the next one is the decision. The feed ranks the coming month for
+     * free; this month is computed from the same stocks block.
+     *
+     * THREE GUARDS, carried through from the feed rather than re-argued:
+     * eight completed observations or the name does not appear; the hit rate
+     * and the median always shown together; and it is cross-referenced with
+     * the screen's own call, so what a reader sees is two independent
+     * readings agreeing or disagreeing, never a calendar on its own. */
+    const stocksS = (seas && seas.stocks) || {};
+    if (Object.keys(stocksS).length) {
+      const MN = ['January','February','March','April','May','June','July',
+                  'August','September','October','November','December'];
+      const now = new Date().getMonth();
+      const rank = (mi) => Object.entries(stocksS).map(([sym, d]) => {
+        const m = (d.m || [])[mi];
+        return m ? { sym, hit: m[0], med: m[1], n: m[2], r: screenOf(sym) } : null;
+      }).filter(Boolean).sort((a, b2) => (b2.hit - a.hit) || (b2.med - a.med));
+
+      const cal = (mi, title) => {
+        const all = rank(mi);
+        if (!all.length) return '';
+        const strong = all.filter(x => x.hit >= 70).slice(0, 5);
+        const weak = all.filter(x => x.hit <= 35).slice(-5).reverse();
+        /* NO data-gpx HERE, AND THIS IS NOT A STYLE PREFERENCE.
+           The live-price pass at the end of this file does
+           `el.textContent = inr(v.price)` on every [data-gpx] element — it is
+           written for the PRICE SPAN of a row, which holds nothing else. Put
+           it on a container and the assignment wipes every child: these cells
+           rendered as a bare "₹1,504" with a LIVE badge where the symbol, the
+           hit rate and the median had been. A calendar cell has no price on
+           it by design; what it carries is an eleven-year record. */
+        const cell = (x, kind) => `<div class="cal-c ${kind}">
+          <span class="cal-s">${esc(x.sym)}</span>
+          <b class="${kind === 'up' ? 'up' : 'dn'}">${x.hit}%</b>
+          <span class="cal-m">median ${x.med > 0 ? '+' : ''}${x.med}%</span>
+          <span class="cal-n">${x.n} years${x.r && x.r.vd && x.r.vd.c
+            ? ` · screen says ${esc(x.r.vd.c)}` : ''}</span>
+        </div>`;
+        return `<h3 class="sub">${esc(title)} — ${esc(MN[mi])}</h3>
+          <p class="said">${all.length} names have ${MN[mi]} on record.
+            ${strong.length} rose in 70% or more of them; ${weak.length} in 35% or fewer.</p>
+          <div class="calg">${strong.map(x => cell(x, 'up')).join('')}</div>
+          ${weak.length ? `<div class="calg cal-w">${weak.map(x => cell(x, 'dn')).join('')}</div>` : ''}`;
+      };
+
+      const nxt = (now + 1) % 12;
+      add('calendar', 'Calendar', sec('calendar', 'The month, on eleven years of record',
+        `Which names have actually done something in <b>${esc(MN[now])}</b>, and in
+         <b>${esc(MN[nxt])}</b>. A calendar has no claim on a share price — this records what
+         <i>repeatedly happened</i>, which is a weaker and more honest statement than a
+         forecast, and it is here as context rather than as a reason.`,
+        cal(now, 'This month') + cal(nxt, 'Next month') +
+        `<p class="said">Only names with <b>eight or more completed observations</b> of that
+          calendar month appear at all — below that a hit rate is a handful of coin flips
+          reading exactly as confidently as a decade. ${Object.keys(stocksS).length} of the
+          989 screened names clear it. The full month-by-month record for any company is on
+          its own page at signal.askakshay.com.</p>`,
+        seas.years ? `${seas.years} years of monthly bars` : ''));
+    }
+
     /* ── 8. THE WEEKEND ────────────────────────────────────────────────────
      * Seven company studies, one per sector, written every Saturday. The full
      * text is a 5-7 minute read each and does not belong on a brief — what
@@ -1026,6 +1130,7 @@
             num(x.mcap_cr) ? ' · ₹' + Math.round(x.mcap_cr).toLocaleString('en-IN') + ' cr' : ''}`,
             num(x.price) == null ? '—' : inr(x.price),
             [`${x.read_minutes || '—'} min`, ''], ['Read', ''], x.sym),
+          chartSlot(x.sym) +
           `<p class="xd-q">${esc(x.name || '')}</p>
            ${(x.facts && x.facts.length)
              ? `<ul class="flags">${x.facts.slice(0, 4).map(f =>
@@ -1040,43 +1145,13 @@
         edition.week ? `week of ${edition.week}` : ''));
     }
 
-    /* ── 9. THE ONE SECTION THAT IS NOT A TRADE ────────────────────────────
-     * A monthly SIP is the only thing on this estate with a measured, boring,
-     * decade-long case behind it, and it sat on a page nobody reaches from a
-     * market brief. Three lines: what the categories are, and the cheapest
-     * credible fund in each. Cost is the lever the investor actually controls
-     * — returns are not, and a screen that ranks on past return teaches the
-     * opposite lesson. */
-    const cats = (funds && funds.categories) || [];
-    if (cats.length) {
-      add('sip', 'SIP', sec('sip', 'Where a monthly SIP goes',
-        `<b>${cats.length}</b> categories screened on AMFI's own NAV history.
-         Direct plans only — the commission is the one difference between two share classes
-         of the same portfolio, and it is the only lever you control.`,
-        `<div class="rows">${cats.slice(0, 5).map((c, i) => {
-          const list = (c.funds || []).slice(0, 3);
-          return xr(
-            rowHead(i + 1, c.label || c.key, esc(c.blurb || ''),
-              `${(c.funds || []).length}`, ['funds', ''], ['', ''], null),
-            list.length
-              ? `<ul class="flags">${list.map(f =>
-                  /* `r3`, not `r3y`. The field was guessed and the guess was
-                     wrong, so every fund rendered its name and a blank where the
-                     return belonged — the failure mode of an optional chain is
-                     silence, which is why it survived a visual check. */
-                  `<li><b>${esc(f.name || f.scheme || '')}</b><span>${
-                    [f.house ? esc(f.house) : '',
-                     num(f.r3) == null ? '' : `3-year ${Number(f.r3).toFixed(1)}% a year`,
-                     num(f.dd3) == null ? '' : `worst fall ${Number(f.dd3).toFixed(0)}%`
-                    ].filter(Boolean).join(' · ')}</span></li>`).join('')}</ul>`
-                + `<p class="said">Past return is shown because it is what exists, not because
-                   it predicts. Nothing measured says last decade's leader leads the next.</p>`
-              : `<p class="said">No fund in this category cleared the screen on this build.</p>`
-          );
-        }).join('')}</div>`,
-        funds.generated_at ? `screened ${String(funds.generated_at).slice(0, 10)}` : ''));
-    }
-
+    /* ── THE SIP SHELF IS NOT ON THIS PAGE ─────────────────────────────────
+     * Added and removed the same day, at Akshay's instruction. It was the one
+     * section here not about the market, which was the argument FOR it and,
+     * on a page read before the open, is the better argument against: a
+     * monthly SIP is a once-a-month decision and this is a daily brief. It
+     * remains in full at signal.askakshay.com/funds. funds.json is no longer
+     * fetched. */
     /* ── THE FOOTER LINE: DID ANY OF THIS ACTUALLY RUN ─────────────────────
      * Every figure above came from a job that either ran or silently did not,
      * and this estate has been bitten by the second more than once — a green
@@ -1096,6 +1171,23 @@
     }
 
     app.innerHTML = out.join('');
+
+    /* ── ONE LISTENER FOR EVERY CHART ON THE PAGE ──────────────────────────
+     * Delegated on `toggle`, which fires on the <details> itself and does NOT
+     * bubble — so it is captured. The alternative, binding per row, means
+     * forty listeners and re-binding after every repaint; this survives both
+     * and costs one.
+     *
+     * A row that is already open at bind time (none today, but a future
+     * `open` attribute would do it) is filled immediately, so the chart is
+     * never waiting on a toggle that already happened. */
+    app.addEventListener('toggle', (e) => {
+      const d = e.target;
+      if (!d || d.tagName !== 'DETAILS' || !d.open) return;
+      d.querySelectorAll('[data-chart]').forEach(h => { fillChart(h); });
+    }, true);
+    app.querySelectorAll('details[open] [data-chart]').forEach(h => { fillChart(h); });
+
     jump.innerHTML = nav.map(([id, label]) =>
       `<button type="button" data-to="${id}">${esc(label)}</button>`).join('');
     wire_up(nav);

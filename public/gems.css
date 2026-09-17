@@ -441,3 +441,31 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
   background:var(--raise2);border:1px solid var(--line);border-left:3px solid var(--up);
   border-radius:var(--r2);color:var(--mut);font-size:.85rem;line-height:1.55}
 .health.is-bad{border-left-color:var(--warn)}
+
+/* ── THE CALENDAR: the one cut of the map that belongs on a brief ──────────
+   Which names have a record in the month you are standing in. */
+.calg{display:grid;grid-template-columns:repeat(auto-fit,minmax(152px,1fr));gap:var(--s2);
+  margin:0 0 var(--s3)}
+.cal-c{padding:var(--s3);border:1px solid var(--line);border-radius:var(--r3);
+  background:var(--raise2);display:grid;gap:2px;border-left:3px solid var(--line2)}
+.cal-c.up{border-left-color:var(--up)} .cal-c.dn{border-left-color:var(--dn)}
+.cal-s{font-weight:800;font-size:.88rem}
+.cal-c b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:1.15rem}
+.cal-m{color:var(--mut);font-size:.75rem}
+.cal-n{color:var(--dim);font-size:.72rem}
+
+/* ── THE PRICE CHART ON EVERY SCRIP ───────────────────────────────────────
+   An SVG path, an area fill and three labels. No library: this page ships no
+   dependency at all and one chart is not a reason to start. */
+.gch-h{margin:0 0 var(--s3)}
+.gch-t{color:var(--dim);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;
+  margin:0 0 var(--s2)}
+.gch svg{display:block;width:100%;height:150px;border:1px solid var(--line);
+  border-radius:var(--r3);background:var(--raise2)}
+.gch-l{stroke-width:2;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.gch-l.up{stroke:var(--up)} .gch-l.dn{stroke:var(--dn)}
+.gch-a{opacity:.13;stroke:none}
+.gch-a.up{fill:var(--up)} .gch-a.dn{fill:var(--dn)}
+.gch-f{display:flex;justify-content:space-between;gap:var(--s2);margin-top:6px;
+  color:var(--dim);font-size:.74rem;flex-wrap:wrap}
+.gch-f b{font-family:var(--mono);font-variant-numeric:tabular-nums}

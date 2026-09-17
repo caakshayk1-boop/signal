@@ -1749,24 +1749,83 @@ try {
       sectors: document.querySelectorAll(".secr").length,
       wire: document.querySelectorAll(".wire li").length,
       reads: document.querySelectorAll("#reads .rows > *").length,
-      sip: document.querySelectorAll("#sip .rows > *").length,
       health: document.querySelectorAll(".health").length,
-      // A blank <span> inside a fund row means a field name was guessed wrong:
-      // optional chaining fails silently and prints nothing at all.
-      blankSpans: [...document.querySelectorAll("#sip .flags li span")]
-        .filter(x => !x.textContent.trim()).length,
     };
   });
   for (const id of ["reading", "market", "sectors", "wire", "verdicts",
-                    "record", "setups", "flow", "ipo", "levels"]) {
+                    "setups", "flow", "ipo", "levels", "calendar", "reads"]) {
     ok(`gems carries the ${id} section`, gCover.ids.includes(id), gCover.ids);
+  }
+  /* REMOVED AT AKSHAY'S INSTRUCTION, and asserted so nobody restores them by
+     reflex. The record is unchanged at /signals and /engines; the fund shelf
+     at /funds. What had to survive the record's removal is the clearance
+     line, which lived only in its crux — see below. */
+  for (const id of ["record", "sip"]) {
+    ok(`gems does not carry the ${id} section`, !gCover.ids.includes(id), gCover.ids);
   }
   ok("every gems section has a jump chip",
      gCover.navLabels === gCover.ids.length, gCover);
   ok("the sector cut renders its rows", gCover.sectors >= 4, gCover.sectors);
   ok("the wire carries headlines", gCover.wire >= 1, gCover.wire);
   ok("one health line, not a section", gCover.health === 1, gCover.health);
-  ok("no fund row prints a blank field", gCover.blankSpans === 0, gCover.blankSpans);
+
+  /* THE ONE SENTENCE THAT MUST NOT GO MISSING. It lived in the record's crux
+     and nowhere else, so deleting that section quietly deleted it — the whole
+     basis on which a reader is shown six open setups without treating them as
+     instructions. It now sits on Setups. */
+  const gClear = await g.evaluate(() =>
+    /No engine on this site is cleared for capital/.test(document.body.innerText));
+  ok("the capital-clearance line survives on the page", gClear === true);
+
+  /* The calendar is the one cut of the map that belongs on a brief. Its cells
+     carry a SYMBOL and an eleven-year hit rate — never a price. `data-gpx` on
+     a container is fatal here: the live-price pass assigns textContent to
+     every element carrying it, which wiped each cell down to a bare "₹1,504"
+     with a LIVE badge. */
+  const gCal = await g.evaluate(() => {
+    const cells = [...document.querySelectorAll(".cal-c")];
+    return {
+      n: cells.length,
+      priceOnly: cells.filter(c => /^₹[\d,.]+$/.test(c.innerText.trim())).length,
+      syms: document.querySelectorAll(".cal-s").length,
+      gpx: document.querySelectorAll(".cal-c[data-gpx]").length,
+      heads: [...document.querySelectorAll("#calendar .sub")].map(h => h.innerText),
+    };
+  });
+  ok("the calendar names both months", gCal.heads.length === 2, gCal.heads);
+  ok("every calendar cell keeps its symbol", gCal.n > 0 && gCal.syms === gCal.n, gCal);
+  ok("no calendar cell is overwritten by a live price",
+     gCal.priceOnly === 0 && gCal.gpx === 0, gCal);
+
+  /* ── A CHART ON EVERY SCRIP, DRAWN ONLY ON OPEN ──────────────────────────
+   * Both halves are the assertion. Eager drawing would be ~33 series requests
+   * before a reader looks at anything; never drawing would be a dead slot. */
+  const gChart = await g.evaluate(async () => {
+    const before = document.querySelectorAll(".gch svg").length;
+    const slots = document.querySelectorAll("[data-chart]").length;
+    const d = document.querySelector("#verdicts details.xr");
+    if (!d) return { slots, before, opened: false };
+    d.open = true;
+    await new Promise(r => setTimeout(r, 4000));
+    const svg = d.querySelector(".gch svg");
+    const path = d.querySelector(".gch-l");
+    return { slots, before, opened: true, drew: !!svg,
+             label: svg ? svg.getAttribute("aria-label") : null,
+             nan: path ? /NaN|Infinity/.test(path.getAttribute("d") || "") : null };
+  });
+  ok("every scrip row carries a chart slot", gChart.slots >= 20, gChart.slots);
+  ok("no chart is drawn before a row is opened", gChart.before === 0, gChart.before);
+  ok("opening a row draws its chart", gChart.drew === true, gChart);
+  ok("the chart path carries no NaN", gChart.nan === false, gChart);
+  ok("the chart states the window it drew",
+     /Closing price, \d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}/.test(gChart.label || ""), gChart.label);
+
+  /* The lede lists what the page contains. It listed the record and the SIP
+     shelf for one build after both were removed — copy that advertises a
+     section that is not there is a worse lie than no copy. */
+  const gLede = await g.evaluate(() => (document.getElementById("lede") || {}).innerText || "");
+  ok("the lede does not advertise a removed section",
+     !/\brecord\b|\bSIP\b/i.test(gLede), gLede.slice(0, 120));
 
   /* The studies are stored as MARKDOWN. Slicing one raw put "## In one line"
    * on the page; nothing else on this site renders Markdown, so the excerpt
