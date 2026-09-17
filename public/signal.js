@@ -2841,10 +2841,17 @@
      * this was modelled on, what this book's own closed trades did in that
      * market. Rendered from the feed's cache if it is already in hand, so the
      * front page pays no extra request on first paint. */
+    /* HELD, NOT RE-READ FROM A FIVE-SECOND CACHE — the same fault the heatmap
+       strip had two commits ago and I reintroduced here. This route renders
+       several times; CACHED() only answers for MICRO_MS, so the render
+       triggered by the heavy screen pass found regime.json "not ready" and the
+       whole section vanished from a page that had just shown it. A regime does
+       not go stale in five seconds. */
     const rgm = CACHED('/regime.json');
-    if (rgm.ready && rgm.ok && rgm.data && rgm.data.ok) {
-      try { out += regimeSec(rgm.data); }
-      catch (e) { /* never break the front page over a section */ }
+    if (rgm.ready && rgm.ok && rgm.data && rgm.data.ok) FRONT_REGIME = rgm.data;
+    if (FRONT_REGIME) {
+      try { out += regimeSec(FRONT_REGIME); }
+      catch (e) { console.error('regime section failed:', e); }
     } else if (!regimeTried) {
       regimeTried = true;
       get('/regime.json').then(() => { if (routeOf() === '/') R['/'](); });
@@ -3750,6 +3757,8 @@
    * re-requesting, not about the data going stale. Held here so any render
    * can draw the strip regardless of which pass it is. */
   let FRONT_SCREEN = null;
+  /* Same reason, same fix: see the note at the regime section. */
+  let FRONT_REGIME = null;
 
   // "2026-09-14" -> "14 Sep". Day first, because that is the part that
   // answers "how soon".

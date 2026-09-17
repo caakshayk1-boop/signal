@@ -1857,6 +1857,19 @@ try {
   ok("the front-page strip links to the full heatmap", strip.linksToFull === true);
   ok("the front-page strip is not a flat grid",
      strip.steps.filter(n => n > 0).length >= 2, strip.steps);
+
+  /* THE REGIME SECTION MUST SURVIVE THE PAGE RE-RENDERING. It reads a feed out
+     of a five-second cache; the render triggered by the heavy screen pass
+     found it "not ready" and the whole section vanished from a page that had
+     just shown it. Same fault the heatmap strip had, reintroduced one section
+     over. Checked AFTER the settle, which is when the later renders land. */
+  const rg = await hh.evaluate(() => ({
+    present: !!document.querySelector(".rgm"),
+    label: (document.querySelector(".rgm-k") || {}).innerText || null,
+    engines: document.querySelectorAll(".inds .ind-r").length,
+  }));
+  ok("the regime section survives the page's later renders", rg.present === true, rg);
+  ok("the regime section names a regime", !!rg.label, rg);
   await hHome.close();
 
   /* ── EVERY CLIENT ROUTE MUST SURVIVE A COLD LOAD ─────────────────────────
