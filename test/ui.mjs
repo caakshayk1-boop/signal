@@ -1645,6 +1645,89 @@ try {
   ok("the tab bar fits the viewport", tabFit === true);
   await mCtx.close();
 
+  /* ── THE LIVE HEATMAP ────────────────────────────────────────────────────
+   * The page's whole claim is its second channel: brightness is the move in
+   * each name's OWN average range, not in percent. So the assertions are about
+   * the ramp being real and honest, not about tiles existing. */
+  const hCtx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const hp = await hCtx.newPage();
+  await hp.goto(SITE + "/heat", { waitUntil: "domcontentloaded" });
+  await hp.waitForTimeout(SETTLE + 6000);
+
+  const heat = await hp.evaluate(() => {
+    const tiles = [...document.querySelectorAll(".ht[data-hsym]")];
+    const step = (t) => {
+      const c = [...t.classList].find(x => /^ht-[udf]\d$/.test(x));
+      return c ? Number(c.slice(-1)) : null;
+    };
+    const dist = [0, 0, 0, 0, 0];
+    for (const t of tiles) { const k = step(t); if (k != null) dist[k]++; }
+    const lum = (c) => { const m = c.match(/[\d.]+/g); if (!m) return null;
+      const [r, g, b] = m.map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const alphaOf = (k) => {
+      const t = tiles.find(x => x.classList.contains("ht-u" + k));
+      if (!t) return null;
+      const m = getComputedStyle(t).backgroundImage.match(/rgba?\([^)]*?([\d.]+)\)/);
+      return m ? Number(m[1]) : null;
+    };
+    return {
+      tiles: tiles.length,
+      bands: document.querySelectorAll(".hband").length,
+      dist,
+      withBorder: document.querySelectorAll(
+        ".ht-vbuy,.ht-vavoid,.ht-vwatch,.ht-vwait").length,
+      newsDots: document.querySelectorAll(".ht-n").length,
+      legend: document.querySelectorAll(".hl-i").length,
+      barText: (document.querySelector(".ht-bar") || {}).innerText || "",
+      sampleTitle: tiles.length ? tiles[0].title : "",
+      alphas: [1, 2, 3, 4].map(alphaOf),
+      tileSurfaceL: tiles.length ? lum(getComputedStyle(tiles[0]).backgroundColor) : null,
+      bodyL: lum(getComputedStyle(document.body).backgroundColor),
+      sideways: Math.round(document.documentElement.scrollWidth
+                         - document.documentElement.clientWidth),
+    };
+  });
+  ok("the heatmap draws tiles", heat.tiles > 20, heat.tiles);
+  ok("the heatmap groups them by sector", heat.bands >= 5, heat.bands);
+  /* A RAMP THAT NEVER REACHES ITS TOP IS A RAMP THAT LIES. The first cuts
+     (0.35/0.75/1.25/2.0 ATR) measured against the live book put 46 of 97 tiles
+     at step 0, two at step 3 and NOTHING at step 4 — the brightest colours on a
+     page about brightness were unreachable. */
+  ok("the intensity ramp uses more than its bottom step",
+     heat.dist.filter(n => n > 0).length >= 3, heat.dist);
+  ok("no single step holds the whole book",
+     Math.max(...heat.dist) < heat.tiles * 0.75, heat.dist);
+  // Strictly increasing alpha, or the ramp is not a ramp.
+  ok("the ramp's alphas increase with the step",
+     heat.alphas.every(a => a != null) &&
+     heat.alphas.every((a, i) => i === 0 || a > heat.alphas[i - 1]), heat.alphas);
+  ok("every tile carries the screen's standing call",
+     heat.withBorder === heat.tiles, { border: heat.withBorder, tiles: heat.tiles });
+  ok("a tile explains itself in its title",
+     /its average range/.test(heat.sampleTitle) , heat.sampleTitle);
+  ok("the heatmap says how many names it could mark",
+     /marked live/.test(heat.barText), heat.barText.slice(0, 90));
+  ok("the heatmap explains all of its channels", heat.legend >= 4, heat.legend);
+  ok("the heatmap does not scroll sideways", heat.sideways <= 0, heat.sideways);
+
+  /* THE TILE SURFACE MUST BELONG TO THE THEME IT IS DRAWN ON. A ramp built on
+     a surface token that did not follow the theme would put dark tiles on a
+     white page. */
+  ok("the tile surface sits on the same side as the page",
+     heat.bodyL > 128 ? heat.tileSurfaceL > 128 : heat.tileSurfaceL < 128,
+     { body: heat.bodyL, tile: heat.tileSurfaceL });
+  await hCtx.close();
+
+  /* ── EVERY CLIENT ROUTE MUST SURVIVE A COLD LOAD ─────────────────────────
+   * /map and /reads had been live for days and returned 404 to anyone who
+   * refreshed, bookmarked or shared them — they were missing from the Worker's
+   * page allow-list, and in-app navigation never asks it. Only a direct fetch
+   * catches this, which is why it is asserted here rather than by clicking. */
+  for (const route of ["/heat", "/map", "/reads", "/screen", "/signals", "/discover"]) {
+    const res = await fetch(SITE + route, { redirect: "follow" });
+    ok(`${route} answers a cold request`, res.status === 200, res.status);
+  }
+
   /* ── GEMS ────────────────────────────────────────────────────────────────
    *
    * THE SECOND PRODUCT HAD NO ASSERTIONS AT ALL. gems.askakshay.com ships
@@ -1819,6 +1902,61 @@ try {
   ok("the chart path carries no NaN", gChart.nan === false, gChart);
   ok("the chart states the window it drew",
      /Closing price, \d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}/.test(gChart.label || ""), gChart.label);
+
+  /* ── THE LIVE BOARD ──────────────────────────────────────────────────────
+   * It boots separately from the brief and must stand on its own: a failure
+   * here cannot take the page down, and a success here must not depend on
+   * screen.json having finished. */
+  const gLive = await g.evaluate(() => {
+    const h = document.querySelector(".lv-h");
+    if (!h) return { rendered: false };
+    const st = document.querySelector(".lv-st");
+    const anchors = [...document.querySelectorAll(".lv-in")].map(e => e.innerText.trim());
+    const secs = [...document.querySelectorAll(".lv-sn")].map(e => e.innerText.trim());
+    const dots = [...document.querySelectorAll(".lv-dot")].map(d => parseFloat(d.style.left));
+    return {
+      rendered: true,
+      words: h.innerText,
+      openWord: /MARKET OPEN/i.test(h.innerText),
+      openClass: !!(st && st.classList.contains("is-open")),
+      anchors, secs,
+      dots: dots.length,
+      dotsInRange: dots.every(v => Number.isFinite(v) && v >= 0 && v <= 100),
+      book: document.querySelectorAll(".lv-bk").length,
+      bookNote: (document.querySelector(".lv-book") || {}).previousElementSibling?.innerText || "",
+      footer: (document.querySelector(".lv-f") || {}).innerText || "",
+    };
+  });
+  ok("the live board renders below the hero", gLive.rendered === true);
+  // The dot and the word must agree, or one of them is lying about the session.
+  ok("the session word and its colour agree",
+     gLive.openWord === gLive.openClass, { w: gLive.openWord, c: gLive.openClass });
+  ok("the live board names a session state",
+     /MARKET (OPEN|CLOSED)/i.test(gLive.words || ""), gLive.words);
+
+  /* THE ROTATION TABLE IS SECTORS ONLY. Bank Nifty and Midcap 100 are anchors
+     six inches above it, and Smallcap 250 and Nifty Next 50 are size buckets —
+     the first build listed all four as "sectors", which makes a capitalisation
+     move read as a sector call. */
+  const broad = ["Nifty 50", "Sensex", "Bank Nifty", "Midcap 100",
+                 "Smallcap 250", "Nifty Next 50", "India VIX"];
+  const bleed = (gLive.secs || []).filter(x =>
+    broad.some(b => b.toLowerCase().includes(x.toLowerCase())));
+  ok("no broad index is listed as a sector", bleed.length === 0, bleed);
+  ok("the rotation table carries sectors", (gLive.secs || []).length >= 5, gLive.secs);
+
+  /* A rail whose dot sits outside it is drawing a position it does not have —
+     the same class of bug as a chart path with NaN in it. */
+  ok("every range dot sits inside its rail",
+     gLive.dots > 0 && gLive.dotsInRange === true, { n: gLive.dots, ok: gLive.dotsInRange });
+
+  ok("the book is marked live", gLive.book > 0, gLive.book);
+  // The one claim on this panel that must never drift: these are not positions.
+  ok("the live book says it is paper, not a portfolio",
+     /on paper/i.test(gLive.bookNote) && /not a portfolio/i.test(gLive.bookNote),
+     (gLive.bookNote || "").slice(0, 90));
+  ok("the live board states its refresh cadence",
+     /refresh/i.test(gLive.footer || ""), (gLive.footer || "").slice(0, 80));
 
   /* The lede lists what the page contains. It listed the record and the SIP
      shelf for one build after both were removed — copy that advertises a

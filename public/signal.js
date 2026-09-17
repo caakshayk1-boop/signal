@@ -13013,6 +13013,8 @@
    * is the thing a reader needs to choose between them. Ordered by how often
    * they answer a question rather than alphabetically. */
   const DISCOVER = [
+    ['/heat',    'The heatmap',   'Today, in each name’s own units',
+                 'Colour is the move measured against that stock’s own average range, not in percent — so a quiet megacap having a violent day outshines a smallcap having a normal one.'],
     ['/map',     'The map',       'Every NSE name on one screen',
                  'Colour the whole market by the call, momentum, value, or what each month has historically done.'],
     ['/reads',   'Weekly reads',  'Seven companies, studied properly',
@@ -13302,6 +13304,318 @@
      absolute value off a colour — and five is the most anyone can hold. */
   const mapClass = (v) => v == null ? 'mc-na'
     : v >= 75 ? 'mc-5' : v >= 58 ? 'mc-4' : v >= 42 ? 'mc-3' : v >= 25 ? 'mc-2' : 'mc-1';
+
+  /* ══ THE LIVE HEATMAP ═════════════════════════════════════════════════════
+   *
+   * Akshay: "a smart AI-level live heat map, unique, colour changing, with
+   * additional values on the tiles like volume or news — make it unique, which
+   * no one has ever built."
+   *
+   * ────────────────────────────────────────────────────────────────────────
+   * WHY EVERY OTHER HEATMAP IS THE SAME HEATMAP
+   * ────────────────────────────────────────────────────────────────────────
+   * Finviz, TradingView, every terminal: tile SIZE is market cap and tile
+   * COLOUR is percentage change. Two channels, and the second one is broken in
+   * a way nobody fixes — a raw percentage is not comparable across names. A
+   * 2% day in HDFCBANK, which typically moves 0.9%, is a violent session. A 2%
+   * day in a smallcap that routinely swings 5% is a quiet one. Colouring both
+   * the same green teaches the eye to look at exactly the wrong tiles, which
+   * is why every heatmap is a wall of dramatic smallcaps and dead megacaps.
+   *
+   * ────────────────────────────────────────────────────────────────────────
+   * FIVE CHANNELS ON ONE TILE. THIS IS THE PART THAT DOES NOT EXIST ELSEWHERE
+   * ────────────────────────────────────────────────────────────────────────
+   *  1. HUE — direction. Up or down, live.
+   *
+   *  2. INTENSITY — THE MOVE IN THE STOCK'S OWN UNITS. |change| divided by
+   *     that name's average true range. A tile only saturates when the move is
+   *     large FOR THAT STOCK. This is the axis nobody ships, and it is the
+   *     whole point of the page: it makes a 1.4% move in a quiet megacap burn
+   *     brighter than a 3% move in something that does that every Tuesday.
+   *
+   *  3. BORDER — THE SITE'S OWN VERDICT. So a tile can be green today while
+   *     the screen says AVOID, and you can SEE the disagreement rather than
+   *     having to remember it. A heatmap that only knows today has no memory;
+   *     this one carries the standing call underneath the move.
+   *
+   *  4. A DOT — this name is in today's wire. Movement with a reason attached
+   *     is a different object to movement without one.
+   *
+   *  5. SIZE — market cap, the one convention worth keeping.
+   *
+   * ────────────────────────────────────────────────────────────────────────
+   * WHAT IT REFUSES TO DO
+   * ────────────────────────────────────────────────────────────────────────
+   * IT DOES NOT DRAW A TILE IT CANNOT MARK. The live board carries prices for
+   * the names this site has published a signal on — that is what is genuinely
+   * live, and it is what is drawn. Filling the grid out to 989 names with
+   * last night's closes, coloured as though they were current, is the single
+   * dishonesty this whole estate exists to avoid: a stale number wearing a
+   * live badge. The count is stated on the page.
+   *
+   * IT DOES NOT SATURATE A TILE IT CANNOT SCALE. A name with no ATR on its row
+   * gets the flat step and is hatched, because an unscaled move rendered at
+   * full intensity would be the loudest tile on the screen for no reason.
+   */
+  const HEAT_MS = 60000;
+
+  /* ── THE MOVE, IN UNITS OF HOW MUCH THIS NAME NORMALLY MOVES ─────────────
+   *
+   * The ratio is today's change over that stock's average true range, so 1.0
+   * means it has travelled its ENTIRE typical daily range in one direction.
+   * That framing matters for the cuts: a directional change is naturally much
+   * smaller than a high-to-low range, so anything calibrated as if they were
+   * the same scale puts the whole book in the bottom step.
+   *
+   * WHICH IS EXACTLY WHAT THE FIRST VERSION DID. Cuts of 0.35/0.75/1.25/2.0
+   * measured against the live book: median 0.38, p90 1.02, p100 1.97 — so
+   * 46 of 97 tiles sat at step 0, two reached step 3 and NOTHING ever reached
+   * step 4. The brightest colours on a page whose entire point is brightness
+   * were unreachable, which is worse than a bad ramp: it is a ramp that lies
+   * about how unusual a day is.
+   *
+   * These cuts are absolute rather than fitted to a day's percentiles — a
+   * percentile ramp re-scales itself every morning, so the same tile means
+   * something different on a quiet day and the page stops being comparable
+   * with itself. Each step is a sentence instead:
+   *
+   *   < 0.25   barely moved
+   *   0.25-0.5 an ordinary drift
+   *   0.5-1.0  a real move for this name
+   *   1.0-1.5  travelled its whole typical daily range
+   *   >= 1.5   an outsized day, whatever the percentage says
+   */
+  const HEAT_CUTS = [0.25, 0.5, 1.0, 1.5];
+  const HEAT_WORDS = ['barely moved', 'an ordinary drift for this name',
+                      'a real move for this name',
+                      'its whole typical daily range, in one direction',
+                      'an outsized day'];
+  const heatStep = (chg, atr) => {
+    const c = sn(chg), a = lvl(atr);
+    if (c == null) return null;
+    if (a == null) return { k: 0, sig: null };          // cannot scale it
+    const sig = Math.abs(c) / a;
+    const k = sig >= HEAT_CUTS[3] ? 4 : sig >= HEAT_CUTS[2] ? 3
+            : sig >= HEAT_CUTS[1] ? 2 : sig >= HEAT_CUTS[0] ? 1 : 0;
+    return { k, sig };
+  };
+
+  /* Where the screen's sectors line up with a LIVE index, and only where that
+     is honest. Industrials and Utilities have no Nifty sector index on the
+     ticker, so they head their band with nothing rather than with a proxy. */
+  const HEAT_IDX = {
+    'Technology': 'Nifty IT', 'Financial Services': 'Nifty Fin Svc',
+    'Healthcare': 'Nifty Pharma', 'Basic Materials': 'Nifty Metal',
+    'Energy': 'Nifty Energy', 'Consumer Defensive': 'Nifty FMCG',
+    'Real Estate': 'Nifty Realty', 'Consumer Cyclical': 'Nifty Auto',
+  };
+
+  const TIER_SPAN = { mega: 3, large: 2, mid: 2, small: 1, micro: 1 };
+
+  const heatHtml = (t, idx) => {
+    const led = Object.entries((t && t.ledger) || {})
+      .map(([sym, v]) => ({ sym, ...v }))
+      .filter(x => sn(x.change_pct) != null);
+    if (!led.length) {
+      return fail('The heatmap', 'the live board carried no marks to draw');
+    }
+    const india = ((t.segments || []).find(x => x.key === 'india') || {}).items || [];
+    const byName = (n) => india.find(x => x.name === n);
+    const clock = heatClock(byName('Nifty 50') || india[0]);
+
+    /* NAMES IN TODAY'S WIRE. Matched on the ticker itself and on the first
+       word of the registered name when that word is long enough to be
+       distinctive — "SBI" would match half the wire, "GRANULES" would not. */
+    const blob = ((WIRE_CACHE || []).map(n => `${n.title || ''} ${n.summary || ''}`).join(' ')).toUpperCase();
+    const inNews = (r) => {
+      if (!blob) return false;
+      if (blob.includes(r.sym)) return true;
+      const w = String(r.name || '').split(/\s+/)[0].toUpperCase();
+      return w.length >= 6 && blob.includes(w);
+    };
+
+    const rows = led.map(x => {
+      const r = idx[x.sym] || {};
+      const h = heatStep(x.change_pct, r.atr_pct);
+      return { ...x, r, h, sector: r.sector || 'Unclassified',
+               span: TIER_SPAN[r.tier] || 1, news: inNews({ ...r, sym: x.sym }) };
+    });
+
+    const bySec = {};
+    for (const x of rows) (bySec[x.sector] = bySec[x.sector] || []).push(x);
+    const order = Object.entries(bySec).sort((a, b) => b[1].length - a[1].length);
+
+    const up = rows.filter(x => x.change_pct > 0).length;
+    const big = rows.filter(x => x.h && x.h.k >= 3).length;
+    const newsN = rows.filter(x => x.news).length;
+    const dis = rows.filter(x => {
+      const c = String((x.r.vd || {}).c || '').toUpperCase();
+      return (c === 'AVOID' && x.change_pct > 0) || (c === 'BUY' && x.change_pct < 0);
+    }).length;
+
+    const tile = (x) => {
+      const k = x.h ? x.h.k : 0;
+      const d = x.change_pct > 0 ? 'u' : x.change_pct < 0 ? 'd' : 'f';
+      const vd = String((x.r.vd || {}).c || '').toUpperCase();
+      const sigTxt = x.h && x.h.sig != null
+        ? `${x.h.sig.toFixed(2)}× its average range — ${HEAT_WORDS[x.h.k]}`
+        : 'no average range on file, so this move could not be scaled';
+      return `<button type="button" class="ht ht-${d}${k} ht-s${x.span}${
+          x.h && x.h.sig == null ? ' ht-na' : ''}${vd ? ` ht-v${esc(vd.toLowerCase())}` : ''}"
+          data-hsym="${esc(x.sym)}"
+          title="${esc(x.sym)} ${pct(x.change_pct)} · ${esc(sigTxt)}${
+            vd ? ` · the screen says ${esc(vd)}` : ''}${x.news ? ' · in today’s wire' : ''}">
+        <span class="ht-s">${esc(x.sym)}</span>
+        <span class="ht-c">${pct(x.change_pct)}</span>
+        <span class="ht-x">${x.h && x.h.sig != null ? x.h.sig.toFixed(1) + '×' : '—'}</span>
+        ${x.news ? '<i class="ht-n" aria-hidden="true"></i>' : ''}
+      </button>`;
+    };
+
+    const band = ([name, items]) => {
+      const ix = byName(HEAT_IDX[name] || '');
+      items.sort((a, b) => (b.h ? b.h.k : 0) - (a.h ? a.h.k : 0)
+                        || Math.abs(b.change_pct) - Math.abs(a.change_pct));
+      const secUp = items.filter(x => x.change_pct > 0).length;
+      return `<section class="hband">
+        <div class="hb-h">
+          <h3>${esc(name)}</h3>
+          <span class="hb-n">${secUp}/${items.length} up</span>
+          ${ix ? `<span class="hb-i">${esc(ix.name)}
+            <b class="${dir(ix.change_pct)}">${pct(ix.change_pct)}</b></span>`
+               : `<span class="hb-i hb-none">no live sector index</span>`}
+        </div>
+        <div class="hgrid">${items.map(tile).join('')}</div>
+      </section>`;
+    };
+
+    return `<div class="ht-bar">
+        <span class="ht-live ${clock.open ? 'is-open' : 'is-shut'}"><i></i>${
+          clock.open ? 'Live' : 'Market closed'}</span>
+        <span class="ht-meta"><b>${rows.length}</b> names marked live · <b>${up}</b> up ·
+          <b>${big}</b> moving more than 1.25× their own range ·
+          <b>${newsN}</b> in today's wire${dis ? ` · <b>${dis}</b> moving against the screen's call` : ''}</span>
+        <span class="ht-at">${t.fetched_at
+          ? 'as of ' + esc(new Date(t.fetched_at).toLocaleTimeString('en-IN',
+              { hour: '2-digit', minute: '2-digit' })) : ''}</span>
+      </div>
+      ${order.map(band).join('')}`;
+  };
+
+  const heatClock = (it) => {
+    const st = Number(it && it.session_start), en = Number(it && it.session_end);
+    const now = Date.now() / 1000;
+    return { open: String((it && it.session) || '').toLowerCase() === 'open'
+                   && isFinite(st) && isFinite(en) && now >= st && now < en };
+  };
+
+  /* The wire, fetched once for the dots. Its absence costs the page a channel
+     and nothing else — every tile still renders. */
+  let WIRE_CACHE = null;
+
+  const heatLegend = () => sec('How to read it', `
+    <div class="hleg">
+      <div class="hl-i"><span class="hl-sw"><i class="ht ht-u4"></i><i class="ht ht-u2"></i>
+        <i class="ht ht-f0"></i><i class="ht ht-d2"></i><i class="ht ht-d4"></i></span>
+        <div><b>Brightness is the move in the stock's own units</b>, not in percent.
+          A tile only burns when the move is large <i>for that name</i> — its change divided
+          by its own average daily range. This is the whole reason the page exists: on every
+          other heatmap a 2% day looks identical in a megacap that never moves and in a
+          smallcap that does it weekly, and only one of those is news.
+          <br><span class="hl-r">Palest, under a quarter of its range: barely moved.
+          Then an ordinary drift, then a real move, then a tile that has travelled its
+          <b>whole typical daily range in one direction</b>, and brightest of all a day of
+          more than one and a half.</span></div></div>
+      <div class="hl-i"><span class="hl-sw"><i class="ht ht-f0 ht-vbuy"></i>
+        <i class="ht ht-f0 ht-vavoid"></i></span>
+        <div><b>The outline is the screen's standing call</b> — green for buy, red for avoid.
+          A green tile in a red outline is a name going up that this site does not rate, and
+          that disagreement is the most interesting thing on the page.</div></div>
+      <div class="hl-i"><span class="hl-sw"><i class="ht ht-f0"><b class="ht-n"></b></i></span>
+        <div><b>A dot means the name is in today's wire.</b> A move with a reason attached is
+          a different object to a move without one.</div></div>
+      <div class="hl-i"><span class="hl-sw"><i class="ht ht-f0 ht-s3"></i><i class="ht ht-f0 ht-s1"></i></span>
+        <div><b>Size is market capitalisation</b>, the one convention worth keeping.
+          A hatched tile has no average range on its row, so its move could not be scaled and
+          is deliberately shown flat rather than guessed at.</div></div>
+    </div>
+    <p class="hint">Only names this site has actually published a signal on are drawn, because
+      those are the ones the live board marks. Filling the grid out to the full screened
+      universe with last night's closes — coloured as if they were current — is the one thing
+      this estate refuses to do. The number drawn is stated above.</p>`);
+
+  R['/heat'] = async () => {
+    paint(head('Heatmap', 'The market coloured by how far each name has moved in its own '
+      + 'terms, not in percent — with the screen’s standing call around every tile.',
+      'Live') + skel('sk-card', 2), true);
+
+    if (!SCREEN || SCREEN_LITE) {
+      const r0 = noteLadder(await get(FULL_URL));
+      if (r0.ok) setScreen((r0.data.rows || []).filter(x => x && x.sym), false);
+    }
+    const idx = {};
+    for (const r of (SCREEN || [])) idx[r.sym] = r;
+
+    if (WIRE_CACHE == null) {
+      const w = await get('/news.json');
+      WIRE_CACHE = (w.ok && Array.isArray(w.data)) ? w.data : [];
+    }
+
+    const shell = (body) => head('Heatmap',
+      'Every name this book has an opinion on, coloured by how far it has moved in its own '
+      + 'terms rather than in percent, and outlined by the call the screen already made.',
+      'Live') + `<div id="heatHost">${body}</div>` + heatLegend();
+
+    const draw = async () => {
+      const t = await get('/api/ticker');
+      const host = document.getElementById('heatHost');
+      if (!t.ok || !t.data) {
+        if (host && !host.dataset.ok) host.innerHTML = fail('The heatmap', t.error || 'the live board did not answer');
+        return null;
+      }
+      if (!host) { paint(shell(heatHtml(t.data, idx))); return t.data; }
+      host.dataset.ok = '1';
+      host.innerHTML = heatHtml(t.data, idx);
+      return t.data;
+    };
+
+    const first = await get('/api/ticker');
+    paint(shell(first.ok && first.data
+      ? heatHtml(first.data, idx)
+      : fail('The heatmap', first.error || 'the live board did not answer')));
+
+    /* One delegated listener: any tile opens that company's card, which is
+       where the chart, the plan and the eleven-year record already live. */
+    const host = document.getElementById('heatHost');
+    if (host) {
+      host.dataset.ok = '1';
+      host.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-hsym]');
+        if (b) go('/stock/' + encodeURIComponent(b.dataset.hsym));
+      });
+    }
+
+    /* SAME DISCIPLINE AS THE LIVE BOARD: a minute while it trades, a slow beat
+       when it does not — never a dead timer, or a page left open overnight
+       never sees the next session — and nothing at all in a hidden tab.
+       Cleared on teardown so leaving the route stops the polling. */
+    let timer = null, beat = 0;
+    const stop = () => { if (timer) { clearInterval(timer); timer = null; } beat = 0; };
+    const at = (ms) => { if (beat === ms && timer) return; stop(); beat = ms;
+      timer = setInterval(tick, ms); };
+    async function tick() {
+      if (document.hidden) return;
+      const d = await draw();
+      const ii = d && ((d.segments || []).find(x => x.key === 'india') || {}).items;
+      at(ii && ii.length && heatClock(ii[0]).open ? HEAT_MS : HEAT_MS * 15);
+    }
+    if (!document.hidden) at(HEAT_MS);
+    const onVis = () => { if (document.hidden) stop(); else tick(); };
+    document.addEventListener('visibilitychange', onVis);
+    main.addEventListener('sig:teardown', () => {
+      stop(); document.removeEventListener('visibilitychange', onVis);
+    }, { once: true });
+  };
 
   R['/map'] = async () => {
     const intro = 'Every name on the screen, on one page. Colour it by the call, by momentum, '
@@ -14066,6 +14380,8 @@
                      'Every name in the universe on price, trend, quality, value and institutional flow. FII and DII holding quarter on quarter, from the company’s own filings.'],
     '/signals':     ['Signals — the public ledger, wins and losses both',
                      'Every call this book has published, open and closed, with the entry, stop and targets it was sent with and what it actually did.'],
+    '/heat':        ['The heatmap — today in each name’s own units',
+                     'The market coloured by how far each name moved against its own average range rather than in percent, outlined by the screen’s standing call, and marked where a name is in today’s wire.'],
     '/map':         ['The map — every NSE name on one screen',
                      'The whole screened market as one picture, coloured by the call, momentum, value, quality, position in its year, or how often each name has risen in this calendar month over eleven years.'],
     '/reads':       ['Weekly reads — seven companies, studied properly',
@@ -14177,7 +14493,7 @@
   const WHERE = { '/': '', '/markets': 'Markets', '/ideas': 'Ideas', '/ipo': 'IPO',
                   '/screen': 'Screen', '/signals': 'Signals', '/brief': 'Brief', '/watch': 'Watchlist',
                   '/engines': 'The floor', '/radar': 'Radar', '/discover': 'Discover', '/buoy': 'BUOY', '/research': 'Research',
-                  '/map': 'The map', '/reads': 'Weekly reads',
+                  '/map': 'The map', '/reads': 'Weekly reads', '/heat': 'Heatmap',
                   '/join': 'The brief', '/methodology': 'Methodology',
                   '/sources': 'Data sources', '/terms': 'Terms', '/privacy': 'Privacy' };
 

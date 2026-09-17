@@ -65,6 +65,16 @@
     sits at a level, the primary market and the weekend studies. Open any scrip for its
     year of closes, so nothing here is a summary of something kept somewhere else.
   </p>
+  <!-- THE LIVE PANEL BOOTS SEPARATELY FROM THE PAGE, and that is deliberate.
+       Everything below it waits on screen.json, which is 1.5 MB and the
+       slowest thing here. The live dashboard needs one 40 KB request, so it
+       renders in its own pass and is on screen while the brief is still
+       parsing — which is also the honest priority: what the market is doing
+       right now outranks what it did at last night's build. -->
+  <section id="live" class="live" aria-live="polite">
+    <div class="sk" style="height:200px"></div>
+  </section>
+
   <div id="app"><div class="sk" style="height:180px"></div><div class="sk" style="height:240px"></div></div>
 </main>
 

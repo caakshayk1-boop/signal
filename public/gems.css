@@ -469,3 +469,73 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 .gch-f{display:flex;justify-content:space-between;gap:var(--s2);margin-top:6px;
   color:var(--dim);font-size:.74rem;flex-wrap:wrap}
 .gch-f b{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ══ THE LIVE BOARD ════════════════════════════════════════════════════════
+ * Sits below the hero and above everything the morning build produced,
+ * because what the market is doing now outranks what it did last night. */
+.live{max-width:var(--wrap);margin:0 auto var(--s6);padding:0 var(--s4)}
+
+.lv-h{display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap;
+  padding:0 0 var(--s3);border-bottom:1px solid var(--line);margin-bottom:var(--s4)}
+.lv-k{font-weight:800;font-size:1.05rem;letter-spacing:-.01em}
+.lv-st{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.05em}
+.lv-st i{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:none}
+.lv-st.is-open{color:var(--up)} .lv-st.is-open i{background:var(--up);
+  animation:lvpulse 2.4s ease-in-out infinite}
+.lv-st.is-shut{color:var(--dim)}
+@keyframes lvpulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media(prefers-reduced-motion:reduce){.lv-st.is-open i{animation:none}}
+.lv-left{color:var(--mut);font-size:.82rem;font-variant-numeric:tabular-nums}
+.lv-prog{flex:1;min-width:80px;height:4px;border-radius:999px;background:var(--raise);
+  overflow:hidden}
+.lv-prog i{display:block;height:100%;background:var(--acc);border-radius:999px}
+.lv-at{color:var(--dim);font-size:.74rem;font-variant-numeric:tabular-nums;margin-left:auto}
+
+/* The four anchors: price, today's position, the year's position. */
+.lv-top{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:var(--s3);
+  margin-bottom:var(--s5)}
+.lv-idx{padding:var(--s3) var(--s4);background:var(--raise2);border:1px solid var(--line);
+  border-radius:var(--r2)}
+.lv-ih{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s2)}
+.lv-in{font-size:.76rem;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.lv-ih b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.9rem}
+.lv-ip{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:1.3rem;
+  font-weight:700;margin:2px 0 var(--s2)}
+.lv-ir{display:grid;grid-template-columns:52px 1fr 34px;gap:6px;align-items:center;
+  margin-top:4px}
+.lv-rl{color:var(--dim);font-size:.68rem}
+.lv-rv{color:var(--mut);font-size:.7rem;font-variant-numeric:tabular-nums;text-align:right}
+.lv-rail{position:relative;display:block;height:6px;border-radius:999px;
+  background:linear-gradient(90deg,var(--dn-soft),var(--raise),var(--up-soft));
+  border:1px solid var(--line)}
+.lv-rail.lv-na{background:var(--raise);opacity:.5}
+.lv-dot{position:absolute;top:50%;width:9px;height:9px;border-radius:50%;
+  background:var(--dim);transform:translate(-50%,-50%);border:2px solid var(--bg)}
+.lv-dot.up{background:var(--up)} .lv-dot.dn{background:var(--dn)}
+.lv-vix .lv-vw{margin:var(--s2) 0 0;color:var(--dim);font-size:.76rem;line-height:1.45}
+
+.lv-sh{font-size:.95rem;font-weight:800;margin:0 0 var(--s2)}
+.lv-note{margin:0 0 var(--s3);color:var(--mut);font-size:.84rem;line-height:1.55}
+
+/* Fourteen sectors, ranked, each with its position inside its own day. */
+.lv-secs{display:grid;gap:5px;margin-bottom:var(--s5)}
+.lv-sec{display:grid;grid-template-columns:minmax(76px,1fr) 62px minmax(60px,1.6fr) 36px;
+  gap:var(--s2);align-items:center;font-size:.83rem}
+.lv-sn{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lv-sec b{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+
+/* The book, marked live — the panel no other page can carry. */
+.lv-book{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:var(--s2)}
+.lv-bk{padding:var(--s3);background:var(--raise2);border:1px solid var(--line);
+  border-radius:var(--r3);display:grid;gap:1px}
+.lv-bs{font-weight:800;font-size:.84rem}
+.lv-bk b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:1.02rem}
+.lv-bp{color:var(--dim);font-size:.72rem;font-variant-numeric:tabular-nums}
+
+.lv-f{margin:var(--s4) 0 0;color:var(--dim);font-size:.76rem;line-height:1.5}
+
+@media(max-width:620px){
+  .lv-at{margin-left:0;width:100%}
+  .lv-sec{grid-template-columns:minmax(64px,1fr) 56px minmax(44px,1.2fr) 32px}
+}

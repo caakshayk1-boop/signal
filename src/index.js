@@ -297,10 +297,18 @@ export default {
      * /stock/:sym is deliberately permitted with any symbol: whether a ticker
      * exists is a question about the screen's 750 rows, which live in a feed
      * this Worker does not read, so the client answers it and says so. */
+    /* EVERY CLIENT ROUTE HAS TO BE IN HERE, and two were not. /map and /reads
+     * have been live for days, are linked from Discover, and returned 404 on a
+     * COLD load — a refresh, a bookmark, a shared link, a search result. In
+     * the app they worked, because the router never asks this Worker; only
+     * someone arriving at the URL directly ever saw it, which is exactly the
+     * visitor a shared link produces. Measured: /map 404, /reads 404,
+     * /screen 200. Same shape of fault as a page that only renders after an
+     * in-app navigation — it cannot be caught by clicking around. */
     const PAGES = new Set(["/", "/brief", "/discover", "/engines", "/funds",
-      "/gems", "/ideas", "/ipo", "/join", "/markets", "/methodology", "/news",
-      "/privacy", "/radar", "/screen", "/signals", "/sources", "/terms", "/watch",
-      "/buoy", "/research"]);
+      "/gems", "/heat", "/ideas", "/ipo", "/join", "/map", "/markets",
+      "/methodology", "/news", "/privacy", "/radar", "/reads", "/screen",
+      "/signals", "/sources", "/terms", "/watch", "/buoy", "/research"]);
     const p = url.pathname.replace(/\/+$/, "") || "/";
     const isPage = PAGES.has(p) || p.startsWith("/stock/");
     // A request for a real file (/signal.js, /screen.json, /fonts/...) has an

@@ -177,6 +177,236 @@
     host.innerHTML = `<div class="gch-t">One year of daily closes</div>` + chartSvg(pts);
   }
 
+  /* ══ THE LIVE DASHBOARD ═══════════════════════════════════════════════════
+   *
+   * Akshay: "below the hero, a live snapshot with realtime movement of what is
+   * happening in the Indian market — not an EOD thing, 5-10 minute refresh or
+   * lower is fine, only unique things."
+   *
+   * WHAT MAKES IT UNIQUE IS NOT THE PRICES. Every Indian markets site shows
+   * Nifty and Sensex. None of them shows, on one screen, WHERE INSIDE TODAY'S
+   * OWN RANGE each index is sitting — and that is the difference between
+   * "Metal +0.94%" and "Metal +0.94% and pinned at 95% of its day", which are
+   * opposite statements about whether the move is being sold into. The feed
+   * has carried day_range_pos all along and nothing on either site read it.
+   *
+   * FOUR THINGS, AND NOTHING ELSE:
+   *   1. The session clock — is it open, and how much of it is left. A live
+   *      number, because "2h 14m to close" changes how you read everything
+   *      under it.
+   *   2. Fourteen sector indices ranked live, each with its position in its
+   *      OWN day and its own year. Rotation you can see rather than infer.
+   *   3. India VIX, live, in words.
+   *   4. This site's own open names, marked live — how many are up right now
+   *      and which have moved most. No other page in the world has this one,
+   *      because no other page has this book.
+   *
+   * ONE REQUEST. All of it comes from /api/ticker, which the header ticker
+   * already fetches — so the dashboard costs a cache hit, not a new feed.
+   *
+   * IT DOES NOT POLL A MARKET THAT IS SHUT, and it does not poll a tab nobody
+   * is looking at. Both are stated on the panel rather than left implicit: a
+   * dashboard that says "live" while serving a number from 14 hours ago is the
+   * single failure this whole estate is built to avoid.
+   */
+  const LIVE_MS = 60000;            // a minute while it is trading. The ask was 5-10.
+  /* AND A SLOW BEAT WHEN IT IS NOT. The first version called clearInterval the
+     moment it saw a closed session, which is right for the night and wrong the
+     next morning: a page left open from Thursday's close never polled again,
+     so at 09:20 on Friday it was still showing Thursday's last trade under a
+     header that would have said "market closed" all day. Backing off instead
+     of stopping means the board picks the session up on its own. Fifteen
+     minutes costs four requests an hour against a cached edge route. */
+  const IDLE_MS = 900000;
+  const IST = 'en-IN';
+
+  const clockOf = (it) => {
+    const st = Number(it && it.session_start), en = Number(it && it.session_end);
+    const sess = String((it && it.session) || '').toLowerCase();
+    if (!isFinite(st) || !isFinite(en) || en <= st) return { sess, known: false };
+    const now = Date.now() / 1000;
+    const through = Math.max(0, Math.min(100, (now - st) / (en - st) * 100));
+    const leftMin = Math.max(0, Math.round((en - now) / 60));
+    return { sess, known: true, through, leftMin,
+             open: sess === 'open' && now >= st && now < en };
+  };
+
+  const hhmm = (m) => m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`;
+
+  /* Where a price sits between its own low and high, as a dot on a rail. The
+     rail is the DAY by default — the reading nobody publishes. */
+  const posBar = (v, lo, hi, cls) => {
+    const n = num(v);
+    if (n == null) return '<span class="lv-rail lv-na" aria-hidden="true"></span>';
+    const at = clamp(n, 0, 100);
+    return `<span class="lv-rail" role="img"
+        aria-label="${at.toFixed(0)}% of the way from ${esc(lo)} to ${esc(hi)}">
+      <i class="lv-dot ${esc(cls || '')}" style="left:${at.toFixed(1)}%"></i></span>`;
+  };
+
+  const liveHtml = (t) => {
+    const segs = (t && t.segments) || [];
+    const segOf = (k) => (segs.find(x => x.key === k) || {}).items || [];
+    const india = segOf('india');
+    if (!india.length) {
+      return `<div class="empty">The live board did not answer. Everything below is the
+        morning build and says so on each section.</div>`;
+    }
+    const by = (n) => india.find(x => x.name === n);
+    const nifty = by('Nifty 50'), vix = by('India VIX');
+    const clock = clockOf(nifty || india[0]);
+
+    /* SECTORS ONLY. The broad indices are the anchor above; repeating them in
+       the rotation table would say the same thing twice, which is the note
+       this page keeps having to relearn. */
+    /* EVERY BROAD INDEX, not just the three obvious ones. The first list
+       excluded Nifty 50, Sensex and VIX — so Bank Nifty and Midcap 100, which
+       are ANCHORS six inches above, appeared again inside the rotation table,
+       and Smallcap 250 and Nifty Next 50 sat there as "sectors" when they are
+       size buckets. A rotation table is only readable if every row is the same
+       KIND of thing; mixing a size index into it makes "Midcap leads Pharma"
+       look like a sector call when it is a capitalisation one. */
+    const BROAD = new Set(['Nifty 50', 'Sensex', 'India VIX', 'Bank Nifty',
+                           'Midcap 100', 'Smallcap 250', 'Nifty Next 50']);
+    const sect = india.filter(x => !BROAD.has(x.name) && num(x.change_pct) != null)
+      .sort((a, b2) => b2.change_pct - a.change_pct);
+    const upN = sect.filter(x => x.change_pct > 0).length;
+
+    /* THE BOOK, MARKED LIVE. `ledger` is a flat map of this site's own names to
+       their current price and move — the one panel here that cannot be copied,
+       because it needs a book to mark. */
+    const led = Object.entries((t && t.ledger) || {})
+      .map(([sym, v]) => ({ sym, ...v }))
+      .filter(x => num(x.change_pct) != null);
+    const ledUp = led.filter(x => x.change_pct > 0).length;
+    const ledMove = led.slice().sort((a, b2) => Math.abs(b2.change_pct) - Math.abs(a.change_pct)).slice(0, 6);
+
+    const anchor = (it) => it ? `<div class="lv-idx">
+        <div class="lv-ih"><span class="lv-in">${esc(it.name)}</span>
+          <b class="${dir(it.change_pct)}">${pct(it.change_pct)}</b></div>
+        <div class="lv-ip">${esc(String(it.price || ''))}</div>
+        <div class="lv-ir">
+          <span class="lv-rl">today</span>
+          ${posBar(it.day_range_pos, it.day_low, it.day_high, dir(it.change_pct))}
+          <span class="lv-rv">${num(it.day_range_pos) == null ? '—'
+            : Math.round(it.day_range_pos) + '%'}</span>
+        </div>
+        <div class="lv-ir">
+          <span class="lv-rl">52 weeks</span>
+          ${posBar(it.range_pos, it.w52_low, it.w52_high, '')}
+          <span class="lv-rv">${num(it.range_pos) == null ? '—'
+            : Math.round(it.range_pos) + '%'}</span>
+        </div>
+      </div>` : '';
+
+    const stamp = t.fetched_at
+      ? new Date(t.fetched_at).toLocaleTimeString(IST, { hour: '2-digit', minute: '2-digit' })
+      : '';
+
+    return `<div class="lv-h">
+        <span class="lv-k">Right now</span>
+        <span class="lv-st ${clock.open ? 'is-open' : 'is-shut'}">
+          <i></i>${clock.open ? 'Market open' : 'Market closed'}</span>
+        ${clock.known && clock.open
+          ? `<span class="lv-left">${hhmm(clock.leftMin)} to close</span>
+             <span class="lv-prog"><i style="width:${clock.through.toFixed(1)}%"></i></span>`
+          : `<span class="lv-left">Showing the last session</span>`}
+        <span class="lv-at">${stamp ? `as of ${esc(stamp)}` : ''}</span>
+      </div>
+
+      <div class="lv-top">${anchor(nifty)}${anchor(by('Bank Nifty'))}${anchor(by('Midcap 100'))}
+        ${vix ? `<div class="lv-idx lv-vix">
+          <div class="lv-ih"><span class="lv-in">India VIX</span>
+            <b class="${num(vix.change_pct) > 0 ? 'dn' : 'up'}">${pct(vix.change_pct)}</b></div>
+          <div class="lv-ip">${esc(String(vix.price || ''))}</div>
+          <p class="lv-vw">${num(vix.price_raw) == null ? ''
+            : num(vix.price_raw) < 12 ? 'Very calm. Options are cheap and nobody is hedging.'
+            : num(vix.price_raw) < 16 ? 'Normal. No one is paying up for protection.'
+            : num(vix.price_raw) < 20 ? 'Unsettled — the market is starting to pay for cover.'
+            : num(vix.price_raw) < 26 ? 'Jumpy. Protection is expensive and moves are wide.'
+            : 'Stressed. This is where falls get violent and bottoms get made.'}</p>
+        </div>` : ''}
+      </div>
+
+      <h3 class="lv-sh">Sector rotation, and whether the move is holding</h3>
+      <p class="lv-note"><b>${upN}</b> of ${sect.length} sector indices are up.
+        The second column is the one nobody publishes: where the index sits inside
+        <b>today's own range</b>. Near 100% it is being bought into the close; near 0% a
+        green number is being sold all the way down.</p>
+      <div class="lv-secs">${sect.map(x => `<div class="lv-sec">
+        <span class="lv-sn">${esc(x.name.replace(/^Nifty /, ''))}</span>
+        <b class="${dir(x.change_pct)}">${pct(x.change_pct)}</b>
+        ${posBar(x.day_range_pos, x.day_low, x.day_high, dir(x.change_pct))}
+        <span class="lv-rv">${num(x.day_range_pos) == null ? '—'
+          : Math.round(x.day_range_pos) + '%'}</span>
+      </div>`).join('')}</div>
+
+      ${led.length ? `<h3 class="lv-sh">This site's own names, marked live</h3>
+        <p class="lv-note"><b>${ledUp}</b> of the ${led.length} names this site has published a
+          signal on are up right now. Not a portfolio — every one of them is on paper, and no
+          engine here is cleared for capital. It is the book being marked in public, which is
+          the part that does not exist anywhere else.</p>
+        <div class="lv-book">${ledMove.map(x => `<div class="lv-bk">
+          <span class="lv-bs">${esc(x.sym)}</span>
+          <b class="${dir(x.change_pct)}">${pct(x.change_pct)}</b>
+          <span class="lv-bp">${esc(x.ccy || '₹')}${Number(x.price).toLocaleString(IST)}</span>
+        </div>`).join('')}</div>` : ''}
+
+      <p class="lv-f">Refreshes every minute while this tab is open and the market is
+        trading${clock.open ? '' : ' — it is not trading now, so nothing here is moving'}.
+        Prices are delayed by whatever the exchange's public feed delays them by; this page
+        does not pretend otherwise.</p>`;
+  };
+
+  async function liveTick(host) {
+    const t = await get('/api/ticker');
+    if (!t || !t.segments) {
+      if (!host.dataset.ok) {
+        host.innerHTML = `<div class="empty">The live board did not answer.</div>`;
+      }
+      return null;                       // keep the last good board on a blip
+    }
+    host.dataset.ok = '1';
+    host.innerHTML = liveHtml(t);
+    return t;
+  }
+
+  function startLive() {
+    const host = document.getElementById('live');
+    if (!host) return;
+    let timer = null, beat = 0;
+    const stop = () => { if (timer) { clearInterval(timer); timer = null; } beat = 0; };
+    const at = (ms) => {
+      if (beat === ms && timer) return;          // already on the right cadence
+      stop();
+      beat = ms;
+      timer = setInterval(() => { if (!document.hidden) run(); }, ms);
+    };
+    const run = async () => {
+      const t = await liveTick(host);
+      /* DO NOT POLL A TRADING MARKET AT THE SAME RATE AS A SHUT ONE. Outside
+         09:15-15:30 IST nothing moves, so a minute timer would be a request a
+         minute all night for an answer that cannot change — but stopping dead
+         means the next session never arrives on a page left open. */
+      const india = t && (t.segments.find(x => x.key === 'india') || {}).items;
+      const open = india && india.length && clockOf(india[0]).open;
+      if (!document.hidden) at(open ? LIVE_MS : IDLE_MS);
+    };
+    /* FIRST RENDER IS UNCONDITIONAL. It must not be gated on visibility: the
+       preview pane reports visibilityState "hidden" permanently, and an
+       observer- or visibility-gated first paint is indistinguishable there
+       from a broken one. Only the REPEAT is gated. */
+    run();
+    if (!document.hidden) at(LIVE_MS);        // run() corrects the cadence once it knows
+    /* A TAB NOBODY IS LOOKING AT POLLS NOTHING. Coming back to it refetches at
+       once rather than waiting out the remainder of a timer, because the first
+       thing a returning reader looks at is the number that went stale while
+       they were away. */
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stop(); else run();
+    });
+  }
+
   const rowHead = (rank, name, sub, val, sub2, tag, sym) => `
     <span class="rk">${rank}</span>
     <span class="rn"><b>${esc(name)}</b><span>${esc(sub)}</span>
@@ -1307,8 +1537,18 @@
     document.documentElement.setAttribute('data-theme', next);
     try { localStorage.setItem('sig:theme', next); } catch {}
     const m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute('content', next === 'dark' ? '#0B0F14' : '#FFFFFF');
+    /* #0C1017, not #0B0F14 — the dark ground moved when this page was ported
+       onto signal.css's palette and the toggle kept writing the retired value,
+       so the phone's status bar sat a shade off the page it framed. */
+    if (m) m.setAttribute('content', next === 'dark' ? '#0C1017' : '#FFFFFF');
   });
+
+  /* THE LIVE BOARD RUNS FIRST AND SEPARATELY.
+   * It needs one 40 KB request; build() waits on a 1.5 MB screen. Starting it
+   * ahead of the brief puts what the market is doing RIGHT NOW on screen while
+   * the rest is still parsing — which is also the honest priority. It is not
+   * awaited and its failure cannot take the page down with it. */
+  try { startLive(); } catch (e) { console.error('live board failed:', e); }
 
   build().catch((err) => {
     /* THE ERROR USED TO BE DISCARDED.
