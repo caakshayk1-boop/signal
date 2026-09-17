@@ -398,3 +398,46 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
   overflow:hidden;margin:var(--s2) 0 var(--s2)}
 .bp-t i{display:block;height:100%;border-radius:999px;background:var(--acc)}
 .bp-d{margin:0;color:var(--dim);font-size:.85rem;line-height:1.5}
+
+/* ── SECTORS: eight rows, leaders then laggards ────────────────────────────
+   The bar is scaled to the median move, not to a fixed span, so a quiet day
+   does not draw eight flat lines and a violent one does not clip. */
+.secg{display:grid;gap:var(--s2);margin:0 0 var(--s4)}
+.secr{display:grid;grid-template-columns:minmax(96px,1.1fr) minmax(60px,2fr) 62px 66px;
+  gap:var(--s2);align-items:center;font-size:.86rem}
+.secr-n{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.secr-b{height:8px;border-radius:999px;background:var(--raise);overflow:hidden;
+  border:1px solid var(--line)}
+.secr-b i{display:block;height:100%;border-radius:999px;background:var(--dim)}
+.secr-b i.up{background:var(--up)} .secr-b i.dn{background:var(--dn)}
+.secr-v{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
+.secr-c{color:var(--dim);font-size:.74rem;text-align:right}
+
+/* The week's furthest movers — a strip, not a table: four facts each. */
+.movs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--s2);
+  margin:0 0 var(--s3)}
+.mov{padding:var(--s3);background:var(--raise2);border:1px solid var(--line);
+  border-radius:var(--r3);display:grid;gap:2px}
+.mov-s{font-weight:800;font-size:.9rem}
+.mov-n{color:var(--dim);font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mov b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:1.05rem}
+.mov-t{color:var(--dim);font-size:.72rem}
+
+/* ── THE WIRE ──────────────────────────────────────────────────────────────
+   Headlines link out and say where they came from. Deliberately the only
+   place on this page that leaves it. */
+.wire{list-style:none;padding:0;margin:0;display:grid;gap:var(--s3)}
+.wire li{padding:var(--s3) var(--s4);background:var(--raise2);border:1px solid var(--line);
+  border-radius:var(--r2)}
+.wire a{font-weight:650;line-height:1.45;text-decoration:none}
+.wire a:hover{text-decoration:underline}
+.wire-s{display:inline-block;margin-left:var(--s2);color:var(--dim);font-size:.72rem;
+  text-transform:uppercase;letter-spacing:.05em}
+.wire p{margin:var(--s2) 0 0;color:var(--mut);font-size:.85rem;line-height:1.55}
+
+/* ── THE RECEIPT ───────────────────────────────────────────────────────────
+   One line, at the very bottom, on whether the jobs behind this page ran. */
+.health{max-width:var(--wrap);margin:var(--s6) auto 0;padding:var(--s3) var(--s4);
+  background:var(--raise2);border:1px solid var(--line);border-left:3px solid var(--up);
+  border-radius:var(--r2);color:var(--mut);font-size:.85rem;line-height:1.55}
+.health.is-bad{border-left-color:var(--warn)}

@@ -163,6 +163,30 @@
         : 'No seasonal tilt either way.'} Historical, not predictive.</p>`;
   };
 
+  /* ── THE FIRST REAL SENTENCE OF A MARKDOWN STUDY ────────────────────────
+   * weekly_reads stores each study as Markdown, and slicing it raw put
+   * "## In one line Jeena Sikho Lifecare Ltd. (JSLL) is..." on the page —
+   * the heading marker, the heading, and the paragraph run together with no
+   * space, because a newline is not a space once it is in HTML.
+   *
+   * This is not a Markdown renderer and must not become one. It finds the
+   * first block that is PROSE — not a heading, not a bullet, not the stats
+   * block the study opens with — and returns it with the inline emphasis
+   * markers stripped. Anything it cannot parse returns empty, and the caller
+   * shows nothing rather than a broken excerpt. */
+  const firstPara = (md, cap = 420) => {
+    const blocks = String(md || '').split(/\n{2,}/);
+    for (const raw of blocks) {
+      const b = raw.trim();
+      if (!b || /^#{1,6}\s/.test(b) || /^[-*>|]/.test(b)) continue;
+      if (/^[A-Z][^:\n]{0,40}:\s/.test(b) && b.length < 120) continue;   // a stats line
+      const clean = b.replace(/[*_`]+/g, '').replace(/\s+/g, ' ').trim();
+      if (clean.split(' ').length < 12) continue;
+      return clean.length > cap ? clean.slice(0, cap).replace(/\s+\S*$/, '') + '…' : clean;
+    }
+    return '';
+  };
+
   const meter = (label, v, good = 50) => {
     const n = num(v); if (n == null) return '';
     return `<div class="mt"><span class="mt-l">${esc(label)}</span>
@@ -261,7 +285,8 @@
 
   /* ── the page ───────────────────────────────────────────────────────────── */
   async function build() {
-    const [screen, stats, sigs, insti, ipo, ipoLive, baro, seas] = await Promise.all([
+    const [screen, stats, sigs, insti, ipo, ipoLive, baro, seas,
+           news, pulse, reads, funds, health] = await Promise.all([
       get('/screen.json'), get('/api/stats'), get('/api/signals?limit=400'),
       get('/institutional.json'), get('/ipo.json'),
       /* THE SUBSCRIPTION BOOK HAS TO BE LIVE OR IT IS WORTHLESS.
@@ -288,6 +313,32 @@
        * guards, and a section whose feed did not answer is absent rather than
        * empty — which is this page's existing rule, not a new one. */
       get('/barometer.json'), get('/seasonality.json'),
+      /* ── THE REST OF THE SITE, BECAUSE THIS IS NOW THE WHOLE OF IT ───────
+       *
+       * Akshay: "make it a single page of truth, incl everything from signal
+       * which is relevant — simple, but only relevant things — the entire
+       * website as a brief."
+       *
+       * BOTH HALVES OF THAT ARE INSTRUCTIONS. "Everything relevant" added the
+       * four feeds below; "only relevant" is why the map, the radar, the
+       * research floor, the methodology and the mandate book are NOT here.
+       * A 989-cell map is a tool you go and use; a brief is read straight
+       * through in one sitting, and a section you scroll past is worse than a
+       * section that does not exist.
+       *
+       *   news    — what actually moved, and why. A daily brief without the
+       *             wire is a spreadsheet.
+       *   pulse   — which sectors led and lagged, and the week's movers. The
+       *             breadth section was reading only the screen's summary and
+       *             throwing the sector cut away.
+       *   reads   — the weekend studies, one line each.
+       *   funds   — where a monthly SIP goes. The only section here that is
+       *             not about a trade, which is exactly why it belongs.
+       *   health  — whether the pipeline behind all of this actually ran. A
+       *             footer line, not a section: it is a trust signal, and a
+       *             trust signal that takes a whole screen is an apology. */
+      get('/news.json'), get('/pulse.json'),
+      get('/weekly_reads.json'), get('/funds.json'), get('/data-health.json'),
     ]);
 
     const d = new Date();
@@ -505,6 +556,64 @@
           require an opinion; below it, the average name is in a downtrend whatever the
           index says.</p>`,
         b.as_of ? `breadth as of ${b.as_of}` : stale));
+    }
+
+    /* ── 1b. WHICH SECTORS, AND WHAT RAN ───────────────────────────────────
+     * Breadth says how many names rose. It cannot say WHERE, and "350 of 989
+     * advanced" reads identically whether that was every bank or every
+     * chemical. pulse.json already cut it by sector and this page was
+     * throwing that away. */
+    const secs = (pulse && (pulse.sectors_day || pulse.sectors)) || [];
+    if (secs.length) {
+      const ranked = secs.filter(x => num(x.median) != null)
+        .sort((a, b) => b.median - a.median);
+      const lead = ranked.slice(0, 4), lag = ranked.slice(-4).reverse();
+      const up = (pulse.movers_up || []).slice(0, 5);
+      add('sectors', 'Sectors', sec('sectors', 'Where it happened',
+        ranked.length
+          ? `<b>${esc(ranked[0].name)}</b> led at ${pct(ranked[0].median)} median, and
+             <b>${esc(ranked[ranked.length - 1].name)}</b> lagged at
+             ${pct(ranked[ranked.length - 1].median)}. A median, not an average — one
+             name up 40% cannot carry a sector here.`
+          : 'No sector cut on this build.',
+        `<div class="secg">${lead.concat(lag).map(x => `
+          <div class="secr">
+            <span class="secr-n">${esc(x.name)}</span>
+            <span class="secr-b"><i class="${x.median >= 0 ? 'up' : 'dn'}"
+              style="width:${clamp(Math.abs(x.median) * 18, 3, 100)}%"></i></span>
+            <span class="secr-v ${dir(x.median)}">${pct(x.median)}</span>
+            <span class="secr-c">${x.up}/${x.n} up</span>
+          </div>`).join('')}</div>` +
+        (up.length ? `<h3 class="sub">Furthest on the week</h3>
+          <div class="movs">${up.map(m => `<div class="mov">
+            <span class="mov-s">${esc(m.sym)}</span>
+            <span class="mov-n">${esc(m.sector || '')}</span>
+            <b class="${dir(m.r1w)}">${pct(m.r1w)}</b>
+            <span class="mov-t">${num(m.turnover_cr) == null ? '' : `₹${Number(m.turnover_cr).toFixed(0)}cr traded`}</span>
+          </div>`).join('')}</div>` : '') +
+        `<p class="said">A week's move is not a reason to buy one. It is where to look
+          first, and the screen's call on each of these is in the next section.</p>`,
+        stale));
+    }
+
+    /* ── 1c. THE WIRE ──────────────────────────────────────────────────────
+     * A daily brief without news is a spreadsheet. This is the one section
+     * that is not a number, and it is deliberately short: headlines and their
+     * source, nothing summarised into a house view. The page does not have an
+     * opinion on the news and should not pretend to. */
+    const wire = Array.isArray(news) ? news.filter(n => n && n.title).slice(0, 6) : [];
+    if (wire.length) {
+      add('wire', 'Wire', sec('wire', 'What moved, and why',
+        `<b>${wire.length}</b> stories the desk read this morning. Headlines and their
+         source — this page does not summarise the news into a view, because a view
+         built on a headline is the cheapest thing on any market site.`,
+        `<ul class="wire">${wire.map(n => `<li>
+          <a href="${esc(n.link || '#')}" target="_blank" rel="noopener nofollow">${esc(n.title)}</a>
+          ${n.source ? `<span class="wire-s">${esc(n.source)}</span>` : ''}
+          ${n.summary ? `<p>${esc(String(n.summary).slice(0, 260))}${
+            String(n.summary).length > 260 ? '…' : ''}</p>` : ''}
+        </li>`).join('')}</ul>`,
+        ''));
     }
 
     /* ── 2. THE SCREEN'S OWN CALL ──────────────────────────────────────────
@@ -898,6 +1007,94 @@
         : `<div class="empty">Nothing is at a level worth naming today.</div>`,
       stale));
 
+    /* ── 8. THE WEEKEND ────────────────────────────────────────────────────
+     * Seven company studies, one per sector, written every Saturday. The full
+     * text is a 5-7 minute read each and does not belong on a brief — what
+     * belongs is that they exist, which ones, and how long they take. This is
+     * the only section here about BUSINESSES rather than prices, and that is
+     * why it is last: it is the thing to read when the market is shut. */
+    const edition = ((reads && reads.editions) || [])[0];
+    const studies = (edition && edition.studies) || [];
+    if (studies.length) {
+      const mins = studies.reduce((a, x) => a + (num(x.read_minutes) || 0), 0);
+      add('reads', 'Reads', sec('reads', 'For the weekend',
+        `<b>${studies.length}</b> companies, one per sector, <b>${mins}</b> minutes in total.
+         No entry, no stop, no target — these are about what a business does and how it
+         makes money, which is the part a chart cannot tell you.`,
+        `<div class="rows">${studies.map((x, i) => xr(
+          rowHead(i + 1, x.sym, `${esc(x.sector || x.industry || '')}${
+            num(x.mcap_cr) ? ' · ₹' + Math.round(x.mcap_cr).toLocaleString('en-IN') + ' cr' : ''}`,
+            num(x.price) == null ? '—' : inr(x.price),
+            [`${x.read_minutes || '—'} min`, ''], ['Read', ''], x.sym),
+          `<p class="xd-q">${esc(x.name || '')}</p>
+           ${(x.facts && x.facts.length)
+             ? `<ul class="flags">${x.facts.slice(0, 4).map(f =>
+                 `<li><b>${esc(typeof f === 'string' ? f : (f.w || f.t || ''))}</b>${
+                   (f && f.e) ? `<span>${esc(f.e)}</span>` : ''}</li>`).join('')}</ul>`
+             : ''}
+           ${(() => { const e = firstPara(x.study); return e ? `<p class="said">${esc(e)}</p>` : ''; })()}
+           <p class="said">Roughly <b>${x.words || '—'}</b> words. Every figure in the full
+             study is checked against this company's own row before it is published; a number
+             that cannot be checked is cut rather than softened.</p>`
+        )).join('')}</div>`,
+        edition.week ? `week of ${edition.week}` : ''));
+    }
+
+    /* ── 9. THE ONE SECTION THAT IS NOT A TRADE ────────────────────────────
+     * A monthly SIP is the only thing on this estate with a measured, boring,
+     * decade-long case behind it, and it sat on a page nobody reaches from a
+     * market brief. Three lines: what the categories are, and the cheapest
+     * credible fund in each. Cost is the lever the investor actually controls
+     * — returns are not, and a screen that ranks on past return teaches the
+     * opposite lesson. */
+    const cats = (funds && funds.categories) || [];
+    if (cats.length) {
+      add('sip', 'SIP', sec('sip', 'Where a monthly SIP goes',
+        `<b>${cats.length}</b> categories screened on AMFI's own NAV history.
+         Direct plans only — the commission is the one difference between two share classes
+         of the same portfolio, and it is the only lever you control.`,
+        `<div class="rows">${cats.slice(0, 5).map((c, i) => {
+          const list = (c.funds || []).slice(0, 3);
+          return xr(
+            rowHead(i + 1, c.label || c.key, esc(c.blurb || ''),
+              `${(c.funds || []).length}`, ['funds', ''], ['', ''], null),
+            list.length
+              ? `<ul class="flags">${list.map(f =>
+                  /* `r3`, not `r3y`. The field was guessed and the guess was
+                     wrong, so every fund rendered its name and a blank where the
+                     return belonged — the failure mode of an optional chain is
+                     silence, which is why it survived a visual check. */
+                  `<li><b>${esc(f.name || f.scheme || '')}</b><span>${
+                    [f.house ? esc(f.house) : '',
+                     num(f.r3) == null ? '' : `3-year ${Number(f.r3).toFixed(1)}% a year`,
+                     num(f.dd3) == null ? '' : `worst fall ${Number(f.dd3).toFixed(0)}%`
+                    ].filter(Boolean).join(' · ')}</span></li>`).join('')}</ul>`
+                + `<p class="said">Past return is shown because it is what exists, not because
+                   it predicts. Nothing measured says last decade's leader leads the next.</p>`
+              : `<p class="said">No fund in this category cleared the screen on this build.</p>`
+          );
+        }).join('')}</div>`,
+        funds.generated_at ? `screened ${String(funds.generated_at).slice(0, 10)}` : ''));
+    }
+
+    /* ── THE FOOTER LINE: DID ANY OF THIS ACTUALLY RUN ─────────────────────
+     * Every figure above came from a job that either ran or silently did not,
+     * and this estate has been bitten by the second more than once — a green
+     * workflow that published nothing, a feed 390 days stale beside a counter
+     * claiming it was current. One line, at the bottom, stating how many of
+     * the twelve datasets are healthy. A section would be an apology; a line
+     * is a receipt. */
+    if (health && health.total) {
+      const bad = health.degraded || 0;
+      out.push(`<p class="health ${bad ? 'is-bad' : ''}">
+        <b>${health.total - bad}</b> of <b>${health.total}</b> datasets behind this page are
+        current${bad ? `, and <b>${bad}</b> ${bad === 1 ? 'is' : 'are'} degraded — every figure
+        drawn from ${bad === 1 ? 'it is' : 'them is'} older than it should be, and the sections
+        above say so where it matters` : ''}.
+        ${health.degraded_core ? `<b>${health.degraded_core}</b> of those is a core dataset.`
+          : 'No core dataset is degraded.'}</p>`);
+    }
+
     app.innerHTML = out.join('');
     jump.innerHTML = nav.map(([id, label]) =>
       `<button type="button" data-to="${id}">${esc(label)}</button>`).join('');
@@ -940,8 +1137,32 @@
       const el = document.getElementById(btn.dataset.to);
       if (el) el.scrollIntoView({ block: 'start' });
     }));
-    const mark = (id) => jump.querySelectorAll('button').forEach(b =>
-      b.setAttribute('aria-current', String(b.dataset.to === id)));
+    /* THE ACTIVE CHIP HAS TO BE ON SCREEN TO BE OF ANY USE.
+     *
+     * The nav fitted the page at eight sections. At twelve it is 909px in a
+     * 760px rail and scrolls — which is fine, except that the chip marking
+     * where you ARE was the one thing scrolled out of sight. A scrollspy whose
+     * indicator you cannot see is just a strip of buttons.
+     *
+     * Only the nav's own rail is scrolled, never the page: scrollIntoView on
+     * the element would drag the document to the section as you read past it,
+     * which is the opposite of what a reader asked for by scrolling. */
+    const mark = (id) => {
+      let active = null;
+      for (const b of jump.querySelectorAll('button')) {
+        const on = b.dataset.to === id;
+        b.setAttribute('aria-current', String(on));
+        if (on) active = b;
+      }
+      if (!active) return;
+      const pad = 12;
+      const l = active.offsetLeft, r = l + active.offsetWidth;
+      if (l < jump.scrollLeft + pad) {
+        jump.scrollTo({ left: Math.max(0, l - pad), behavior: 'smooth' });
+      } else if (r > jump.scrollLeft + jump.clientWidth - pad) {
+        jump.scrollTo({ left: r - jump.clientWidth + pad, behavior: 'smooth' });
+      }
+    };
     if (nav.length) mark(nav[0][0]);
 
     /* WHICH SECTION IS THE READER IN — COMPUTED, NOT OBSERVED.

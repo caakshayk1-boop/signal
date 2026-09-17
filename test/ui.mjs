@@ -1733,6 +1733,67 @@ try {
   const gScroll = await g.evaluate(() =>
     Math.round(document.documentElement.scrollWidth - document.documentElement.clientWidth));
   ok("gems does not scroll sideways", gScroll <= 0, gScroll);
+
+  /* ── ONE PAGE THAT CARRIES THE WHOLE SITE ────────────────────────────────
+   * Gems is now the brief for everything, so the check is that each part of
+   * the site it claims to cover actually rendered — a section that silently
+   * drops because a feed changed a field name is the whole failure mode here,
+   * and it looks identical to a quiet day. */
+  const gCover = await g.evaluate(() => {
+    const ids = [...document.querySelectorAll("section.sec")].map(x => x.id);
+    const j = document.getElementById("jump");
+    return {
+      ids,
+      navLabels: [...j.querySelectorAll("button")].length,
+      navScrolls: j.scrollWidth > j.clientWidth,
+      sectors: document.querySelectorAll(".secr").length,
+      wire: document.querySelectorAll(".wire li").length,
+      reads: document.querySelectorAll("#reads .rows > *").length,
+      sip: document.querySelectorAll("#sip .rows > *").length,
+      health: document.querySelectorAll(".health").length,
+      // A blank <span> inside a fund row means a field name was guessed wrong:
+      // optional chaining fails silently and prints nothing at all.
+      blankSpans: [...document.querySelectorAll("#sip .flags li span")]
+        .filter(x => !x.textContent.trim()).length,
+    };
+  });
+  for (const id of ["reading", "market", "sectors", "wire", "verdicts",
+                    "record", "setups", "flow", "ipo", "levels"]) {
+    ok(`gems carries the ${id} section`, gCover.ids.includes(id), gCover.ids);
+  }
+  ok("every gems section has a jump chip",
+     gCover.navLabels === gCover.ids.length, gCover);
+  ok("the sector cut renders its rows", gCover.sectors >= 4, gCover.sectors);
+  ok("the wire carries headlines", gCover.wire >= 1, gCover.wire);
+  ok("one health line, not a section", gCover.health === 1, gCover.health);
+  ok("no fund row prints a blank field", gCover.blankSpans === 0, gCover.blankSpans);
+
+  /* The studies are stored as MARKDOWN. Slicing one raw put "## In one line"
+   * on the page; nothing else on this site renders Markdown, so the excerpt
+   * has to arrive as prose or not at all. */
+  const gMd = await g.evaluate(() => {
+    const t = document.body.innerText;
+    return { heading: /(^|\n)#{1,6}\s/.test(t), bold: /\*\*/.test(t),
+             link: /\]\(https?:/.test(t) };
+  });
+  ok("no raw Markdown reaches the page",
+     !gMd.heading && !gMd.bold && !gMd.link, gMd);
+
+  /* Twelve chips do not fit a 760px rail, which is fine — but the chip
+     marking where you are must be scrolled INTO that rail, or the scrollspy
+     indicates into empty space. */
+  const gChip = await g.evaluate(async () => {
+    const j = document.getElementById("jump");
+    const last = [...document.querySelectorAll("section.sec")].pop();
+    last.scrollIntoView();
+    await new Promise(r => setTimeout(r, 1200));
+    const a = j.querySelector('button[aria-current="true"]');
+    if (!a) return { found: false };
+    return { found: true,
+             visible: a.offsetLeft >= j.scrollLeft - 2 &&
+                      a.offsetLeft + a.offsetWidth <= j.scrollLeft + j.clientWidth + 2 };
+  });
+  ok("the active jump chip stays in view", gChip.found && gChip.visible, gChip);
   await gCtx.close();
 } finally {
   await browser.close();
