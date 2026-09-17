@@ -32,6 +32,20 @@
   const jump = document.getElementById('jump');
   const LAUNCH = '2026-09-02';
 
+  /* ── ENGINES ARE SHOWN BY NAME, NOT BY DATABASE KEY ──────────────────────
+   * Akshay: "multibagger is what on gems — signal site?" Fair question, and
+   * the answer is that it is ASCENT and this page was printing the raw key.
+   * signal.askakshay.com has shown display names for months; gems was leaking
+   * `multibagger`, `keel`, `breakout` straight out of the ledger, so the same
+   * engine had two names across two products and one of them was internal.
+   * The map is signal's ENGINE_REGISTRY, names only. */
+  const ENG_NAME = {
+    pivot: 'PIVOT', breakout: 'BREACH', magic: 'TIDAL', magicmagic: 'TIDAL',
+    equity_measured: 'PLUMB', multibagger: 'ASCENT', momentum_quant: 'VECTOR',
+    ai_longterm: 'NORTH', ledge: 'LEDGE', keel: 'KEEL', intraday: 'GUST',
+  };
+  const engName = (k) => ENG_NAME[String(k || '')] || String(k || '—');
+
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   /* Number(null) IS 0, AND 0 IS FINITE.
@@ -310,17 +324,20 @@
           <span class="hpick-n">${esc(r.name || '')}</span>
         </div>
         <div class="hpick-p">
-          <b class="${dir(x.change_pct)}">${esc(x.ccy || '₹')}${Number(x.price).toLocaleString('en-IN')}</b>
-          <span class="${dir(x.change_pct)}">${pct(x.change_pct)} today</span>
+          <b class="${dir(x.change_pct)}">${num(x.price) == null ? '—'
+            : esc(x.ccy || '₹') + Number(x.price).toLocaleString('en-IN')}</b>
+          ${num(x.change_pct) == null
+            ? `<span class="hpick-nm">screen close — this book holds no live mark on it</span>`
+            : `<span class="${dir(x.change_pct)}">${pct(x.change_pct)} today</span>`}
         </div>
       </div>
-      <p class="said">${scaled
+      ${num(x.change_pct) == null ? '' : `<p class="said">${scaled
         ? `That is <b>${x.h.sig.toFixed(2)}×</b> this name's own average daily range —
            ${esc(HEAT.WORDS[x.h.k])}. The same move in a quieter stock would be a bigger
            event, and in a wilder one, a smaller one; this is why the tile is that bright.`
         : `This name has no average range on its row, so the move could not be scaled and the
            tile is drawn flat rather than at an intensity nobody computed.`}
-        ${x.news ? ' It is named in <b>today\'s wire</b>, above.' : ''}</p>
+        ${x.news ? ' It is named in <b>today\'s wire</b>, above.' : ''}</p>`}
       ${vd.c ? `<p class="said"><b>The screen says ${esc(vd.c)}</b>${
         vd.l ? ` · ${esc(vd.l)}` : ''}${vd.o ? `. ${esc(vd.o)}.` : '.'}
         ${(x.change_pct > 0 && vd.c === 'AVOID') || (x.change_pct < 0 && vd.c === 'BUY')
@@ -346,7 +363,7 @@
           ])}
           ${ladder(t)}
           <p class="said">Published ${esc(String(t.alert_date || t.date || '').slice(0, 10))} by
-            <b>${esc(t.signal_type || 'an engine')}</b>${
+            <b>${esc(engName(t.signal_type))}</b>${
               t.timeframe ? ` on the ${esc(t.timeframe)}` : ''}${
             String(t.alert_date || t.date || '').slice(0, 10) < LAUNCH
               ? ` — before ${esc(LAUNCH)}, so it is open but outside the window this
@@ -375,18 +392,48 @@
   let HEAT_LAST = [];
   /* Filled by the brief's own pass over the ledger; the panel reads it. */
   const OPEN_BY_SYM = new Map();
+  /* Names this site has published a signal on SINCE LAUNCH. See the note where
+     the live book is filtered. */
+  const SINCE_SYMS = new Set();
   function wireHeatPicks() {
-    const host = document.getElementById('live');
-    if (!host || host.dataset.picks) return;
-    host.dataset.picks = '1';
-    host.addEventListener('click', (e) => {
+    /* ── BOUND ON THE DOCUMENT, NOT ON THE LIVE BOARD ────────────────────
+     * It was bound to #live, and the heat tiles live there — but the movers
+     * strip and the calendar cells are rendered by the brief into #app, so a
+     * click on either reached no listener and did nothing. Exactly the fault
+     * the tiles had, in two more places, because the fix was scoped to the
+     * element that happened to have it first.
+     *
+     * One listener on the document catches every [data-hsym] on the page
+     * wherever it is rendered, including anything added later. */
+    if (document.body.dataset.picks) return;
+    document.body.dataset.picks = '1';
+    document.addEventListener('click', (e) => {
       const close = e.target.closest('.hpick-x');
       const pick = document.getElementById('heatPick');
       if (close && pick) { pick.hidden = true; pick.innerHTML = ''; return; }
       const b = e.target.closest('[data-hsym]');
       if (!b || !pick) return;
-      const x = HEAT_LAST.find(r => r.sym === b.dataset.hsym);
+      /* ── RESOLVE FROM ANYWHERE THE SYMBOL CAME FROM ─────────────────────
+       * HEAT_LAST holds only the names the live board marks. The movers strip
+       * comes from pulse and the calendar from seasonality, so a click on
+       * either found nothing and did exactly what the tiles used to do:
+       * nothing at all. Anything with a screen row can be described — the
+       * live mark is simply absent for a name this book does not hold, and
+       * the panel says what it has rather than refusing to open. */
+      const sym = b.dataset.hsym;
+      let x = HEAT_LAST.find(r => r.sym === sym);
+      if (!x && HEAT_IDX_ROWS) {
+        const r = HEAT_IDX_ROWS.find(z => z && z.sym === sym);
+        if (r) x = { sym, price: num(r.price), ccy: '₹', change_pct: null,
+                     r, h: null, news: false };
+      }
       if (!x) return;
+      /* THE PANEL GOES WHERE THE CLICK WAS. One panel, moved, rather than
+         three — a tile at the top of the board and a calendar cell two
+         thousand pixels down cannot share a fixed position without one of
+         them opening off screen. */
+      const block = b.closest('.hgrid, .movs, .calg, .lv-book');
+      if (block && block.nextElementSibling !== pick) block.after(pick);
       pick.innerHTML = heatPanel(x);
       pick.hidden = false;
       pick.querySelectorAll('[data-chart]').forEach(h => { fillChart(h); });
@@ -427,9 +474,18 @@
     /* THE BOOK, MARKED LIVE. `ledger` is a flat map of this site's own names to
        their current price and move — the one panel here that cannot be copied,
        because it needs a book to mark. */
+    /* ── THIS SITE'S OWN NAMES, WHICH IS FEWER THAN THE FEED'S ────────────
+     * Akshay: "65 of 99 — fix this, the total published per the signal site
+     * is 56." He is right. /api/ticker's `ledger` marks every name the ledger
+     * holds, including tickets published by news.askakshay.com before this
+     * site existed. Counting them made this panel claim a book a third larger
+     * than the one the record is accountable for. SINCE_SYMS is filled from
+     * the launch-filtered ledger by the brief's own pass; until that lands the
+     * panel shows what it has and the count is honest either way. */
     const led = Object.entries((t && t.ledger) || {})
       .map(([sym, v]) => ({ sym, ...v }))
-      .filter(x => num(x.change_pct) != null);
+      .filter(x => num(x.change_pct) != null)
+      .filter(x => !SINCE_SYMS.size || SINCE_SYMS.has(x.sym));
     const ledUp = led.filter(x => x.change_pct > 0).length;
     const ledMove = led.slice().sort((a, b2) => Math.abs(b2.change_pct) - Math.abs(a.change_pct)).slice(0, 6);
 
@@ -437,14 +493,18 @@
         <div class="lv-ih"><span class="lv-in">${esc(it.name)}</span>
           <b class="${dir(it.change_pct)}">${pct(it.change_pct)}</b></div>
         <div class="lv-ip">${esc(String(it.price || ''))}</div>
+        ${/* "45%" against a rail meant nothing on its own — Akshay asked what
+             52 weeks / 26% signifies, which is the correct question to ask of
+             a number with no unit. The rail is a range and the figure is a
+             POSITION inside it; the label now says so. */''}
         <div class="lv-ir">
-          <span class="lv-rl">today</span>
+          <span class="lv-rl" title="Where it sits between today's low and today's high">today's range</span>
           ${posBar(it.day_range_pos, it.day_low, it.day_high, dir(it.change_pct))}
           <span class="lv-rv">${num(it.day_range_pos) == null ? '—'
             : Math.round(it.day_range_pos) + '%'}</span>
         </div>
         <div class="lv-ir">
-          <span class="lv-rl">52 weeks</span>
+          <span class="lv-rl" title="Where it sits between its 52-week low and its 52-week high">in its year</span>
           ${posBar(it.range_pos, it.w52_low, it.w52_high, '')}
           <span class="lv-rv">${num(it.range_pos) == null ? '—'
             : Math.round(it.range_pos) + '%'}</span>
@@ -489,9 +549,14 @@
         <span class="lv-sn">${esc(x.name.replace(/^Nifty /, ''))}</span>
         <b class="${dir(x.change_pct)}">${pct(x.change_pct)}</b>
         ${posBar(x.day_range_pos, x.day_low, x.day_high, dir(x.change_pct))}
-        <span class="lv-rv">${num(x.day_range_pos) == null ? '—'
-          : Math.round(x.day_range_pos) + '%'}</span>
+        <span class="lv-rv" title="${esc(x.name)} sits ${num(x.day_range_pos) == null ? '—'
+          : Math.round(x.day_range_pos) + '%'} of the way from today's low to today's high">${
+          num(x.day_range_pos) == null ? '—' : Math.round(x.day_range_pos) + '%'}</span>
       </div>`).join('')}</div>
+      <p class="lv-note lv-key"><b>Reading a row:</b> Pharma <b>+1.49%</b> at <b>97%</b> means
+        the index is up 1.49% today <i>and</i> is sitting 97% of the way between today's low
+        and today's high — it is being bought into the close. The same +1.49% at 10% would be
+        a gain that has been sold all day.</p>
 
       ${HEATSTRIP || ''}
 
@@ -862,7 +927,8 @@
      * already leaves nothing but Indian names, and if that ever stops being
      * true this page must not silently start showing them. */
     const ENGINE_OK = new Set(['breakout', 'magic', 'magicmagic', 'equity_measured',
-      'multibagger', 'momentum_quant', 'ai_longterm', 'ledge', 'keel', 'strict', 'reclaim']);
+      'multibagger', 'momentum_quant', 'ai_longterm', 'ledge', 'keel', 'pivot', 'intraday',
+      'strict', 'reclaim']);
     const since = ledger.filter(r =>
       String(r.date || '').slice(0, 10) >= LAUNCH
       && ENGINE_OK.has(String(r.signal_type || ''))
@@ -1078,7 +1144,12 @@
             <span class="secr-c">${x.up}/${x.n} up</span>
           </div>`).join('')}</div>` +
         (up.length ? `<h3 class="sub">Furthest on the week</h3>
-          <div class="movs">${up.map(m => `<div class="mov">
+          ${/* CLICKABLE, like every other price on this board. "Furthest on the
+               week cannot click and read" — right, and these carry a symbol
+               like the tiles do, so the one delegated listener opens them
+               with no second code path. */''}
+          <div class="movs">${up.map(m => `<div class="mov" role="button" tabindex="0"
+              data-hsym="${esc(m.sym)}">
             <span class="mov-s">${esc(m.sym)}</span>
             <span class="mov-n">${esc(m.sector || '')}</span>
             <b class="${dir(m.r1w)}">${pct(m.r1w)}</b>
@@ -1225,6 +1296,7 @@
        The launch filter exists so the RECORD counts one population. Whether
        this book is currently holding a name is a different question, and every
        open ticket answers it. */
+    for (const r of since) SINCE_SYMS.add(bare(r.symbol));
     for (const r of ledger) {
       if (String(r.status || '').toUpperCase() !== 'OPEN') continue;
       if (!(r.entry && r.sl && r.target1)) continue;
@@ -1248,7 +1320,7 @@
         : 'Nothing is open. An empty list is a result — the engines publish when a setup clears their floors, and not otherwise.',
       picks.length
         ? `<div class="rows">${picks.map((r, i) => xr(
-            rowHead(i + 1, r.symbol, `${esc(r.signal_type || '')} · ${esc(r.timeframe || '')}${
+            rowHead(i + 1, r.symbol, `${esc(engName(r.signal_type))} · ${esc(r.timeframe || '')}${
                 r.market && r.market !== 'NSE' ? ' · ' + esc(r.market) : ''}`,
               money(r.entry, r.currency), [`stop ${money(r.sl, r.currency)}`, 'dn'],
               num(r.rr) ? [`${Number(r.rr).toFixed(1)}R`, 'flat'] : null),
@@ -1264,7 +1336,7 @@
             (nameOf(r.symbol) ? `<p class="said"><b>${esc(nameOf(r.symbol))}</b></p>` : '') +
             (r.remarks ? `<p class="xd-q">${esc(String(r.remarks).slice(0, 240))}</p>` : '') +
             `<p class="said">Published ${esc(String(r.date || '').slice(0, 10))} by
-              <b>${esc(r.signal_type || 'an engine')}</b>, which is on <b>paper</b>. The levels
+              <b>${esc(engName(r.signal_type))}</b>, which is on <b>paper</b>. The levels
               are the engine's; the outcome is recorded whichever way it goes.</p>`
           )).join('')}</div>
           <p class="said"><b>No engine on this site is cleared for capital.</b> The bar is
@@ -1518,7 +1590,8 @@
            rendered as a bare "₹1,504" with a LIVE badge where the symbol, the
            hit rate and the median had been. A calendar cell has no price on
            it by design; what it carries is an eleven-year record. */
-        const cell = (x, kind) => `<div class="cal-c ${kind}">
+        const cell = (x, kind) => `<div class="cal-c ${kind}" role="button" tabindex="0"
+            data-hsym="${esc(x.sym)}">
           <span class="cal-s">${esc(x.sym)}</span>
           <b class="${kind === 'up' ? 'up' : 'dn'}">${x.hit}%</b>
           <span class="cal-m">median ${x.med > 0 ? '+' : ''}${x.med}%</span>

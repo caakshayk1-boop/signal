@@ -13676,6 +13676,24 @@
                raise and do not answer: it cleared the significance bar on
                <b>seventeen</b> trades, and this site's own rule is thirty.</p>` : ''}`
         : ''}
+      ${/* ── THE ONE THING THE LAUNCH FILTER CANNOT SHOW ────────────────────
+           * Akshay asked for both: count only this site's record, AND keep
+           * GUST's 17 closed at +1.472R. Those cannot be one number — those 17
+           * trades are from June and July, before this site's record began, so
+           * the launch filter is exactly what removes them.
+           *
+           * They are two different claims and both are true, so both are
+           * printed and labelled. The cell above is what THIS SITE has done.
+           * The line below is the measured record the ENGINE was brought back
+           * on, which is a fact about the engine and not a figure this site
+           * takes credit for. Collapsing them into one average is how the
+           * +0.163R that started this whole thread happened. */''}
+      <p class="said"><b>GUST is the exception, and it is stated rather than folded in.</b>
+        It was brought back on a measured record of <b>17 closed at +1.472R</b>, t=3.69, 70.6%
+        won — and every one of those trades is from before ${esc(LAUNCH)}, so none of them is
+        in the figure above. That is the engine's basis, not this site's record, and the two
+        are not added together.</p>
+
       <h3 class="sub">The last year, by regime</h3>
       <div class="rgm-bar" role="img" aria-label="${order.map(([k, n]) =>
         `${(NAMES[k] || {}).t || k} ${Math.round(n / tot * 100)}%`).join(', ')}">

@@ -2103,6 +2103,40 @@ try {
              hasLevels: !!(p && /entry/i.test(p.innerText) && /stop/i.test(p.innerText)),
              saysPaper: !!(p && /on paper/i.test(p.innerText)) };
   });
+  /* EVERY PRICE ON THE BOARD OPENS, not just the ones whose section happened
+     to carry the listener. It was bound to #live, and the movers strip and the
+     calendar are rendered into #app, so clicks there reached nothing — the
+     tiles' original bug, in two more places, because the fix was scoped to the
+     element that had it first. */
+  const gAll = await g.evaluate(async () => {
+    const out = {};
+    for (const [k, sel] of [["tile", "#live .hgrid-s .ht[data-hsym]"],
+                            ["mover", ".mov[data-hsym]"],
+                            ["calendar", ".cal-c[data-hsym]"],
+                            ["book", ".lv-bk[data-hsym]"]]) {
+      const el = document.querySelector(sel);
+      if (!el) { out[k] = "absent"; continue; }
+      const p = document.getElementById("heatPick");
+      if (p) { p.hidden = true; p.innerHTML = ""; }
+      el.click();
+      await new Promise(r => setTimeout(r, 2200));
+      const q = document.getElementById("heatPick");
+      out[k] = !!(q && !q.hidden && q.innerHTML.length > 80);
+    }
+    return out;
+  });
+  for (const k of ["tile", "mover", "calendar", "book"]) {
+    ok(`a ${k} opens its detail`, gAll[k] === true || gAll[k] === "absent", gAll);
+  }
+  /* Engine KEYS must never reach a reader — signal has shown names for months
+     and this page was leaking `multibagger` and `keel` out of the ledger. */
+  const gKeys = await g.evaluate(() => {
+    const t = document.body.innerText;
+    return ["multibagger", "magicmagic", "equity_measured", "momentum_quant", "ai_longterm"]
+      .filter(k => t.includes(k));
+  });
+  ok("no raw engine key reaches the page", gKeys.length === 0, gKeys);
+
   ok("an open ticket shows its levels in the panel",
      gTicket.ticket === false || (gTicket.hasLevels && gTicket.saysPaper), gTicket);
 

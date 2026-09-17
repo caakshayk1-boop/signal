@@ -581,3 +581,12 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 .hpick-t{margin:0 0 var(--s3);padding:var(--s3) var(--s4);border:1px solid var(--line2);
   border-left:3px solid var(--acc);border-radius:var(--r2);background:var(--bg)}
 .hpick-t h4{margin:0 0 var(--s2);font-size:.82rem;font-weight:800;letter-spacing:.01em}
+
+/* Everything that opens a panel says so by the cursor. */
+.mov[role="button"],.cal-c[role="button"]{cursor:pointer}
+.mov[role="button"]:hover,.cal-c[role="button"]:hover{border-color:var(--line2)}
+.mov[role="button"]:focus-visible,.cal-c[role="button"]:focus-visible{
+  outline:2px solid var(--acc);outline-offset:2px}
+.lv-key{border-left:3px solid var(--line2);padding-left:var(--s3);margin-top:var(--s2)}
+
+.hpick-nm{color:var(--dim);font-size:.72rem}
