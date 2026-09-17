@@ -5770,3 +5770,5 @@ main.is-nav{animation:routein var(--t-mid) var(--ease-out) backwards}
 .rgm-key span{display:inline-flex;align-items:center;gap:6px}
 .rgm-key i{width:10px;height:10px;border-radius:3px;flex:none}
 .rgm-key b{font-variant-numeric:tabular-nums}
+
+.rgm-off{color:var(--warn);font-weight:700}

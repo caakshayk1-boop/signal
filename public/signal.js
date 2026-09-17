@@ -2774,11 +2774,28 @@
        strip rendered nowhere and looked, from outside, exactly like a feature
        that had not been deployed. `sr` is the screen this route already
        fetched and is holding. */
-    if (sr && sr.ready && sr.ok && sr.data && Array.isArray(sr.data.rows) && sr.data.rows.length) {
-      FRONT_SCREEN = sr.data.rows;
-    }
-    const srRows = FRONT_SCREEN
-      || (sr && sr.ready && sr.ok && sr.data && sr.data.rows) || null;
+    /* ── THE LITE FEED, NOT THE 1.5 MB ONE ────────────────────────────────
+     *
+     * The strip was reading CACHED('/screen.json'), which is the largest asset
+     * on the site. On a desktop it lands inside the five-second cache window
+     * and the strip draws; on a phone on 4G it does not, and the section
+     * silently is not there — which is what Akshay saw, intermittently, on the
+     * same page that had shown it two hours earlier.
+     *
+     * screen-lite.json carries atr_pct, vd, sector and mcap_cr — every field a
+     * tile uses. The only thing it lacks is `tier`, which drives tile span,
+     * and the strip draws uniform tiles anyway. Reading it first makes the
+     * strip deterministic AND puts it on screen far sooner, because the page
+     * stops waiting on a quarter-megabyte to colour twenty-four squares.
+     *
+     * The full feed is still preferred when it happens to be in hand, so a
+     * reader arriving from /screen or /heat gets the identical rows those
+     * pages used. */
+    const lite = CACHED('/screen-lite.json');
+    const pick = (c) => (c && c.ready && c.ok && c.data
+      && Array.isArray(c.data.rows) && c.data.rows.length) ? c.data.rows : null;
+    FRONT_SCREEN = pick(sr) || pick(lite) || FRONT_SCREEN;
+    const srRows = FRONT_SCREEN;
     if (tk && tk.ok && tk.data && srRows && srRows.length) {
       /* The wire is already in hand from this page's own fetch; feeding it
          here means the news dots work without a second request. */
@@ -13615,7 +13632,16 @@
               e.avg_r > 0 ? '+' : ''}${e.avg_r.toFixed(3)}R</span>
             <span class="ind-w">${e.n} closed · ${e.win_rate}% won · t ${
               e.t == null ? '—' : e.t.toFixed(2)}${e.trusted
-                ? ' · <b>clears the bar</b>' : ''}</span></div>`).join('')}</div>`
+                ? ' · <b>clears the bar</b>' : ''}${e.retired
+                ? ` · <b class="rgm-off">${esc(e.retired)}</b>` : ''}</span></div>`).join('')}</div>
+          ${(cell.engines || []).some(e => e.readable && e.retired && e.avg_r > 0)
+            ? `<p class="said">The engine with the best record here is <b>switched off</b>.
+               That is shown rather than tidied away: an earlier version of this table
+               dropped retired engines and, in doing so, hid the only one that made money
+               while leaving three that lost it — which is survivorship bias pointed
+               backwards. Whether it should be switched back on is a question the numbers
+               raise and do not answer: it cleared the significance bar on
+               <b>seventeen</b> trades, and this site's own rule is thirty.</p>` : ''}`
         : ''}
       <h3 class="sub">The last year, by regime</h3>
       <div class="rgm-bar" role="img" aria-label="${order.map(([k, n]) =>

@@ -325,6 +325,35 @@
         vd.l ? ` · ${esc(vd.l)}` : ''}${vd.o ? `. ${esc(vd.o)}.` : '.'}
         ${(x.change_pct > 0 && vd.c === 'AVOID') || (x.change_pct < 0 && vd.c === 'BUY')
           ? ' <b>Today is moving against that call</b>, which is the interesting case.' : ''}</p>` : ''}
+      ${(() => {
+        const t = OPEN_BY_SYM.get(x.sym);
+        if (!t) return '';
+        const cur = t.currency || '₹';
+        const e = num(t.entry), sl = num(t.sl), live = num(x.price);
+        /* WHERE THE TRADE ACTUALLY IS, not just where it was opened. A ticket
+           two rupees above its stop and one comfortably in profit look
+           identical as a row of levels, and they are not the same situation. */
+        const toStop = (live != null && sl != null && live > 0)
+          ? (live - sl) / live * 100 : null;
+        const risk = (e != null && sl != null && e > 0) ? (e - sl) / e * 100 : null;
+        return `<div class="hpick-t">
+          <h4>This book has an open ticket on it</h4>
+          ${figs([
+            [money(t.entry, cur), 'entry'],
+            [money(t.sl, cur), 'stop', 'dn'],
+            [money(t.target1, cur), 'first target', 'up'],
+            [num(t.rr) ? Number(t.rr).toFixed(2) + 'R' : '—', 'reward:risk'],
+          ])}
+          ${ladder(t)}
+          <p class="said">Published ${esc(String(t.date || '').slice(0, 10))} by
+            <b>${esc(t.signal_type || 'an engine')}</b>${
+              t.timeframe ? ` on the ${esc(t.timeframe)}` : ''}.${
+            toStop != null ? ` It is trading <b>${toStop > 0 ? toStop.toFixed(1) + '% above'
+              : Math.abs(toStop).toFixed(1) + '% below'}</b> its stop right now${
+              risk != null ? `, against ${risk.toFixed(1)}% of risk when it was opened` : ''}.` : ''}
+            <b>On paper</b> — no engine here is cleared for capital.</p>
+        </div>`;
+      })()}
       ${figs([
         [num(r.mcap_cr) == null ? '—' : '₹' + Math.round(r.mcap_cr).toLocaleString('en-IN') + ' cr', 'market cap'],
         [num(r.atr_pct) == null ? '—' : Number(r.atr_pct).toFixed(2) + '%', 'average daily range'],
@@ -341,6 +370,8 @@
      it survives every refresh the board does — a per-tile handler would have
      to be re-bound on each of them. */
   let HEAT_LAST = [];
+  /* Filled by the brief's own pass over the ledger; the panel reads it. */
+  const OPEN_BY_SYM = new Map();
   function wireHeatPicks() {
     const host = document.getElementById('live');
     if (!host || host.dataset.picks) return;
@@ -1176,6 +1207,14 @@
      * none of the US ones. The full multi-market ledger stays on Signal. */
     const open = since.filter(r => String(r.status || '').toUpperCase() === 'OPEN'
                                && r.entry && r.sl && r.target1);
+    /* ── THE OPEN BOOK, KEYED FOR THE HEAT PANEL ──────────────────────────
+     * Akshay: "if it is part of any open signal from signal, show levels."
+     * Right, and it was the obvious gap: a tile could be a name this book has
+     * a LIVE ticket on — an entry, a stop, three targets — and the panel said
+     * only what the move was worth in ATR. The levels are the whole reason
+     * the name is on the board. Keyed bare because the ledger writes
+     * NIACL.NS and the heat tiles key on NIACL. */
+    for (const r of open) OPEN_BY_SYM.set(bare(r.symbol), r);
     const seen = new Set();
     const picks = open.filter(r => {
       const k = String(r.symbol || '').toUpperCase();

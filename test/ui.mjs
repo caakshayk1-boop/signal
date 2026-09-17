@@ -2080,6 +2080,19 @@ try {
   ok("the detail can be closed", gClick.closable === true, gClick);
   ok("the marked book is clickable too", gClick.booksClickable > 0, gClick.booksClickable);
 
+  /* A tile that is a name this book has a LIVE ticket on must show the levels.
+     94 of the 99 marked names carry one, and without this the panel described
+     the move and said nothing about the position. */
+  const gTicket = await g.evaluate(() => {
+    const p = document.getElementById("heatPick");
+    return { open: !!(p && !p.hidden),
+             ticket: !!(p && p.querySelector(".hpick-t")),
+             hasLevels: !!(p && /entry/i.test(p.innerText) && /stop/i.test(p.innerText)),
+             saysPaper: !!(p && /on paper/i.test(p.innerText)) };
+  });
+  ok("an open ticket shows its levels in the panel",
+     gTicket.ticket === false || (gTicket.hasLevels && gTicket.saysPaper), gTicket);
+
   /* ── THE LIVE BOARD ──────────────────────────────────────────────────────
    * It boots separately from the brief and must stand on its own: a failure
    * here cannot take the page down, and a success here must not depend on
