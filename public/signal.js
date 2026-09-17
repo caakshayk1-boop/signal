@@ -12117,43 +12117,27 @@
       // reading of a coin flipped a few times, and printing it as a percentage
       // is the single easiest way for this page to mislead.
       const measured = n >= 20;
-      const prior = n === 0 ? '' : `<div class="ef-win ef-prior">
-        <span class="ef-wk">Before ${esc(LAUNCH)} · the earlier ledger</span>
-        ${measured
-          ? `<div class="ef-rec">
-               <span class="ef-n"><b class="${dir(L.avg_r)}">${L.avg_r > 0 ? '+' : ''}${Number(L.avg_r).toFixed(3)}</b><em>R per trade</em></span>
-               <span class="ef-n"><b>${Number(L.win_rate).toFixed(0)}%</b><em>win rate</em></span>
-               <span class="ef-n"><b>${n}</b><em>closed</em></span>
-             </div>
-             <div class="ef-bar" role="img" aria-label="${Number(L.win_rate).toFixed(0)}% of ${n} closed trades were wins">
-               <i style="width:${Math.max(2, Math.min(100, L.win_rate)).toFixed(0)}%"></i></div>`
-          /* A FIGURE, NOT A SENTENCE — the same shape as the measured case
-           * directly above, with the two cells it cannot fill left out
-           * rather than filled with dashes.
-           *
-           * It was a sentence: "Only 1 closed trade — not enough to carry a
-           * win rate", printed on every engine with a thin prior ledger. Two
-           * of them share a count and it became the same sentence twice,
-           * which the duplication check is right to call boilerplate — the
-           * only thing specific to either was the digit. Shortening it just
-           * moved it under the word threshold, which is gaming the rule
-           * rather than answering it.
-           *
-           * The count is the fact and it is already a figure in the measured
-           * case; the reason a small sample carries no rate is a property of
-           * the page and is stated once under the roster. So the two cases
-           * now render the same way and the prose is gone from both. */
-          : `<div class="ef-rec">
-               <span class="ef-n"><b>${n}</b><em>closed, too few to rate</em></span>
-             </div>`}
-        ${/* The same two clauses appeared on all five engines carrying an
-            * earlier ledger. What differs per engine is the trade count that
-            * set its floor; the reason the block is published at all is a
-            * property of the page, and moved under the roster. */''}
-        ${floorN ? `<p class="ef-thin">The <b>${floorN}</b> closed trades behind it are what set
-          this engine's floor.</p>` : ''}
-      </div>`;
-      const rec = mine + prior;
+      /* ── THE EARLIER LEDGER IS NOT THIS SITE'S RECORD, SO IT IS NOT HERE ──
+       *
+       * Akshay: "only after cut-off for signal page — don't mention anything
+       * from the past for any engine, don't carry it from news.askakshay.com."
+       *
+       * Right, and the block that used to sit here was the last place the old
+       * site's numbers survived on this one. It printed BREACH at -0.582R over
+       * 23 closed under a heading that said "the earlier ledger" — trades
+       * published by a different site, under stops this site has since said
+       * were wrong, on a ledger that has been re-graded twice.
+       *
+       * Carrying them was defended as honesty: deleting a losing record looks
+       * like hiding it. But the record this site is accountable for starts on
+       * LAUNCH, every other surface counts from there, and a second population
+       * printed beside the first is how a reader ends up distrusting both. The
+       * page now shows one record and says which one it is.
+       *
+       * `n`, `L`, `measured` and `floorN` stay computed above — the roster
+       * still uses them to decide sample sufficiency. They are simply no
+       * longer rendered as a second scoreboard. */
+      const rec = mine;
       const bt = B ? `<p class="ef-bt"><span class="ef-btk">BACKTEST</span>
              ${B.n} signals · <b class="${dir(B.exp)}">${B.exp > 0 ? '+' : ''}${B.exp.toFixed(3)}R</b>
              · ${B.win.toFixed(0)}% win · t=${B.t.toFixed(2)}
@@ -13632,8 +13616,18 @@
           <span><i>Win rate</i><b>${cell.win_rate}%</b></span>
           <span><i>t-statistic</i><b>${cell.t == null ? '—' : cell.t.toFixed(2)}</b></span>
         </div>
-        <p class="said">${Math.abs(cell.t || 0) >= 2
-          ? `<b>That clears the significance bar</b>, on ${cell.n} trades.`
+        ${/* A SIGNIFICANT LOSS IS NOT A BAR CLEARED. This tested Math.abs(t),
+             so a t of -2.32 on -0.768R would have read "that clears the
+             significance bar" — congratulating the page on losing money
+             reliably. Significance and direction are two facts and the
+             sentence has to carry both. */''}
+        <p class="said">${(cell.t || 0) >= 2
+          ? `<b>That clears the significance bar</b>, on ${cell.n} trades — the only cell on
+             this page that does.`
+          : (cell.t || 0) <= -2
+          ? `<b>Significantly negative.</b> A t of ${cell.t.toFixed(2)} over ${cell.n} trades
+             says the losses are not bad luck. That is a harder result than "no edge" and it
+             is the one this book has in this market.`
           : `<b>Not significant.</b> A t of ${cell.t == null ? '—' : cell.t.toFixed(2)} over
              ${cell.n} trades is indistinguishable from chance, which is the honest reading
              of this book in this market and not a placeholder for a better one.`}</p>`;
