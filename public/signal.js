@@ -12191,10 +12191,16 @@
         is the engine's and the bar is the same for all of them. An engine showing
         <b>no win rate yet</b> has closed
         nothing since ${esc(LAUNCH)} — that is the honest state of a record that restarted, not a
-        missing figure, and it gets one when a position closes. Where a card also shows an
-        <b>earlier ledger</b>, those trades were published under a different configuration on a
-        ledger that has been re-graded twice; they are shown because deleting them would be the
-        more flattering choice, and they are <b>not</b> this site's record.</p>` +
+        missing figure, and it gets one when a position closes.
+        ${/* The sentence that used to follow described the "earlier ledger"
+             block on each card, and that block is gone — those trades were
+             published by a different site under stops this one has since said
+             were wrong. A note explaining a thing the page no longer shows is
+             worse than no note: it tells a reader to look for something that
+             is not there. */''}
+        <b>Nothing published before ${esc(LAUNCH)} is counted anywhere on this site</b> —
+        those trades belong to the ledger this book replaced, and mixing two populations
+        under one heading is how a reader ends up trusting neither.</p>` +
       (() => {
         /* KEYS IN THE LEDGER THAT ARE NOT ON THIS FLOOR.
          * The roster is a whitelist — it is what the site publishes as an
