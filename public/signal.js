@@ -1343,6 +1343,27 @@
                        hunts: 'A lower low in price against a higher low in RSI, traded only '
                             + 'when price reclaims the level it lost.',
                        tf: 'Daily → weeks' },
+    /* ── THE TENTH, BROUGHT BACK ──────────────────────────────────────────
+     *
+     * GUST was switched off on 2026-07-30 with the rest of the intraday tier,
+     * on a measurement of that TIER: −0.005R over 583 trades against +0.171R
+     * on daily closes. The decision was right about the tier and wrong about
+     * this engine inside it — on its own seventeen closed trades it reads
+     * +1.472R at t=3.69 and 70.6% won, which is the best record on this board
+     * by a distance, and it was retired for the company it kept.
+     *
+     * IT COMES BACK AT RESEARCH AND NOT ABOVE IT. Seventeen trades clears the
+     * t-statistic bar and does not come close to the sample one — this site
+     * requires thirty closed at t ≥ 2 before an engine is trusted with
+     * anything, and an engine cannot be exempted from that rule for having
+     * impressed on a small sample. That is the precise error the rule exists
+     * to prevent. So it is logged and shown, and never alerted, exactly as
+     * PIVOT is. */
+    intraday:        { name: 'GUST',   role: 'Intraday momentum', band: null,
+                       hunts: 'A 15-minute momentum push on the Nifty 50 universe — VWAP '
+                            + 'reclaimed, RSI crossing 55, on a volume surge. The only '
+                            + 'engine here that does not hold overnight.',
+                       tf: '15-minute → the close' },
   };
 
   /* ── A LANE IS NOT A DATABASE KEY EITHER ──────────────────────────────────
@@ -1527,6 +1548,9 @@
        everything else — a new engine promoting itself on the day it was
        written is the claim this whole record exists to refuse. */
     pivot: 'RESEARCH',
+    /* Seventeen closed at t=3.69 — the best record here, and thirteen trades
+       short of the bar. RESEARCH until it has thirty. */
+    intraday: 'RESEARCH',
   };
 
   /* Backtested records for the engines that have no live sample yet. Kept
