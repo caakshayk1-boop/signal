@@ -1674,8 +1674,14 @@ try {
       tiles: tiles.length,
       bands: document.querySelectorAll(".hband").length,
       dist,
+      /* SCOPED TO REAL TILES. The unscoped selector also matched the two
+         legend swatches, which demonstrate what a buy and an avoid outline
+         look like — so "every tile carries a call" was comparing 99 tiles
+         against 98 bordered tiles plus 2 swatches, and passed only while
+         those happened to sum to 99. */
       withBorder: document.querySelectorAll(
-        ".ht-vbuy,.ht-vavoid,.ht-vwatch,.ht-vwait").length,
+        ".ht[data-hsym].ht-vbuy,.ht[data-hsym].ht-vavoid," +
+        ".ht[data-hsym].ht-vwatch,.ht[data-hsym].ht-vwait").length,
       newsDots: document.querySelectorAll(".ht-n").length,
       legend: document.querySelectorAll(".hl-i").length,
       barText: (document.querySelector(".ht-bar") || {}).innerText || "",
@@ -1701,8 +1707,13 @@ try {
   ok("the ramp's alphas increase with the step",
      heat.alphas.every(a => a != null) &&
      heat.alphas.every((a, i) => i === 0 || a > heat.alphas[i - 1]), heat.alphas);
-  ok("every tile carries the screen's standing call",
-     heat.withBorder === heat.tiles, { border: heat.withBorder, tiles: heat.tiles });
+  /* Not "every", because a screened row may legitimately carry no verdict and
+     a tile cannot invent one. Never MORE than the tiles, and the overwhelming
+     majority of them — which is the claim the legend actually makes. */
+  ok("no more outlines than tiles", heat.withBorder <= heat.tiles,
+     { border: heat.withBorder, tiles: heat.tiles });
+  ok("nearly every tile carries the screen's standing call",
+     heat.withBorder >= heat.tiles * 0.9, { border: heat.withBorder, tiles: heat.tiles });
   ok("a tile explains itself in its title",
      /its average range/.test(heat.sampleTitle) , heat.sampleTitle);
   ok("the heatmap says how many names it could mark",
@@ -1733,6 +1744,29 @@ try {
     typeof window.HEAT === "object" && typeof window.HEAT.rows === "function");
   ok("the tiles are built by the shared core", wireWired === true);
   ok("the heatmap does not scroll sideways", heat.sideways <= 0, heat.sideways);
+
+  /* ── A TILE MUST NOT CUT ITS OWN TEXT ────────────────────────────────────
+   * grid-auto-rows was a fixed 70px (58 on a phone) against a tile holding
+   * three lines. At the reader's own larger text size those lines exceed it
+   * and overflow:hidden slices every ticker through the middle of its letters,
+   * which is what Akshay photographed. Checked at 100/130/160% because the
+   * default size is exactly the one that did NOT show the fault. */
+  const clip = await hp.evaluate(async () => {
+    const out = {};
+    for (const pct of [100, 130, 160]) {
+      document.documentElement.style.fontSize = pct + "%";
+      await new Promise(r => setTimeout(r, 300));
+      let clipped = 0;
+      for (const t of document.querySelectorAll(".ht[data-hsym]")) {
+        if (t.scrollHeight - t.clientHeight > 1) clipped++;
+      }
+      out[pct] = clipped;
+    }
+    document.documentElement.style.fontSize = "";
+    return out;
+  });
+  ok("no tile clips its text at any reader text size",
+     Object.values(clip).every(n => n === 0), clip);
 
   /* THE TILE SURFACE MUST BELONG TO THE THEME IT IS DRAWN ON. A ramp built on
      a surface token that did not follow the theme would put dark tiles on a

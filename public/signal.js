@@ -2774,7 +2774,11 @@
        strip rendered nowhere and looked, from outside, exactly like a feature
        that had not been deployed. `sr` is the screen this route already
        fetched and is holding. */
-    const srRows = (sr && sr.ready && sr.ok && sr.data && sr.data.rows) || null;
+    if (sr && sr.ready && sr.ok && sr.data && Array.isArray(sr.data.rows) && sr.data.rows.length) {
+      FRONT_SCREEN = sr.data.rows;
+    }
+    const srRows = FRONT_SCREEN
+      || (sr && sr.ready && sr.ok && sr.data && sr.data.rows) || null;
     if (tk && tk.ok && tk.data && srRows && srRows.length) {
       /* The wire is already in hand from this page's own fetch; feeding it
          here means the news dots work without a second request. */
@@ -3693,6 +3697,18 @@
   let heavyTried = false;
   /* Same shape as heavyTried: one retry per visit, never a loop on failure. */
   let regimeTried = false;
+  /* ── THE SCREEN ROWS, HELD ONCE SEEN ──────────────────────────────────────
+   * The front page renders more than once — the heavy pass re-enters it, and
+   * so does the regime fetch — and CACHED() only answers for MICRO_MS, which
+   * is five seconds. So a re-entry that lands six seconds later finds the
+   * screen "not ready" and the heatmap strip silently disappears from a page
+   * that had just drawn it. Measured exactly that way: the strip present on
+   * one render and absent on the next, with nothing in the console.
+   *
+   * The rows do not expire in five seconds — the micro-cache is about not
+   * re-requesting, not about the data going stale. Held here so any render
+   * can draw the strip regardless of which pass it is. */
+  let FRONT_SCREEN = null;
 
   // "2026-09-14" -> "14 Sep". Day first, because that is the part that
   // answers "how soon".
@@ -11145,16 +11161,39 @@
       const d = Math.sqrt(ua * ub);
       return d > 0 ? inter / d : 0;
     };
+    /* THE TITLE IS NOT THE ONLY THING THAT REPEATS.
+     *
+     * This compared headlines and nothing else, so two wires running the same
+     * story under different headlines but the SAME body both printed — and the
+     * page showed one paragraph twice. Caught on /news: "The Fed's indication
+     * of another rate hike in 2026 kept investors cautious…" under two
+     * different titles from two sources.
+     *
+     * An identical summary is not a similarity judgement to tune a threshold
+     * for; it is the same text. Checked exactly, before the fuzzy title pass,
+     * and the second one becomes a byline on the first exactly as a
+     * title-match would. */
+    const bodyKey = (x) => String(x && x.summary || '')
+      .toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 160);
+    const byBody = new Map();
+
     const kept = [];
     for (let i = 0; i < list.length; i++) {
       let host = null;
-      for (const k of kept) { if (sim(toks[i], toks[k.i]) >= threshold) { host = k; break; } }
+      const bk = bodyKey(list[i]);
+      if (bk.length >= 60 && byBody.has(bk)) {
+        host = byBody.get(bk);
+      } else {
+        for (const k of kept) { if (sim(toks[i], toks[k.i]) >= threshold) { host = k; break; } }
+      }
       if (host) {
         // The byline, not a deletion. Same source twice is not worth printing.
         const src = list[i].source;
         if (src && src !== list[host.i].source && !host.also.includes(src)) host.also.push(src);
       } else {
-        kept.push({ i, also: [] });
+        const k = { i, also: [] };
+        kept.push(k);
+        if (bk.length >= 60) byBody.set(bk, k);
       }
     }
     return kept.map(k => (k.also.length
