@@ -930,8 +930,11 @@
        favour of the 20-40% one, which is the same screen with the floor that
        actually carries the thesis. ENG_NAME still maps it, so its closed rows
        render a name rather than a raw key. */
-    const ENGINE_OK = new Set(['breakout', 'magicmagic', 'equity_measured',
-      'multibagger', 'momentum_quant', 'ai_longterm', 'ledge', 'keel', 'pivot', 'intraday',
+    /* equity_measured and ai_longterm retired 2026-09-18 — the first on a
+       significantly negative record (t=-2.92), the second on having none.
+       ENG_NAME still maps both so their closed rows render a name. */
+    const ENGINE_OK = new Set(['breakout', 'magicmagic',
+      'multibagger', 'momentum_quant', 'ledge', 'keel', 'pivot', 'intraday',
       'strict', 'reclaim']);
     const since = ledger.filter(r =>
       String(r.date || '').slice(0, 10) >= LAUNCH

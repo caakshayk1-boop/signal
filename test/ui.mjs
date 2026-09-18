@@ -1599,17 +1599,75 @@ try {
       const sentences = [...seen].filter(([, n]) => n > 1)
         .map(([t, n]) => `x${n}: "${t.slice(0, 70)}"`);
 
-      // A figure only counts when it carries a unit.
+      /* A figure only counts when it carries a unit — AND when it is the same
+         number saying the same thing.
+         
+         THE FALSE POSITIVE THIS FIXES. ACE filed an entry at 1229.20 and the
+         stock closed at 1229.20, so the brief printed "NOW ₹1,229.20" and
+         "ENTRY ₹1,229.20" and the ladder repeated it. Three true statements
+         that happen to share a value, flagged as boilerplate. A stock sitting
+         exactly on its entry is information — arguably the most useful thing
+         on the page that day — and a duplication rule that cannot tell it from
+         copy-paste will be silenced rather than obeyed.
+         
+         The rule now pairs each figure with the LABEL nearest it. The same
+         number under three different labels is three facts; the same number
+         under the same label three times is the repetition this was written
+         to catch. */
       const UNIT = /(?:₹|\$)[\d,]+(?:\.\d+)?|[\d,]+(?:\.\d+)?\s?(?:%|×|R\b|:\s?1)/g;
+      /* textContent, not innerText — ONE SOURCE FOR BOTH HALVES.
+         The walker below reads textContent, which sees inside a collapsed
+         <details>; this read innerText, which does not. So every figure in a
+         folded block arrived with an empty label, they all collided under "",
+         and /ideas reported three false triples. Mixing the two is the bug. */
+      /* STOP WALKING WHEN THE CONTEXT STOPS BEING ONE FACT.
+         Walking up three levels to find a label eventually reaches the whole
+         ROW — "ROE · ROA · REV + · PAT" — and hands the same label to four
+         different cells, so four legitimate figures collide under it. That is
+         how a weight of 25% carried by four separate factors read as one
+         number printed four times.
+         An element holding more than one figure is not a label, it is a
+         container; at that point the node's own position is what distinguishes
+         it from its siblings. */
+      const countFigs = (t) => ((t || "").match(UNIT) || []).length;
+      const labelOf = (node) => {
+        let el = node.parentElement, hops = 0;
+        while (el && hops++ < 3) {
+          const full = el.textContent || "";
+          const t = full.replace(UNIT, "").replace(/\s+/g, " ").trim();
+          if (t.length >= 2) {
+            /* More than one figure in here means this is the ROW, not the
+               label, and every cell in it would collide under one key. The
+               leaf element the figure actually lives in is what distinguishes
+               them — identity, not an index, because the text node is a
+               grandchild by this point and indexOf returned 0 for all four. */
+            if (countFigs(full) > 1) {
+              const leaf = node.parentElement;
+              if (!leaf.dataset.figid) {
+                leaf.dataset.figid = String(++window.__figSeq || (window.__figSeq = 1));
+              }
+              return t.slice(0, 20).toUpperCase() + "#" + leaf.dataset.figid;
+            }
+            return t.slice(0, 24).toUpperCase();
+          }
+          el = el.parentElement;
+        }
+        return "";
+      };
       const figs = [];
       for (const el of document.querySelectorAll("#main .card, #main .ipo, #main .b-sec, #main .aic, #main .ef-c")) {
         const c = new Map();
-        for (const m of (el.innerText || "").match(UNIT) || []) {
-          const k = m.replace(/\s+/g, "");
-          c.set(k, (c.get(k) || 0) + 1);
+        const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        let n;
+        while ((n = w.nextNode())) {
+          for (const m of (n.textContent || "").match(UNIT) || []) {
+            const k = m.replace(/\s+/g, "") + "@" + labelOf(n);
+            c.set(k, (c.get(k) || 0) + 1);
+          }
         }
-        const bad = [...c].filter(([, n]) => n >= 3).map(([v, n]) => `${v} x${n}`);
-        if (bad.length) figs.push(`${(el.innerText || "").split("\n")[0].slice(0, 14)}: ${bad.join(", ")}`);
+        const bad = [...c].filter(([, n2]) => n2 >= 3)
+          .map(([v, n2]) => `${v.split("@")[0]} x${n2} under "${v.split("@")[1]}"`);
+        if (bad.length) figs.push(`${(el.textContent || "").trim().slice(0, 14)}: ${bad.join(", ")}`);
       }
       return { sentences, figs };
     });

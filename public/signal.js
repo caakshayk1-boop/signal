@@ -260,7 +260,22 @@
     if (v === null || v === undefined || v === '') return '—';
     const n = Number(v);
     if (!Number.isFinite(n)) return '—';
-    return cur + Math.abs(n).toLocaleString('en-IN', Math.abs(n) >= 1000
+    /* ── ABOVE ₹1,000 THE PAISE WERE DROPPED, AND LEVELS COLLIDED ──────────
+     *
+     * Rounding to whole rupees over ₹1,000 is right for a market cap and
+     * wrong for a LEVEL. ACE filed an entry at 1229.20 against a close of
+     * 1229.45 and the brief printed "₹1,229" for both — two different
+     * decisions, one number, and no way for a reader to tell which line was
+     * which. The entry slider held the true 1229.2 and therefore disagreed
+     * with the text beside it.
+     *
+     * A price is kept to two decimals whenever it HAS them. A round number
+     * still prints round — ₹1,229 stays ₹1,229 — so nothing gains noise it
+     * did not have; only a value carrying paise shows them, which is exactly
+     * when dropping them loses information. */
+    const abs = Math.abs(n);
+    const hasPaise = Math.round(abs * 100) % 100 !== 0;
+    return cur + abs.toLocaleString('en-IN', (abs >= 1000 && !hasPaise)
       ? { maximumFractionDigits: 0 }
       : { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       .replace(/^/, n < 0 ? '-' : '');
@@ -1334,8 +1349,16 @@
     magicmagic:      { name: 'TIDAL',  role: 'Recovery',         band: '20–40% off the high',
                        hunts: 'The same screen, deeper water — a larger fall, so more room back to the high.',
                        tf: 'Weekly → months' },
+    /* RETIRED 2026-09-18 ON ITS OWN MEASURE. 16 closed, -0.535R, 25% won,
+       t=-2.92 — the only engine on this board whose record is significantly
+       NEGATIVE, and the one whose whole claim was that it came from a measured
+       edge rather than a pattern. The measure came back and it is against it.
+       An engine that loses reliably is a stronger finding than one that does
+       nothing, and it is the easiest one to act on. */
     equity_measured: { name: 'PLUMB',  role: 'Measured equity',  band: null,
-                       hunts: 'The backtested daily-close engine, sized against the weekly regime. The only one built from a measured edge rather than a pattern.',
+                       retired: '2026-09-18',
+                       hunts: 'The backtested daily-close engine. Retired on its own record: '
+                            + '16 closed at −0.535R, t=−2.92 — significantly negative.',
                        tf: 'Daily → days' },
     multibagger:     { name: 'ASCENT', role: 'Leaders',          band: null,
                        hunts: 'Names already near their highs with institutional volume behind them — CAN SLIM, held for quarters not weeks.',
@@ -1343,7 +1366,12 @@
     momentum_quant:  { name: 'VECTOR', role: 'Momentum',         band: null,
                        hunts: 'Cross-sectional rank over the full NSE screen: six and twelve month returns over one-year sigma, skipping the last month.',
                        tf: 'Monthly → months' },
-    ai_longterm:     { name: 'NORTH',  role: 'Long horizon',     band: null,
+    /* RETIRED 2026-09-18. Not on a bad record — on NO record. It has never
+       had a closed trade graded, so there is nothing to defend it with, and
+       its weekly-to-months horizon is the one ASCENT already covers. Two
+       engines hunting the same ground with one of them unmeasured is the
+       duplication this roster has just spent a day removing. */
+    ai_longterm:     { name: 'NORTH',  retired: '2026-09-18',  role: 'Long horizon',     band: null,
                        hunts: 'The long-horizon screen, run weekly against the whole board.',
                        tf: 'Weekly → months' },
     /* ── THE TWO NEW ONES ─────────────────────────────────────────────────
