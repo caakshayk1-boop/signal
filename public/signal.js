@@ -1310,8 +1310,26 @@
     breakout:        { name: 'BREACH', role: 'Breakouts',        band: null,
                        hunts: 'Price clearing a level it has been under — 52-week, 20-week and 6-month highs, confirmed on volume.',
                        tf: 'Daily → weeks' },
+    /* ── ONE RECOVERY BAND, NOT TWO ───────────────────────────────────────
+     * `magic` (>15% off the high) and `magicmagic` (20-40%) were the same
+     * screen run twice with a different floor and published under ONE name,
+     * so the floor showed two TIDAL cards and a name could sit on both.
+     *
+     * The wider band is also the weaker one — 23 closed at -0.193R against 19
+     * at -0.247R is not a difference either sample can carry — and >15% admits
+     * every name 20-40% does plus a shallower tail. The deeper fall is the
+     * whole thesis: more room back to the high. So the narrow band is the
+     * engine and this one stops publishing.
+     *
+     * RETIRED, NOT DELETED. 23 closed trades carry this key and a deleted
+     * entry would render them as the raw string `magic` — the exact leak the
+     * display names exist to prevent. It keeps its name and is filtered out
+     * of the roster by `retired`. */
     magic:           { name: 'TIDAL',  role: 'Recovery',         band: '>15% off the high',
-                       hunts: 'Quality names in a dip, with weekly momentum already turning back up.',
+                       retired: '2026-09-18',
+                       hunts: 'The wider recovery band. Retired — the 20–40% screen is the '
+                            + 'engine, and this one admitted everything it does plus a '
+                            + 'shallower tail.',
                        tf: 'Weekly → months' },
     magicmagic:      { name: 'TIDAL',  role: 'Recovery',         band: '20–40% off the high',
                        hunts: 'The same screen, deeper water — a larger fall, so more room back to the high.',
@@ -1563,6 +1581,10 @@
              from: '2025-01', to: '2026-09' },
   };
 
+  /* A retired engine keeps its NAME so its closed trades still render, and is
+     absent from everything that describes what the site publishes now. One
+     predicate, used by every consumer, so the two cannot drift. */
+  const LIVE_ENGINES = () => Object.entries(ENGINE_REGISTRY).filter(([, m]) => !m.retired);
   const ENGINES = new Set(Object.keys(ENGINE_REGISTRY));
   const eng = k => ENGINE_REGISTRY[String(k || '')] || null;
   const engName = k => (eng(k) || {}).name || String(k || '—');
@@ -1606,7 +1628,7 @@
    *
    * So the counts come from here, both pages print the same sentence, and the
    * sentence states the arithmetic instead of asserting a total. */
-  const ENGINE_KEYS = () => Object.keys(ENGINE_REGISTRY);
+  const ENGINE_KEYS = () => LIVE_ENGINES().map(([k]) => k);
   const ENGINE_NAMES = () => [...new Set(ENGINE_KEYS().map(k => ENGINE_REGISTRY[k].name))];
   /* The research floor's own count, read from its feed rather than hardcoded —
    * a fourth engine added there must not leave a "three" behind on two other
@@ -1650,7 +1672,7 @@
    * rewritten in the database — so the substitution happens on the way out,
    * the same place the key itself is translated. Longest keys first, or
    * "magic" would eat the front of "magicmagic". */
-  const ENGINE_WORDS = Object.entries(ENGINE_REGISTRY)
+  const ENGINE_WORDS = LIVE_ENGINES()
     .map(([k, v]) => [k, v.name])
     .concat([['Magic-levels', 'TIDAL levels'], ['MagicMagic', 'TIDAL'], ['Magic', 'TIDAL']])
     .sort((a, b) => b[0].length - a[0].length);
@@ -7451,7 +7473,7 @@
       if (!last.has(k)) last.set(k, r);          // rows arrive newest first
     }
     const seen = new Set();
-    const cards = Object.entries(ENGINE_REGISTRY).map(([key, meta]) => {
+    const cards = LIVE_ENGINES().map(([key, meta]) => {
       const v = (d.engines || {})[key] || {};
       const trades = v.trades || 0;
       const win = v.win_rate;
@@ -7557,7 +7579,7 @@
       </details>`;
     }).join('');
 
-    const on = Object.entries(ENGINE_REGISTRY).filter(([k]) => {
+    const on = LIVE_ENGINES().filter(([k]) => {
       const v = (d.engines || {})[k] || {}; return v.status !== 'disabled';
     }).length;
 
@@ -12049,7 +12071,11 @@
      * history than /api/stats reports — 107 closed for breakout against 27.
      * Naming its sample is the only way "3.24R" stops looking arbitrary. */
     const ENG_FLOOR = (ef.ok && ef.data && ef.data.engines) || {};
-    const keys = Object.keys(ENGINE_REGISTRY);
+    /* LIVE_ENGINES, not the raw registry — this is the floor, and a retired
+       engine is by definition not on it. The count, the cards and the roster
+       all read the same predicate so the page cannot say "11 engines" over
+       ten cards. */
+    const keys = ENGINE_KEYS();
     const tierOrder = { LIVE: 0, PAPER: 1, RESEARCH: 2, BLOCKED: 3 };
     keys.sort((a, b) => (tierOrder[ENGINE_TIER[a]] ?? 9) - (tierOrder[ENGINE_TIER[b]] ?? 9)
                      || ((live[b]?.trades || 0) - (live[a]?.trades || 0)));

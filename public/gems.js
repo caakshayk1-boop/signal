@@ -926,7 +926,11 @@
      * check stays as a guard rather than a filter: applying the engine rule
      * already leaves nothing but Indian names, and if that ever stops being
      * true this page must not silently start showing them. */
-    const ENGINE_OK = new Set(['breakout', 'magic', 'magicmagic', 'equity_measured',
+    /* `magic` is absent: the >15% recovery band was retired 2026-09-18 in
+       favour of the 20-40% one, which is the same screen with the floor that
+       actually carries the thesis. ENG_NAME still maps it, so its closed rows
+       render a name rather than a raw key. */
+    const ENGINE_OK = new Set(['breakout', 'magicmagic', 'equity_measured',
       'multibagger', 'momentum_quant', 'ai_longterm', 'ledge', 'keel', 'pivot', 'intraday',
       'strict', 'reclaim']);
     const since = ledger.filter(r =>
