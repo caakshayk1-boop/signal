@@ -2836,7 +2836,7 @@
     const rgm = CACHED('/regime.json');
     if (rgm.ready && rgm.ok && rgm.data && rgm.data.ok) FRONT_REGIME = rgm.data;
     if (FRONT_REGIME) {
-      try { out += regimeSec(FRONT_REGIME); }
+      try { out += regimeSec(FRONT_REGIME, LR); }
       catch (e) { console.error('regime section failed:', e); }
     } else if (!regimeTried) {
       regimeTried = true;
@@ -13587,7 +13587,7 @@
    * the label actually describes it reads −0.008R. That is what goes on the
    * page.
    */
-  const regimeSec = (d) => {
+  const regimeSec = (d, liveRec) => {
     const t = d && d.today;
     if (!t || !t.regime) return '';
     const cell = ((d.measured || {}).cells || {})[t.regime];
@@ -13628,6 +13628,63 @@
              ${cell.n} trades is indistinguishable from chance, which is the honest reading
              of this book in this market and not a placeholder for a better one.`}</p>`;
 
+    /* ── TWO CLOCKS, NOT TWO POPULATIONS ──────────────────────────────────
+     *
+     * The record above this panel is computed in the browser from the live
+     * ledger. This panel is a SNAPSHOT: regime.py writes regime.json on a
+     * schedule, because labelling every past session by trend and trailing
+     * volatility is not work a page can do on load.
+     *
+     * Since 2026-09-19 both use the identical population rule, so they agree
+     * the moment they are computed together — verified at 11 closed, 9.1%,
+     * -0.723R from two different stores in two different languages. What they
+     * cannot do is agree CONTINUOUSLY: two KEEL trades closed at -1R in the
+     * two hours after one particular snapshot, and the page went straight back
+     * to showing 13 closed at 7.7% above 11 closed at 9.1% — which is exactly
+     * the pair of numbers that started this, with the cause moved rather than
+     * removed.
+     *
+     * A reader cannot be expected to infer a stale timestamp from a figure. So
+     * the panel says when it was measured, and when the live count has since
+     * moved it says that too, with both numbers. The gap is a fact about the
+     * clock and it is printed as one. */
+    const liveN = liveRec && Number.isFinite(Number(liveRec.trades)) ? Number(liveRec.trades) : null;
+    /* The SNAPSHOT'S WHOLE POPULATION, summed across every regime cell — not
+       `cell.n`, which is only the trades that fall in TODAY'S regime. The two
+       are equal today because every closed trade since launch happens to sit
+       in calm_range, and comparing the record's all-regime total against one
+       cell would start lying the moment that stops being true. */
+    const snapN = (() => {
+      const cells = (d.measured || {}).cells;
+      if (!cells) return null;
+      const tot = Object.values(cells)
+        .reduce((a, c) => a + (Number.isFinite(Number(c && c.n)) ? Number(c.n) : 0), 0);
+      return tot || null;
+    })();
+    /* ageHours, not Date.parse: a stamp with no offset parses as LOCAL time,
+       which is the bug that once added 8 hours to every feed age on this site
+       in MYT. regime.json carries +00:00, and the helper handles both. */
+    /* The field is `generated_at`. Written as `computed_at` first, which is
+       falsy and silently degraded the sentence to "at the last run" — a stamp
+       that reads as deliberate vagueness rather than as a missing field. */
+    const stampAge = d.generated_at ? ageWord(ageHours(d.generated_at)) : null;
+    const drift = (liveN != null && snapN != null && liveN !== snapN)
+      ? `<p class="hint"><b>Measured ${stampAge ? esc(stampAge) + ',' : 'at the last run,'} on
+          ${snapN} closed ${snapN === 1 ? 'trade' : 'trades'}.</b> The record above reads
+          <b>${liveN}</b>, because it is computed from the live ledger on every load and
+          ${liveN > snapN ? `${liveN - snapN} more ${liveN - snapN === 1 ? 'trade has' : 'trades have'} closed since`
+                          : `this panel is the older count`}. Same engines, same rule, different
+          clock — the labels below are rebuilt on a schedule, because labelling every past
+          session by trend and volatility is not work this page can do while you wait.</p>`
+      : (stampAge && snapN ? `<p class="hint">Measured ${esc(stampAge)}, on ${snapN} closed
+          ${snapN === 1 ? 'trade' : 'trades'} — the same engines and the same rule the record
+          above uses.</p>` : '');
+    /* `stampAge && snapN`, not `stampAge` alone. With an empty or broken feed
+       snapN is null and this read "Measured 2h old, on the closed trades",
+       printed directly under a verdict that had just said this book has never
+       closed a trade in this regime. A sentence with no number in it is not
+       worth the line. */
+
     return sec('What kind of market this is', `
       <div class="rgm">
         <div class="rgm-h">
@@ -13644,6 +13701,7 @@
       </div>
       <h3 class="sub">What this book has done in it</h3>
       ${verdict}
+      ${drift}
       ${/* `.inds/.ind-r`, not `.rank/.rank-r`: the rank row is two columns and
            these are three — name, figure, working — so the engine name and its
            R multiple overlapped. The company page's indicator grid already

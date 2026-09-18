@@ -241,8 +241,23 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
       if (!/Number\.isFinite\s*\(/.test(body)) continue;
       if (!/\bnull\b/.test(body)) continue;                 // must be able to return null
       if (!/Number\s*\(/.test(body)) continue;              // must coerce
-      const guards = /(==|===)\s*null|!=\s*null|!==\s*null|===\s*undefined|undefined\s*===|===\s*''|typeof\s+\w+\s*===/.test(body);
-      if (!guards) bad.push(`${file}:${lineOf(code, m.index)}`);
+      /* A FALSY CHECK IS A GUARD, and a stronger one than the idioms above.
+       * This flagged gridVal(), which opens:
+       *     const raw = (cell ? cell.textContent : '').trim();
+       *     if (!raw || raw === '—' || ...) return null;
+       * `!raw` rejects null, undefined AND '' — every case this rule exists to
+       * catch, and more than `=== ''` catches on its own. The rule was right
+       * about the shape and wrong about the idiom, so it failed on correct
+       * code, which is how a rule teaches people to skip it.
+       *
+       * The falsy check only counts when it SHORT-CIRCUITS BEFORE the
+       * coercion. `if (!x) doSomething()` that falls through to Number(x)
+       * guards nothing, and this still fails on it. */
+      const explicit = /(==|===)\s*null|!=\s*null|!==\s*null|===\s*undefined|undefined\s*===|===\s*''|typeof\s+\w+\s*===/.test(body);
+      const firstCoerce = body.search(/Number\s*\(/);
+      const beforeCoerce = firstCoerce < 0 ? body : body.slice(0, firstCoerce);
+      const falsyExit = /if\s*\(\s*!\w[\s\S]{0,120}?\)\s*(\{[^{}]{0,80}?)?\breturn\b/.test(beforeCoerce);
+      if (!explicit && !falsyExit) bad.push(`${file}:${lineOf(code, m.index)}`);
     }
   }
   ok("a number-or-null helper rejects null before it coerces", bad.length === 0, bad);
@@ -519,8 +534,18 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   // Comment lines explain this guard and would otherwise be counted as uses
   // of it — the same trap that made an earlier check match its own docstring.
   const code = JS.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
+  /* FOUR, not three. A fourth full-payload route was added and this constant
+   * was not moved with it, so the check has been red since — reporting a
+   * CORRECTLY guarded call site as a failure.
+   *
+   * It stays an EXACT count rather than becoming `>= 3`, because the exact
+   * form is what catches the dangerous direction: a guard deleted from an
+   * existing site. `>=` would pass while a route quietly started reading a
+   * lite cache. The four are the screen, the company page, the engine floor
+   * and the regime panel; adding a fifth means moving this number, on
+   * purpose, in the same commit. */
   const fullGuards = (code.match(/!SCREEN \|\| SCREEN_LITE/g) || []).length;
-  ok("all three full-payload call sites reject a lite cache", fullGuards === 3, fullGuards);
+  ok("every full-payload call site rejects a lite cache", fullGuards === 4, fullGuards);
   // And nothing may reach for the raw path any more.
   ok("no route fetches '/screen.json' by literal — FULL_URL or LITE_URL",
      !/get\(\s*['"]\/screen\.json['"]\s*\)/.test(JS));
@@ -799,7 +824,19 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
  * construction, and it looks like working data. */
 {
   const PULL = readFileSync("scripts/pull-feeds.mjs", "utf8");
-  const fetched = [...JS.matchAll(/['"]\/([a-z-]+)\.json['"]/g)].map(m => m[1]);
+  /* FETCH SITES, not every string that looks like a path. This matched any
+   * '/x.json' literal anywhere in the bundle and so flagged `buoy`, whose
+   * only appearance is in the FEED LABEL map — the table that turns a feed
+   * path into the words "BUOY research" on the freshness bar. Nothing fetches
+   * it; pull-feeds.mjs says so in a comment and deliberately does not mirror
+   * it. The rule was reporting a feed as un-synced because the site knows how
+   * to NAME it.
+   *
+   * Reading only get()/CACHED()/fetch() keeps the rule pointed at what it is
+   * about: a feed the site actually READS and the sync does not pull is stale
+   * by construction and looks like working data. */
+  const fetched = [...JS.matchAll(/\b(?:get|CACHED|fetch)\s*\(\s*['"]\/([a-z-]+)\.json['"]/g)]
+    .map(m => m[1]);
   /* Two exceptions, both produced HERE rather than synced: build.json is
      stamped at deploy time by scripts/stamp-build.mjs, and institutional.json
      is built by this repo's own institutional.yml from exchange filings. */
