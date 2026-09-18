@@ -39,6 +39,31 @@ const ok = (name, cond, detail) => {
 // The routes fetch several feeds each; the brief also fetches a price series.
 const SETTLE = 7000;
 
+/* ── WAIT FOR THE CONDITION, NOT FOR THE CLOCK ───────────────────────────────
+ *
+ * A fixed timeout asks "has 7 seconds passed", which is not the question. The
+ * question is "has the thing arrived". Those differ by exactly the latency
+ * between the runner and the site, and CI runs from a GitHub runner against
+ * PRODUCTION while this file is usually run from a laptop against wrangler dev.
+ *
+ * Measured against production on 2026-09-18: /markets had ZERO `.mk` rows after
+ * SETTLE and sixty-seven after a reload and another SETTLE. The board is not
+ * broken and never was — it is slower than the clock this file reads. In CI it
+ * stayed at zero through both and took three real assertions down with it, plus
+ * `the hero renders`, which fails whenever the client render lands after the
+ * seventh second. The prerendered shell makes that one look especially odd: the
+ * page is visibly THERE, with a headline, and `.hero h1` does not exist yet
+ * because that headline is the static snapshot.
+ *
+ * THIS WEAKENS NOTHING. Every assertion is unchanged and must still pass on the
+ * same evidence; only the moment it is evaluated moves. If the condition never
+ * becomes true the wait expires and the assertion runs anyway, against whatever
+ * is on the page — so a genuinely broken board still fails, it just fails after
+ * waiting rather than before. The reload-before-judging-the-board comment below
+ * already makes this argument; this generalises it. */
+const until = (page, fn, arg = null, timeout = 30000) =>
+  page.waitForFunction(fn, arg, { timeout, polling: 250 }).catch(() => false);
+
 /* The brief folds its workup behind a <details>, and innerText is
  * layout-aware — anything a closed fold is not rendering reads as "". Every
  * assertion about a widget inside the workup opens it first. Not a weakening:
@@ -84,6 +109,7 @@ try {
   });
 
   await p.goto(SITE + "/markets", { waitUntil: "domcontentloaded" });
+  await until(p, () => document.querySelectorAll(".mk").length > 40);
   await p.waitForTimeout(SETTLE);
 
   /* ONE RELOAD BEFORE JUDGING THE BOARD.
@@ -102,6 +128,7 @@ try {
   if (nRows <= 40) {
     await p.waitForTimeout(6000);
     await p.reload({ waitUntil: "domcontentloaded" });
+    await until(p, () => document.querySelectorAll(".mk").length > 40);
     await p.waitForTimeout(SETTLE);
     nRows = await rows.count();
   }
@@ -468,6 +495,11 @@ try {
   await p.goto(SITE + "/", { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(SETTLE);
 
+  /* `.hero h1`, not any h1: index.html ships a PRERENDERED shell carrying
+     `h1.pre-h`, which the client render replaces. Waiting on the real one is
+     the difference between "the page has rendered" and "the page arrived as
+     HTML". */
+  await until(p, () => document.querySelectorAll(".hero h1").length === 1);
   ok("the hero renders", await p.locator(".hero h1").count() === 1);
   /* BOUND TO THE BRIEF LINK, NOT TO WHICHEVER BUTTON IS PRIMARY.
    *

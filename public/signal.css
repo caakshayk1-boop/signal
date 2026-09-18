@@ -4655,7 +4655,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .rd-feed{display:grid;gap:8px}
 .rd-row{display:grid;gap:4px 12px;padding:12px 14px;border:1px solid var(--line);
   border-radius:var(--r-3);background:var(--surface);cursor:pointer;
-  grid-template-columns:22px minmax(0,1fr) auto;align-items:start}
+  grid-template-columns:22px minmax(0,1fr) minmax(0,auto);align-items:start}
+.rd-row > *{min-width:0}
 .rd-row:hover{border-color:var(--line2)}
 .rd-row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .rd-rank{font:600 var(--t-3)/1.4 var(--mono);color:var(--dim)}
@@ -4989,19 +4990,48 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   gap:var(--s-4) var(--s-5);margin-top:var(--s-5);padding-top:var(--s-4);
   grid-template-columns:repeat(auto-fit,minmax(112px,1fr));
   border-top:1px solid var(--line)}
-.rd-f{display:flex;flex-direction:column-reverse;gap:var(--s-1);align-items:flex-start}
+.rd-facts > *{min-width:0}
+/* The label sits UNDER the value (column-reverse) and is the wider of the two,
+   so it is the one that sets the track's min-content width. It wraps now
+   instead of pushing the column. */
+.rd-f{display:flex;flex-direction:column-reverse;gap:var(--s-1);align-items:flex-start;
+  min-width:0;overflow-wrap:anywhere}
 .rd-f em{font:500 var(--t-3)/1.25 var(--ui);letter-spacing:var(--ls-0);
   text-transform:none;color:var(--dim);font-style:normal}
+/* nowrap KEEPS A NUMBER WHOLE; IT MUST NOT KEEP A RANGE WHOLE.
+   "₹930.60 – ₹1,855.50" is 177px and its cell is 113px, so the 52-week range
+   ran 64px past its own box on a 320px phone — the largest single overflow on
+   /radar and the reason CI's Linux Chromium, whose metrics are a shade wider
+   than this laptop's, reported the page scrolling sideways by 13px while it
+   measured zero here.
+   Each price is one unbroken token with no internal space, so normal wrapping
+   can only ever break at the spaces around the dash — which is exactly where a
+   range should break. The numbers themselves are still never split, and a
+   single value like "+4.93%" contains no space and so cannot wrap at all.
+   No breakpoint: a first attempt scoped this to 560px and left 768px still
+   nowrap, where it overflowed the document by 11px. The cell is narrow at
+   whatever width the grid makes it narrow, which is not a function of the
+   viewport. */
 .rd-f b{font:500 var(--t-6)/1.1 var(--mono);font-variant-numeric:tabular-nums;
-  letter-spacing:var(--ls-snug);white-space:nowrap;color:var(--text)}
+  letter-spacing:var(--ls-snug);white-space:normal;color:var(--text);min-width:0}
 .rd-f b.up{color:var(--up)} .rd-f b.dn{color:var(--dn)}
 /* The year's range as a line, with the close marked on it. */
 .rd-band{grid-column:1/-1;position:relative;display:block;height:4px;margin-top:8px;
   border-radius:999px;background:linear-gradient(90deg,var(--up-soft),var(--raised),var(--dn-soft))}
 .rd-band i{position:absolute;top:-3px;width:2px;height:10px;border-radius:2px;
   background:var(--text);transform:translateX(-1px)}
+/* minmax(0,1fr), NOT 1fr — the same defect as the hero rail, in a second
+   place. A grid item's default min-width is `auto`, which is its MIN-CONTENT
+   width, so a track holding "RSI monthly" above a value will not shrink below
+   that label. Two of them exceed a 320px phone: measured on production, this
+   grid's content ran 35px past its own box, and `.rd-row` 21px past its own.
+   Both were absorbed by an ancestor here and NOT on CI's Linux Chromium, whose
+   font metrics are a shade wider — which is why /radar scrolled sideways by
+   13px there and by nothing on this laptop. A layout that depends on which
+   machine renders it is not a layout. */
 @media(max-width:520px){
-  .rd-facts{grid-template-columns:repeat(2,1fr)}
+  .rd-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rd-facts > *{min-width:0}
 }
 /* A stop the market has already traded through is not a level any more. */
 .rd-f b.is-hit{color:var(--dn);text-decoration:line-through;
