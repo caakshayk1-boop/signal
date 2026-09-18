@@ -61,20 +61,35 @@ const wire = Array.isArray(news) ? news : [];
  *
  * It must never fail the build. A snapshot without the numbers is a smaller
  * page; a build that dies because a fetch timed out is an outage. */
-const LAUNCH = "2026-09-02";   // must match LAUNCH in public/signal.js
-
-/* The engines this site publishes, lifted from the app's own registry so the
- * snapshot cannot disagree with the page about which engines count. Throws if
- * the registry cannot be found, because a silently empty whitelist would make
- * the shell claim zero published on a day that is false. */
-const ENGINES = (() => {
-  const src = readFileSync(new URL("../public/signal.js", import.meta.url), "utf8");
-  const block = src.match(/const ENGINE_REGISTRY = \{([\s\S]*?)\n  \};/);
-  if (!block) throw new Error("prerender: ENGINE_REGISTRY not found in signal.js");
-  const keys = [...block[1].matchAll(/^\s{4}([a-z0-9_]+)\s*:/gm)].map((m) => m[1]);
-  if (!keys.length) throw new Error("prerender: ENGINE_REGISTRY parsed empty");
-  return new Set(keys);
+/* ── LAUNCH AND THE ROSTER COME FROM engines.js, NOT FROM HERE ─────────────
+ *
+ * This file used to carry `const LAUNCH = "2026-09-02"` under a comment
+ * reading "must match LAUNCH in public/signal.js" — a copy, with a note asking
+ * a human to keep it in step. That is the arrangement that put five different
+ * records on one site.
+ *
+ * It also parsed ENGINE_REGISTRY out of signal.js and took EVERY key, retired
+ * ones included, so the crawler's snapshot would have counted engines the page
+ * had switched off — the identical bug the page itself had.
+ *
+ * engines.js is the one browser copy and is loaded here the same way the two
+ * bundles load it: it assigns to a global, so a bare object stands in for
+ * `window`. Throws rather than degrading, because a silently empty whitelist
+ * makes the shell claim zero published on a day that is false, and a wrong
+ * number in a crawler's index outlives the build that produced it. */
+const BOOK = (() => {
+  const src = readFileSync(new URL("../public/engines.js", import.meta.url), "utf8");
+  const root = {};
+  new Function("window", src)(root);
+  const b = root.ENGINE_BOOK;
+  if (!b || typeof b.keys !== "function") {
+    throw new Error("prerender: ENGINE_BOOK not found in engines.js");
+  }
+  if (!b.keys().length) throw new Error("prerender: the live engine roster is empty");
+  return b;
 })();
+const LAUNCH = BOOK.LAUNCH;
+const ENGINES = new Set(BOOK.keys());
 async function liveRecord() {
   try {
     // /api/signals, NOT /api/stats. stats is all-time and cannot be filtered,
@@ -101,10 +116,15 @@ async function liveRecord() {
      * carefully writing the same filter twice, it has to come from one source.
      * A second copy would be correct today and wrong the next time an engine
      * is added. */
+    /* The identical predicate the page applies — BOOK.inBook — rather than a
+       third hand-written copy of it. It adds the rupee guard this filter did
+       not have, which today changes nothing because the engine rule already
+       leaves only Indian names, and stops the snapshot counting a COMEX future
+       the day that stops being true. `alert_date` is still preferred over
+       `date` where a row carries one. */
     const rows = j.signals.filter((x) =>
-      String(x.alert_date || x.date || "").slice(0, 10) >= LAUNCH
-      && ENGINES.has(String(x.signal_type || ""))
-      && String(x.action || "BUY").toUpperCase() !== "SELL");
+      BOOK.ok(x)
+      && String(x.alert_date || x.date || "").slice(0, 10) >= LAUNCH);
     const closed = rows.filter(
       (x) => Number.isFinite(Number(x.r_multiple)) && (x.badge || "") !== "open");
     // NOT `if (!rows.length) return null`. Zero rows on or after LAUNCH is a
