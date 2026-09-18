@@ -2086,15 +2086,36 @@ body::before{display:none}
 /* ── HERO ────────────────────────────────────────────────────────────────
    A composition, not a card. No border, no radius, no shadow — the section
    below it supplies the first rule on the page. §8: not everything is a card. */
-.hero{display:grid;gap:clamp(24px,4vw,44px);padding:clamp(24px,5vw,60px) 0 clamp(28px,4vw,48px);
+/* ── A MASTHEAD, NOT A SPLASH SCREEN ──────────────────────────────────────
+ *
+ * This stood 567px tall to carry 604 characters, which on a 900px viewport
+ * meant the reader's whole first screen was one headline and a rail of index
+ * quotes — and the thing the page is actually for, the market and the record,
+ * began below the fold.
+ *
+ * Nothing was cut. The headline still leads with the losing record, the rail
+ * still carries Nifty, Sensex, VIX and the flows. What changed is that the
+ * vertical padding and the leading stopped being set for a landing page:
+ * 60px of top padding became 32px, the 72px display size became 60px, and the
+ * gaps between headline, subhead and buttons dropped a step each. A daily
+ * reader arrives here every morning and does not need to be introduced to the
+ * site every time. */
+.hero{display:grid;gap:clamp(20px,3vw,36px);padding:clamp(18px,3vw,32px) 0 clamp(20px,3vw,34px);
   border-bottom:1px solid var(--line)}
-@media(min-width:900px){.hero{grid-template-columns:minmax(0,1.55fr) minmax(240px,.85fr);
-  align-items:end;gap:clamp(36px,5vw,72px)}}
-.hero h1{font:400 clamp(38px,7vw,72px)/1.02 var(--serif);letter-spacing:var(--ls-tight);
-  margin:clamp(14px,2vw,20px) 0 0;text-wrap:balance}
-.hero-sub{font-size:clamp(var(--t-6),1.6vw,var(--t-7));line-height:1.6;color:var(--muted);
-  margin-top:clamp(14px,2vw,20px);max-width:54ch}
-.hero-cta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:clamp(22px,3vw,30px)}
+@media(min-width:900px){.hero{grid-template-columns:minmax(0,1.6fr) minmax(240px,.8fr);
+  align-items:end;gap:clamp(32px,4vw,60px)}}
+.hero h1{font:400 clamp(34px,5.4vw,60px)/1.04 var(--serif);letter-spacing:var(--ls-tight);
+  margin:clamp(10px,1.4vw,14px) 0 0;text-wrap:balance}
+.hero-sub{font-size:clamp(var(--t-5),1.4vw,var(--t-6));line-height:1.55;color:var(--muted);
+  margin-top:clamp(10px,1.4vw,14px);max-width:58ch}
+.hero-cta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:clamp(16px,2vw,22px)}
+/* Two stacked full-width buttons cost 111px on a phone to carry 76
+   characters. Side by side they cost 56 and read the same. */
+@media(min-width:360px) and (max-width:560px){
+  .hero-cta{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+  .hero-cta .btn-hero{min-height:46px;padding:8px 12px;font-size:var(--t-5);min-width:0}
+  .hero-cta .btn-hero em{font-size:var(--t-1);line-height:1.25}
+}
 .btn-hero{display:inline-flex;flex-direction:column;gap:3px;background:var(--ink-btn);
   color:var(--on-ink);border-radius:var(--r-3);padding:12px 20px;min-height:52px;justify-content:center;
   font:600 var(--t-6)/1.2 var(--ui);transition:transform var(--t-fast) var(--ease),opacity var(--t-fast) var(--ease)}
@@ -2105,7 +2126,50 @@ body::before{display:none}
   border-bottom:1px solid transparent;transition:color var(--t-fast) var(--ease),
     border-color var(--t-fast) var(--ease)}
 .btn-ghost:hover{color:var(--text);border-bottom-color:var(--line2)}
+/* ── THE MARKET RAIL ──────────────────────────────────────────────────────
+ * Four readings — Nifty, Sensex, VIX, the flows. One under another at 16px
+ * padding they ran to 431px on a phone to carry 250 characters, so the whole
+ * first screen was the masthead and a column of quotes nobody had asked for
+ * yet. Below 900px they sit two-up instead: same four readings, same numbers,
+ * roughly half the height. The flows keep the full width because "FII +₹600
+ * cr · DII -₹212 cr" does not fit a half column without wrapping to three
+ * lines, which would give back everything the two-up saved. */
 .hero-r{display:grid;gap:8px;align-content:end}
+/* minmax(0,1fr), NOT 1fr. A grid item's default min-width is `auto`, which is
+   its MIN-CONTENT width — and "INDIA VIX 11.39 -13.55%" laid out as
+   `1fr auto` does not go below about 178px. At 320px two such tracks cannot
+   fit, the item refuses to shrink, and the document gains 36px of sideways
+   scroll: the exact defect test/ui.mjs measures every route for at 320x568,
+   and it caught this within one run of being introduced.
+   minmax(0,·) lets the track shrink; min-width:0 lets the item inside it
+   shrink too, and both are needed. The 360px floor is the second guard — on
+   the narrowest phones still in use these read better stacked regardless. */
+/* TWO-UP AT EVERY WIDTH, and on the desktop it is what closes the hero's own
+   hole. The rail ran four boxes deep — Nifty, Sensex, VIX, flows — which made
+   it ~420px tall against a ~300px headline column, and `align-items:end`
+   bottom-aligns the two, so the shorter one was pushed down: 160px of nothing
+   above the largest words on the site, directly under the navigation. Sensex
+   and VIX sit side by side now; Nifty keeps the full width because it carries
+   the advancing-names line, and the flows keep it because "FII +₹600 cr ·
+   DII +₹1,020 cr" wraps to three lines in a half column and gives back more
+   than the pairing saved.
+
+   minmax(0,1fr), NOT 1fr. A grid item's default min-width is `auto` — its
+   MIN-CONTENT width — and "INDIA VIX 11.39 -13.55%" laid out as `1fr auto`
+   will not go below about 178px. At 320px two such tracks cannot fit, the
+   item refuses to shrink, and the document gains 36px of sideways scroll:
+   exactly the defect test/ui.mjs measures on every route at 320x568, and it
+   caught this within one run of it being introduced. The track has to be
+   allowed to shrink AND the item inside it has to be allowed to shrink. */
+@media(min-width:360px){
+  .hero-r{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px}
+  .hero-r > .hero-reg,.hero-r > .hero-fl{grid-column:1/-1}
+  .hero-r > *{min-width:0}
+}
+@media(max-width:899px){
+  .hero-reg,.hero-q{padding:10px 12px}
+  .hero-reg .s{font-size:var(--t-3)}
+}
 .hero-reg,.hero-q{border:1px solid var(--line);border-radius:var(--r-3);padding:16px 16px;
   display:grid;gap:5px;background:var(--surface)}
 .hero-reg .k,.hero-q .k{font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-widest);text-transform:uppercase;
@@ -5280,7 +5344,25 @@ a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,
    One number, then the five measures it is made of, then what the fall has
    put on offer. The derivation is not hidden behind a tooltip: a score whose
    inputs you cannot see is a horoscope. */
-.baro{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+/* ── A ROW LAYOUT THAT HAD BEEN RUNNING AS A COLUMN ───────────────────────
+ *
+ * `.baro` is declared TWICE. The first rule sets flex-direction:column for
+ * phones; this one never reset it, and everything below is written for a row:
+ * `flex-wrap`, `align-items:flex-start`, and `.baro-p{flex:1 1 320px}`.
+ *
+ * In a COLUMN container flex-basis is the HEIGHT. So .baro-p was given a
+ * 320px height basis to hold 93px of content — a 34px bar, a 17px label and a
+ * 42px line — and the panel stood 520px tall across the full 1240px width to
+ * print 225 characters, with the gauge stacked above the breadth instead of
+ * beside it. That is 227px of pure flex arithmetic, and it was the single
+ * emptiest block on the front page.
+ *
+ * Declared explicitly in both directions now, so neither rule depends on what
+ * the other did or did not reset. */
+.baro{display:flex;flex-direction:column;gap:var(--s-4);align-items:stretch}
+@media(min-width:760px){
+  .baro{flex-direction:row;gap:var(--s-6);flex-wrap:nowrap;align-items:center}
+}
 .baro-s{flex:0 0 auto;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
   min-width:140px}
 .baro-s b{font:700 var(--t-12)/1 var(--serif);letter-spacing:var(--ls-tight);
@@ -5289,7 +5371,7 @@ a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,
 .baro-b{display:block;flex:1 1 100%;font:600 var(--t-2)/1.4 var(--ui);
   letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--dim)}
 .baro-s.up b{color:var(--up)} .baro-s.dn b{color:var(--down)}
-.baro-p{flex:1 1 320px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.baro-p{flex:1 1 auto;display:flex;flex-direction:column;gap:var(--s-2);min-width:0}
 .baro-i{display:grid;grid-template-columns:minmax(0,1fr) 84px 32px;gap:0 12px;
   align-items:center}
 .baro-k{font:500 var(--t-3)/1.3 var(--ui);color:var(--muted);min-width:0}
@@ -5530,12 +5612,49 @@ h3,h4,.rd-h{font-family:var(--ui);font-weight:700;letter-spacing:-.016em}
  * Below 1080px it is a single column exactly as before, so the phone layout
  * that was measured and fixed earlier is untouched.
  */
+/* ── WHY THIS IS COLUMNS AND NOT A GRID ───────────────────────────────────
+ *
+ * It was `grid-template-columns:repeat(2,1fr)` with `align-items:start`, and
+ * a CSS grid sizes every ROW to its tallest cell. Panels here are whatever
+ * height their content is, so each row left a void under the shorter of its
+ * two. Measured on the front page at 1440px before this change:
+ *
+ *   MOVING (450px)        beside  WHAT KIND OF MARKET (701px)   -> 251px void
+ *   THE WIRE (336px)      beside  THE RECORD (486px)            -> 150px void
+ *
+ * Four hundred vertical pixels of nothing, on a page whose own complaint is
+ * that it does not use its space. The fix is not to pad the short panels or
+ * to pair them more cleverly — either one breaks the moment a feed returns a
+ * different number of rows, which it does every day.
+ *
+ * Multi-column packs instead: each panel takes its own height and the next
+ * one starts immediately below it, so a void cannot exist by construction.
+ * The reading order becomes column-major — down the left, then down the right
+ * — which is how a broadsheet is read, and this page calls itself the morning
+ * edition.
+ *
+ * `column-span:all` is what makes the full-width sections still work, and it
+ * does something better than grid-column did: it closes the column run and
+ * opens a new one, so a wide section acts as a chapter break and the panels
+ * after it re-balance among themselves rather than inheriting the ragged
+ * bottom of the ones before.
+ *
+ * break-inside:avoid keeps a panel whole. A panel taller than half the run
+ * simply makes its column taller, which is the correct failure — the
+ * alternative is a card split across two columns.
+ */
 @media(min-width:1080px){
   main{max-width:1320px}
-  .secgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:var(--s-5) var(--s-5);align-items:start}
-  .secgrid > .sec{margin-top:0;min-width:0}
-  .secgrid > .sec.is-lead,.secgrid > .sec.sec-wide{grid-column:1/-1}
+  .secgrid{column-count:2;column-gap:var(--s-6)}
+  /* margin-TOP is what breaks multicol: it is discarded at the top of column
+     one and applied at the top of column two, so the two columns start at
+     different heights. Spacing goes underneath instead. */
+  .secgrid > .sec{margin-top:0;margin-bottom:var(--s-6);min-width:0;
+    break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;
+    display:flow-root}
+  .secgrid > .sec.is-lead,.secgrid > .sec.sec-wide{column-span:all;
+    margin-bottom:var(--s-7)}
+  .secgrid > .sec:last-child{margin-bottom:0}
 }
 
 /* ── ROUTE TRANSITION ─────────────────────────────────────────────────────

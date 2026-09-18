@@ -30,7 +30,7 @@
 
   const app = document.getElementById('app');
   const jump = document.getElementById('jump');
-  const LAUNCH = '2026-09-02';
+  const LAUNCH = ENGINE_BOOK.LAUNCH;   /* one date, in engines.js */
 
   /* ── ENGINES ARE SHOWN BY NAME, NOT BY DATABASE KEY ──────────────────────
    * Akshay: "multibagger is what on gems — signal site?" Fair question, and
@@ -39,12 +39,11 @@
    * `multibagger`, `keel`, `breakout` straight out of the ledger, so the same
    * engine had two names across two products and one of them was internal.
    * The map is signal's ENGINE_REGISTRY, names only. */
-  const ENG_NAME = {
-    pivot: 'PIVOT', breakout: 'BREACH', magic: 'TIDAL', magicmagic: 'TIDAL',
-    equity_measured: 'PLUMB', multibagger: 'ASCENT', momentum_quant: 'VECTOR',
-    ai_longterm: 'NORTH', ledge: 'LEDGE', keel: 'KEEL', intraday: 'GUST',
-  };
-  const engName = (k) => ENG_NAME[String(k || '')] || String(k || '—');
+  /* WAS A HAND-TYPED COPY OF signal's registry and drifted, which is what a
+     hand-typed copy does. Both pages now read engines.js — see that file for
+     what the drift cost. Retired engines still resolve, because their closed
+     rows stay in the ledger and must render a name, not a database key. */
+  const engName = (k) => ENGINE_BOOK.name(k);
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -926,21 +925,22 @@
      * check stays as a guard rather than a filter: applying the engine rule
      * already leaves nothing but Indian names, and if that ever stops being
      * true this page must not silently start showing them. */
-    /* `magic` is absent: the >15% recovery band was retired 2026-09-18 in
-       favour of the 20-40% one, which is the same screen with the floor that
-       actually carries the thesis. ENG_NAME still maps it, so its closed rows
-       render a name rather than a raw key. */
-    /* equity_measured and ai_longterm retired 2026-09-18 — the first on a
-       significantly negative record (t=-2.92), the second on having none.
-       ENG_NAME still maps both so their closed rows render a name. */
-    const ENGINE_OK = new Set(['breakout', 'magicmagic',
-      'multibagger', 'momentum_quant', 'ledge', 'keel', 'pivot', 'intraday',
-      'strict', 'reclaim']);
-    const since = ledger.filter(r =>
-      String(r.date || '').slice(0, 10) >= LAUNCH
-      && ENGINE_OK.has(String(r.signal_type || ''))
-      && String(r.action || 'BUY').toUpperCase() !== 'SELL'
-      && String(r.currency || '₹') === '₹');
+    /* ── ONE PREDICATE, SHARED WITH signal.askakshay.com ──────────────────
+     *
+     * This was a hand-typed Set of ten keys. Two of them — `strict` and
+     * `reclaim` — are BUOY's lane names, not engines, and appear in no feed;
+     * they had been sitting in the filter doing nothing since the day they
+     * were typed. Meanwhile the three engines retired on 2026-09-18 had to be
+     * remembered here separately from signal.js, from regime.py and from
+     * engine_names.py, which is four places to remember one fact and is
+     * exactly how the front page came to publish a record containing engines
+     * it said were switched off.
+     *
+     * ENGINE_BOOK.inBook is the same function signal's ledger() calls: live
+     * engine, long only, rupee-priced, on or after LAUNCH. The two pages
+     * cannot now disagree about what "the record" contains, because there is
+     * no second definition to disagree with. */
+    const since = ledger.filter(r => ENGINE_BOOK.inBook(r));
     const out = [];
     const nav = [];
     const add = (id, label, html) => { nav.push([id, label]); out.push(html); };

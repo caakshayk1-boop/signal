@@ -735,7 +735,7 @@
    *
    * The cutoff was 2026-08-29, the publish date. Moving it costs the site
    * 22 published and 5 closed trades, all five of them losses. */
-  const LAUNCH = '2026-09-02';
+  const LAUNCH = ENGINE_BOOK.LAUNCH;   /* one date, in engines.js */
 
   /* ONE CUTOFF, ON THE PUBLISH DATE, EVERYWHERE.
    *
@@ -1310,107 +1310,14 @@
    * the ledger recorded.
    *
    * `hunts` is the one line that has to survive a reader who knows nothing:
-   * what does this thing go looking for. */
-  const ENGINE_REGISTRY = {
-    /* PIVOT is the newest and the only one built outward from a framework
-       rather than from a pattern: location, then context, then confirmation,
-       in that order, with a name that is not AT a level never scored on its
-       trend. Its confirmation stage is DAILY-BAR PROXIES — this site has no
-       depth feed, so there is no delta, no CVD and no footprint, and the
-       engine says so on every signal it files rather than borrowing the
-       vocabulary of data it does not have. */
-    pivot:           { name: 'PIVOT',  role: 'Reaction at a level', band: null,
-                       hunts: 'Price AT a level the market has already reacted to — its 200-day, the top of a multi-week shelf, or a swing high being retested — with the higher timeframe agreeing and the session confirming it.',
-                       tf: 'Daily → weeks' },
-    breakout:        { name: 'BREACH', role: 'Breakouts',        band: null,
-                       hunts: 'Price clearing a level it has been under — 52-week, 20-week and 6-month highs, confirmed on volume.',
-                       tf: 'Daily → weeks' },
-    /* ── ONE RECOVERY BAND, NOT TWO ───────────────────────────────────────
-     * `magic` (>15% off the high) and `magicmagic` (20-40%) were the same
-     * screen run twice with a different floor and published under ONE name,
-     * so the floor showed two TIDAL cards and a name could sit on both.
-     *
-     * The wider band is also the weaker one — 23 closed at -0.193R against 19
-     * at -0.247R is not a difference either sample can carry — and >15% admits
-     * every name 20-40% does plus a shallower tail. The deeper fall is the
-     * whole thesis: more room back to the high. So the narrow band is the
-     * engine and this one stops publishing.
-     *
-     * RETIRED, NOT DELETED. 23 closed trades carry this key and a deleted
-     * entry would render them as the raw string `magic` — the exact leak the
-     * display names exist to prevent. It keeps its name and is filtered out
-     * of the roster by `retired`. */
-    magic:           { name: 'TIDAL',  role: 'Recovery',         band: '>15% off the high',
-                       retired: '2026-09-18',
-                       hunts: 'The wider recovery band. Retired — the 20–40% screen is the '
-                            + 'engine, and this one admitted everything it does plus a '
-                            + 'shallower tail.',
-                       tf: 'Weekly → months' },
-    magicmagic:      { name: 'TIDAL',  role: 'Recovery',         band: '20–40% off the high',
-                       hunts: 'The same screen, deeper water — a larger fall, so more room back to the high.',
-                       tf: 'Weekly → months' },
-    /* RETIRED 2026-09-18 ON ITS OWN MEASURE. 16 closed, -0.535R, 25% won,
-       t=-2.92 — the only engine on this board whose record is significantly
-       NEGATIVE, and the one whose whole claim was that it came from a measured
-       edge rather than a pattern. The measure came back and it is against it.
-       An engine that loses reliably is a stronger finding than one that does
-       nothing, and it is the easiest one to act on. */
-    equity_measured: { name: 'PLUMB',  role: 'Measured equity',  band: null,
-                       retired: '2026-09-18',
-                       hunts: 'The backtested daily-close engine. Retired on its own record: '
-                            + '16 closed at −0.535R, t=−2.92 — significantly negative.',
-                       tf: 'Daily → days' },
-    multibagger:     { name: 'ASCENT', role: 'Leaders',          band: null,
-                       hunts: 'Names already near their highs with institutional volume behind them — CAN SLIM, held for quarters not weeks.',
-                       tf: 'Weekly → 6–12 months' },
-    momentum_quant:  { name: 'VECTOR', role: 'Momentum',         band: null,
-                       hunts: 'Cross-sectional rank over the full NSE screen: six and twelve month returns over one-year sigma, skipping the last month.',
-                       tf: 'Monthly → months' },
-    /* RETIRED 2026-09-18. Not on a bad record — on NO record. It has never
-       had a closed trade graded, so there is nothing to defend it with, and
-       its weekly-to-months horizon is the one ASCENT already covers. Two
-       engines hunting the same ground with one of them unmeasured is the
-       duplication this roster has just spent a day removing. */
-    ai_longterm:     { name: 'NORTH',  retired: '2026-09-18',  role: 'Long horizon',     band: null,
-                       hunts: 'The long-horizon screen, run weekly against the whole board.',
-                       tf: 'Weekly → months' },
-    /* ── THE TWO NEW ONES ─────────────────────────────────────────────────
-     * Every engine above buys strength that is ALREADY VISIBLE — 52-week
-     * highs, names near their highs, twelve-month momentum. None of them looks
-     * for the FIRST move off a base, which is the point where the invalidation
-     * level is closest and therefore where risk is smallest. These two do,
-     * from opposite evidence: LEDGE from price going quiet, KEEL from momentum
-     * refusing to confirm a new low. */
-    ledge:           { name: 'LEDGE',  role: 'Base breakout',    band: '≥12% off the high',
-                       hunts: 'A Darvas box — price gone quiet in a tight range after a fall — '
-                            + 'and then a CLOSE out of the top of it on volume.',
-                       tf: 'Daily → weeks' },
-    keel:            { name: 'KEEL',   role: 'Divergence turn',  band: '≥12% off the high',
-                       hunts: 'A lower low in price against a higher low in RSI, traded only '
-                            + 'when price reclaims the level it lost.',
-                       tf: 'Daily → weeks' },
-    /* ── THE TENTH, BROUGHT BACK ──────────────────────────────────────────
-     *
-     * GUST was switched off on 2026-07-30 with the rest of the intraday tier,
-     * on a measurement of that TIER: −0.005R over 583 trades against +0.171R
-     * on daily closes. The decision was right about the tier and wrong about
-     * this engine inside it — on its own seventeen closed trades it reads
-     * +1.472R at t=3.69 and 70.6% won, which is the best record on this board
-     * by a distance, and it was retired for the company it kept.
-     *
-     * IT COMES BACK AT RESEARCH AND NOT ABOVE IT. Seventeen trades clears the
-     * t-statistic bar and does not come close to the sample one — this site
-     * requires thirty closed at t ≥ 2 before an engine is trusted with
-     * anything, and an engine cannot be exempted from that rule for having
-     * impressed on a small sample. That is the precise error the rule exists
-     * to prevent. So it is logged and shown, and never alerted, exactly as
-     * PIVOT is. */
-    intraday:        { name: 'GUST',   role: 'Intraday momentum', band: null,
-                       hunts: 'A 15-minute momentum push on the Nifty 50 universe — VWAP '
-                            + 'reclaimed, RSI crossing 55, on a volume surge. The only '
-                            + 'engine here that does not hold overnight.',
-                       tf: '15-minute → the close' },
-  };
+   * what does this thing go looking for.
+   *
+   * THE DATA MOVED TO engines.js AND THIS IS NOW A POINTER. gems.askakshay.com
+   * is a separate bundle and kept its own hand-typed copy of these names and
+   * of which ones still run — two of its keys, `strict` and `reclaim`, are in
+   * no feed and never were. One file, loaded by both pages, the way
+   * heatcore.js already shares the heatmap's arithmetic. */
+  const ENGINE_REGISTRY = ENGINE_BOOK.REGISTRY;
 
   /* ── A LANE IS NOT A DATABASE KEY EITHER ──────────────────────────────────
    *
@@ -1612,10 +1519,38 @@
   /* A retired engine keeps its NAME so its closed trades still render, and is
      absent from everything that describes what the site publishes now. One
      predicate, used by every consumer, so the two cannot drift. */
-  const LIVE_ENGINES = () => Object.entries(ENGINE_REGISTRY).filter(([, m]) => !m.retired);
-  const ENGINES = new Set(Object.keys(ENGINE_REGISTRY));
-  const eng = k => ENGINE_REGISTRY[String(k || '')] || null;
-  const engName = k => (eng(k) || {}).name || String(k || '—');
+  const LIVE_ENGINES = () => ENGINE_BOOK.live();
+
+  /* ── TWO QUESTIONS, AND ANSWERING BOTH FROM ONE SET WAS THE BUG ──────────
+   *
+   * "What does this site publish?" and "what does this key render as?" are
+   * different questions, and answering both from one Set is what put a
+   * retired engine's trades back into the published record.
+   *
+   * eng()/engName() read the registry DIRECTLY and are never filtered, so a
+   * historical row whose engine has since been switched off still renders its
+   * name rather than a raw key. Nothing else needs the full key list, and an
+   * ENGINES_ALL Set was written here and deleted again rather than left
+   * unused with a comment claiming it did something.
+   *
+   * ENGINES is the POPULATION: the engines publishing today. Every count on
+   * this site — published, closed, win rate, expectancy, the roster — is
+   * drawn from it, so a retirement removes an engine from the record the
+   * moment it is marked, without a second list to remember.
+   *
+   * THE BUG THIS FIXES, stated so it is not re-introduced. ENGINES was
+   * `new Set(Object.keys(ENGINE_REGISTRY))` — every key, retired included —
+   * and engineOk() is the ledger's admission gate. So on 2026-09-19 the front
+   * page read 65 published / 12 closed / 8.3% / -0.746R, and those figures
+   * carried 20 rows and one closed trade from magic and equity_measured,
+   * two engines the same page said out loud were retired. The roster below
+   * it offered "all 10" while the paragraph beside it said eight publish
+   * here. The corrected population is 45 published, 11 closed, 9.1% won,
+   * -0.723R at t=-2.22. Every one of those numbers is worse or smaller than
+   * the one it replaces, which is the direction an honesty fix usually runs. */
+  const ENGINES = new Set(ENGINE_BOOK.keys());
+  const eng = k => ENGINE_BOOK.get(k);
+  const engName = k => ENGINE_BOOK.name(k);
   /* ── A FILTER OPTION HAS TO NAME ONE THING ────────────────────────────────
    * Two registry keys deliberately share a display name: `magic` and
    * `magicmagic` are the same screen read at two depths off the 52-week high,
@@ -1624,18 +1559,7 @@
    * "TIDAL (12)" and "TIDAL (6)" with nothing to choose between them.
    * Where a name is shared, the filter appends the band that separates them;
    * where it is unique, the plain name is left alone. */
-  const ENG_SHARED = (() => {
-    const n = {};
-    for (const v of Object.values(ENGINE_REGISTRY)) n[v.name] = (n[v.name] || 0) + 1;
-    return n;
-  })();
-  const engLabel = (k) => {
-    const e = eng(k);
-    if (!e) return engName(k);
-    return (ENG_SHARED[e.name] > 1 && e.band) ? `${e.name} · ${e.band}` : e.name;
-  };
-  /* The old map is kept as the fallback for a row whose engine has since been
-   * retired: an unrecognised key renders as itself rather than as blank. */
+  const engLabel = k => ENGINE_BOOK.label(k);
   /* ── HOW MANY ENGINES ARE THERE? ONE ANSWER, NOT THREE ──────────────────
    *
    * Three pages counted this three different ways and none of them showed
@@ -1657,7 +1581,7 @@
    * So the counts come from here, both pages print the same sentence, and the
    * sentence states the arithmetic instead of asserting a total. */
   const ENGINE_KEYS = () => LIVE_ENGINES().map(([k]) => k);
-  const ENGINE_NAMES = () => [...new Set(ENGINE_KEYS().map(k => ENGINE_REGISTRY[k].name))];
+  const ENGINE_NAMES = () => ENGINE_BOOK.names();
   /* The research floor's own count, read from its feed rather than hardcoded —
    * a fourth engine added there must not leave a "three" behind on two other
    * pages. Null until /research.json has been fetched by any route this
@@ -1720,6 +1644,10 @@
     return Number.isFinite(Number(n)) && Number(n) > 0 ? Math.round(Number(n)) : 989;
   };
 
+  /* THE ADMISSION GATE. One predicate, one population — see ENGINES above.
+   * A row from a retired engine, or from an engine this site never ran
+   * (commodity and top5_pick are news.askakshay.com's, and arrive in the same
+   * feed), is not in this site's record. */
   const engineOk = r => ENGINES.has(String(r.signal_type || ''));
 
   /* ── AND NOTHING SHORT ────────────────────────────────────────────────────
@@ -2703,7 +2631,7 @@
      * page whose case is that the numbers speak. */
     if (sgx.ok) {
       const fam = new Map();
-      for (const k of ENGINES) {
+      for (const k of ENGINES) {  /* live engines only — see ENGINES */
         const label = ENGINE_LABEL[k] || k;
         if (!fam.has(label)) fam.set(label, { label, pub: 0, closed: 0, wins: 0 });
       }
@@ -2797,8 +2725,16 @@
               ? (Math.round(r.wins / r.closed * 1000) / 10) + '%' : '—'}</span>` : ''}
           </a>`).join('')}
         </div>`)}
-        <p class="hint">${engineTallyNote()} This roster groups by name, so the two TIDAL bands
-          share a row; the floor on <a href="/signals">the ledger</a> lists them separately.
+        ${/* THE BAND SENTENCE IS CONDITIONAL, because the condition stopped
+             being true. It read "the two TIDAL bands share a row" as a flat
+             statement; `magic` was retired on 2026-09-18, magicmagic carries
+             TIDAL alone, and the roster has eight names over eight keys — so
+             the page was explaining a merge that no longer happens. It is
+             printed exactly when the roster actually groups two keys into one
+             row, and engineTally() already knows whether it does. */''}
+        <p class="hint">${engineTallyNote()}${ENGINE_KEYS().length > ENGINE_NAMES().length
+          ? ` This roster groups by name, so the two TIDAL bands share a row; the floor on
+             <a href="/signals">the ledger</a> lists them separately.` : ''}
           An engine is trusted with capital at 30 closed trades and t&nbsp;≥&nbsp;2, and none is
           there. <a href="/engines">What each engine fires on</a> ·
           <a href="/methodology">How this is measured</a> ·
