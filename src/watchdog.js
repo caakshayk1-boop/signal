@@ -59,9 +59,15 @@ const API = "https://api.github.com";
  * at 14:14. Twelve minutes is one Cloudflare tick past the slot — close enough
  * that GitHub's own scheduler still wins on a healthy morning, late enough
  * that it is not racing it for no reason. */
-const GRACE_MIN = 12;
+export const GRACE_MIN = 12;
 
-const WATCH = [
+/* EXPORTED FOR THE GUARD, NOT FOR THE WORKER. Nothing else imports these;
+ * src/index.js takes runWatchdog() alone. Until this repo's guard started
+ * reading them, the file that REPAIRS every dropped scheduled job in both
+ * repos had no test of any kind — not of its inventory, not of its grace, not
+ * of dueSlot, which is the one function whose arithmetic decides whether a
+ * missed 20:00 scan is noticed at all. */
+export const WATCH = [
   {
     /* THE TOP OF THE CHAIN, AND IT WAS THE ONE THING UNWATCHED.
      *
@@ -105,6 +111,26 @@ const WATCH = [
        * with no cron anywhere to explain why. */
       { dow: [1, 2, 3, 4, 5], h: 12, m: 0, inputs: { slot: "eod" }, job: "scan_eod" },
       { dow: [6], h: 4, m: 0, inputs: { slot: "weekend" }, job: "scan_weekend" },
+      /* 06:00 UTC — 11:30 IST, two hours into the NSE session. The `midday`
+       * slot, added to daily_scan.yml with the intraday engine, which until
+       * then had a cron nowhere and therefore had never run.
+       *
+       * THE PARAGRAPH ABOVE IS WHY THIS LINE HAS TO EXIST. Removing a cron
+       * there and leaving a slot here dispatches work no cron explains. The
+       * mirror image is this: ADDING a cron there and not adding a slot here
+       * leaves the one scan of the day that runs while the market is open
+       * with no watchdog at all — and this is the repo whose scheduler was
+       * measured dropping runs and both their retries.
+       *
+       * 11:30 was chosen over 11:45 because a dispatch that drifts three
+       * hours must still land inside the session: 14:30 IST worst case
+       * against a 15:30 close. standalone_scan refuses the slot outright
+       * after 14:30 IST rather than reporting a stale session as a live one,
+       * so a badly drifted dispatch files nothing instead of filing a lie.
+       *
+       * `scan_midday` is _scan_job("midday") in standalone_scan.py. Per slot,
+       * not per day, so a completed midday can never satisfy a missing eod. */
+      { dow: [1, 2, 3, 4, 5], h: 6, m: 0, inputs: { slot: "midday" }, job: "scan_midday" },
     ],
   },
   {
@@ -161,7 +187,7 @@ const hdrs = (token) => ({
  *  matched no arm of its own cron table and resolved to TASK=none. The
  *  watchdog would have fired it, GitHub would have reported success, and
  *  nothing whatsoever would have been sent. The slot has to say what to run. */
-function dueSlot(now, slots, graceMin = GRACE_MIN) {
+export function dueSlot(now, slots, graceMin = GRACE_MIN) {
   let best = null;
   // Look back two days: a Friday-evening slot can still be the newest one on
   // a Sunday, and reporting "nothing due" then would hide a real outage.

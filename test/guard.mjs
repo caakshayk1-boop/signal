@@ -11,6 +11,7 @@
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { WATCH, dueSlot, GRACE_MIN } from "../src/watchdog.js";
 
 const JS = readFileSync("public/signal.js", "utf8");
 const CSS = readFileSync("public/signal.css", "utf8");
@@ -1085,6 +1086,156 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
        < (PKG.scripts.deploy || "").indexOf("minify.mjs"));
   ok("esbuild is a declared dependency, not something the deploy hopes is there",
      !!(PKG.devDependencies || {}).esbuild);
+}
+
+/* ── A BREACHED STOP VOIDS THE SETUP, ON EVERY SURFACE THAT SHOWS ONE ───────
+ *
+ * The rule shipped as four characters of comparison inside wireRadar's live
+ * overlay, so it was true on /radar and nowhere else. The front page's
+ * conviction slate is the worse case: it awaits live quotes and prints
+ * "Live ₹940" four lines above "Stop ₹999.05", with the score and the
+ * reward-to-risk between them, and said nothing. Five cards, first screen.
+ *
+ * Consistency between two surfaces cannot come from writing the same test in
+ * both — it has to come from calling the same function. */
+{
+  const code = JS.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
+  ok("the void rule is declared exactly once",
+     (code.match(/const stopVoid = /g) || []).length === 1);
+  ok("...and its explanation too — one sentence, not two spellings",
+     (code.match(/const STOP_VOID_WHY = /g) || []).length === 1);
+  /* TWO CALL SITES: the radar overlay and the conviction card. The
+     declaration is `const stopVoid = (live, stop) =>` and does not match
+     `stopVoid(`, which is why this is 2 and not 3 — the first draft said 3
+     and failed, which is the check working on itself.
+     An EXACT count, not >=: the dangerous direction is a new surface that
+     prints a stop beside a live price and never asks. */
+  const uses = (code.match(/\bstopVoid\(/g) || []).length;
+  ok("both surfaces that show a stop beside a live price call it", uses === 2, uses);
+  ok("the radar overlay asks the rule rather than re-deriving it",
+     /const hit = stopVoid\(v\.price, s\);/.test(code));
+  ok("the conviction card decides once, before it renders anything",
+     /const voided = stopVoid\(p\._live && p\._live\.price, p\.stop\);/.test(code));
+  ok("a voided card says so above the plan it invalidates",
+     /class="cv-void"/.test(code) && /lv-plan\$\{voided \? ' is-void' : ''\}/.test(code));
+  /* THE SCORE IS STAMPED, NEVER RECOMPUTED. Inventing a fresh number in the
+     browser is the fault this site avoids everywhere else; a score that goes
+     on reading as current is the fault directly above. */
+  ok("the score keeps its value and says when it was taken",
+     /\$\{voided \? ' <i>at build<\/i>' : ''\}/.test(code));
+  /* The stop path and scale-out restate the levels as instructions one block
+     below the strike-through, and read live until this wrapped them. */
+  ok("the stop path goes with the plan",
+     /class="lv-trail-void"/.test(code) && /\.lv-trail-void\{/.test(CSS));
+  /* This file declares no --t-* scale, so a bare var() would delete the whole
+     declaration. Same rule the brief's fundamentals block is held to. */
+  for (const m of (CSS.match(/\.cv-void[\s\S]*?\}/) || [""])[0].matchAll(/var\(--[\w-]+\)/g)) {
+    ok(`the void banner's ${m[0]} carries a literal fallback`, false, m[0]);
+  }
+  ok("the void banner's custom properties all carry fallbacks", true);
+
+  /* ── AND THE CELLS THAT COULD NEVER FILL ─────────────────────────────────
+   * The slate's Volatility, 3Y CAGR, ROCE trend and Results cells read the
+   * SCREEN global, which on the front page is permanently null — the heavy
+   * pass resolves the rows and never calls setScreen(). So the "filled only
+   * for a reader who has been to /screen this session" fallback was the only
+   * path, and four cells were empty on every visit. The rows are right there
+   * in FRONT_SCREEN, which this route holds for the heatmap strip. */
+  ok("the conviction slate reads the screen this route is actually holding",
+     /const cvRows = FRONT_SCREEN \|\| SCREEN;/.test(code));
+}
+
+/* ── THE WATCHDOG HAD NO TEST OF ANY KIND ────────────────────────────────────
+ *
+ * It is the thing that repairs a dropped scheduled run in BOTH repos, it
+ * exists because GitHub's scheduler was measured dropping a 05:00 slot and
+ * both of its retries, and nothing anywhere checked its arithmetic or its
+ * inventory.
+ *
+ * It also holds its OWN COPY of a schedule that lives in another repo's
+ * workflow files. That coupling cannot be checked from here — the crons are
+ * not in this checkout — so what is checked instead is the shape that made
+ * the last two incidents possible: a slot that names work nothing can do, and
+ * an inventory that changed without anyone meaning it to. */
+{
+  ok("the watchdog watches something", WATCH.length === 4, WATCH.length);
+  for (const w of WATCH) {
+    ok(`${w.file}: says which repo, and why it is watched`,
+       /^[\w-]+\/[\w-]+$/.test(w.repo || "") && !!w.why && w.why.length > 8, w);
+    ok(`${w.file}: has at least one slot`, (w.slots || []).length > 0);
+    for (const sl of w.slots || []) {
+      const at = `${w.file} ${String(sl.h).padStart(2, "0")}:${String(sl.m).padStart(2, "0")}Z`;
+      ok(`${at}: is a real UTC time on real weekdays`,
+         Number.isInteger(sl.h) && sl.h >= 0 && sl.h <= 23 &&
+         Number.isInteger(sl.m) && sl.m >= 0 && sl.m <= 59 &&
+         Array.isArray(sl.dow) && sl.dow.length > 0 &&
+         sl.dow.every((d) => Number.isInteger(d) && d >= 0 && d <= 6), sl);
+    }
+  }
+
+  /* A DISPATCH THAT NAMES NO WORK SENDS NOTHING. The scan and brief entries
+   * pass `inputs` to workflow_dispatch; an entry that forgot them dispatched
+   * a workflow whose every slot arm fell through to SLOT="" and which then
+   * did nothing at all, green. */
+  const scan = WATCH.find((w) => w.file === "daily_scan.yml");
+  const brief = WATCH.find((w) => w.file === "scheduled_tasks.yml");
+  ok("the scan and the briefs are both watched", !!scan && !!brief);
+  for (const sl of scan.slots) {
+    ok(`daily_scan ${sl.h}:00Z names the slot it is dispatching`, !!(sl.inputs || {}).slot, sl);
+    /* job is the job_runs key the watchdog asks "did the WORK land?". It is
+     * _scan_job(slot) over there — `scan_` + the slot — and a mismatch makes
+     * the watchdog query a row that is never written, so it concludes the
+     * work never happened and dispatches forever. */
+    ok(`daily_scan ${sl.inputs.slot}: its ledger key matches its slot`,
+       sl.job === "scan_" + sl.inputs.slot, sl.job);
+  }
+  /* AN EXACT SET, NOT A COUNT >= n. The dangerous direction is a slot quietly
+   * disappearing — which is how `midday` came to have a cron in daily_scan.yml
+   * and no watchdog entry, leaving the one scan that runs while the market is
+   * open as the only unwatched one. `>=` would pass through that. Adding or
+   * removing a slot means editing this line, on purpose, in the same commit. */
+  const slotNames = scan.slots.map((x) => x.inputs.slot).sort().join(",");
+  ok("the scan's watched slots are exactly midday, eod and weekend",
+     slotNames === "eod,midday,weekend", slotNames);
+
+  /* ── dueSlot, THE ARITHMETIC ─────────────────────────────────────────────
+   * Everything above is inventory. This is the function that decides whether
+   * a missed slot is noticed, and it had never been executed by a test. */
+  const utc = (y, mo, d, h, mi) => new Date(Date.UTC(y, mo, d, h, mi));
+  // 2026-09-16 is a Wednesday.
+  const midday = scan.slots.find((x) => x.inputs.slot === "midday");
+  /* dueSlot LOOKS BACK TWO DAYS ON PURPOSE — a Friday-evening slot is still
+   * the newest one on a Sunday, and "nothing due" there would hide a real
+   * outage. So these assert WHICH INSTANT came back, never that nothing did:
+   * the first draft of these checks expected null and failed, because a
+   * yesterday's slot was legitimately being returned. */
+  const iso = (r) => (r ? new Date(r.at).toISOString().slice(0, 16) : null);
+  ok("a midday slot well past its grace is claimed today",
+     iso(dueSlot(utc(2026, 8, 16, 6, GRACE_MIN + 8), [midday])) === "2026-09-16T06:00",
+     iso(dueSlot(utc(2026, 8, 16, 6, GRACE_MIN + 8), [midday])));
+  ok("...and INSIDE the grace today's is not claimed — yesterday's is the newest",
+     iso(dueSlot(utc(2026, 8, 16, 6, GRACE_MIN - 5), [midday])) === "2026-09-15T06:00",
+     iso(dueSlot(utc(2026, 8, 16, 6, GRACE_MIN - 5), [midday])));
+  // 2026-09-20 is a Sunday. A weekday slot has none of its own that day, so
+  // the newest it can offer is Friday's — not Saturday's, which does not exist.
+  ok("a weekday slot on a Sunday reaches back to Friday, not to a day it never ran",
+     iso(dueSlot(utc(2026, 8, 20, 6, 30), [midday])) === "2026-09-18T06:00",
+     iso(dueSlot(utc(2026, 8, 20, 6, 30), [midday])));
+  /* THE NEWEST SLOT WINS, and it must be able to reach back across a day —
+   * a Friday-evening slot is still the newest one on a Saturday morning. */
+  const eod = scan.slots.find((x) => x.inputs.slot === "eod");
+  ok("the most recent passed slot is the one returned",
+     (dueSlot(utc(2026, 8, 16, 13, 0), [midday, eod]) || {}).inputs?.slot === "eod");
+  ok("a slot from yesterday is still reachable this morning",
+     (dueSlot(utc(2026, 8, 17, 2, 0), [midday, eod]) || {}).inputs?.slot === "eod");
+  /* THE GRACE IS A SAFETY MARGIN, NOT A CONSTANT TO NUDGE. Twelve minutes is
+     one Cloudflare tick past the slot; the newspaper entry overrides it to
+     three hours because a duplicate build races a commit. */
+  ok("the default grace is one watchdog tick past the slot",
+     GRACE_MIN >= 10 && GRACE_MIN <= 20, GRACE_MIN);
+  const paper = WATCH.find((w) => w.file === "newspaper.yml");
+  ok("the unguarded build keeps its long grace — a duplicate races a commit",
+     paper.graceMin >= 120, paper.graceMin);
 }
 
 console.log(fails

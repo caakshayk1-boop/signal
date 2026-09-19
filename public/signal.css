@@ -5165,6 +5165,36 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .rd-row.is-void .rd-sc em, .rdc.is-void .rdc-m em{
   color:var(--dim);font-style:italic}
 
+/* ── THE SAME RULE ON THE FRONT PAGE'S SLATE ───────────────────────────────
+ * The conviction card is the worse case the radar's version was written for:
+ * it awaits a live quote and then prints "Live ₹482" four lines above
+ * "Stop ₹511", with the score and the reward-to-risk between them, and said
+ * nothing about the plan having already failed. Five of them, on the first
+ * screen of the front page.
+ *
+ * Dimmed, not hidden — the company's quality figures did not change when the
+ * trade died. The PLAN is what must stop reading as a live instruction, so
+ * the levels lose their up/down colour and strike through; the ratios above
+ * them are untouched. Every value here is a literal or an existing token:
+ * this file declares no --t-* scale, so a bare var() would delete the rule. */
+.card.cv.is-void{opacity:.78}
+.cv-void{
+  margin:8px 0 0;padding:8px 10px;border-radius:8px;
+  background:color-mix(in srgb, var(--dn, #d9534f) 10%, transparent);
+  border:1px solid color-mix(in srgb, var(--dn, #d9534f) 34%, transparent);
+  color:var(--text, #111);font-size:12.5px;line-height:1.45}
+.cv-void b{color:var(--dn, #d9534f);letter-spacing:.02em}
+.kv.lv-plan.is-void .vv{color:var(--dim, #777) !important;text-decoration:line-through}
+.kv.lv-plan.is-void .vv i{text-decoration:line-through}
+/* The stop path and the scale-out sit BELOW the struck-through levels and
+   restate them as instructions ("20% at ₹1,219.10"). Dimmed as one block:
+   striking through every number in it would be unreadable, and the banner
+   above has already said why none of it applies. */
+.lv-trail-void{opacity:.5;filter:saturate(.25)}
+@media (prefers-reduced-motion: no-preference){
+  .cv-void{transition:background var(--t-fast, .15s) var(--ease, ease)}
+}
+
 /* Sortable column headings on the screen grid. The affordance has to be
    visible before the click: a heading that only reveals it is sortable after
    you have already sorted it is a control nobody finds. */
