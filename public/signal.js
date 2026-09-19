@@ -265,6 +265,13 @@
             && typeof j.ledger === 'object' && Object.keys(j.ledger).length) {
           LIVE_PX = j.ledger;
         }
+        /* The per-engine R:R floors, from the file that already computes them.
+           Same reason as the price map: the rule was reachable from one route
+           and every other surface published without it. */
+        if (String(url).split('?')[0] === '/engines.json' && j && j.engines
+            && typeof j.engines === 'object') {
+          ENG_FLOORS = j.engines;
+        }
       } catch (e) { /* a price overlay must never break a feed read */ }
       /* Named here, so a route reports every feed it touched without having to
          know which ones those were. Guarded: a missing label or a feed with no
@@ -1974,6 +1981,66 @@
    * A row from a retired engine, or from an engine this site never ran
    * (commodity and top5_pick are news.askakshay.com's, and arrive in the same
    * feed), is not in this site's record. */
+  /* ── IS THE PLAN PLAYABLE AT ALL? ────────────────────────────────────────
+   *
+   * Akshay, on the brief for TATACHEM: "how is this even correct, who gives
+   * such kind of signals."
+   *
+   * He is right and the numbers are not close. That setup published:
+   *
+   *     entry  734.90    stop 597.00    risk 18.76% of entry
+   *     target 1  758.20   =  0.169R
+   *     target 2  837.30   =  0.743R
+   *     target 3  absent
+   *
+   * A first target at 0.169R needs an 85.5% win rate merely to break even.
+   * This book's win rate is 7.7%. Both published targets sit below 1R, which
+   * means the plan cannot pay for its own stop even if BOTH print. And the
+   * page rendered it as "90 HIGH CONVICTION".
+   *
+   * THE FLOOR ALREADY EXISTED AND WAS ENFORCED NOWHERE. engines.json states
+   * the rule in its own `basis` field — break-even R:R is (1-p)/p plus a 15%
+   * margin, default 2.0 below 25 closed trades — and publishes a `floor` per
+   * engine. Nothing on the site ever compared a signal's geometry against it.
+   * `ledge` is not even in that file, so its floor is the 2.0 default and its
+   * first target came in at a twelfth of that.
+   *
+   * THE CONVICTION SCORE IS NOT THE PROBLEM, AND MUST NOT BE THE FIX. It
+   * deliberately excludes reward-to-risk, with a reasoned note: a conviction
+   * score answers "what does the evidence say", and the plan's geometry is a
+   * separate question. That reasoning is right. What was wrong is that only
+   * the first half reached the page, in large type, under a confident word.
+   *
+   * So geometry becomes its own gate rather than being folded into a score it
+   * does not belong in: a setup that cannot clear its engine's floor is not
+   * presented as an action, whatever the evidence says about the company. */
+  const rrFloor = (engine) => {
+    const e = ENG_FLOORS[String(engine || '')];
+    const f = e && Number(e.floor);
+    /* 2.0 is engines.json's own default for an engine without a measured win
+       rate. An engine missing from that file gets the same default rather than
+       a free pass — absence is not permission, the rule this repo already
+       applies to the capital book. */
+    return Number.isFinite(f) && f > 0 ? f : 2;
+  };
+  /* Filled from engines.json wherever it is fetched; the floor falls back to
+     2.0 until it arrives, which is the strict direction. */
+  let ENG_FLOORS = {};
+  const rrOf = (sig) => {
+    const entry = lvl(sig && sig.entry), stop = lvl(sig && sig.sl), t1 = lvl(sig && sig.target1);
+    if (entry == null || stop == null || t1 == null) return null;
+    const risk = Math.abs(entry - stop);
+    if (!(risk > 0)) return null;
+    return Math.abs(t1 - entry) / risk;
+  };
+  /* Returns null when the geometry cannot be read — unknown is not the same as
+     unplayable, and a row without levels is simply not a plan. */
+  const playable = (sig) => {
+    const rr = rrOf(sig);
+    if (rr == null) return null;
+    return rr >= rrFloor(sig && sig.signal_type);
+  };
+
   const engineOk = r => ENGINES.has(String(r.signal_type || ''));
 
   /* ── AND NOTHING SHORT ────────────────────────────────────────────────────
@@ -2586,7 +2653,7 @@
      * one of the two calls from cache. /api/stats is still fetched, but only
      * for engine_floors — a property of the engines, not of this site's
      * record, and labelled as such where it is shown. */
-    const [t, p, n, m, fl, ed, lw, sgx, tk] = await Promise.all(
+    const [t, p, n, m, fl, ed, lw, sgx, tk, rgmFeed] = await Promise.all(
       [get('/today.json'), get('/pulse.json'), get('/news.json'), get('/api/markets'),
        get('/api/flows'), get('/edition.json'), get('/api/wire'),
        ledger(),
@@ -2599,7 +2666,28 @@
         * NOT publish. In the same Promise.all rather than awaited separately:
         * it must not add a round trip to first paint, and a reader who never
         * opens /research is exactly the one who needs the sentence. */
-       loadResearchN()]);
+       loadResearchN(),
+       /* ── REGIME IS REQUESTED WITH THE FIRST BATCH, NOT AFTER IT ─────────
+        *
+        * It was fetched only AFTER the first render, as a follow-up, so it
+        * entered a connection queue that this very Promise.all had already
+        * saturated. A browser runs six connections per origin over HTTP/1.1
+        * and this page opens more than that, so the request that starts last
+        * waits longest — and get() aborts at eight seconds. The regime panel
+        * was therefore missing whenever the page was busy, which is exactly
+        * when there is most to render.
+        *
+        * Two workarounds were written before the cause was found: HELD(), for
+        * a payload that arrived but aged past the coalescing window, and a
+        * retry that only marks itself done on success. Both are correct and
+        * both stay — they cover different failures. Neither helps a request
+        * that never got a connection, because an aborted fetch leaves nothing
+        * to hold and nothing to retry from within the render.
+        *
+        * Asking for it up front costs no extra request — the page fetched it
+        * anyway — and removes the second render the section needed to appear
+        * at all. */
+       get('/regime.json')]);
     /* THE SITE'S OWN RECORD — THROUGH ledger(), NOT A SECOND COPY OF ITS RULES.
      *
      * The first attempt fetched /api/signals here and filtered it by hand. It
@@ -3234,7 +3322,10 @@
        triggered by the heavy screen pass found regime.json "not ready" and the
        whole section vanished from a page that had just shown it. A regime does
        not go stale in five seconds. */
-    const rgm = CACHED('/regime.json');
+    /* The batch result first; CACHED() is the fallback for a re-render that
+       did not re-fetch. */
+    const rgm = (rgmFeed && rgmFeed.ok && rgmFeed.data)
+      ? { ...rgmFeed, ready: true } : CACHED('/regime.json');
     if (rgm.ready && rgm.ok && rgm.data && rgm.data.ok) FRONT_REGIME = rgm.data;
     else if (!FRONT_REGIME) {
       const h = HELD('/regime.json');
@@ -3244,8 +3335,27 @@
       try { out += regimeSec(FRONT_REGIME, LR); }
       catch (e) { console.error('regime section failed:', e); }
     } else if (!regimeTried) {
-      regimeTried = true;
-      get('/regime.json').then(() => { if (routeOf() === '/') R['/'](); });
+      /* ── "TRIED" MUST MEAN "SUCCEEDED", NOT "ATTEMPTED" ──────────────────
+       *
+       * This set the flag BEFORE the fetch resolved, so a single failed
+       * attempt retired the retry permanently for that page session and the
+       * regime panel was gone until a reload.
+       *
+       * That matters here because the failure is not rare. The front page
+       * opens more concurrent requests than a browser will run at once over
+       * HTTP/1.1, so under load the last of them can sit in the queue past
+       * get()'s eight-second abort — and an aborted fetch leaves NOTHING in
+       * the micro-cache, which is the one case HELD() cannot rescue, because
+       * there is no payload to hold. Measured: two runs of the same load,
+       * one with the section and one without.
+       *
+       * The flag is now set only when a usable payload actually arrived. A
+       * failure leaves it false, so the next render tries again — which is
+       * what "retry" was supposed to mean. */
+      get('/regime.json').then((r) => {
+        if (r && r.ok && r.data && r.data.ok) regimeTried = true;
+        if (routeOf() === '/') R['/']();
+      }).catch(() => { /* leave the flag false so a later render retries */ });
     }
 
     out += sec('Today', `<div class="grid grid-5">
@@ -9580,8 +9690,14 @@
       <div class="b-sk" style="height:88px;margin-top:26px"></div>
       <div class="b-sk" style="height:300px;margin-top:26px"></div></div></div>`);
 
+    /* engines.json is fetched here so the R:R floor is KNOWN before this page
+       ranks anything. Without it every floor falls back to 2.0, which is the
+       strict direction and would simply refuse more setups — but the brief is
+       the one page that features a single signal, so it should decide on the
+       real number. */
     const [a, sc, st] = await Promise.all(
-      [ledger(), getScreen(false).then(g => (LITE_GOT = g.lite, noteLadder(g.r))), get('/api/stats')]);
+      [ledger(), getScreen(false).then(g => (LITE_GOT = g.lite, noteLadder(g.r))),
+       get('/api/stats'), get('/engines.json')]);
     if (!a.ok) { paint(fail('The signal brief', a.error)); return; }
     const rows = a.rows;
     /* SINCE LAUNCH, LIKE EVERY OTHER SURFACE ON THIS SITE.
@@ -9669,7 +9785,18 @@
       ].filter(v => Number.isFinite(v));
       return parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : null;
     };
+    /* ── GEOMETRY IS A GATE, NOT A TIE-BREAK ──────────────────────────────
+     * This sorted on evidence and used `rr` only to break ties, so a setup
+     * whose first target sat at 0.169R could lead the page on the strength of
+     * its momentum percentile. Evidence about a company says nothing about
+     * whether the plan attached to it can pay for its own stop.
+     * Unplayable setups are not deleted — they are still in the ledger and
+     * still open — they are sorted BELOW every playable one, so the brief
+     * features one only when there is nothing else, and says so when it does. */
+    const rankKey = (r) => (playable(r) === false ? 1 : 0);
     const ranked = open.slice().sort((x, y) => {
+      const gx = rankKey(x), gy = rankKey(y);
+      if (gx !== gy) return gx - gy;
       const sx = scoreOf(x.symbol), sy = scoreOf(y.symbol);
       if (sx == null && sy == null) return (y.rr || 0) - (x.rr || 0);
       if (sx == null) return 1;
@@ -9886,7 +10013,26 @@
      * weak, for the overall score and for every component stance. */
     const BANDS = [[60, 'HIGH CONVICTION', 'up'], [40, 'MIXED', ''], [0, 'LOW CONVICTION', 'dn']];
     const bandOf = v => BANDS.find(b => v >= b[0]) || BANDS[BANDS.length - 1];
-    const conviction = score == null ? 'UNSCORED' : bandOf(score)[1];
+    /* ── THE LABEL CANNOT OUTRUN THE PLAN ─────────────────────────────────
+     * `score` is evidence about the COMPANY and deliberately excludes
+     * reward-to-risk — see the note on the last component, and that reasoning
+     * stands. What does not stand is printing the evidence half alone, in the
+     * largest word on the card, over a plan that cannot pay for its own stop.
+     * TATACHEM published at 0.169R and this line rendered "HIGH CONVICTION".
+     * A reader sees one word. It has to be true about the thing they would
+     * actually do. */
+    const okGeom = playable(sig);
+    /* The book's own win rate, so the break-even number has something true to
+       be compared against rather than sitting on the page as an abstraction. */
+    const LRW = (() => {
+      const w = recordOf(rows.filter(sinceLaunch));
+      return w && w.trades ? w.win_rate : null;
+    })();
+    const rrNow = rrOf(sig);
+    const floorNow = rrFloor(sig.signal_type);
+    const conviction = score == null ? 'UNSCORED'
+      : okGeom === false ? 'NOT PLAYABLE'
+      : bandOf(score)[1];
     // Where this setup sits among everything open, for the standfirst below.
     const openRank = ranked.findIndex(r => r.symbol === sig.symbol) + 1;
 
@@ -9975,7 +10121,15 @@
      *
      * The all-time figures are not discarded; they are shown beneath, labelled
      * as the engine before this site, with their own dates. */
-    const HERE = recordOf(rows.filter(sinceLaunch));
+    /* ── THE ENGINE'S RECORD, NOT THE BOOK'S ──────────────────────────────
+     * `rows` is the whole ledger. This computed the BOOK's record and the
+     * strip below labelled it "Engine LEDGE — 13 closed · 7.7% won" and "Its
+     * expectancy -0.765R". LEDGE has never closed a trade. The card
+     * attributed every loss the site has taken to one engine that took none
+     * of them, which is wrong in both directions at once: it slanders the
+     * engine and it hides that there is no evidence about it either way. */
+    const HERE = recordOf(rows.filter(sinceLaunch)
+      .filter(r => String(r.signal_type || '') === String(sig.signal_type || '')));
     const H = HERE.trades ? HERE : null;
     /* No pre-launch record is cited anywhere on this page. Those trades were
      * graded in a rebuild rather than watched live, and this site is a fresh
@@ -10049,8 +10203,20 @@
           : `<b>Chosen, not recommended.</b> This is the highest-scoring of the
              <b>${ranked.length}</b> signals open since ${esc(LAUNCH)}, ranked on the measured components —
              what the market did, not on how far the engine placed its own target.`}
-          A ${conviction.toLowerCase().replace(' conviction', '-conviction')} setup built from price
-          structure, momentum, volume and defined risk. Every figure below comes from the published ledger,
+          ${okGeom === false
+            ? `<b class="dn">The plan attached to it does not clear this engine's
+               reward-to-risk floor.</b> The first target sits at
+               <b>${rrNow == null ? '—' : rrNow.toFixed(2)}R</b> against a floor of
+               <b>${floorNow.toFixed(1)}R</b>${rrNow != null && rrNow < 1
+                 ? `, so the stop costs more than the first target pays even when it prints`
+                 : ``}. It would have to win
+               <b>${rrNow ? (100 / (1 + rrNow)).toFixed(0) : '—'}%</b> of the time merely to
+               break even — against this book's <b>${LRW == null ? '—' : LRW + '%'}</b>.
+               It is shown because it was published and this site does not delete what it
+               published; it is not an action.`
+            : `A ${conviction.toLowerCase().replace(' conviction', '-conviction')} setup built from price
+               structure, momentum, volume and defined risk.`}
+          Every figure below comes from the published ledger,
           the same NSE screen the rest of this site runs on, and ${pts ? `${pts.length} real daily closes` : 'the published levels'}.</p>
       </header>
 
