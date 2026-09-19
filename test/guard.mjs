@@ -920,6 +920,39 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
        .includes("script-src 'self' 'unsafe-inline'"));
 }
 
+/* ── NO FONT MAY BE SHIPPED, OR PRELOADED, WITHOUT A RULE THAT RENDERS IT ────
+ * Manrope carried the interface until Plus Jakarta Sans replaced it. After
+ * that --disp, --ui and --serif all pointed at Jakarta and NOTHING referenced
+ * Manrope — yet four faces stayed in the repo, four @font-face blocks stayed
+ * in the stylesheet, and index.html went on PRELOADING one of them.
+ *
+ * A preload is the highest-priority fetch a page can make. Spending one on a
+ * font with no rule to render costs every visitor 24 KB on the critical path,
+ * 100% of the time, for nothing. Dead weight is cheap to carry and expensive
+ * to preload — which is why this checks both.
+ *
+ * "Referenced" means outside comments and outside @font-face itself: a family
+ * that appears only in its own declaration is declaring itself, not being used. */
+{
+  const live = CSS.replace(/\/\*[\s\S]*?\*\//g, "").replace(/@font-face\{[\s\S]*?\}/g, "");
+  const declared = [...new Set(
+    [...CSS.matchAll(/@font-face\{font-family:'([^']+)'/g)].map((m) => m[1])
+  )];
+  ok("the stylesheet declares at least one face", declared.length > 0);
+
+  const unused = declared.filter((f) => !new RegExp(`[^-]\\b${f}\\b`).test(live));
+  ok("every declared @font-face family is referenced by a live rule",
+     unused.length === 0, unused);
+
+  // And every preloaded file must belong to a family that survived that check.
+  const preloaded = [...HTML.matchAll(/rel="preload"[^>]*href="\/fonts\/([^"]+)"/g)]
+    .map((m) => m[1]);
+  const declaredSrc = [...CSS.matchAll(/url\('\/fonts\/([^']+)'\)/g)].map((m) => m[1]);
+  const orphanPreload = preloaded.filter((f) => !declaredSrc.includes(f));
+  ok("every preloaded font file is one the stylesheet actually declares",
+     orphanPreload.length === 0, orphanPreload);
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

@@ -35,21 +35,18 @@
 [hidden] { display: none !important; }
 
 /* ── FACES ───────────────────────────────────────────────────────────────
-   Manrope carries the whole interface, the way it does on the reference site —
+   MANROPE IS GONE. It carried the interface until Plus Jakarta Sans replaced
+   it; --disp, --ui and --serif all point at Jakarta now and NOTHING referenced
+   Manrope any more. Four faces, 96 KB, still shipped — and index.html still
+   PRELOADED one of them, which is the highest-priority fetch a page can make,
+   spent on a font with no rule to render. Dead weight is cheap to carry and
+   expensive to preload.
    one family at 400/500/600/700 rather than a display face plus a UI face.
    Self-hosted, latin subset only: this site contacts no third party, and
    loading four faces from a font CDN to look like someone else would be a
    strange place to break that.
    JetBrains Mono stays for figures only. Manrope has tabular numerals but a
    ledger reads better when prices are unmistakably monospaced. */
-@font-face{font-family:'Manrope';font-style:normal;font-weight:400;font-display:swap;
-  src:url('/fonts/Manrope-400-latin.woff2') format('woff2')}
-@font-face{font-family:'Manrope';font-style:normal;font-weight:500;font-display:swap;
-  src:url('/fonts/Manrope-500-latin.woff2') format('woff2')}
-@font-face{font-family:'Manrope';font-style:normal;font-weight:600;font-display:swap;
-  src:url('/fonts/Manrope-600-latin.woff2') format('woff2')}
-@font-face{font-family:'Manrope';font-style:normal;font-weight:700;font-display:swap;
-  src:url('/fonts/Manrope-700-latin.woff2') format('woff2')}
 @font-face{font-family:'JBMono';font-style:normal;font-weight:400;font-display:swap;
   src:url('/fonts/JetBrainsMono-400-latin.woff2') format('woff2')}
 @font-face{font-family:'JBMono';font-style:normal;font-weight:500;font-display:swap;
