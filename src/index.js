@@ -186,13 +186,42 @@ async function proxyToProduction(url, request) {
  * true the console will say so immediately, which is the correct way to find
  * out that a key moved into the client bundle.
  */
+/* ── CLOUDFLARE'S OWN BEACON IS INJECTED AT THE EDGE ─────────────────────────
+ *
+ * Web Analytics adds <script src="static.cloudflareinsights.com/beacon.min.js">
+ * to the response AFTER this Worker has returned it. It is not in index.html —
+ * grep finds zero — so nothing in this repo could have predicted it, and the
+ * first CSP blocked it:
+ *
+ *     Loading the script 'https://static.cloudflareinsights.com/beacon.min.js/…'
+ *     violates the following Content Security Policy directive: "script-src
+ *     'self' 'sha256-…'". The action has been blocked.
+ *
+ * THE LOCAL SUITE CANNOT CATCH THIS, and that is worth recording rather than
+ * patching quietly. `wrangler dev` serves the Worker's own response; the edge
+ * is not in the path, so the beacon does not exist locally. test/ui.mjs passed
+ * 357/0 against localhost and CI failed against production on the same commit.
+ * Any check that must see edge behaviour has to run against the deployed site —
+ * which is exactly what CI's post-deploy step is for, and why it is worth
+ * keeping green.
+ *
+ * Named explicitly rather than opened up. `script-src 'self' https:` would have
+ * made this pass and permitted every script host on the internet; two exact
+ * origins permit Cloudflare's analytics and nothing else. If the analytics are
+ * not wanted, the fix is to turn Web Analytics off on the zone and delete these
+ * two lines — not to widen the policy. */
+const CF_BEACON = "https://static.cloudflareinsights.com";
+const CF_REPORT = "https://cloudflareinsights.com";
+
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' ${INLINE_SCRIPT_HASHES.map((h) => `'${h}'`).join(" ")}`,
+  `script-src 'self' ${CF_BEACON} ${INLINE_SCRIPT_HASHES.map((h) => `'${h}'`).join(" ")}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
-  "connect-src 'self'",
+  /* The beacon POSTs its measurement back; without this the script loads and
+     then fails at the last step, which is the worst of both outcomes. */
+  `connect-src 'self' ${CF_REPORT}`,
   "form-action 'self'",
   "base-uri 'self'",
   "frame-ancestors 'none'",
