@@ -953,6 +953,47 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      orphanPreload.length === 0, orphanPreload);
 }
 
+/* ── THE COMMITTED ASSETS MUST STILL BE THE SOURCE ──────────────────────────
+ * scripts/minify.mjs rewrites public/signal.js and public/signal.css IN PLACE
+ * before wrangler deploy, because wrangler serves ./public directly. It
+ * restores them in a finally — including when the deploy fails, which is the
+ * case a `&&` chain gets wrong.
+ *
+ * If a restore is ever missed, the next `git add -A` commits a minified file,
+ * and from then on the repository's documentation is gone and every later diff
+ * is unreadable. That is not a small loss here: several of these comments are
+ * the only record of why a rule exists.
+ *
+ * So this asserts the committed file is the AUTHORED one. It is also the
+ * reason minify runs after guard in the deploy chain rather than before.
+ *
+ * It doubles as the check that the stripping is worth doing at all: if the
+ * comment share ever fell near zero, the build step would be cost without
+ * benefit and should be removed rather than carried. */
+{
+  const commentShare = (src) => {
+    const stripped = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    return 1 - stripped.length / src.length;
+  };
+  ok("public/signal.js is the authored source, not a minified artefact",
+     commentShare(JS) > 0.10 && /\n\s*\/\*/.test(JS),
+     `comment share ${(commentShare(JS) * 100).toFixed(0)}%`);
+  ok("public/signal.css is the authored source, not a minified artefact",
+     commentShare(CSS) > 0.10 && /\n\s*\/\*/.test(CSS),
+     `comment share ${(commentShare(CSS) * 100).toFixed(0)}%`);
+
+  // The build step must actually be in the chain that ships.
+  const PKG = JSON.parse(readFileSync("package.json", "utf8"));
+  ok("the deploy script minifies before it deploys",
+     /minify\.mjs\s+--\s+.*wrangler deploy/.test(PKG.scripts.deploy || ""),
+     PKG.scripts.deploy);
+  ok("...and minifies AFTER the guard, which reads the authored source",
+     (PKG.scripts.deploy || "").indexOf("guard.mjs")
+       < (PKG.scripts.deploy || "").indexOf("minify.mjs"));
+  ok("esbuild is a declared dependency, not something the deploy hopes is there",
+     !!(PKG.devDependencies || {}).esbuild);
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);
