@@ -78,10 +78,6 @@
 
 @font-face{font-family:'Newsreader';font-style:normal;font-weight:400;font-display:swap;
   src:url('/fonts/Newsreader-400-latin.woff2') format('woff2')}
-@font-face{font-family:'Newsreader';font-style:normal;font-weight:600;font-display:swap;
-  src:url('/fonts/Newsreader-600-latin.woff2') format('woff2')}
-@font-face{font-family:'Newsreader';font-style:italic;font-weight:400;font-display:swap;
-  src:url('/fonts/Newsreader-400i-latin.woff2') format('woff2')}
 
 /* ── TOKENS ──────────────────────────────────────────────────────────────── */
 /* ── THE SCALE ────────────────────────────────────────────────────────────
@@ -1001,7 +997,6 @@ h4.sh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-tran
    Size makes it secondary; transparency made it unreadable. */
 .kv.lv-plan .vv i{font-style:normal;font-size:var(--t-2);opacity:1}
 
-
 /* ── WIDE LAYOUT ──────────────────────────────────────────────────────────
    At 1280 a single column of cards is a 1,200px-wide paragraph. Card lists go
    two-up above 1000px; the tables stay full width because a table that has to
@@ -1169,7 +1164,6 @@ body::before{display:none}
 .heat-t .hn{font:400 var(--t-2)/1 var(--ui);opacity:.7}
 .heat{gap:4px}
 .heat-t{border-radius:var(--r-3);padding:12px 12px}
-
 
 /* The tinted percentage beside a level. opacity:.75 composited #0E7C48 to
    3.29:1 and #C23B2E to 3.48:1 on white — both under the bar. At full
@@ -5953,7 +5947,6 @@ main.is-nav{animation:routein var(--t-mid) var(--ease-out) backwards}
 /* The heatmap's tiles now live in heat.css, loaded by this site AND by gems,
    so the ramp cannot drift into two different greens. Only the tokens it
    depends on stay here. */
-
 
 /* ── THE LIVE MARK ON A COMPANY PAGE ───────────────────────────────────────
  * The page was the only surface without one: the heatmap said ₹410, the chart

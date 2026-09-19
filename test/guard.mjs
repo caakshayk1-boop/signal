@@ -1045,6 +1045,61 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   const orphanPreload = preloaded.filter((f) => !declaredSrc.includes(f));
   ok("every preloaded font file is one the stylesheet actually declares",
      orphanPreload.length === 0, orphanPreload);
+
+  /* ── AND THE DIRECTORY MUST MATCH THE DECLARATIONS, BOTH WAYS ────────────
+   *
+   * The family check above passes for a family that is used at ONE weight and
+   * shipped at three. Newsreader was exactly that: declared at 400, 600 and
+   * 400-italic, and every rule that reaches it is written `font: 400 ...`, so
+   * the bold and the italic could not be selected by anything in this
+   * stylesheet. Measured in a browser at 414px and 1280px — 24 elements
+   * rendering Newsreader on /brief, zero of them bold, zero italic — and the
+   * two files were never fetched on any route. 48 KB in the repo and in every
+   * deployment, reachable by nothing.
+   *
+   * Both directions are faults, and they are different faults:
+   *   · a FILE with no declaration is dead weight in the deploy;
+   *   · a DECLARATION with no file is a 404 the browser answers by silently
+   *     falling back to Georgia, which looks like a design choice.
+   *
+   * Lazy loading is why neither shows up as a slow page — a face nothing
+   * renders is never fetched — so nothing but this will ever notice. */
+  const onDisk = readdirSync("public/fonts").filter((f) => /\.woff2?$/.test(f)).sort();
+  const wanted = [...new Set(declaredSrc)].sort();
+  ok("every font file in the repo is declared by the stylesheet",
+     onDisk.every((f) => wanted.includes(f)), onDisk.filter((f) => !wanted.includes(f)));
+  ok("every declared font file exists — a missing one falls back silently",
+     wanted.every((f) => onDisk.includes(f)), wanted.filter((f) => !onDisk.includes(f)));
+
+  /* ── AND THE OFFLINE SHELL MUST CARRY THE FACES EVERY ROUTE RENDERS ──────
+   * sw.js precached seven faces the site had stopped using; the fix that
+   * replaced them with the one variable face stopped there, and the site
+   * loads THREE on every route. Measured across six routes: Jakarta plus
+   * both JetBrains Mono weights on all six. Every price, ticker and table
+   * figure here is --mono, so the offline shell rendered the prose correctly
+   * and every NUMBER in a system monospace.
+   *
+   * Newsreader is excluded on purpose — 23 KB for one route's headings. So
+   * this is not "every declared face"; it is every face the CHROME needs. */
+  const SW = readFileSync("public/sw.js", "utf8");
+  const SHELL_FONTS = ["PlusJakarta-var-latin.woff2",
+                       "JetBrainsMono-400-latin.woff2",
+                       "JetBrainsMono-500-latin.woff2"];
+  for (const f of SHELL_FONTS) {
+    ok(`the offline shell precaches ${f}`, SW.includes("/fonts/" + f));
+  }
+  /* A precache list that names a file the repo does not have fails silently:
+     c.add() is caught per entry so the install still succeeds. */
+  const swFonts = [...SW.matchAll(/"\/fonts\/([^"]+)"/g)].map((m) => m[1]);
+  ok("the offline shell names no font the repo does not ship",
+     swFonts.every((f) => onDisk.includes(f)), swFonts.filter((f) => !onDisk.includes(f)));
+  /* CHANGING THE LIST WITHOUT BUMPING THE NAME SHIPS NOTHING. activate deletes
+     every cache whose key is not CACHE, so a new SHELL under an old key is
+     served from the old cache until something else evicts it. */
+  ok("the cache key is versioned, so a changed shell actually replaces one",
+     /const CACHE = "signal-shell-v(\d+)"/.test(SW) &&
+     Number(SW.match(/signal-shell-v(\d+)/)[1]) >= 3,
+     (SW.match(/signal-shell-v\d+/) || [])[0]);
 }
 
 /* ── THE COMMITTED ASSETS MUST STILL BE THE SOURCE ──────────────────────────
