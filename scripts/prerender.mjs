@@ -133,10 +133,34 @@ async function liveRecord() {
     // unreachable" branch on the one day that sentence was false.
     const wins = closed.filter((x) => Number(x.r_multiple) > 0).length;
     const sum = closed.reduce((a, x) => a + Number(x.r_multiple), 0);
-    return { published: rows.length, trades: closed.length, wins,
-             losses: closed.length - wins,
-             win_rate: closed.length ? Math.round(wins / closed.length * 1000) / 10 : null,
-             expectancy_r: closed.length ? Math.round(sum / closed.length * 1000) / 1000 : null };
+    /* ── THE SNAPSHOT MUST NOT SOFTEN WHAT THE PAGE STATES PLAINLY ─────────
+     * This printed "Too few to settle anything" below thirty closed trades,
+     * which on 2026-09-19 sat under 13 closed at -0.765R — a result whose 95%
+     * interval excludes zero. The crawler's copy of the record was therefore
+     * kinder about it than the page, and the crawler's copy is the one that
+     * gets indexed and quoted.
+     *
+     * A z-approximation, not the page's exact t-distribution: this is a build
+     * script whose whole job is a one-paragraph summary, and the two agree on
+     * the only thing this sentence claims — whether the interval clears zero.
+     * At 13 trades the z interval is NARROWER than the t interval, so it is
+     * the conservative direction: anything this calls significant, the page's
+     * stricter test already did. */
+    const n = closed.length;
+    let significant = false, lo = null, hi = null;
+    if (n > 1) {
+      const mean = sum / n;
+      const sd = Math.sqrt(closed.reduce(
+        (a, x) => a + (Number(x.r_multiple) - mean) ** 2, 0) / (n - 1));
+      const se = sd / Math.sqrt(n);
+      lo = mean - 1.96 * se; hi = mean + 1.96 * se;
+      significant = sd > 0 && (hi < 0 || lo > 0);
+    }
+    return { published: rows.length, trades: n, wins,
+             losses: n - wins, significant,
+             ci: lo == null ? null : [Math.round(lo * 100) / 100, Math.round(hi * 100) / 100],
+             win_rate: n ? Math.round(wins / n * 1000) / 10 : null,
+             expectancy_r: n ? Math.round(sum / n * 1000) / 1000 : null };
   } catch { return null; }
 }
 const rec = await liveRecord();
@@ -156,7 +180,16 @@ const block = `${OPEN}
   <p class="pre-s">${rec && rec.trades
     ? `<b>${rec.published}</b> published since ${LAUNCH}, <b>${rec.trades}</b> closed, averaging
        <b>${rec.expectancy_r > 0 ? "+" : ""}${rec.expectancy_r}R</b>.
-       ${rec.trades < 30 ? `Too few to settle anything. Shown anyway.` : ``}
+       ${rec.significant
+          ? `Statistically ${rec.ci[1] < 0 ? "negative" : "positive"} — the 95% interval
+             (${rec.ci[0] > 0 ? "+" : ""}${rec.ci[0].toFixed(2)}R to
+             ${rec.ci[1] > 0 ? "+" : ""}${rec.ci[1].toFixed(2)}R) excludes zero.
+             ${rec.trades < 30 ? `That settles the sign, not the size.` : ``}`
+          : rec.ci
+          ? `The 95% interval (${rec.ci[0] > 0 ? "+" : ""}${rec.ci[0].toFixed(2)}R to
+             ${rec.ci[1] > 0 ? "+" : ""}${rec.ci[1].toFixed(2)}R) includes zero — too few to
+             settle anything, and shown anyway.`
+          : ``}
        The screen below is research.`
     : rec && rec.published
       ? `<b>${rec.published}</b> published since ${LAUNCH}, none closed yet. The screen below is

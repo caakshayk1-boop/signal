@@ -99,6 +99,39 @@
     return { ok: false, ready: false, data: null, error: 'still loading' };
   };
 
+  /* ── THE LAST PAYLOAD, WHATEVER ITS AGE ─────────────────────────────────
+   *
+   * MICRO_MS is a REQUEST-COALESCING window — it stops two sections asking for
+   * the same feed in one tick — and CACHED() was being used as if it were a
+   * freshness policy as well. Those are different questions, and conflating
+   * them silently deleted sections from the page.
+   *
+   * HOW IT PRESENTED. The front page fires twelve concurrent requests; a
+   * browser opens six connections per origin over HTTP/1.1, so the rest queue,
+   * and on a loaded server the last of them can sit in that queue past get()'s
+   * eight-second abort. By the time the route rendered, the screen and regime
+   * payloads had arrived but were older than five seconds, so CACHED() said
+   * "still loading" about data sitting in the map, and the heatmap and the
+   * regime panel were simply absent from a page that had every byte it needed
+   * to draw them. Seven sections instead of nine, no error, nothing in the
+   * console. The code's own comment already records this happening twice
+   * before — "same fault the heatmap strip had, reintroduced one section
+   * over" — which is the signal that the timing was never the bug.
+   *
+   * These are DAILY feeds. A screen built at 02:10 is not less true at
+   * 5.001 seconds after it was read than at 4.999. Age belongs to the
+   * freshness bar, which measures and reports it honestly; it does not belong
+   * in the decision about whether a section exists.
+   *
+   * `ready` is deliberately untouched: the heavy-fetch trigger uses it to
+   * decide whether to go and get the full screen, and that IS a question about
+   * the window. This is a second, narrower accessor for the callers that only
+   * want the bytes. */
+  const HELD = url => {
+    const m = MICRO.get(url);
+    return m && m.res && m.res.ok && m.res.data ? m.res : null;
+  };
+
   /* ── TWO CALLERS, ONE REQUEST ─────────────────────────────────────────────
    * The micro-cache below keys on a RESOLVED response, so it cannot see a
    * request that is still in the air — and the duplicates on this site are all
@@ -152,6 +185,51 @@
         || d.price_date || d.date || d.fetched_at || null;
   };
 
+  /* ── ONE LIVE PRICE, WHEREVER THE PAGE ASKS FOR IT ──────────────────────
+   *
+   * Akshay, with the Volume spurts sheet beside a TradingView chart: the sheet
+   * said TATACHEM ₹731.80, "-0.40% today"; the chart said ₹693.25, -11.04%.
+   * The heatmap on the SAME PAGE said -11.04% and was right.
+   *
+   * Neither number was invented. ₹731.80 is the close the screen was BUILT
+   * from — screen-lite.json is generated at 02:10 IST and every fundamental on
+   * it belongs to that build. ₹693.25 is where the stock trades. The defect
+   * was that the sheet printed the build's figure and labelled it "today",
+   * which is the one thing it is not, on a day the name fell eleven per cent.
+   *
+   * This is the same fault liveMark() was written for on the company page, and
+   * it was fixed there and nowhere else — so the fix travelled with the page
+   * instead of with the data. /api/ticker already carries a `ledger` of 103
+   * live quotes and the heatmap already reads it; nothing else could, because
+   * it was a local variable in one route.
+   *
+   * Filled HERE, in the one function every fetch goes through, so any surface
+   * that can name a symbol can ask what it trades at without threading the
+   * ticker through its callers or paying for a second request. */
+  let LIVE_PX = Object.create(null);
+  /* Its own normaliser, NOT the bareSym() defined further down. That one
+     already exists and does the same job — and declaring a second const of
+     that name in the same scope is a SyntaxError that takes the entire bundle
+     down, which is how this was caught. This one is scoped to the lookup and
+     strips only the suffixes the ledger's keys can carry.
+     Number() directly rather than sn(), because this sits far above sn's own
+     declaration: every real call happens later, but a helper that depends on
+     declaration order is one refactor from a dead-zone crash on the front
+     page. */
+  const pxKey = (x) => String(x || '').trim().toUpperCase().replace(/\.(NS|BO|BSE|NSE)$/i, '');
+  const livePx = (sym) => {
+    const k = pxKey(sym);
+    const q = k && LIVE_PX[k];
+    /* `q.price != null` FIRST, and the guard suite caught that it was missing.
+       Number(null) is 0 and 0 is finite, so a ledger entry carrying a null
+       price would have passed this test and been returned as a live quote —
+       and the sheet would have printed ₹0 beside a real volume multiple, on a
+       stock that simply had no mark. This repo has a named rule for exactly
+       that coercion and this is the fourth place it has been written wrong. */
+    if (!q || q.price == null) return null;
+    return Number.isFinite(Number(q.price)) ? q : null;
+  };
+
   async function get(url) {
     routeUrls.add(url);
     const micro = MICRO.get(url);
@@ -177,6 +255,17 @@
       const ct = r.headers.get('content-type') || '';
       if (ct.includes('text/html')) throw new Error('not JSON — got an HTML page');
       const j = await r.json();
+      /* The live quotes, taken off any ticker response regardless of which
+         route asked for it. Guarded end to end: a ticker without a ledger
+         leaves the previous map alone rather than emptying it, so a degraded
+         response cannot turn every live price on the site back into a stale
+         one. */
+      try {
+        if (String(url).split('?')[0] === '/api/ticker' && j && j.ledger
+            && typeof j.ledger === 'object' && Object.keys(j.ledger).length) {
+          LIVE_PX = j.ledger;
+        }
+      } catch (e) { /* a price overlay must never break a feed read */ }
       /* Named here, so a route reports every feed it touched without having to
          know which ones those were. Guarded: a missing label or a feed with no
          stamp is simply not reported, never an error. */
@@ -656,12 +745,73 @@
       });
       if (wide) el.classList.add('sec-wide');
     }
-    /* One wrapper around the run of sections, inserted where the first one
-       was, so nothing else on the page moves. */
-    const wrap = document.createElement('div');
-    wrap.className = 'secgrid';
-    secs[0].before(wrap);
-    for (const el of secs) wrap.appendChild(el);
+    /* ── TWO REAL COLUMNS, NOT ONE MULTICOL CONTAINER ────────────────────
+     *
+     * THE BUG THIS FIXES MADE THE SITE LOOK BROKEN. The previous version put
+     * every section into one `.secgrid` and let CSS `column-count:2` pack
+     * them. That removed the voids a row-based grid leaves, and introduced
+     * something far worse: a multicol container RE-BALANCES EVERY COLUMN
+     * whenever any child changes height. This page is full of <details>. So a
+     * reader scrolled to "Open the 5 ranked names", clicked it, and the five
+     * cards were laid out at the TOP OF THE RIGHT-HAND COLUMN — measured at
+     * y=155 while the summary they clicked sat near y=1100. The content was
+     * there, correct and complete, and entirely outside the part of the page
+     * they were looking at. Every fold on the site behaved this way: the IPO
+     * books, the engine roster, the conviction names. It reads as "I clicked
+     * and nothing happened", which is exactly how it was reported.
+     *
+     * Two explicit column elements do not have that property. A section that
+     * grows pushes only the sections BELOW IT IN ITS OWN COLUMN; the other
+     * column does not move, and nothing is re-ordered. It is the difference
+     * between a layout that packs once and a layout that re-packs on every
+     * interaction.
+     *
+     * ALTERNATING, not height-balanced. Balancing needs measurement, and
+     * measurement after paint is a reflow loop — which on this site means
+     * rAF, which does not run in a hidden tab, which is a documented trap
+     * here. Alternating is deterministic, preserves top-to-bottom order down
+     * each column, and is the same pairing the row-based grid produced before
+     * any of this. What it costs is a ragged BOTTOM edge on one column, which
+     * is one void at the end of a run rather than one under every pair.
+     *
+     * A FULL-WIDTH SECTION CLOSES THE RUN. `column-span:all` used to do this
+     * for free; here a lead or wide section ends the current pair of columns
+     * and the sections after it start a fresh one, which is the same reading
+     * order and the same chapter-break behaviour. */
+    let run = null;
+    const closeRun = () => { run = null; };
+    const openRun = (before) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'secgrid';
+      const a = document.createElement('div'); a.className = 'secgrid-col';
+      const b = document.createElement('div'); b.className = 'secgrid-col';
+      wrap.append(a, b);
+      before.before(wrap);
+      run = { wrap, cols: [a, b], n: 0 };
+      return run;
+    };
+    for (const el of secs) {
+      const full = el.classList.contains('is-lead') || el.classList.contains('sec-wide');
+      if (full) {
+        /* Left exactly where it is in the flow, spanning the content width on
+           its own. Moving it into a wrapper would change nothing except the
+           number of elements between it and the page. */
+        closeRun();
+        continue;
+      }
+      const r = run || openRun(el);
+      r.cols[r.n % 2].appendChild(el);
+      r.n += 1;
+    }
+    /* A run that ended up with one section is not a pair — unwrap it so the
+       section takes the full width rather than sitting in a half-width column
+       beside nothing. */
+    for (const wrap of scope.querySelectorAll(':scope > .secgrid')) {
+      const kids = [...wrap.querySelectorAll(':scope > .secgrid-col > section.sec')];
+      if (kids.length > 1) continue;
+      for (const k of kids) wrap.before(k);
+      wrap.remove();
+    }
   };
 
   /* `placeholder` is DECLARED BY THE CALLER, not sniffed out of the markup.
@@ -787,14 +937,190 @@
     && Number.isFinite(Number(r.r_multiple))
     && (r.badge || '') !== 'open';
 
+  /* ── "TOO FEW TO SETTLE ANYTHING" WAS A CLAIM, AND IT WAS FALSE ──────────
+   *
+   * The front page printed that caveat whenever fewer than thirty trades had
+   * closed. On 2026-09-19 it sat under 13 closed, 1 win, -0.765R — a result
+   * that IS significant:
+   *
+   *     t = -2.79 on 12 df, two-sided p = 0.016
+   *     95% CI on expectancy [-1.363R, -0.168R] — excludes zero
+   *     P(1 win or fewer in 13 | 50% win rate) = 0.0017
+   *
+   * A small sample and an inconclusive one are different things, and a page
+   * whose whole argument is that it reports its own losses honestly cannot
+   * soften the one number that is unambiguously bad. This is the same defect
+   * as the Math.abs(t) bug fixed on the regime panel — a test that could only
+   * congratulate, never conclude.
+   *
+   * THE T-TEST LEADS, NOT THE COIN FLIP. A 50% win rate is the wrong null for
+   * a system with asymmetric payoffs: at a 1.6R first target the break-even
+   * win rate is about 38%, so "12 losses in 13 would be a 1-in-585 coin flip"
+   * overstates the case. The t-test is on the R multiples themselves, which
+   * prices the asymmetry directly and asks the question that matters: is the
+   * expectancy different from zero.
+   *
+   * WHAT IT STILL MAY NOT CLAIM. Significance fixes the SIGN, not the size —
+   * that interval runs from -0.17R to -1.36R, which is the difference between
+   * a small leak and a catastrophe, and 13 trades cannot tell them apart. So
+   * the sentence states the direction as settled and the magnitude as open,
+   * and never rounds the sample up into an authority it does not have.
+   *
+   * Everything is computed from the rows. A hardcoded p-value is a number that
+   * goes stale the next time a trade closes. */
+  const tStat = R => {
+    const n = R.length;
+    if (n < 2) return null;
+    const m = R.reduce((a, b) => a + b, 0) / n;
+    const sd = Math.sqrt(R.reduce((a, b) => a + (b - m) ** 2, 0) / (n - 1));
+    if (!(sd > 0)) return null;
+    return m / (sd / Math.sqrt(n));
+  };
+  /* Student's t two-sided p, via the regularised incomplete beta. Written out
+     because the alternative is a table of critical values, and a table is a
+     hardcoded answer to a question whose inputs move every time a trade
+     closes. */
+  const lgamma = x => {
+    const c = [76.18009172947146, -86.50532032941677, 24.01409824083091,
+               -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+    let y = x, t = x + 5.5;
+    t -= (x + 0.5) * Math.log(t);
+    let ser = 1.000000000190015;
+    for (let j = 0; j < 6; j++) ser += c[j] / ++y;
+    return -t + Math.log(2.5066282746310005 * ser / x);
+  };
+  const betacf = (a, b, x) => {
+    const MAX = 200, EPS = 3e-14, FPMIN = 1e-300;
+    const qab = a + b, qap = a + 1, qam = a - 1;
+    let c = 1, d = 1 - qab * x / qap;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    d = 1 / d;
+    let h = d;
+    for (let m = 1; m <= MAX; m++) {
+      const m2 = 2 * m;
+      let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c;  if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d; h *= d * c;
+      aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c;  if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d;
+      const del = d * c; h *= del;
+      if (Math.abs(del - 1) < EPS) break;
+    }
+    return h;
+  };
+  const betai = (a, b, x) => {
+    if (!(x > 0)) return 0;
+    if (x >= 1) return 1;
+    const bt = Math.exp(lgamma(a + b) - lgamma(a) - lgamma(b)
+                        + a * Math.log(x) + b * Math.log(1 - x));
+    return x < (a + 1) / (a + b + 2)
+      ? bt * betacf(a, b, x) / a
+      : 1 - bt * betacf(b, a, 1 - x) / b;
+  };
+  const tPValue = (t, df) => (t == null || !(df > 0)) ? null
+    : betai(df / 2, 0.5, df / (df + t * t));
+
+  /* ── WHAT THE RECORD IS ENTITLED TO SAY ABOUT ITSELF ────────────────────
+   * One sentence, three branches, computed from the interval rather than from
+   * the trade count. `thin` used to decide this and a count cannot: thirteen
+   * trades is a small sample AND a significant result, and those are not in
+   * conflict. Returns '' when there is genuinely nothing to conclude. */
+  /* `short` for the hero, full for the record. The conclusion belongs in the
+     largest type; the interval, the t and the p belong beside the tiles that
+     produced them. Printing all of it twice made the fold 613px to say what
+     the second sentence already said. */
+  const verdictOf = (rec, short) => {
+    if (!rec || !rec.trades) return '';
+    const n = rec.trades, ci = rec.ci;
+    if (!ci) return `One closed trade settles nothing in either direction.`;
+    if (!rec.significant) {
+      return short
+        ? `Too few to settle anything — the 95% interval still includes zero.`
+        : `At ${n} closed the 95% interval runs ${fmtR(ci[0])} to ${fmtR(ci[1])}
+           and includes zero — too few to settle anything, and shown anyway.`;
+    }
+    const dir = ci[1] < 0 ? 'negative' : 'positive';
+    if (short) {
+      return `<b>Statistically ${dir}</b> — the 95% interval excludes zero
+        (${fmtR(ci[0])} to ${fmtR(ci[1])}), so the sign is settled even though
+        ${n} trades cannot settle the size.`;
+    }
+    return `<b>Statistically ${dir}</b>, not merely unlucky: the 95% interval on
+      expectancy runs ${fmtR(ci[0])} to ${fmtR(ci[1])} and <b>excludes zero</b>
+      (t&nbsp;=&nbsp;${rec.t}, p&nbsp;=&nbsp;${fmtP(rec.p)} on ${n} closed).
+      ${n < 30 ? `That fixes the <b>sign</b> and not the <b>size</b> — an interval
+        that wide is the difference between a small leak and a bad one, and ${n}
+        trades cannot tell them apart. Still short of the 30 this book requires
+        before it trusts an engine.` : ''}`;
+  };
+  const fmtR = v => `${v > 0 ? '+' : ''}${Number(v).toFixed(2)}R`;
+  const fmtP = v => v == null ? '—'
+    : v < 0.001 ? '&lt;0.001'
+    : Number(v).toFixed(3);
+
   const recordOf = rows => {
     const closed = rows.filter(isScored);
-    if (!closed.length) return { trades: 0, wins: 0, losses: 0, win_rate: null, expectancy_r: null };
+    if (!closed.length) return { trades: 0, wins: 0, losses: 0, win_rate: null,
+                                 expectancy_r: null, t: null, p: null,
+                                 ci: null, significant: false };
     const wins = closed.filter(r => Number(r.r_multiple) > 0).length;
     const sum = closed.reduce((a, r) => a + Number(r.r_multiple), 0);
-    return { trades: closed.length, wins, losses: closed.length - wins,
-             win_rate: Math.round(wins / closed.length * 1000) / 10,
-             expectancy_r: Math.round(sum / closed.length * 1000) / 1000 };
+    const R = closed.map(r => Number(r.r_multiple));
+    const n = R.length, mean = sum / n;
+    const t = tStat(R);
+    const p = t == null ? null : tPValue(t, n - 1);
+    /* The interval, because the sign and the size are two different claims and
+       only one of them is settled here. */
+    let ci = null;
+    if (n > 1) {
+      const sd = Math.sqrt(R.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1));
+      const se = sd / Math.sqrt(n);
+      /* 95% two-sided critical t. Solved by bisection on the same distribution
+         the p-value uses rather than read off a table, so it is right for any
+         df instead of for the ones somebody happened to type in. */
+      let lo = 0, hi = 100;
+      for (let i = 0; i < 80; i++) {
+        const mid = (lo + hi) / 2;
+        (tPValue(mid, n - 1) > 0.05) ? (lo = mid) : (hi = mid);
+      }
+      const crit = (lo + hi) / 2;
+      ci = [Math.round((mean - crit * se) * 1000) / 1000,
+            Math.round((mean + crit * se) * 1000) / 1000];
+    }
+    /* ── EVERY PUBLISHED SIGNAL IS IN EXACTLY ONE BUCKET ─────────────────
+     * An external audit: "account for all 65: open / triggered /
+     * never-triggered / expired / withdrawn. Gaps read as survivorship
+     * filtering." The page printed a published count and a closed count and
+     * left the difference to inference — which, on a site whose entire claim
+     * is that it does not hide its losses, is the one arithmetic a reader is
+     * entitled to see closed.
+     *
+     * Zero-count buckets are PRINTED, not omitted. A withdrawn count of zero
+     * is information; a missing withdrawn row is the thing that looks like
+     * filtering. */
+    const bucket = { closed: 0, open: 0, withdrawn: 0, expired: 0, other: 0 };
+    for (const r of rows) {
+      const st = String(r.status || '').toUpperCase();
+      const bd = String(r.badge || '').toLowerCase();
+      if (isScored(r)) bucket.closed += 1;
+      else if (withdrawn(r)) bucket.withdrawn += 1;
+      else if (st === 'EXPIRED') bucket.expired += 1;
+      else if (st === 'OPEN' || bd === 'open') bucket.open += 1;
+      else bucket.other += 1;
+    }
+    return { bucket, trades: n, wins, losses: n - wins,
+             win_rate: Math.round(wins / n * 1000) / 10,
+             expectancy_r: Math.round(mean * 1000) / 1000,
+             t: t == null ? null : Math.round(t * 100) / 100,
+             p: p == null ? null : p,
+             ci,
+             /* Significant when the interval excludes zero, which is the same
+                statement as p < 0.05 and is the one a reader can check against
+                the two numbers printed beside it. */
+             significant: !!(ci && (ci[1] < 0 || ci[0] > 0)) };
   };
 
   const head = (title, sub, eyebrow) =>
@@ -2140,7 +2466,9 @@
     return `<div class="breadth">
       <div class="breadth-n">
         <span><b class="up">${b.up}</b> <span style="color:var(--dim)">up</span></span>
-        <span style="color:var(--dim);font:400 11px/1 var(--mono)">${b.counted} names screened</span>
+        <span style="color:var(--dim);font:400 11px/1 var(--mono)">${b.counted} names screened${
+          Math.max(0, b.counted - b.up - b.down) > 0
+            ? ` · ${Math.max(0, b.counted - b.up - b.down)} unchanged` : ''}</span>
         <span><b class="dn">${b.down}</b> <span style="color:var(--dim)">down</span></span>
       </div>
       ${/* THE UNCHANGED NAMES WERE MISSING FROM THE PICTURE. Two bars for up
@@ -2439,21 +2767,69 @@
           const neg = LR.expectancy_r < 0;
           const allLost = LR.wins === 0;
           const thin = LR.trades < 30;
-          return `<h1>Every signal, graded.<br>${allLost
-              ? `All <b class="dn">${LR.trades}</b> that closed, lost.`
-              : `Including the <b class="dn">${LR.losses}</b> that lost.`}</h1>
+          /* ── WHAT THE PAGE IS, THEN WHAT IT HAS COST ────────────────────
+           *
+           * The headline was "Every signal, graded. Including the 12 that
+           * lost." — the record, in the largest type on the site, before the
+           * page had said what the site IS. An external audit's finding, and
+           * it is right about a first-time reader: the honesty is the whole
+           * argument and it is an argument ABOUT something, so the something
+           * has to come first or the loss disclosure is the opening line of a
+           * page whose subject is still unknown.
+           *
+           * WHAT THE AUDIT ASKED FOR AND DID NOT GET. It wanted the honesty
+           * block moved BELOW the value proposition and the disclaimer. Half
+           * of that is taken: the H1 now names the product. The other half is
+           * refused — the losses stay above the fold, in the subhead, in the
+           * second sentence, and on the secondary button. A record that a
+           * reader has to scroll to find is a curated record, and there is no
+           * version of this page worth shipping where the number moves down
+           * because it is bad. It reads worse this way. It is the only way
+           * that is true.
+           *
+           * The H1 is a claim the page can support in the next sentence —
+           * every name screened, every signal graded — and not a promise
+           * about returns, which is the sentence this site exists to not
+           * write. */
+          return `<h1>India's market, screened every session.<br>
+              <span class="h1-sub">${allLost
+                ? `Every signal graded — all <b class="dn">${LR.trades}</b> that closed, lost.`
+                : `Every signal graded, including the <b class="dn">${LR.losses}</b> that lost.`}</span></h1>
             <p class="hero-sub">
-              <b>${LR.published}</b> published since ${esc(LAUNCH)}.
-              <b>${LR.trades}</b> have closed, averaging
+              <b>${universeN()}</b> NSE names re-screened before every open — breadth, sector
+              heat, the IPO books open now, the wire, and a public ledger of every signal
+              this site has published.
+              Since ${esc(LAUNCH)}: <b>${LR.published}</b> published,
+              <b>${LR.trades}</b> closed, averaging
               <b class="${neg ? 'dn' : 'up'}">${LR.expectancy_r > 0 ? '+' : ''}${LR.expectancy_r}R</b>${
                 allLost ? '' : ` at a <b>${LR.win_rate}%</b> win rate`}.
-              ${thin ? `Too few to settle anything. Shown anyway.` : ''}
-              Everything below is research, not a recommendation.
+              ${verdictOf(LR, true)}
             </p>`;
         })()}
+        ${/* ── THE RECORD STAYS THE PRIMARY ACTION ────────────────────────
+             * The audit asks for "See this morning's screen" as the primary
+             * call and the ledger as the secondary. Half taken, half refused,
+             * and the refusal is the considered half.
+             *
+             * Its real finding was that no value proposition existed above the
+             * fold — the page opened with a loss disclosure before it had said
+             * what the site was. The H1 fixes that. The CTA order is a
+             * different question, and test/ui.mjs pins the answer: "the hero
+             * leads with the measured record". That is a deliberate decision
+             * somebody already made, and it is right for the same reason the
+             * audit gives two sections earlier — the record is "your single
+             * most differentiating asset". Every screener has a screen. What
+             * this site has that they do not is a graded ledger with the
+             * losses in it.
+             *
+             * So: the headline names the product, and the first thing it asks
+             * you to do is check its record. The screen is the second button,
+             * not a demoted one. */''}
         <div class="hero-cta">
           <a class="btn-hero" href="/signals">The record
-            <em>every trade, graded, with the losses</em></a>
+            <em>every trade, graded — including the losses</em></a>
+          <a class="btn-hero btn-hero-2" href="/screen">This morning's screen
+            <em>every NSE name, ranked and explained</em></a>
           <a class="btn-ghost" href="/brief">Today’s brief · ${CURVE_MIN} →</a>
         </div>
       </div>
@@ -2680,13 +3056,35 @@
           ${tile(LR.trades ? (LR.expectancy_r > 0 ? '+' : '') + LR.expectancy_r + 'R' : '—', 'Per trade',
                  'expectancy, closed only', LR.trades ? dir(LR.expectancy_r) : '')}
         </div>
+        ${/* THE ARITHMETIC, CLOSED. Printed whether or not the extra buckets
+             are empty — see the note on `bucket` in recordOf. The sum is
+             asserted in the sentence rather than left for the reader to do,
+             because the reader doing it and finding a gap is how this was
+             found in the first place. */''}
+        ${LR.published ? (() => {
+          const b = LR.bucket || {};
+          const parts = [
+            [b.closed, 'closed and graded'],
+            [b.open, 'still open'],
+            [b.withdrawn, 'withdrawn before entry'],
+            [b.expired, 'expired unfilled'],
+            [b.other, 'unclassified'],
+          ].filter(x => x[1] !== 'unclassified' || x[0] > 0);
+          const sum = parts.reduce((a, x) => a + (x[0] || 0), 0);
+          return `<p class="sec-note recon"><b>${LR.published}</b> published
+            = ${parts.map(([n, label]) =>
+                `<b class="${n ? '' : 'z'}">${n}</b> ${label}`).join(' + ')}.
+            ${sum === LR.published ? '' :
+              `<b class="dn">These do not sum to ${LR.published} — that is a defect in this
+               page, not a rounding difference.</b>`}</p>`;
+        })() : ''}
         <p class="sec-note">${!LR.published
           ? ``
           : !LR.trades
           ? `Nothing has closed yet.`
           : `${LR.trades} closed, averaging
              <b class="${neg ? 'dn' : 'up'}">${LR.expectancy_r > 0 ? '+' : ''}${LR.expectancy_r}R</b>.
-             ${LR.trades < 30 ? 'Too few to settle anything, and shown anyway.' : ''}`}
+             ${verdictOf(LR)}`}
         </p>
         ${/* COLUMNS ARE EARNED.
             * "Closed" and "Win rate" are printed for every engine whether or
@@ -2804,7 +3202,10 @@
     const lite = CACHED('/screen-lite.json');
     const pick = (c) => (c && c.ready && c.ok && c.data
       && Array.isArray(c.data.rows) && c.data.rows.length) ? c.data.rows : null;
-    FRONT_SCREEN = pick(sr) || pick(lite) || FRONT_SCREEN;
+    /* HELD last: a payload already in hand beats drawing nothing. */
+    const held = HELD('/screen-lite.json') || HELD('/screen.json');
+    FRONT_SCREEN = pick(sr) || pick(lite) || FRONT_SCREEN
+      || (held && Array.isArray(held.data.rows) && held.data.rows.length ? held.data.rows : null);
     const srRows = FRONT_SCREEN;
     if (tk && tk.ok && tk.data && srRows && srRows.length) {
       /* The wire is already in hand from this page's own fetch; feeding it
@@ -2835,6 +3236,10 @@
        not go stale in five seconds. */
     const rgm = CACHED('/regime.json');
     if (rgm.ready && rgm.ok && rgm.data && rgm.data.ok) FRONT_REGIME = rgm.data;
+    else if (!FRONT_REGIME) {
+      const h = HELD('/regime.json');
+      if (h && h.data && h.data.ok) FRONT_REGIME = h.data;
+    }
     if (FRONT_REGIME) {
       try { out += regimeSec(FRONT_REGIME, LR); }
       catch (e) { console.error('regime section failed:', e); }
@@ -3388,24 +3793,15 @@
    * close_date sits in the feed and was never read by this file. These derive
    * the number from it against the Indian trading day, so the claim decays to
    * the truth as the feed ages instead of repeating the morning it was built. */
-  const istToday = () => {
-    // en-CA renders YYYY-MM-DD, which compares correctly as a plain string.
-    try { return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); }
-    catch { return new Date().toISOString().slice(0, 10); }
-  };
-  const daysLeftFor = r => {
-    const cd = String(r.close_date || '').slice(0, 10);
-    // No usable close date: keep whatever the build said rather than invent one.
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(cd)) return r.days_left != null ? r.days_left : null;
-    return Math.round(
-      (Date.parse(cd + 'T00:00:00Z') - Date.parse(istToday() + 'T00:00:00Z')) / 86400000);
-  };
-  /* Books the calendar still says are taking bids. A negative days_left is a
-   * closed book, and it must not appear under a heading that says "open". */
-  const ipoOpenNow = list => (list || []).filter(r => {
-    const dl = daysLeftFor(r);
-    return dl == null || dl >= 0;
-  });
+  /* ── MOVED TO engines.js, WHICH BOTH SITES LOAD ──────────────────────────
+   * These three lived here, and gems.askakshay.com — a separate bundle that
+   * cannot see them — read ipo.open raw instead. So signal showed two open
+   * books and gems showed five, three of which had stopped taking bids the
+   * previous day, under a heading that said "open". Not a stale feed: one site
+   * applying a rule the other did not know existed. */
+  const istToday = SIGNAL_RULES.istToday;
+  const daysLeftFor = SIGNAL_RULES.daysLeft;
+  const ipoOpenNow = SIGNAL_RULES.ipoOpenNow;
 
   // NSE keys on the symbol; the mirror sometimes carries a name and no symbol.
   const ipoLiveFor = r => {
@@ -3799,10 +4195,20 @@
             <button type="button" class="t5name" data-card="${esc(r.sym)}">${esc(r.name || '')}</button>
             ${watchBtn(r.sym)}
           </span>
-          <span class="t5m"><b>${Number(r.vol_spike).toFixed(2)}×</b> average volume
-            · <i class="${dir(r.r1d)}">${pct(r.r1d)}</i> today
-            · ₹${esc(fmtN(r.price))}
-            · RSI <b class="${zc}">${r.rsi != null ? Math.round(r.rsi) : '—'}</b> <em>${esc(zw)}</em></span>
+          ${/* LIVE WHERE THERE IS A LIVE QUOTE, AND SAID SO WHERE THERE IS NOT.
+               This printed the screen's build-time close and its build-time
+               1-day return under the word "today". On 18 Sep that read
+               "TATACHEM -0.40% today · ₹731.80" while the stock was at ₹693.25,
+               down 11.04%, and the heatmap two sections above said so. */''}
+          ${(() => {
+            const q = livePx(r.sym);
+            const px = q ? sn(q.price) : lvl(r.price);
+            const ch = q ? sn(q.change_pct) : sn(r.r1d);
+            return `<span class="t5m"><b>${Number(r.vol_spike).toFixed(2)}×</b> average volume
+              · <i class="${dir(ch)}">${pct(ch)}</i> ${q ? 'today' : 'on the screen build'}
+              · ₹${esc(fmtN(px))}${q ? '' : ' <em class="t5stale">screen close</em>'}
+              · RSI <b class="${zc}">${r.rsi != null ? Math.round(r.rsi) : '—'}</b> <em>${esc(zw)}</em></span>`;
+          })()}
           <span class="t5div" data-div="${esc(r.sym)}">${div || ''}</span>
         </div>`;
       };
@@ -8413,7 +8819,16 @@
         aria-label="${u} advanced, ${flat} unchanged, ${d} declined of ${t}">
         ${seg(u, 'sb-u', u + ' up')}${seg(flat, 'sb-f', flat)}${seg(d, 'sb-d', d + ' down')}
       </div>
-      <div class="splitl"><span>${u} advancing</span><span>${d} declining</span></div>`;
+      ${/* ── THE THIRD BUCKET IS NAMED, NOT LEFT AS A GAP ───────────────────
+           * The BAR always carried the unchanged slice; the LABELS under it
+           * did not, so the page printed "160 advancing" and "818 declining"
+           * beside "985 names screened" and left a reader to notice that those
+           * do not add up. An external audit did notice, and it is the kind of
+           * gap that reads as filtering rather than as an omission. Seven
+           * names went nowhere; the page says so. */''}
+      <div class="splitl"><span>${u} advancing</span>${
+        flat > 0 ? `<span class="sb-fl">${flat} unchanged</span>` : ''
+      }<span>${d} declining</span></div>`;
   };
 
   /* A labelled 0-100 meter. */
@@ -13668,14 +14083,18 @@
        falsy and silently degraded the sentence to "at the last run" — a stamp
        that reads as deliberate vagueness rather than as a missing field. */
     const stampAge = d.generated_at ? ageWord(ageHours(d.generated_at)) : null;
+    /* ── ONE LINE, NOT A PARAGRAPH ────────────────────────────────────────
+     * This said the same thing three times: that the panel is a snapshot, that
+     * the record is live, and why the labels are rebuilt on a schedule. The
+     * reader needs the first two and can be told the third if they ask. Four
+     * consecutive paragraphs of justification under four numbers is the shape
+     * that makes a page feel defensive rather than measured. */
     const drift = (liveN != null && snapN != null && liveN !== snapN)
-      ? `<p class="hint"><b>Measured ${stampAge ? esc(stampAge) + ',' : 'at the last run,'} on
-          ${snapN} closed ${snapN === 1 ? 'trade' : 'trades'}.</b> The record above reads
-          <b>${liveN}</b>, because it is computed from the live ledger on every load and
-          ${liveN > snapN ? `${liveN - snapN} more ${liveN - snapN === 1 ? 'trade has' : 'trades have'} closed since`
-                          : `this panel is the older count`}. Same engines, same rule, different
-          clock — the labels below are rebuilt on a schedule, because labelling every past
-          session by trend and volatility is not work this page can do while you wait.</p>`
+      ? `<p class="hint">Measured ${stampAge ? esc(stampAge) : 'at the last run'}, on
+          <b>${snapN}</b> closed. The record above reads <b>${liveN}</b> —
+          ${liveN > snapN ? `${liveN - snapN} more ${liveN - snapN === 1 ? 'has' : 'have'} closed since`
+                          : `this panel is the older count`}.
+          Same engines, same rule, <a href="/methodology">different clock</a>.</p>`
       : (stampAge && snapN ? `<p class="hint">Measured ${esc(stampAge)}, on ${snapN} closed
           ${snapN === 1 ? 'trade' : 'trades'} — the same engines and the same rule the record
           above uses.</p>` : '');
@@ -13736,11 +14155,13 @@
            * on, which is a fact about the engine and not a figure this site
            * takes credit for. Collapsing them into one average is how the
            * +0.163R that started this whole thread happened. */''}
-      <p class="said"><b>GUST is the exception, and it is stated rather than folded in.</b>
-        It was brought back on a measured record of <b>17 closed at +1.472R</b>, t=3.69, 70.6%
-        won — and every one of those trades is from before ${esc(LAUNCH)}, so none of them is
-        in the figure above. That is the engine's basis, not this site's record, and the two
-        are not added together.</p>
+      ${/* SHORTENED, NOT DROPPED. The point survives — GUST's record is real,
+           it predates this site, and the two are never added — but it was
+           four sentences to make it, directly under three other paragraphs of
+           reasoning. The engine floor carries the full basis. */''}
+      <p class="hint">GUST's <b>+1.472R over 17 closed</b> (t=3.69) is not in the figure
+        above: those trades predate ${esc(LAUNCH)}.
+        <a href="/engines">The engine's basis</a>, not this site's record.</p>
 
       <h3 class="sub">The last year, by regime</h3>
       <div class="rgm-bar" role="img" aria-label="${order.map(([k, n]) =>
@@ -13750,13 +14171,21 @@
       </div>
       <div class="rgm-key">${order.map(([k, n]) => `<span><i class="rgm-${esc(k)}"></i>${
         esc((NAMES[k] || {}).t || k)} <b>${Math.round(n / tot * 100)}%</b></span>`).join('')}</div>
-      <p class="hint">Labelled from trend and trailing realised volatility only — the two
-        things computable for every past session. Breadth is not an input: it has no history,
-        and a regime that cannot be backfilled cannot be measured against the ledger.
-        Every window is trailing, so a label cannot change when later prices arrive.
-        <b>Only NSE equity trades are counted</b> — ${(d.measured || {}).excluded_non_nse || 0}
-        closed trades are COMEX commodities or FX pairs, which an Indian equity regime says
-        nothing about.</p>`,
+      ${/* THE METHOD GOES BEHIND A FOLD, AND THE FOLD SAYS WHAT IS IN IT.
+           This was the fourth consecutive paragraph of reasoning in one
+           section. It is all true and none of it is what a reader came for —
+           they came for the regime and what the book did in it. A reader who
+           wants to know how the label is derived will open a summary that
+           says so; one who does not is no longer reading past four
+           justifications to reach the chart. */''}
+      ${foldBody('How this label is derived', `
+        <p class="hint">Trend and trailing realised volatility only — the two things
+          computable for every past session. Breadth is not an input: it has no history, and
+          a regime that cannot be backfilled cannot be measured against the ledger. Every
+          window is trailing, so a label cannot change when later prices arrive.
+          <b>Only NSE equity trades are counted</b> — ${(d.measured || {}).excluded_non_nse || 0}
+          closed trades are COMEX commodities or FX pairs, which an Indian equity regime says
+          nothing about.</p>`)}`,
       `day ${d.run_days}`);
   };
 
@@ -14201,6 +14630,149 @@
 
       <p class="prose-note">If a source cannot be reached, the page shows that it could not be
         reached. It never carries the last value forward and never fills a gap with an estimate.</p>`));
+  };
+
+  /* ── THE DISCLAIMER, AS ITS OWN PAGE ─────────────────────────────────────
+   *
+   * An external audit's first blocker, and it was right: this site publishes
+   * ranked, security-specific NSE candidates and carried no registration
+   * statement anywhere a reader met before acting. /terms said the right
+   * things and nobody reads terms.
+   *
+   * SEBI's Research Analyst Regulations define "research services" to include
+   * buy/sell/hold recommendations, price targets, stop-loss levels and model
+   * portfolios — with the trigger being CONSIDERATION. Free publication does
+   * not require registration; taking a fee for it does. That is the line this
+   * page states plainly, because the honest position today is on the free side
+   * of it and the reader is entitled to know which side that is.
+   *
+   * Nothing here is legal advice and this page says so about itself. */
+  R['/disclaimer'] = async () => {
+    paint(prose('Disclaimer', 'What this site is, and what it is not.',
+      'The short version: educational research, not advice, and not registered.', `
+      <div class="note err"><b>Not registered with SEBI as a Research Analyst or an
+        Investment Adviser.</b> Everything published here is market research and data,
+        for education. Nothing on this site is a recommendation to buy or sell any
+        security, and nothing here is personalised to your circumstances.</div>
+
+      <h3>Why the registration line matters</h3>
+      <p>SEBI's Research Analyst Regulations treat buy, sell and hold calls, price targets,
+        stop-loss levels and model portfolios as <b>research services</b>. The trigger for
+        registration is <b>consideration</b> — being paid. Publishing research for free does
+        not require registration; charging for it does, in any form, including a paid channel,
+        a subscription or a tip jar attached to the same output.</p>
+      <p>This site is free, carries no paid tier, no paid channel, no affiliate link to a
+        broker and no payment page. If that ever changes, registration comes first and this
+        page changes with it. Until then the honest description of what you are reading is
+        <b>published research output, not a service you are buying</b>.</p>
+
+      <h3>What the numbers are</h3>
+      <p>Every engine on this site publishes a level, a stop and targets, and every closed
+        trade is graded and kept — including the losses, which are the majority. The record
+        is <a href="/signals">on the ledger</a>, in full, and the method is on
+        <a href="/methodology">the methodology page</a>. None of it is a forecast. A published
+        record is a description of what happened, not a claim about what will.</p>
+
+      <h3>No execution, no custody, no account</h3>
+      <p>This site cannot place a trade. It holds no money, connects to no broker for
+        execution, and has no view of any account you hold. Anything it describes as a
+        position is <b>paper</b> unless it says otherwise.</p>
+
+      <h3>Prices can be wrong</h3>
+      <p>Market data comes from third parties over endpoints that carry no service guarantee.
+        It may be delayed, stale or wrong. Check any figure against your broker or the
+        exchange before you act on it. See <a href="/sources">data sources</a>.</p>
+
+      <h3>Risk</h3>
+      <p>Trading and investing carry risk, including the total loss of capital. Past results
+        — every figure in the record here included — do not predict future results. This
+        site's own measured expectancy is currently <b>negative</b>, and it says so on the
+        front page rather than in this paragraph.</p>
+
+      <p class="hint">This page describes how the site operates. It is not legal advice, and
+        it is not a substitute for reading SEBI's own regulations at
+        <a href="https://www.sebi.gov.in" rel="noopener" target="_blank">sebi.gov.in</a>.</p>
+      `));
+  };
+
+  /* ── DISCLOSURES ─────────────────────────────────────────────────────────
+   * Separate from the disclaimer on purpose. A disclaimer says what the site
+   * is; a disclosure says what could bias it. Merging them lets the second
+   * hide inside the first. */
+  R['/disclosures'] = async () => {
+    paint(prose('Disclosures', 'Conflicts, incentives and who pays for this.',
+      'What could bias what you are reading.', `
+      <h3>Who pays for this</h3>
+      <p><b>Nobody.</b> There is no subscription, no paid tier, no sponsorship, no advertising,
+        no affiliate arrangement with any broker, exchange, data vendor or product, and no paid
+        placement of any name on any list. Nothing on this site is compensated by anyone whose
+        security it mentions.</p>
+
+      <h3>Positions</h3>
+      <p>The author may hold positions in Indian listed securities in a personal capacity.
+        Where a name appears on this site and is also held personally, that is a conflict,
+        and the policy is to state it against the name rather than in general terms here.
+        <b>No such holding is currently disclosed against any published name.</b> If you are
+        reading this and a name here is one the author holds, the omission is a defect —
+        <a href="mailto:ca.akshayk1@gmail.com">say so</a>.</p>
+
+      <h3>Employment</h3>
+      <p>The author works in a finance role unrelated to Indian capital markets and unrelated
+        to any security this site screens. This site is a personal project, built and run
+        outside that employment, and represents no employer's view.</p>
+
+      <h3>The engines are not neutral about themselves</h3>
+      <p>Every engine here was written by the author, measured by the author's code, and
+        graded against rules the author set. That is a conflict no disclosure removes, and the
+        only honest mitigation is that the grading rules are published, the ledger is complete
+        including the losses, and the code that computes the record is the code that renders
+        it. See <a href="/methodology">how this is measured</a> and
+        <a href="/engines">what each engine fires on</a>.</p>
+
+      <h3>What changes if this ever charges</h3>
+      <p>Registration first, this page rewritten second, and the record re-audited third.
+        See <a href="/disclaimer">the disclaimer</a>.</p>
+      `));
+  };
+
+  /* ── ABOUT ───────────────────────────────────────────────────────────────
+   * The audit's point: a named, credentialled author is the whole difference
+   * between this and an anonymous tips channel, and it was nowhere on the site
+   * except eight words in the footer. */
+  R['/about'] = async () => {
+    paint(prose('About', 'Who builds this, and why it publishes its losses.',
+      'A Chartered Accountant, an FP&A day job, and a ledger that is not curated.', `
+      <h3>Who</h3>
+      <p><b>Akshay Kothari</b> — Chartered Accountant, working in FP&amp;A. This site is a
+        personal project. It is not a firm, not a service and not a product you can buy.</p>
+
+      <h3>Why the losses are on the front page</h3>
+      <p>Because a track record that only appears when it flatters is not a track record.
+        Every signal this site publishes is graded when it closes and kept whether it won or
+        lost, and the front page leads with the resulting number even when — as now — that
+        number is significantly negative. The alternative is the format this site was built
+        to be the opposite of: a channel that posts its winners.</p>
+
+      <h3>What it does</h3>
+      <p>Screens the NSE every session, publishes what the engines computed with the level,
+        the stop and the targets, and grades every one of them afterwards. The
+        <a href="/methodology">methodology</a> is public, the
+        <a href="/signals">ledger</a> is complete, and the
+        <a href="/engines">engine floor</a> states what each one fires on and what its
+        measured record is — including the ones that have been switched off.</p>
+
+      <h3>What it is not</h3>
+      <p>Not registered with SEBI, not advice, not a tip service, and not something that can
+        place a trade. See <a href="/disclaimer">the disclaimer</a> and
+        <a href="/disclosures">the disclosures</a>.</p>
+
+      <h3>Contact</h3>
+      <p><a href="mailto:ca.akshayk1@gmail.com">ca.akshayk1@gmail.com</a> ·
+        <a href="https://www.linkedin.com/in/akkothari" rel="me noopener" target="_blank">LinkedIn</a> ·
+        <a href="https://askakshay.com/" rel="me noopener" target="_blank">askakshay.com</a></p>
+      <p class="hint">Corrections are welcome and are the point. If a number here is wrong,
+        it is a defect in the site and not a difference of opinion — send it.</p>
+      `));
   };
 
   R['/terms'] = async () => {

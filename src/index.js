@@ -20,6 +20,7 @@
  * and 404s anything it does not have.
  */
 import { runVercelHandler } from "./adapter.js";
+import { INLINE_SCRIPT_HASHES } from "./csp-hashes.js";
 import { providerInfo } from "./api/_providers.js";
 import ticker from "./api/ticker.js";
 import signals from "./api/signals.js";
@@ -155,6 +156,74 @@ async function proxyToProduction(url, request) {
   }
 }
 
+/* ── BROWSER SECURITY HEADERS ────────────────────────────────────────────────
+ *
+ * This site served NONE of these. An external audit flagged it, and a check
+ * from the outside confirmed it: no HSTS, no CSP, no nosniff, no referrer
+ * policy, no framing restriction. For a page that publishes financial research
+ * under a named CA, being framed by somebody else's domain is the cheap attack
+ * and it was entirely unmitigated.
+ *
+ * frame-ancestors, and the whole CSP, are sent as a HEADER and never as a
+ * <meta> tag. frame-ancestors, report-uri and sandbox are header-only
+ * directives: in a meta CSP the browser ignores them and logs an error, which
+ * is a control that looks present in the source and does nothing.
+ *
+ * script-src NAMES ITS INLINE SCRIPTS BY HASH rather than allowing
+ * 'unsafe-inline'. Two of them cannot become files — the theme bootstrap has
+ * to run inline and blocking or the page paints the wrong ground and flips —
+ * so they are hashed. See scripts/csp-hashes.mjs.
+ *
+ * style-src DOES allow 'unsafe-inline', and the reason is stated rather than
+ * hidden: this app positions bars, tiles and heat cells by writing style=""
+ * from live data on every render — a split bar's widths ARE the breadth
+ * numbers. Removing that is a rewrite of the rendering layer, and an inline
+ * style is a far weaker vector than an inline script. Narrowing script-src
+ * without waiting for that rewrite is the trade worth taking.
+ *
+ * connect-src is 'self' only: every upstream (Yahoo, NSE, the wire) is fetched
+ * by this Worker server-side, never by the browser. If that ever stops being
+ * true the console will say so immediately, which is the correct way to find
+ * out that a key moved into the client bundle.
+ */
+const CSP = [
+  "default-src 'self'",
+  `script-src 'self' ${INLINE_SCRIPT_HASHES.map((h) => `'${h}'`).join(" ")}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "form-action 'self'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "upgrade-insecure-requests",
+].join("; ");
+
+const SECURITY_HEADERS = {
+  "content-security-policy": CSP,
+  /* Two years, subdomains included. NOT preload: the audit's own note is the
+     reason — preload is hard to reverse, and askakshay.com has siblings that
+     are not all under this Worker's control. */
+  "strict-transport-security": "max-age=63072000; includeSubDomains",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
+  /* Redundant beside frame-ancestors and kept for browsers that predate it. */
+  "x-frame-options": "DENY",
+  "cross-origin-opener-policy": "same-origin",
+};
+
+/* Applied to every response this Worker returns. A Response from the assets
+   binding has immutable headers, so it is rebuilt rather than mutated —
+   res.headers.set() on one of those throws and would have taken the whole site
+   down the first time a reader loaded a stylesheet. */
+const harden = (res) => {
+  const h = new Headers(res.headers);
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) h.set(k, v);
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
+};
+
 export default {
   /* CRON ENTRY POINT.
    *
@@ -178,7 +247,28 @@ export default {
     }).catch((e) => console.log("watchdog failed", String(e))));
   },
 
+  /* ── ONE WRAP, NOT TWENTY ────────────────────────────────────────────────
+   * The handler below has well over a dozen return points — API routes, the
+   * dev proxy, the SPA fallback, the missing-file 404, the assets passthrough.
+   * Hardening each one is a list to keep in step, and the response that gets
+   * forgotten is by definition the one nobody is looking at. So the handler is
+   * called from here and every response it can produce, including a thrown
+   * error's, leaves through the same function. */
   async fetch(request, env, ctx) {
+    try {
+      return harden(await this.handleRequest(request, env, ctx));
+    } catch (e) {
+      /* A Worker that throws returns a Cloudflare error page with none of
+         these headers. Answering it ourselves keeps the policy on even on the
+         path where something has already gone wrong. */
+      return harden(new Response(
+        JSON.stringify({ ok: false, error: "worker error" }),
+        { status: 500, headers: { "content-type": "application/json" } },
+      ));
+    }
+  },
+
+  async handleRequest(request, env, ctx) {
     mirrorEnv(env);
     const url = new URL(request.url);
 
@@ -305,7 +395,8 @@ export default {
      * visitor a shared link produces. Measured: /map 404, /reads 404,
      * /screen 200. Same shape of fault as a page that only renders after an
      * in-app navigation — it cannot be caught by clicking around. */
-    const PAGES = new Set(["/", "/brief", "/discover", "/engines", "/funds",
+    const PAGES = new Set(["/", "/about", "/brief", "/disclaimer", "/disclosures",
+      "/discover", "/engines", "/funds",
       "/gems", "/heat", "/ideas", "/ipo", "/join", "/map", "/markets",
       "/methodology", "/news", "/privacy", "/radar", "/reads", "/screen",
       "/signals", "/sources", "/terms", "/watch", "/buoy", "/research"]);

@@ -2182,6 +2182,59 @@ body::before{display:none}
 .hero-q .v{font:500 clamp(var(--t-8),2.4vw,var(--t-9))/1 var(--mono);font-variant-numeric:tabular-nums}
 .hero-q .c{font:500 var(--t-4)/1 var(--mono);font-variant-numeric:tabular-nums;text-align:right}
 
+/* ── THE HEADLINE'S SECOND LINE ──────────────────────────────────────────────
+ * The H1 now carries two claims: what the site is, and what its record cost.
+ * They are not the same size, because they are not the same kind of statement
+ * — the first names the product and the second qualifies it — but the second
+ * is inside the <h1> on purpose so it cannot be scrolled past. */
+.hero h1 .h1-sub{display:block;margin-top:.28em;
+  font:400 clamp(17px,2vw,24px)/1.3 var(--ui);letter-spacing:var(--ls-0);
+  color:var(--muted);text-wrap:balance}
+.hero h1 .h1-sub b{font-weight:650}
+
+/* The second call to action is the record. Outlined rather than filled: two
+   solid buttons of equal weight make neither of them the primary. */
+.btn-hero-2{background:transparent;color:var(--text);
+  box-shadow:inset 0 0 0 1px var(--line2)}
+.btn-hero-2 em{color:var(--muted)}
+.btn-hero-2:hover{box-shadow:inset 0 0 0 1px var(--text)}
+
+/* A zero in the reconciliation is information, so it is legible rather than
+   hidden — dimmed to say "nothing here", never removed. */
+.recon b{font-variant-numeric:tabular-nums;color:var(--text)}
+.recon b.z{color:var(--dim);font-weight:500}
+
+/* ── THE DISCLOSURE BAR ──────────────────────────────────────────────────────
+ * Legible, not decorative, and not dismissible. A reader has to be able to
+ * read it without effort — which means real contrast, not the grey-on-grey a
+ * disclaimer usually gets when somebody wants it present and invisible. It
+ * sits between the ticker and the tabs, on every route.
+ *
+ * --warn-soft, not a red alarm: this states what the site IS, and is not an
+ * error. Both are theme tokens, so it inverts correctly in dark without a
+ * second rule — the trap this stylesheet already has a note about, where a
+ * colour defined only inside a [data-theme] block never applies in the
+ * un-stamped default state.
+ *
+ * NAMED .dscl, NOT .disc. `.disc` is already the Discover grid — the wrapper
+ * around .disc-c cards — so styling it here would have given that page a
+ * warning-coloured background and a flex row layout. Caught before it
+ * shipped by grepping the name rather than assuming it was free. */
+.dscl{border-bottom:1px solid var(--line);background:var(--warn-soft);
+  padding:8px clamp(16px,4vw,28px)}
+.dscl p{margin:0;max-width:1320px;margin-inline:auto;
+  font:400 var(--t-3)/1.45 var(--ui);color:var(--text);
+  display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.dscl b{font-weight:650}
+.dscl span{color:var(--muted)}
+.dscl a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;
+  white-space:nowrap}
+.dscl a:hover{text-decoration-thickness:2px}
+@media(max-width:560px){
+  .dscl{padding:7px 16px}
+  .dscl p{font-size:var(--t-2);line-height:1.4}
+}
+
 /* ── COMMAND PALETTE ─────────────────────────────────────────────────────── */
 .cmd{border:0;padding:0;background:none;max-width:none;max-height:none;width:100%;height:100%;
   color:var(--text)}
@@ -5675,16 +5728,21 @@ h3,h4,.rd-h{font-family:var(--ui);font-weight:700;letter-spacing:-.016em}
  */
 @media(min-width:1080px){
   main{max-width:1320px}
-  .secgrid{column-count:2;column-gap:var(--s-6)}
-  /* margin-TOP is what breaks multicol: it is discarded at the top of column
-     one and applied at the top of column two, so the two columns start at
-     different heights. Spacing goes underneath instead. */
-  .secgrid > .sec{margin-top:0;margin-bottom:var(--s-6);min-width:0;
-    break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;
-    display:flow-root}
-  .secgrid > .sec.is-lead,.secgrid > .sec.sec-wide{column-span:all;
-    margin-bottom:var(--s-7)}
-  .secgrid > .sec:last-child{margin-bottom:0}
+  /* TWO COLUMN ELEMENTS, NOT A MULTICOL CONTAINER. See gridSections() for what
+     multicol did to every <details> on this site. A flex row of two flex
+     columns has the property that matters: a section growing inside one
+     column moves only what is below it in THAT column. */
+  .secgrid{display:flex;align-items:flex-start;gap:var(--s-6)}
+  .secgrid-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;
+    gap:var(--s-6)}
+  .secgrid-col > .sec{margin-top:0;min-width:0}
+}
+/* Below the breakpoint the wrapper and its columns collapse to a single
+   ordinary stack, so the phone layout is exactly the flow it was before any
+   of this — the columns are display:contents and the sections are simply the
+   children of main again, in source order. */
+@media(max-width:1079.98px){
+  .secgrid,.secgrid-col{display:contents}
 }
 
 /* ── ROUTE TRANSITION ─────────────────────────────────────────────────────
@@ -5921,3 +5979,8 @@ main.is-nav{animation:routein var(--t-mid) var(--ease-out) backwards}
 .rgm-key b{font-variant-numeric:tabular-nums}
 
 .rgm-off{color:var(--warn);font-weight:700}
+
+/* A figure that is the screen's build close rather than a live price says so,
+   quietly but in words — never colour alone, and never silently. */
+.t5stale{font-style:normal;font-size:var(--t-1);letter-spacing:var(--ls-wide);
+  text-transform:uppercase;color:var(--dim)}

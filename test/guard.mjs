@@ -859,6 +859,67 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("the deploy and the scheduled sync pull the same feeds", onlySync.length === 0, onlySync);
 }
 
+/* ── EVERY PUBLISHED PARTITION MUST ADD UP ───────────────────────────────────
+ *
+ * An external audit read the front page and did the arithmetic this build did
+ * not: "160 of 985 screened names advanced and 818 declined" — 160 + 818 is
+ * 978, and the seven missing names were never labelled. They are the unchanged
+ * ones, and on a site whose argument is that it publishes its own losses, an
+ * unexplained gap in a count reads as filtering rather than as an omission.
+ *
+ * The labels are fixed. This stops the class: any feed that publishes a
+ * partition of a total has to reconcile, at BUILD time, before the number can
+ * reach a reader. Checked against the committed feeds, so a bad sync fails the
+ * deploy rather than shipping.
+ *
+ * It does NOT require up + down === counted. Unchanged names are real and the
+ * whole point is that they be accounted for, not assumed away — so the rule is
+ * that the parts must never EXCEED the whole, and that any remainder is
+ * nameable. A partition summing past its total is arithmetic that cannot be
+ * explained by a third bucket and is always a defect. */
+{
+  const partitions = [
+    ["pulse.json", "breadth", (d) => d.breadth],
+  ];
+  for (const [file, label, pick] of partitions) {
+    let feed = null;
+    try { feed = JSON.parse(readFileSync(new URL(`../public/${file}`, import.meta.url), "utf8")); }
+    catch { /* a feed that is not committed cannot be checked and is not a failure here */ }
+    const b = feed && pick(feed);
+    if (!b || !Number.isFinite(Number(b.counted))) continue;
+    const up = Number(b.up) || 0, down = Number(b.down) || 0, total = Number(b.counted);
+    ok(`${file} · ${label} — the parts never exceed the whole`,
+       up + down <= total, `${up} up + ${down} down > ${total} counted`);
+    ok(`${file} · ${label} — the remainder is a whole number of names`,
+       Number.isInteger(total - up - down), total - up - down);
+  }
+}
+
+/* ── THE CSP'S SCRIPT HASHES MUST MATCH THE SCRIPTS ──────────────────────────
+ *
+ * src/csp-hashes.js is generated from the inline <script> blocks in the
+ * shells. A hash is a copy, and copies drift — except this one fails LOUD: an
+ * inline script edited without regenerating produces a policy that blocks the
+ * site's own theme bootstrap, which is a white page in production caused by a
+ * security control. That is the worst kind of outage, because the code looks
+ * right and the header looks right and only the pair is wrong.
+ *
+ * Imported from the same module the generator exports, so this checks the real
+ * extraction rule rather than a second implementation of it. */
+{
+  const { inlineHashes } = await import("../scripts/csp-hashes.mjs");
+  const generated = JSON.parse(
+    readFileSync(new URL("../src/csp-hashes.js", import.meta.url), "utf8")
+      .match(/INLINE_SCRIPT_HASHES = (\[[\s\S]*?\]);/)[1]);
+  const current = inlineHashes();
+  ok("the CSP's script hashes match the inline scripts",
+     JSON.stringify(generated) === JSON.stringify(current),
+     `run \`node scripts/csp-hashes.mjs\` — committed ${generated.length}, found ${current.length}`);
+  ok("every inline script is hashed, none left to 'unsafe-inline'",
+     current.length > 0 && !readFileSync(new URL("../src/index.js", import.meta.url), "utf8")
+       .includes("script-src 'self' 'unsafe-inline'"));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

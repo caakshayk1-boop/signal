@@ -418,6 +418,23 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 .secg{display:grid;gap:var(--s2);margin:0 0 var(--s4)}
 .secr{display:grid;grid-template-columns:minmax(96px,1.1fr) minmax(60px,2fr) 62px 66px;
   gap:var(--s2);align-items:center;font-size:.86rem}
+/* ── THE TRACK MINIMUMS ADD UP TO MORE THAN A SMALL PHONE ────────────────────
+ * 96 + 60 + 62 + 66 plus three gaps is 308px, and none of those four can
+ * shrink below its floor — so on a 320px screen the row was 4px wider than the
+ * column that holds it and the whole document scrolled sideways. Measured, not
+ * guessed: the row's right edge sat at 324 against a 320 viewport.
+ *
+ * The same defect as the hero rail and the radar facts grid, in a third place
+ * and a third file: a fixed minimum on a track that has to fit a phone. Below
+ * 420px the floors come off the two flexible columns and the two fixed ones
+ * are cut to what their content actually needs — "14/17 up" does not need
+ * 66px. */
+@media(max-width:420px){
+  .secr{grid-template-columns:minmax(0,1.2fr) minmax(0,1.6fr) 48px 54px;gap:6px;
+    font-size:.8rem}
+  .secr-c{font-size:.7rem}
+  .secr > *{min-width:0}
+}
 .secr-n{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .secr-b{height:8px;border-radius:999px;background:var(--raise);overflow:hidden;
   border:1px solid var(--line)}
@@ -590,3 +607,31 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 .lv-key{border-left:3px solid var(--line2);padding-left:var(--s3);margin-top:var(--s2)}
 
 .hpick-nm{color:var(--dim);font-size:.72rem}
+
+/* ── THE DISCLOSURE BAR ──────────────────────────────────────────────────────
+ * gems.askakshay.com is a separate bundle and loads gems.css, not signal.css,
+ * so the bar arrived here as unstyled markup: default block margins, no box,
+ * and 4px of horizontal scroll at 320px — caught by the overflow sweep before
+ * it shipped. Same rules as signal.css, kept minimal rather than imported,
+ * because these two stylesheets deliberately share nothing.
+ *
+ * .dscl, never .disc — `.disc` is the Discover grid on the sibling site and
+ * reusing the name is how one page's disclaimer restyles another page's
+ * content. */
+/* gems DEFINES ITS OWN TOKENS and they are not signal's names: --ink, not
+   --text; --acc, not --accent; and there is no --muted here at all. The first
+   version of this block was copied across with signal's names and referenced
+   three properties that do not exist on this site — guard.mjs caught --muted,
+   which is the whole reason that check exists. Secondary text is --ink at
+   reduced opacity rather than a new token, because adding a token to carry one
+   sentence is how two stylesheets start disagreeing about grey. */
+.dscl{border-bottom:1px solid var(--line);background:rgba(176,122,8,.10);
+  padding:8px clamp(14px,4vw,24px);margin:0}
+.dscl p{margin:0;max-width:1180px;margin-inline:auto;
+  font:400 12px/1.45 var(--ui,system-ui);color:var(--ink);
+  display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;min-width:0}
+.dscl b{font-weight:650}
+.dscl span{color:var(--ink);opacity:.72;min-width:0}
+.dscl a{color:var(--acc);text-decoration:underline;text-underline-offset:2px;
+  white-space:nowrap}
+@media(max-width:560px){ .dscl{padding:7px 14px} .dscl p{font-size:11px;line-height:1.4} }

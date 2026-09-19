@@ -76,6 +76,24 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://signal.askakshay.com/about</loc>
+    <lastmod>2026-09-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://signal.askakshay.com/disclaimer</loc>
+    <lastmod>2026-09-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://signal.askakshay.com/disclosures</loc>
+    <lastmod>2026-09-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://signal.askakshay.com/sources</loc>
     <lastmod>2026-09-08</lastmod>
     <changefreq>monthly</changefreq>

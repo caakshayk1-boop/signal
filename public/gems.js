@@ -1398,7 +1398,14 @@
     }
 
     /* ── 6. IPO ────────────────────────────────────────────────────────────── */
-    const openIpo = (ipo && ipo.open) || [];
+    /* ── THE SAME RULE signal.askakshay.com APPLIES, NOT THE RAW ARRAY ────
+     * This read ipo.open straight from the feed and counted five books open.
+     * signal ran the same array through ipoOpenNow() and counted two — the
+     * other three had closed the day before. A book that has stopped taking
+     * bids is not an open book, and the two products cannot print different
+     * answers to "how many are open" and both be this site.
+     * SIGNAL_RULES lives in engines.js, which both bundles load. */
+    const openIpo = SIGNAL_RULES.ipoOpenNow((ipo && ipo.open) || []);
     const upcoming = (ipo && ipo.upcoming) || [];
     /* The live book, keyed by symbol, so a row can prefer it over the mirror. */
     const liveBook = new Map(((ipoLive && ipoLive.issues) || []).map(i => [i.symbol, i]));

@@ -155,6 +155,25 @@
      page that lists them with what each is for, and More is a sheet for the
      reference material. Icons are drawn, not emoji — an emoji set renders
      differently on every platform and cannot take the current-tab colour. -->
+<!-- ── THE DISCLAIMER IS ABOVE THE FOLD, NOT IN THE FOOTER ──────────────────
+     An external audit's first blocker: this site publishes ranked, security-
+     specific NSE candidates and carried no registration statement anywhere a
+     reader would see before acting. The footer said "Not investment advice",
+     which is the right sentence in the wrong place — nobody scrolls past a
+     ranked list to find out whether they should have.
+
+     It is static HTML in the shell rather than rendered by the app, so it is
+     present on the FIRST PAINT, on every route, before any JavaScript runs,
+     and in the crawler's copy. A disclosure that depends on a bundle loading
+     is a disclosure that is missing exactly when the bundle fails. -->
+<aside class="dscl" role="note">
+  <p><b>Research and market data, published for education.</b>
+     <span>Not registered with SEBI as a Research Analyst or Investment Adviser.
+     Nothing here is a recommendation to buy or sell any security, and nothing
+     here is personalised to you.</span>
+     <a href="/disclaimer">Full disclaimer</a> · <a href="/disclosures">Disclosures</a></p>
+</aside>
+
 <nav class="tabs" id="tabs" aria-label="Sections">
   <a href="/" data-route="/">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/></svg>
@@ -214,7 +233,10 @@
   <h1 class="pre-h">Every signal, graded. Including the 12 that lost.</h1>
   <p class="pre-s"><b>45</b> published since 2026-09-02, <b>13</b> closed, averaging
        <b>-0.765R</b>.
-       Too few to settle anything. Shown anyway.
+       Statistically negative — the 95% interval
+             (-1.30R to
+             -0.23R) excludes zero.
+             That settles the sign, not the size.
        The screen below is research.</p>
   <p class="pre-m">Every session, <b>985 names</b> re-screened and the wire read
     for what touches them.</p>
@@ -247,6 +269,8 @@
     <a href="mailto:ca.akshayk1@gmail.com">Email</a>
   </p>
   <p><a href="/methodology">Methodology</a> · <a href="/sources">Data sources</a> ·
+     <a href="/about">About</a> · <a href="/disclaimer">Disclaimer</a> ·
+     <a href="/disclosures">Disclosures</a> ·
      <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
   <p>A public ledger — wins <i>and</i> losses. Not investment advice.</p>
 </footer>
