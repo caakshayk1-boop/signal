@@ -176,6 +176,17 @@
     '/api/wire': 'Wire', '/api/flows': 'FII & DII', '/api/calendar': 'Calendar',
     '/api/stats': 'All-time stats', '/api/ipo-live': 'IPO demand',
   };
+  /* ── FEEDS THE FRESHNESS BAR WILL NOT DOWNLOAD ───────────────────────────
+   * url → the FEED_AGE row it fills. A row listed here is passive: the bar
+   * never fetches it, and it is filled by whatever route loads the file for
+   * its own reasons. The screen is here because it is the largest asset on
+   * the site (253 KB brotli, 1.98 MB raw) and the bar was fetching it on
+   * every cold load of every route to read one timestamp off the top.
+   * Both projections map to the same row — they carry the same stamp, because
+   * lite_payload() copies every key but `rows` straight across. */
+  const PASSIVE_AGE_ROWS = {
+    '/screen.json': 'Stock screen', '/screen-lite.json': 'Stock screen',
+  };
   /* The stamp a feed carries is not the same field twice: a build writes
      generated_at, a mirror writes built_on, the screen writes price_date.
      Asked in the order a reader would trust them. */
@@ -280,6 +291,16 @@
         const base = String(url).split('?')[0];
         const label = FEED_NAMES[base];
         if (label) noteFresh(label, feedStampOf(j));
+        /* AND THE HEADER BAR'S ROW, FOR THE FEEDS IT REFUSES TO FETCH ITSELF.
+         * The screen row is filled from whichever projection a route loaded;
+         * hooking it HERE rather than in the routes is the same reason
+         * noteFresh is here — get() sees every fetch this site makes, and a
+         * route added next year inherits it without knowing this exists. The
+         * first version hung it off noteScreenMeta(), which four of the nine
+         * screen-loading routes do not call, so the front page — which loads
+         * screen-lite.json on every visit — reported its own screen as not
+         * used on the page. */
+        if (PASSIVE_AGE_ROWS[base]) noteFeedAge(PASSIVE_AGE_ROWS[base], j, base);
       } catch (e) { /* freshness must never break a fetch */ }
       // Content, not timestamps: two fetches a minute apart with identical
       // bodies are the same edition and must not trigger a repaint.
@@ -287,7 +308,34 @@
       const prev = FEEDS.get(url);
       FEEDS.set(url, body);
       if (prev !== undefined && prev !== body) feedRev++;
-      try { sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), j })); } catch (e) { /* private mode */ }
+      /* ── ONE SERIALISATION, AND NOT DURING THE LOAD ──────────────────────
+       *
+       * This was `JSON.stringify({ at: Date.now(), j })` — a SECOND full
+       * serialisation of an object that had just been serialised on the line
+       * above. On screen-lite.json, 1.26 MB, the pair measured 7 ms + 12 ms on
+       * a desktop and a phone is three to five times slower. `body` is already
+       * that object's JSON, so the wrapper is two literals and a splice; the
+       * bytes are identical, which is what makes it a substitution rather than
+       * a reimplementation.
+       *
+       * And it is written when the main thread is next free, not in the
+       * middle of the load. A 1.26 MB sessionStorage write is SYNCHRONOUS —
+       * another ~10 ms desktop, ~40 ms mobile, blocking paint — and what it
+       * buys is a fallback for a LATER failed fetch. Nothing on this load
+       * reads it, so nothing on this load should wait for it.
+       *
+       * The catch names quota first because that is what actually fires here:
+       * the origin allowance is ~5 MB and this site's feeds do not fit in it.
+       * Silent is correct — the cache is an optimisation and a page that
+       * cannot write it is not a page in trouble — but "private mode" named
+       * the rarer cause and sent the next reader looking in the wrong place. */
+      const stash = () => {
+        try { sessionStorage.setItem(key, '{"at":' + Date.now() + ',"j":' + body + '}'); }
+        catch (e) { /* over quota, or storage denied (private mode) — either way
+                       the stale-copy fallback is simply not available */ }
+      };
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(stash, { timeout: 2000 });
+      else setTimeout(stash, 0);
       const res = { ok: true, data: j, stale: false };
       MICRO.set(url, { at: Date.now(), res });
       return res;
@@ -2718,7 +2766,32 @@
      * Two calls that look identical, one awaited and one not, is exactly how
      * this got written. noteLadder returns its argument either way, so it
      * composes both ways — the only difference is whether you await it. */
-    const heavy = [CACHED('/api/calendar'), noteLadder(CACHED('/screen.json'))];
+    /* ── ASK FOR THE FILE THIS ROUTE ACTUALLY FETCHES ────────────────────
+     *
+     * This read CACHED('/screen.json') while the retry twenty lines below
+     * fetches getScreen(false) — the LITE projection. Two different URLs, so
+     * the cache lookup could never be satisfied by the route's own request.
+     *
+     * It worked anyway, and that is the interesting part: the freshness bar
+     * in the header used to download screen.json at boot on every route, and
+     * `sr` was quietly living off it. Three things on this page read `sr` —
+     * the volume-spurts count, the most-connected story, and the wire's
+     * impact ranking — and when the bar stopped buying 253 KB it had no
+     * reason to buy, all three went to zero. Volume spurts read 20 before and
+     * 0 after, which is how this was found.
+     *
+     * Lite first, because it is what the route fetches and what eight other
+     * routes already hold; the full table second, so a reader arriving from
+     * /screen or a company card is served from what they already paid for
+     * rather than sent for a second projection. The not-ready wrapper is
+     * returned unchanged when neither is there — callers test `.ok`. */
+    const cachedScreen = () => {
+      const l = CACHED(LITE_URL);
+      if (l.ready && l.ok) return l;
+      const f = CACHED(FULL_URL);
+      return f.ready && f.ok ? f : l;
+    };
+    const heavy = [CACHED('/api/calendar'), noteLadder(cachedScreen())];
     const cl = heavy[0], sr = heavy[1];
     /* ONCE PER VISIT, NOT ONCE PER RENDER.
      *
@@ -3287,11 +3360,11 @@
      * The full feed is still preferred when it happens to be in hand, so a
      * reader arriving from /screen or /heat gets the identical rows those
      * pages used. */
-    const lite = CACHED('/screen-lite.json');
+    const lite = CACHED(LITE_URL);
     const pick = (c) => (c && c.ready && c.ok && c.data
       && Array.isArray(c.data.rows) && c.data.rows.length) ? c.data.rows : null;
     /* HELD last: a payload already in hand beats drawing nothing. */
-    const held = HELD('/screen-lite.json') || HELD('/screen.json');
+    const held = HELD(LITE_URL) || HELD(FULL_URL);
     FRONT_SCREEN = pick(sr) || pick(lite) || FRONT_SCREEN
       || (held && Array.isArray(held.data.rows) && held.data.rows.length ? held.data.rows : null);
     const srRows = FRONT_SCREEN;
@@ -11621,6 +11694,26 @@
     /world news/i,         // news.json — the wire on Today
   ];
   let HEALTH = null;
+  /* The bar's resolved rows and its repaint, held so a row this bar refuses to
+     fetch can be filled by the route that legitimately loads it. Both stay
+     null until paintFreshness() has run; every writer checks. */
+  let FRESH_ROWS = null, freshPaint = null;
+  /* ── A FEED'S AGE, FROM THE COPY THE PAGE ALREADY HAS ────────────────────
+   * Called by noteScreenMeta() wherever a screen payload lands, full or lite.
+   * It costs nothing: the bytes are already parsed and in memory, and this is
+   * the only path by which the Stock screen row is ever filled.
+   * The payload names its own projection (`is_lite`), so the panel's URL line
+   * reports the file that was actually read rather than a guess. */
+  const noteFeedAge = (label, d, url) => {
+    if (!FRESH_ROWS || !d) return;
+    const row = FRESH_ROWS.find(x => x.label === label);
+    if (!row) return;
+    const ts = feedStamp(d);
+    if (!ts) return;
+    row.ts = ts; row.ok = true; row.url = url; row.passive = false;
+    row.h = ageHours(ts);
+    try { if (freshPaint) freshPaint(); } catch (e) { /* never break a route over a timestamp */ }
+  };
   /* ── FRESHNESS, MEASURED HERE ─────────────────────────────────────────────
    *
    * This read a status string out of data-health.json and reported it. On the
@@ -11644,8 +11737,50 @@
    * tracker showed green at 19 hours old while the book it describes had moved
    * from 27x to 104x, and the live wire would have shown green a day after it
    * stopped. A feed's tolerance belongs to the feed. */
+  /* ── THE SCREEN'S AGE, WITHOUT DOWNLOADING THE SCREEN ────────────────────
+   *
+   * This row named '/screen.json' — the largest asset on the site, 1.98 MB
+   * raw and 253 KB brotli — and paintFreshness runs on EVERY route. So every
+   * page load on this site downloaded the full screen table to read one
+   * timestamp off the top of it, including the seven routes that had
+   * deliberately fetched screen-lite.json instead precisely so they would not
+   * have to. The lite projection exists to save ~70 KB on those routes and
+   * the chrome above them was spending 253 KB undoing it.
+   *
+   * It also filled sessionStorage. get() caches every feed there, screen.json
+   * is 1.98 MB of a ~5 MB origin quota, and on /radar — screen + lite +
+   * institutional — the quota was already exhausted, so the stale-fallback
+   * write for whatever loaded next threw and was swallowed.
+   *
+   * The stamp is IDENTICAL in the two files, not merely similar:
+   * stock_screen.lite_payload() copies every top-level key except `rows`
+   * straight across, so generated_at, built_at and built_on are the same
+   * bytes. Asserted in test/guard.mjs rather than trusted.
+   *
+   * SO THIS ROW NO LONGER FETCHES AT ALL. paintFreshness() runs ONCE, at
+   * boot, on the line before render() — so its requests always start before
+   * any route body has run, and picking "the cheaper projection" here just
+   * moved the bill: on a cold load of /screen the bar fetched the lite table
+   * and the route then fetched the full one, 182 KB spent to avoid 253 KB and
+   * 435 KB paid in total.
+   *
+   * The screen's age comes from the payload the ROUTE loads, handed over by
+   * noteScreenMeta() the moment it lands — free, exact, and whichever
+   * projection that route legitimately needed. A route that loads no screen
+   * says so, which is what the panel above already promises: "every feed THIS
+   * PAGE loaded". Forcing a 253 KB download so the sentence could stay true
+   * was the sentence describing the bar instead of the page.
+   *
+   * CACHED(), not HELD(). HELD ignores age by design — it answers "have we
+   * ever had this" — and get() only serves from the micro-cache inside
+   * MICRO_MS, so a HELD hit outside that window would have made get()
+   * re-download the file this note exists to stop paying for. */
+  const screenAgeUrl = () => {
+    for (const u of [FULL_URL, LITE_URL]) if (CACHED(u).ready || INFLIGHT.has(u)) return u;
+    return null;
+  };
   const FEED_AGE = [
-    ['Stock screen',   '/screen.json',     30],
+    ['Stock screen',   screenAgeUrl,       30],
     ['Market pulse',   '/pulse.json',      30],
     ['Trade ideas',    '/today.json',      30],
     ['Signal ledger',  '/alerts.json',     30],
@@ -11843,7 +11978,14 @@
     const edr = await get('/edition.json');
     const edTs = edr.ok ? feedStamp(edr.data) : null;
 
-    const rows = await Promise.all(FEED_AGE.map(async ([label, url, maxH]) => {
+    const rows = await Promise.all(FEED_AGE.map(async ([label, src, maxH]) => {
+      /* A row may name its feed, or name a FUNCTION that picks one. The
+         function is allowed to answer NOTHING, and that is the point: it
+         means "only if it is already paid for". Such a row is left passive
+         and filled later by the route, never fetched by this bar. */
+      const url = typeof src === 'function' ? src() : src;
+      if (!url) return { label, url: null, ok: false, ts: null, inherited: false,
+                         maxH, h: null, passive: true };
       const r = await get(url);
       let ts = r.ok ? feedStamp(r.data) : null;
       let inherited = false;
@@ -11851,8 +11993,15 @@
       return { label, url, ok: r.ok, ts, inherited, maxH, h: ageHours(ts) };
     }));
 
+    /* Kept, so a passive row can be filled when its feed arrives and the chip
+       repainted from the SAME array the panel reads. Two copies of this state
+       is how a header and the sheet behind it end up disagreeing about one
+       number, which is the fault this whole bar was rewritten to remove. */
+    FRESH_ROWS = rows;
+
+    freshPaint = () => {
     const dated = rows.filter(x => x.h != null);
-    if (!dated.length) return;
+    if (!dated.length) { btn.hidden = true; return; }
     // Each feed against its OWN tolerance; "worst" is the one furthest past it,
     // not simply the oldest — a weekly screen at 20 hours is fine and an IPO
     // book at 20 hours is not.
@@ -11891,12 +12040,16 @@
         <div class="board" style="margin-top:14px">
           ${rows.map(x => `<div class="board-row">
             <span class="n">${esc(x.label)}<br>
-              <em style="font-style:normal;color:var(--dim);font-size:var(--t-3)">${esc(x.url)}</em></span>
+              <em style="font-style:normal;color:var(--dim);font-size:var(--t-3)">${esc(x.url || 'not fetched by this bar')}</em></span>
             <span class="p">${x.ts
               ? esc(isDateOnly(x.ts) ? String(x.ts) + ' (date only)' : String(x.ts).slice(0, 16).replace('T', ' '))
               : '—'}${x.inherited ? '<br><em style="font-style:normal;color:var(--dim);font-size:var(--t-2)">from the edition build</em>' : ''}</span>
             <span class="c ${x.h == null ? '' : x.h <= (x.maxH || 26) ? 'up' : 'dn'}">${
-              x.ok ? esc(ageWord(x.h)) : 'did not load'}</span>
+              /* "did not load" is a FAILURE and a passive row is not one — it
+                 is a feed this page had no reason to download. Printing the
+                 first for the second is the bar reporting an outage that did
+                 not happen. */
+              x.ok ? esc(ageWord(x.h)) : x.passive ? 'not used on this page' : 'did not load'}</span>
           </div>`).join('')}
         </div>
         ${upstream.length ? `<p class="sheet-p" style="margin-top:16px">
@@ -11914,6 +12067,8 @@
         <p class="sheet-p" style="margin-top:14px">
           <a href="/methodology" style="color:var(--accent)">How this is measured →</a></p>`);
     };
+    };
+    freshPaint();
   }
 
   /* ══ THE TRUST PAGES ═══════════════════════════════════════════════════

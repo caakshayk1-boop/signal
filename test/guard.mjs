@@ -521,6 +521,89 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   }
 }
 
+/* ── THE CHROME MUST NOT DOWNLOAD THE LARGEST FILE ON THE SITE ───────────────
+ *
+ * paintFreshness() runs ONCE, at boot, on the line before render() — so its
+ * requests start before any route body has run. Its FEED_AGE table named
+ * '/screen.json': 1.98 MB raw, 253 KB brotli, the biggest asset here, fetched
+ * on every cold load of every route to read one timestamp off the top of it.
+ * The seven light routes fetch screen-lite.json specifically to avoid that
+ * file, and the bar above them was buying it anyway.
+ *
+ * It also filled sessionStorage. Measured on /radar — screen + lite +
+ * institutional — the ~5 MB origin quota was exhausted, so the stale-copy
+ * write for whatever loaded next threw and was swallowed.
+ *
+ * The row is PASSIVE now: the bar never fetches a screen, and get() hands it
+ * the stamp off whichever projection the route loaded for its own reasons.
+ * Three things have to hold for that to be honest, and each is checked. */
+{
+  const code = JS.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
+
+  // 1. The bar must not name a screen payload as a row it fetches.
+  const feedAge = (code.match(/const FEED_AGE = \[[\s\S]*?\n  \];/) || [""])[0];
+  ok("the freshness bar has a FEED_AGE table to check", feedAge.length > 0);
+  ok("no FEED_AGE row names a screen payload — the bar must not fetch 1.98 MB",
+     !/screen(-lite)?\.json/.test(feedAge), feedAge.match(/screen[^'"]*\.json/g));
+
+  // 2. Its resolver must be able to answer NOTHING. Returning a URL when the
+  //    payload is not already paid for is how this regressed once mid-fix:
+  //    on a cold /screen the bar fetched lite and the route then fetched
+  //    full, 435 KB in total to avoid 253 KB.
+  /* The body is captured to the first line that closes it at this nesting,
+     NOT with a lazy [\s\S]*? run at the whole file: the first version did
+     that, found a `return null;` some thousands of lines later, and passed
+     against a resolver that had been put back to fetching the lite table. A
+     check that cannot fail is worse than no check. */
+  const resolver = (code.match(/const screenAgeUrl = \(\) => \{[\s\S]*?\n  \};/) || [""])[0];
+  ok("the screen's age resolver is present and self-contained",
+     resolver.length > 0 && resolver.length < 400, resolver.length);
+  ok("the screen's age row fetches nothing of its own",
+     /return null;/.test(resolver) && !/return (LITE_URL|FULL_URL|'\/screen)/.test(
+       resolver.replace(/if \([^\n]*\) return u;/, "")), resolver);
+
+  // 3. A passive row has to be FILLABLE, or the screen silently never reports
+  //    its age. The fill is hooked into get() — the one place that sees every
+  //    fetch — and an earlier version hung it off noteScreenMeta(), which four
+  //    of the nine screen-loading routes do not call.
+  ok("the passive row is filled from get(), not from a route",
+     /if \(PASSIVE_AGE_ROWS\[base\]\) noteFeedAge\(/.test(code));
+  const passive = (code.match(/const PASSIVE_AGE_ROWS = \{[\s\S]*?\};/) || [""])[0];
+  for (const u of ["/screen.json", "/screen-lite.json"]) {
+    ok(`both projections fill the same row — ${u}`,
+       new RegExp(`'${u}': 'Stock screen'`).test(passive));
+  }
+  ok("the label a passive row fills is a label FEED_AGE actually has",
+     /\['Stock screen',/.test(feedAge));
+
+  // 4. And the two projections must genuinely carry the same stamp, or the
+  //    bar reports a different age depending on which route the reader
+  //    landed on. stock_screen.lite_payload() copies every top-level key but
+  //    `rows`; this asserts the result rather than trusting the promise.
+  {
+    let full = null, lite = null;
+    try { full = JSON.parse(readFileSync("public/screen.json", "utf8")); } catch { /* not synced */ }
+    try { lite = JSON.parse(readFileSync("public/screen-lite.json", "utf8")); } catch { /* not synced */ }
+    if (full && lite) {
+      const stamps = ["generated_at", "built_at", "built_on", "price_date"];
+      const differ = stamps.filter((k) => JSON.stringify(full[k]) !== JSON.stringify(lite[k]));
+      ok("both screen projections carry the same build stamp", differ.length === 0, differ);
+    } else {
+      console.log("  note  screen payloads not both synced into this checkout yet");
+    }
+  }
+
+  // 5. The stale-copy write must not block the load. It is a fallback for a
+  //    LATER failed fetch; nothing on this load reads it, and a 1.26 MB
+  //    sessionStorage write is synchronous.
+  ok("the sessionStorage stash is deferred, not written during the fetch",
+     /requestIdleCallback\(stash/.test(code) && /else setTimeout\(stash, 0\)/.test(code));
+  // 6. And it reuses the serialisation that was already made, rather than
+  //    running JSON.stringify over the same megabyte twice.
+  ok("the payload is serialised once per fetch",
+     (code.match(/JSON\.stringify\(\{ at: Date\.now\(\), j \}\)/g) || []).length === 0);
+}
+
 /* ── A LITE CACHE MUST NEVER SERVE A ROUTE THAT NEEDS THE PROSE ──────────────
  * SCREEN is one module-level cache shared by every route. Without the variant
  * flag, the first light route to load poisons /screen and /stock/:id: both
@@ -546,9 +629,19 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
    * purpose, in the same commit. */
   const fullGuards = (code.match(/!SCREEN \|\| SCREEN_LITE/g) || []).length;
   ok("every full-payload call site rejects a lite cache", fullGuards === 4, fullGuards);
-  // And nothing may reach for the raw path any more.
-  ok("no route fetches '/screen.json' by literal — FULL_URL or LITE_URL",
-     !/get\(\s*['"]\/screen\.json['"]\s*\)/.test(JS));
+  /* And nothing may reach for the raw path any more — through get(), and
+   * equally through the two CACHE lookups.
+   *
+   * The front page read CACHED('/screen.json') while its own retry fetched
+   * the LITE projection: two URLs, so the lookup could never be answered by
+   * the route's own request. It worked only because the freshness bar in the
+   * header was downloading screen.json at boot for an unrelated reason, and
+   * when that stopped, the volume-spurts count went from 20 to 0. A literal
+   * is how a caller ends up asking for a file nobody on that route fetches. */
+  const litSel = /(?:get|CACHED|HELD)\(\s*['"]\/screen(?:-lite)?\.json['"]\s*\)/g;
+  const lits = code.match(litSel) || [];
+  ok("no route reaches a screen payload by literal — FULL_URL or LITE_URL",
+     lits.length === 0, lits);
   /* The light routes go through getScreen(false), which asks for the lite
      table and FALLS BACK to the full one when it 404s. That fallback is not
      optional: screen-lite.json is produced by one pipeline and delivered by
