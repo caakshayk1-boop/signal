@@ -9,9 +9,9 @@
  *
  *   node test/guard.mjs
  */
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
-import { WATCH, dueSlot, GRACE_MIN } from "../src/watchdog.js";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { WATCH, dueSlot, GRACE_MIN } from "../src/watchdog_schedule.js";
 
 const JS = readFileSync("public/signal.js", "utf8");
 const CSS = readFileSync("public/signal.css", "utf8");
@@ -1213,6 +1213,39 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
  * the last two incidents possible: a slot that names work nothing can do, and
  * an inventory that changed without anyone meaning it to. */
 {
+  /* ── THIS GUARD MUST RUN BEFORE `npm ci`, SO WHAT IT IMPORTS MUST TOO ─────
+   *
+   * deploy.yml runs `node test/guard.mjs` at step 4 and `npm ci` at step 6, on
+   * purpose: a static guard that needs an install is not a fast fail.
+   *
+   * The first version of the checks below imported src/watchdog.js, which
+   * opens with `import { db } from "./api/_db.js"` and reaches
+   * @libsql/client. It passed locally, where node_modules exists, and took
+   * main's deploy down with ERR_MODULE_NOT_FOUND at the first step in under a
+   * second — the site did not ship. Reproduced afterwards by moving
+   * node_modules aside, which is the only way to run this the way CI does.
+   *
+   * So: every module this file reaches, transitively, may import node:
+   * builtins and relative paths and NOTHING ELSE. A bare specifier is a
+   * package, a package needs an install, and an install is two steps away. */
+  {
+    const seen = new Set(), bad = [];
+    const walk = (file) => {
+      if (seen.has(file) || !existsSync(file)) return;
+      seen.add(file);
+      const src = readFileSync(file, "utf8");
+      for (const m of src.matchAll(/^\s*(?:import|export)[^'"]*?from\s*['"]([^'"]+)['"]/gm)) {
+        const spec = m[1];
+        if (spec.startsWith("node:")) continue;
+        if (!spec.startsWith(".")) { bad.push(`${file} -> ${spec}`); continue; }
+        walk(join(dirname(file), spec));
+      }
+    };
+    walk("test/guard.mjs");
+    ok("nothing this guard imports needs an install — it runs before npm ci",
+       bad.length === 0, bad);
+  }
+
   ok("the watchdog watches something", WATCH.length === 4, WATCH.length);
   for (const w of WATCH) {
     ok(`${w.file}: says which repo, and why it is watched`,
