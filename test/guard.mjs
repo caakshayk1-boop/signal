@@ -1246,6 +1246,45 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
        bad.length === 0, bad);
   }
 
+  /* ── AND THE TWO WORKFLOWS THAT MAKE THAT SENTENCE TRUE ──────────────────
+   *
+   * The check above is only worth anything while the guard actually runs in a
+   * bare checkout. Two files decide that and neither is obvious from here.
+   *
+   * deploy.yml runs it as its first step, before `npm ci`. checks.yml runs it
+   * on every pull request and installs NOTHING — which is what makes a PR
+   * reproduce the deploy's environment rather than a developer's. An
+   * `npm ci` added to either one ahead of the guard would leave every check
+   * passing while the deploy that matters still broke, which is precisely
+   * what happened on 2026-09-20 with no PR workflow at all. */
+  {
+    const DEPLOY = readFileSync(".github/workflows/deploy.yml", "utf8");
+    ok("a pull-request workflow exists at all — merging is not the first test",
+       existsSync(".github/workflows/checks.yml"));
+    /* COMMENTS STRIPPED FIRST. That file's header explains why it does not
+       run `npm ci` and why test/ui.mjs is deliberately absent — and the first
+       version of these checks read the prose and failed on both, reporting the
+       explanation as the offence. Same trap this file already has a note about
+       one screen up: a check that matches its own documentation. */
+    const yamlCode = (t) => t.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+    const CHECKS = existsSync(".github/workflows/checks.yml")
+      ? yamlCode(readFileSync(".github/workflows/checks.yml", "utf8")) : "";
+    ok("it runs on pull_request", /^on:\s*$[\s\S]*?^\s{2}pull_request:/m.test(CHECKS));
+    ok("it runs the guard", /node test\/guard\.mjs/.test(CHECKS));
+    ok("it installs nothing, so a PR runs the guard the way the deploy does",
+       !/npm (ci|install)/.test(CHECKS));
+    /* ui.mjs drives a real browser against a running server. It belongs after
+       a deploy, against the thing that was deployed — deploy.yml runs it
+       there. On a diff it would be slow and flaky and prove nothing. */
+    ok("it does NOT try to run the live UI suite", !/test\/ui\.mjs/.test(CHECKS));
+
+    const dep = yamlCode(DEPLOY);
+    const gAt = dep.indexOf("node test/guard.mjs");
+    const iAt = dep.indexOf("npm ci");
+    ok("the deploy still runs the guard before it installs", gAt > -1 && iAt > -1 && gAt < iAt,
+       `guard@${gAt} npm ci@${iAt}`);
+  }
+
   ok("the watchdog watches something", WATCH.length === 4, WATCH.length);
   for (const w of WATCH) {
     ok(`${w.file}: says which repo, and why it is watched`,

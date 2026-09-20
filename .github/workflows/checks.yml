@@ -1,0 +1,69 @@
+# Everything that can be checked WITHOUT deploying, run on the branch instead
+# of on the site.
+#
+# WHY THIS EXISTS. It did not, and on 2026-09-20 that cost a deploy. A commit
+# merged to main, deploy.yml ran `node test/guard.mjs` as its first step, and
+# the guard died with ERR_MODULE_NOT_FOUND in under a second: it had grown an
+# import that reached @libsql/client, and that step runs BEFORE `npm ci`. Every
+# later step was skipped and the Worker was never deployed. The change had been
+# green locally, in a checkout where node_modules exists, and there was nothing
+# between "merge" and "main is red" to say otherwise.
+#
+# A repo whose only workflow runs after merge cannot fail a branch. It can only
+# fail the site.
+#
+# NO `npm ci`, AND THAT IS THE POINT.
+#
+# deploy.yml runs the guard before installing, deliberately — a static guard
+# that needs an install is not a fast fail. If this workflow installed first it
+# would pass on exactly the commit that breaks the deploy, which is the failure
+# it was written for. So it runs in the same bare environment, and guard.mjs
+# carries a check asserting that nothing it imports needs a package.
+#
+# WHAT IS DELIBERATELY NOT HERE: test/ui.mjs. It drives a real browser against
+# a running server and belongs after a deploy, against the thing that was
+# deployed — which is where deploy.yml already runs it. Same rule the sibling
+# repo applies to its live-network suites: they belong on a schedule against
+# production, not on a diff.
+name: checks
+
+on:
+  pull_request:
+  # Not `push` to main: deploy.yml already runs the guard there, as its first
+  # step, and running it twice on one commit buys nothing. Not `push` to other
+  # branches either, because every branch here arrives through a pull request
+  # and that would simply double every run.
+  workflow_dispatch:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+        # No `cache: npm`. Nothing here installs, so a cache would only be
+        # restored to be ignored — and restoring one could mask the very
+        # bare-environment property this job exists to reproduce.
+
+      # Does every shipped file still parse? esbuild answers this at deploy
+      # time, inside the minify step, which is after the point of no return.
+      # `node --check` answers it here and needs nothing installed.
+      - name: Every shipped script parses
+        run: |
+          for f in public/*.js src/*.js scripts/*.mjs test/*.mjs; do
+            node --check "$f" || { echo "::error file=$f::does not parse"; exit 1; }
+          done
+
+      # The 163 static checks. Every one exists because the fault it catches
+      # shipped.
+      - name: Static guards
+        run: node test/guard.mjs
+
+      # Pure arithmetic behind every chip, sort and badge on the Screen.
+      - name: Institutional arithmetic
+        run: node test/institutional.mjs
