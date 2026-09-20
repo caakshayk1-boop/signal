@@ -14,12 +14,27 @@
 // stale version never pinned anyone to old code — but the OFFLINE shell was
 // precaching seven faces the site stopped using and none of the one it now
 // loads, so an offline visit fell back to system fonts.
-const CACHE = "signal-shell-v2";
+//
+// v3: THAT FIX WAS HALF OF ONE. It replaced the seven dead faces with the one
+// variable face and stopped there, and the site loads THREE on every route.
+// Measured across /, /brief, /screen, /radar, /signals and /methodology:
+// Jakarta plus both JetBrains Mono weights, downloaded on all six. Every
+// price, every ticker, every eyebrow and every table figure on this site is
+// set in --mono, so the shell this was precaching rendered offline with the
+// prose right and every NUMBER in a system monospace.
+//
+// Newsreader is deliberately NOT here. It is 23 KB for --b-serif, which one
+// route uses; precaching it would spend the offline budget on the headings of
+// a page a reader is unlikely to be looking at when the network drops.
+const CACHE = "signal-shell-v3";
 const SHELL = [
   "/", "/index.html", "/signal.css", "/signal.js", "/icon.svg",
   // One variable face, weights 200-800, replacing the five static Manrope and
   // Newsreader files the redesign retired.
   "/fonts/PlusJakarta-var-latin.woff2",
+  // The numbers. Both weights: 400 is the table figure, 500 the eyebrow.
+  "/fonts/JetBrainsMono-400-latin.woff2",
+  "/fonts/JetBrainsMono-500-latin.woff2",
 ];
 
 self.addEventListener("install", (e) => {

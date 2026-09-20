@@ -11,6 +11,7 @@
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { WATCH, dueSlot, GRACE_MIN } from "../src/watchdog.js";
 
 const JS = readFileSync("public/signal.js", "utf8");
 const CSS = readFileSync("public/signal.css", "utf8");
@@ -521,6 +522,89 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   }
 }
 
+/* ── THE CHROME MUST NOT DOWNLOAD THE LARGEST FILE ON THE SITE ───────────────
+ *
+ * paintFreshness() runs ONCE, at boot, on the line before render() — so its
+ * requests start before any route body has run. Its FEED_AGE table named
+ * '/screen.json': 1.98 MB raw, 253 KB brotli, the biggest asset here, fetched
+ * on every cold load of every route to read one timestamp off the top of it.
+ * The seven light routes fetch screen-lite.json specifically to avoid that
+ * file, and the bar above them was buying it anyway.
+ *
+ * It also filled sessionStorage. Measured on /radar — screen + lite +
+ * institutional — the ~5 MB origin quota was exhausted, so the stale-copy
+ * write for whatever loaded next threw and was swallowed.
+ *
+ * The row is PASSIVE now: the bar never fetches a screen, and get() hands it
+ * the stamp off whichever projection the route loaded for its own reasons.
+ * Three things have to hold for that to be honest, and each is checked. */
+{
+  const code = JS.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
+
+  // 1. The bar must not name a screen payload as a row it fetches.
+  const feedAge = (code.match(/const FEED_AGE = \[[\s\S]*?\n  \];/) || [""])[0];
+  ok("the freshness bar has a FEED_AGE table to check", feedAge.length > 0);
+  ok("no FEED_AGE row names a screen payload — the bar must not fetch 1.98 MB",
+     !/screen(-lite)?\.json/.test(feedAge), feedAge.match(/screen[^'"]*\.json/g));
+
+  // 2. Its resolver must be able to answer NOTHING. Returning a URL when the
+  //    payload is not already paid for is how this regressed once mid-fix:
+  //    on a cold /screen the bar fetched lite and the route then fetched
+  //    full, 435 KB in total to avoid 253 KB.
+  /* The body is captured to the first line that closes it at this nesting,
+     NOT with a lazy [\s\S]*? run at the whole file: the first version did
+     that, found a `return null;` some thousands of lines later, and passed
+     against a resolver that had been put back to fetching the lite table. A
+     check that cannot fail is worse than no check. */
+  const resolver = (code.match(/const screenAgeUrl = \(\) => \{[\s\S]*?\n  \};/) || [""])[0];
+  ok("the screen's age resolver is present and self-contained",
+     resolver.length > 0 && resolver.length < 400, resolver.length);
+  ok("the screen's age row fetches nothing of its own",
+     /return null;/.test(resolver) && !/return (LITE_URL|FULL_URL|'\/screen)/.test(
+       resolver.replace(/if \([^\n]*\) return u;/, "")), resolver);
+
+  // 3. A passive row has to be FILLABLE, or the screen silently never reports
+  //    its age. The fill is hooked into get() — the one place that sees every
+  //    fetch — and an earlier version hung it off noteScreenMeta(), which four
+  //    of the nine screen-loading routes do not call.
+  ok("the passive row is filled from get(), not from a route",
+     /if \(PASSIVE_AGE_ROWS\[base\]\) noteFeedAge\(/.test(code));
+  const passive = (code.match(/const PASSIVE_AGE_ROWS = \{[\s\S]*?\};/) || [""])[0];
+  for (const u of ["/screen.json", "/screen-lite.json"]) {
+    ok(`both projections fill the same row — ${u}`,
+       new RegExp(`'${u}': 'Stock screen'`).test(passive));
+  }
+  ok("the label a passive row fills is a label FEED_AGE actually has",
+     /\['Stock screen',/.test(feedAge));
+
+  // 4. And the two projections must genuinely carry the same stamp, or the
+  //    bar reports a different age depending on which route the reader
+  //    landed on. stock_screen.lite_payload() copies every top-level key but
+  //    `rows`; this asserts the result rather than trusting the promise.
+  {
+    let full = null, lite = null;
+    try { full = JSON.parse(readFileSync("public/screen.json", "utf8")); } catch { /* not synced */ }
+    try { lite = JSON.parse(readFileSync("public/screen-lite.json", "utf8")); } catch { /* not synced */ }
+    if (full && lite) {
+      const stamps = ["generated_at", "built_at", "built_on", "price_date"];
+      const differ = stamps.filter((k) => JSON.stringify(full[k]) !== JSON.stringify(lite[k]));
+      ok("both screen projections carry the same build stamp", differ.length === 0, differ);
+    } else {
+      console.log("  note  screen payloads not both synced into this checkout yet");
+    }
+  }
+
+  // 5. The stale-copy write must not block the load. It is a fallback for a
+  //    LATER failed fetch; nothing on this load reads it, and a 1.26 MB
+  //    sessionStorage write is synchronous.
+  ok("the sessionStorage stash is deferred, not written during the fetch",
+     /requestIdleCallback\(stash/.test(code) && /else setTimeout\(stash, 0\)/.test(code));
+  // 6. And it reuses the serialisation that was already made, rather than
+  //    running JSON.stringify over the same megabyte twice.
+  ok("the payload is serialised once per fetch",
+     (code.match(/JSON\.stringify\(\{ at: Date\.now\(\), j \}\)/g) || []).length === 0);
+}
+
 /* ── A LITE CACHE MUST NEVER SERVE A ROUTE THAT NEEDS THE PROSE ──────────────
  * SCREEN is one module-level cache shared by every route. Without the variant
  * flag, the first light route to load poisons /screen and /stock/:id: both
@@ -546,9 +630,19 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
    * purpose, in the same commit. */
   const fullGuards = (code.match(/!SCREEN \|\| SCREEN_LITE/g) || []).length;
   ok("every full-payload call site rejects a lite cache", fullGuards === 4, fullGuards);
-  // And nothing may reach for the raw path any more.
-  ok("no route fetches '/screen.json' by literal — FULL_URL or LITE_URL",
-     !/get\(\s*['"]\/screen\.json['"]\s*\)/.test(JS));
+  /* And nothing may reach for the raw path any more — through get(), and
+   * equally through the two CACHE lookups.
+   *
+   * The front page read CACHED('/screen.json') while its own retry fetched
+   * the LITE projection: two URLs, so the lookup could never be answered by
+   * the route's own request. It worked only because the freshness bar in the
+   * header was downloading screen.json at boot for an unrelated reason, and
+   * when that stopped, the volume-spurts count went from 20 to 0. A literal
+   * is how a caller ends up asking for a file nobody on that route fetches. */
+  const litSel = /(?:get|CACHED|HELD)\(\s*['"]\/screen(?:-lite)?\.json['"]\s*\)/g;
+  const lits = code.match(litSel) || [];
+  ok("no route reaches a screen payload by literal — FULL_URL or LITE_URL",
+     lits.length === 0, lits);
   /* The light routes go through getScreen(false), which asks for the lite
      table and FALLS BACK to the full one when it 404s. That fallback is not
      optional: screen-lite.json is produced by one pipeline and delivered by
@@ -951,6 +1045,61 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   const orphanPreload = preloaded.filter((f) => !declaredSrc.includes(f));
   ok("every preloaded font file is one the stylesheet actually declares",
      orphanPreload.length === 0, orphanPreload);
+
+  /* ── AND THE DIRECTORY MUST MATCH THE DECLARATIONS, BOTH WAYS ────────────
+   *
+   * The family check above passes for a family that is used at ONE weight and
+   * shipped at three. Newsreader was exactly that: declared at 400, 600 and
+   * 400-italic, and every rule that reaches it is written `font: 400 ...`, so
+   * the bold and the italic could not be selected by anything in this
+   * stylesheet. Measured in a browser at 414px and 1280px — 24 elements
+   * rendering Newsreader on /brief, zero of them bold, zero italic — and the
+   * two files were never fetched on any route. 48 KB in the repo and in every
+   * deployment, reachable by nothing.
+   *
+   * Both directions are faults, and they are different faults:
+   *   · a FILE with no declaration is dead weight in the deploy;
+   *   · a DECLARATION with no file is a 404 the browser answers by silently
+   *     falling back to Georgia, which looks like a design choice.
+   *
+   * Lazy loading is why neither shows up as a slow page — a face nothing
+   * renders is never fetched — so nothing but this will ever notice. */
+  const onDisk = readdirSync("public/fonts").filter((f) => /\.woff2?$/.test(f)).sort();
+  const wanted = [...new Set(declaredSrc)].sort();
+  ok("every font file in the repo is declared by the stylesheet",
+     onDisk.every((f) => wanted.includes(f)), onDisk.filter((f) => !wanted.includes(f)));
+  ok("every declared font file exists — a missing one falls back silently",
+     wanted.every((f) => onDisk.includes(f)), wanted.filter((f) => !onDisk.includes(f)));
+
+  /* ── AND THE OFFLINE SHELL MUST CARRY THE FACES EVERY ROUTE RENDERS ──────
+   * sw.js precached seven faces the site had stopped using; the fix that
+   * replaced them with the one variable face stopped there, and the site
+   * loads THREE on every route. Measured across six routes: Jakarta plus
+   * both JetBrains Mono weights on all six. Every price, ticker and table
+   * figure here is --mono, so the offline shell rendered the prose correctly
+   * and every NUMBER in a system monospace.
+   *
+   * Newsreader is excluded on purpose — 23 KB for one route's headings. So
+   * this is not "every declared face"; it is every face the CHROME needs. */
+  const SW = readFileSync("public/sw.js", "utf8");
+  const SHELL_FONTS = ["PlusJakarta-var-latin.woff2",
+                       "JetBrainsMono-400-latin.woff2",
+                       "JetBrainsMono-500-latin.woff2"];
+  for (const f of SHELL_FONTS) {
+    ok(`the offline shell precaches ${f}`, SW.includes("/fonts/" + f));
+  }
+  /* A precache list that names a file the repo does not have fails silently:
+     c.add() is caught per entry so the install still succeeds. */
+  const swFonts = [...SW.matchAll(/"\/fonts\/([^"]+)"/g)].map((m) => m[1]);
+  ok("the offline shell names no font the repo does not ship",
+     swFonts.every((f) => onDisk.includes(f)), swFonts.filter((f) => !onDisk.includes(f)));
+  /* CHANGING THE LIST WITHOUT BUMPING THE NAME SHIPS NOTHING. activate deletes
+     every cache whose key is not CACHE, so a new SHELL under an old key is
+     served from the old cache until something else evicts it. */
+  ok("the cache key is versioned, so a changed shell actually replaces one",
+     /const CACHE = "signal-shell-v(\d+)"/.test(SW) &&
+     Number(SW.match(/signal-shell-v(\d+)/)[1]) >= 3,
+     (SW.match(/signal-shell-v\d+/) || [])[0]);
 }
 
 /* ── THE COMMITTED ASSETS MUST STILL BE THE SOURCE ──────────────────────────
@@ -992,6 +1141,156 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
        < (PKG.scripts.deploy || "").indexOf("minify.mjs"));
   ok("esbuild is a declared dependency, not something the deploy hopes is there",
      !!(PKG.devDependencies || {}).esbuild);
+}
+
+/* ── A BREACHED STOP VOIDS THE SETUP, ON EVERY SURFACE THAT SHOWS ONE ───────
+ *
+ * The rule shipped as four characters of comparison inside wireRadar's live
+ * overlay, so it was true on /radar and nowhere else. The front page's
+ * conviction slate is the worse case: it awaits live quotes and prints
+ * "Live ₹940" four lines above "Stop ₹999.05", with the score and the
+ * reward-to-risk between them, and said nothing. Five cards, first screen.
+ *
+ * Consistency between two surfaces cannot come from writing the same test in
+ * both — it has to come from calling the same function. */
+{
+  const code = JS.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
+  ok("the void rule is declared exactly once",
+     (code.match(/const stopVoid = /g) || []).length === 1);
+  ok("...and its explanation too — one sentence, not two spellings",
+     (code.match(/const STOP_VOID_WHY = /g) || []).length === 1);
+  /* TWO CALL SITES: the radar overlay and the conviction card. The
+     declaration is `const stopVoid = (live, stop) =>` and does not match
+     `stopVoid(`, which is why this is 2 and not 3 — the first draft said 3
+     and failed, which is the check working on itself.
+     An EXACT count, not >=: the dangerous direction is a new surface that
+     prints a stop beside a live price and never asks. */
+  const uses = (code.match(/\bstopVoid\(/g) || []).length;
+  ok("both surfaces that show a stop beside a live price call it", uses === 2, uses);
+  ok("the radar overlay asks the rule rather than re-deriving it",
+     /const hit = stopVoid\(v\.price, s\);/.test(code));
+  ok("the conviction card decides once, before it renders anything",
+     /const voided = stopVoid\(p\._live && p\._live\.price, p\.stop\);/.test(code));
+  ok("a voided card says so above the plan it invalidates",
+     /class="cv-void"/.test(code) && /lv-plan\$\{voided \? ' is-void' : ''\}/.test(code));
+  /* THE SCORE IS STAMPED, NEVER RECOMPUTED. Inventing a fresh number in the
+     browser is the fault this site avoids everywhere else; a score that goes
+     on reading as current is the fault directly above. */
+  ok("the score keeps its value and says when it was taken",
+     /\$\{voided \? ' <i>at build<\/i>' : ''\}/.test(code));
+  /* The stop path and scale-out restate the levels as instructions one block
+     below the strike-through, and read live until this wrapped them. */
+  ok("the stop path goes with the plan",
+     /class="lv-trail-void"/.test(code) && /\.lv-trail-void\{/.test(CSS));
+  /* This file declares no --t-* scale, so a bare var() would delete the whole
+     declaration. Same rule the brief's fundamentals block is held to. */
+  for (const m of (CSS.match(/\.cv-void[\s\S]*?\}/) || [""])[0].matchAll(/var\(--[\w-]+\)/g)) {
+    ok(`the void banner's ${m[0]} carries a literal fallback`, false, m[0]);
+  }
+  ok("the void banner's custom properties all carry fallbacks", true);
+
+  /* ── AND THE CELLS THAT COULD NEVER FILL ─────────────────────────────────
+   * The slate's Volatility, 3Y CAGR, ROCE trend and Results cells read the
+   * SCREEN global, which on the front page is permanently null — the heavy
+   * pass resolves the rows and never calls setScreen(). So the "filled only
+   * for a reader who has been to /screen this session" fallback was the only
+   * path, and four cells were empty on every visit. The rows are right there
+   * in FRONT_SCREEN, which this route holds for the heatmap strip. */
+  ok("the conviction slate reads the screen this route is actually holding",
+     /const cvRows = FRONT_SCREEN \|\| SCREEN;/.test(code));
+}
+
+/* ── THE WATCHDOG HAD NO TEST OF ANY KIND ────────────────────────────────────
+ *
+ * It is the thing that repairs a dropped scheduled run in BOTH repos, it
+ * exists because GitHub's scheduler was measured dropping a 05:00 slot and
+ * both of its retries, and nothing anywhere checked its arithmetic or its
+ * inventory.
+ *
+ * It also holds its OWN COPY of a schedule that lives in another repo's
+ * workflow files. That coupling cannot be checked from here — the crons are
+ * not in this checkout — so what is checked instead is the shape that made
+ * the last two incidents possible: a slot that names work nothing can do, and
+ * an inventory that changed without anyone meaning it to. */
+{
+  ok("the watchdog watches something", WATCH.length === 4, WATCH.length);
+  for (const w of WATCH) {
+    ok(`${w.file}: says which repo, and why it is watched`,
+       /^[\w-]+\/[\w-]+$/.test(w.repo || "") && !!w.why && w.why.length > 8, w);
+    ok(`${w.file}: has at least one slot`, (w.slots || []).length > 0);
+    for (const sl of w.slots || []) {
+      const at = `${w.file} ${String(sl.h).padStart(2, "0")}:${String(sl.m).padStart(2, "0")}Z`;
+      ok(`${at}: is a real UTC time on real weekdays`,
+         Number.isInteger(sl.h) && sl.h >= 0 && sl.h <= 23 &&
+         Number.isInteger(sl.m) && sl.m >= 0 && sl.m <= 59 &&
+         Array.isArray(sl.dow) && sl.dow.length > 0 &&
+         sl.dow.every((d) => Number.isInteger(d) && d >= 0 && d <= 6), sl);
+    }
+  }
+
+  /* A DISPATCH THAT NAMES NO WORK SENDS NOTHING. The scan and brief entries
+   * pass `inputs` to workflow_dispatch; an entry that forgot them dispatched
+   * a workflow whose every slot arm fell through to SLOT="" and which then
+   * did nothing at all, green. */
+  const scan = WATCH.find((w) => w.file === "daily_scan.yml");
+  const brief = WATCH.find((w) => w.file === "scheduled_tasks.yml");
+  ok("the scan and the briefs are both watched", !!scan && !!brief);
+  for (const sl of scan.slots) {
+    ok(`daily_scan ${sl.h}:00Z names the slot it is dispatching`, !!(sl.inputs || {}).slot, sl);
+    /* job is the job_runs key the watchdog asks "did the WORK land?". It is
+     * _scan_job(slot) over there — `scan_` + the slot — and a mismatch makes
+     * the watchdog query a row that is never written, so it concludes the
+     * work never happened and dispatches forever. */
+    ok(`daily_scan ${sl.inputs.slot}: its ledger key matches its slot`,
+       sl.job === "scan_" + sl.inputs.slot, sl.job);
+  }
+  /* AN EXACT SET, NOT A COUNT >= n. The dangerous direction is a slot quietly
+   * disappearing — which is how `midday` came to have a cron in daily_scan.yml
+   * and no watchdog entry, leaving the one scan that runs while the market is
+   * open as the only unwatched one. `>=` would pass through that. Adding or
+   * removing a slot means editing this line, on purpose, in the same commit. */
+  const slotNames = scan.slots.map((x) => x.inputs.slot).sort().join(",");
+  ok("the scan's watched slots are exactly midday, eod and weekend",
+     slotNames === "eod,midday,weekend", slotNames);
+
+  /* ── dueSlot, THE ARITHMETIC ─────────────────────────────────────────────
+   * Everything above is inventory. This is the function that decides whether
+   * a missed slot is noticed, and it had never been executed by a test. */
+  const utc = (y, mo, d, h, mi) => new Date(Date.UTC(y, mo, d, h, mi));
+  // 2026-09-16 is a Wednesday.
+  const midday = scan.slots.find((x) => x.inputs.slot === "midday");
+  /* dueSlot LOOKS BACK TWO DAYS ON PURPOSE — a Friday-evening slot is still
+   * the newest one on a Sunday, and "nothing due" there would hide a real
+   * outage. So these assert WHICH INSTANT came back, never that nothing did:
+   * the first draft of these checks expected null and failed, because a
+   * yesterday's slot was legitimately being returned. */
+  const iso = (r) => (r ? new Date(r.at).toISOString().slice(0, 16) : null);
+  ok("a midday slot well past its grace is claimed today",
+     iso(dueSlot(utc(2026, 8, 16, 6, GRACE_MIN + 8), [midday])) === "2026-09-16T06:00",
+     iso(dueSlot(utc(2026, 8, 16, 6, GRACE_MIN + 8), [midday])));
+  ok("...and INSIDE the grace today's is not claimed — yesterday's is the newest",
+     iso(dueSlot(utc(2026, 8, 16, 6, GRACE_MIN - 5), [midday])) === "2026-09-15T06:00",
+     iso(dueSlot(utc(2026, 8, 16, 6, GRACE_MIN - 5), [midday])));
+  // 2026-09-20 is a Sunday. A weekday slot has none of its own that day, so
+  // the newest it can offer is Friday's — not Saturday's, which does not exist.
+  ok("a weekday slot on a Sunday reaches back to Friday, not to a day it never ran",
+     iso(dueSlot(utc(2026, 8, 20, 6, 30), [midday])) === "2026-09-18T06:00",
+     iso(dueSlot(utc(2026, 8, 20, 6, 30), [midday])));
+  /* THE NEWEST SLOT WINS, and it must be able to reach back across a day —
+   * a Friday-evening slot is still the newest one on a Saturday morning. */
+  const eod = scan.slots.find((x) => x.inputs.slot === "eod");
+  ok("the most recent passed slot is the one returned",
+     (dueSlot(utc(2026, 8, 16, 13, 0), [midday, eod]) || {}).inputs?.slot === "eod");
+  ok("a slot from yesterday is still reachable this morning",
+     (dueSlot(utc(2026, 8, 17, 2, 0), [midday, eod]) || {}).inputs?.slot === "eod");
+  /* THE GRACE IS A SAFETY MARGIN, NOT A CONSTANT TO NUDGE. Twelve minutes is
+     one Cloudflare tick past the slot; the newspaper entry overrides it to
+     three hours because a duplicate build races a commit. */
+  ok("the default grace is one watchdog tick past the slot",
+     GRACE_MIN >= 10 && GRACE_MIN <= 20, GRACE_MIN);
+  const paper = WATCH.find((w) => w.file === "newspaper.yml");
+  ok("the unguarded build keeps its long grace — a duplicate races a commit",
+     paper.graceMin >= 120, paper.graceMin);
 }
 
 console.log(fails
