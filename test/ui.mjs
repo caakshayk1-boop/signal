@@ -64,6 +64,81 @@ const SETTLE = 7000;
 const until = (page, fn, arg = null, timeout = 30000) =>
   page.waitForFunction(fn, arg, { timeout, polling: 250 }).catch(() => false);
 
+/* ── AND THE SAME ARGUMENT, APPLIED TO THE SLEEP AFTER EVERY NAVIGATION ──────
+ *
+ * The note above was written for one case and left thirty-one others alone:
+ * `goto(route)` followed by `waitForTimeout(SETTLE + n)`, an unconditional ten
+ * seconds, in loops over fourteen routes and two viewports.
+ *
+ * MEASURED, from the deploy of 2026-09-20 (run 202). The job took 19m27s. The
+ * guard, npm ci and `wrangler deploy` were 24 seconds of it and the Playwright
+ * install 42; ui.mjs was 18m20s for 357 assertions, 3.1s each. Three sections
+ * were two thirds:
+ *
+ *     323s  135 checks   the same fact is not printed twice
+ *     285s   28 checks   table columns map to their headers
+ *     166s   41 checks   prefers-reduced-motion: reduce
+ *
+ * The middle one is two viewports over fourteen routes: 28 navigations, each
+ * sleeping ten seconds, which is 280 seconds. It measured 285. The assertions
+ * themselves cost almost nothing — the suite is not slow because the site is
+ * slow or because there are 357 checks, it is slow because it sleeps.
+ *
+ * WHAT "SETTLED" MEANS HERE. Not "the network is idle", which this site never
+ * is — the clock ticks every second and the live price overlay comes back on a
+ * timer. It is: nothing this page asked for is still outstanding, nothing has
+ * landed for `quiet` milliseconds, and `main` has stopped changing for the
+ * same. `main`, not `document`: the header clock rewrites itself every second
+ * and would keep any whole-document check false forever.
+ *
+ * IT CAN NEVER BE SLOWER THAN THE SLEEP IT REPLACES. The cap passed at each
+ * call site is that site's old duration, so a page that genuinely never
+ * settles waits exactly as long as it does today and the assertion then runs
+ * against whatever is there — the same degradation `until` already documents.
+ * That is the property that makes this safe to ship without being able to
+ * watch it in CI: the worst case is today's behaviour.
+ *
+ * WHY A COUNTER AND NOT waitForLoadState("networkidle"). That helper judges
+ * the whole context and is satisfied by any 500ms gap, which on a page firing
+ * twelve feeds in two waves lands in the trough between them. This counts THIS
+ * page's own outstanding fetches, which is the question being asked. */
+const NET_PROBE = `(() => {
+  window.__inflight = 0;
+  window.__lastNet = Date.now();
+  const f = window.fetch;
+  if (typeof f !== "function") return;
+  window.fetch = function (...a) {
+    window.__inflight++;
+    let done = false;
+    const settle = () => { if (!done) { done = true; window.__inflight--; window.__lastNet = Date.now(); } };
+    try {
+      return f.apply(this, a).then(
+        (r) => { settle(); return r; },
+        (e) => { settle(); throw e; });
+    } catch (e) { settle(); throw e; }
+  };
+})();`;
+
+/* Every context gets the probe. Wrapped rather than added at twelve call
+   sites, so a context added later inherits it — the same reason noteFresh
+   lives inside get() over in signal.js rather than in twenty routes. */
+const newCtx = async (opts) => {
+  const c = await browser.newContext(opts);
+  await c.addInitScript(NET_PROBE);
+  return c;
+};
+
+const settled = (page, cap = SETTLE, quiet = 400) =>
+  until(page, (q) => {
+    const w = window;
+    if ((w.__inflight || 0) > 0) return false;
+    if (Date.now() - (w.__lastNet || 0) < q.quiet) return false;
+    const m = document.querySelector("main") || document.body;
+    const n = m ? m.innerHTML.length : 0;
+    if (w.__uiLen !== n) { w.__uiLen = n; w.__uiChanged = Date.now(); return false; }
+    return Date.now() - (w.__uiChanged || 0) >= q.quiet;
+  }, { quiet }, cap);
+
 /* The brief folds its workup behind a <details>, and innerText is
  * layout-aware — anything a closed fold is not rendering reads as "". Every
  * assertion about a widget inside the workup opens it first. Not a weakening:
@@ -95,7 +170,7 @@ try {
 
   /* ── MARKETS ─────────────────────────────────────────────────────────── */
   console.log("  /markets");
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const ctx = await newCtx({ viewport: { width: 1440, height: 900 } });
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", e => errs.push("pageerror: " + e.message));
@@ -110,7 +185,7 @@ try {
 
   await p.goto(SITE + "/markets", { waitUntil: "domcontentloaded" });
   await until(p, () => document.querySelectorAll(".mk").length > 40);
-  await p.waitForTimeout(SETTLE);
+  await settled(p, SETTLE);
 
   /* ONE RELOAD BEFORE JUDGING THE BOARD.
    *
@@ -129,7 +204,7 @@ try {
     await p.waitForTimeout(6000);
     await p.reload({ waitUntil: "domcontentloaded" });
     await until(p, () => document.querySelectorAll(".mk").length > 40);
-    await p.waitForTimeout(SETTLE);
+    await settled(p, SETTLE);
     nRows = await rows.count();
   }
   ok("board renders 40+ instruments", nRows > 40, nRows);
@@ -188,7 +263,7 @@ try {
   /* ── BRIEF ───────────────────────────────────────────────────────────── */
   console.log("\n  /brief");
   await p.goto(SITE + "/brief", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE);
+  await settled(p, SETTLE);
 
   const body = await p.locator("main").innerText();
   ok("no NaN, undefined or Infinity anywhere", !/NaN|undefined|Infinity/.test(body),
@@ -390,7 +465,7 @@ try {
    * "highest reward-to-risk" and quietly changed which company was on screen
    * while someone was reading it. */
   await p.goto(SITE + "/signals", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE);
+  await settled(p, SETTLE);
   /* THERE MAY BE NO CARDS, AND THAT IS A REAL STATE.
    *
    * This asserted `nLinks > 0` unconditionally, so it failed the moment the
@@ -419,7 +494,7 @@ try {
     const r = document.querySelector('.xr[data-xr]');
     if (r) r.click();
   });
-  await p.waitForTimeout(SETTLE);
+  await settled(p, SETTLE);
   const nCards = await p.locator("main article.card").count();
   const nLinks = await p.locator("a.brief-link").count();
   if (nCards === 0) {
@@ -444,14 +519,14 @@ try {
       const row = document.querySelector(`.xr[aria-controls="${panel.id}"]`);
       if (row) row.click();
     });
-    await p.waitForTimeout(SETTLE);
+    await settled(p, SETTLE);
     ok("a collapsed row reveals its brief link when opened", await link.isVisible());
     await link.click();
-    await p.waitForTimeout(SETTLE + 1500);
+    await settled(p, SETTLE + 1500);
     const opened = (await p.locator(".b-hero h1").innerText()).split(" ")[0];
     ok("the brief opens the symbol that was clicked", opened === wanted, { opened, wanted });
     await p.evaluate(() => window.dispatchEvent(new HashChangeEvent("hashchange")));
-    await p.waitForTimeout(SETTLE + 1500);
+    await settled(p, SETTLE + 1500);
     const after = (await p.locator(".b-hero h1").innerText()).split(" ")[0];
     ok("a repaint does not swap the instrument", after === wanted, { after, wanted });
   }
@@ -493,7 +568,7 @@ try {
    */
   console.log("\n  premium build");
   await p.goto(SITE + "/", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE);
+  await settled(p, SETTLE);
 
   /* `.hero h1`, not any h1: index.html ships a PRERENDERED shell carrying
      `h1.pre-h`, which the client render replaces. Waiting on the real one is
@@ -535,7 +610,7 @@ try {
   if (!tkr || tkr.items <= 20) {
     await p.waitForTimeout(6000);
     await p.reload({ waitUntil: "domcontentloaded" });
-    await p.waitForTimeout(SETTLE);
+    await settled(p, SETTLE);
     tkr = await readTicker();
   }
   /* The bar is 0% at the top of a page by definition, so asserting it exists
@@ -602,7 +677,7 @@ try {
   ok("the contextual label is empty on Today",
      (await p.locator("#barWhere").innerText()).trim() === "");
   await p.goto(SITE + "/markets", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE);
+  await settled(p, SETTLE);
   ok("the contextual label follows the route",
      (await p.locator("#barWhere").innerText()).trim() === "Markets");
 
@@ -632,7 +707,7 @@ try {
   }
 
   await p.goto(SITE + "/signals", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE);
+  await settled(p, SETTLE);
   /* THE CURVE IS SCOPED TO LAUNCH, so it is legitimately empty until a signal
    * published on or after that date closes. The assertion is therefore not
    * "a chart exists" but "the section is honest": either it draws the curve
@@ -674,7 +749,7 @@ try {
    */
   console.log("\n  watchlist and alerts");
   await p.goto(SITE + "/screen", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE + 6000);
+  await settled(p, SETTLE + 6000);
   ok("the price line is drawn for the screen rows", await p.locator(".scr-r .pl").count() > 20);
   ok("its 200-day and 50-day markers are placed",
      await p.locator(".pl-m.is-200").count() > 0 && await p.locator(".pl-m.is-50").count() > 0);
@@ -705,7 +780,7 @@ try {
    * a real market state and not a defect. */
   console.log("\n  institutional movement");
   await p.goto(SITE + "/screen", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE + 6000);
+  await settled(p, SETTLE + 6000);
 
   const instiFeed = await p.evaluate(async () => {
     try { return await fetch("/institutional.json").then(r => r.ok ? r.json() : null); }
@@ -804,7 +879,7 @@ try {
     const sym = Object.keys(instiFeed.rows).find(s => instiFeed.rows[s].quality === "complete");
     // Routing is pushState now; assigning location.hash navigates nowhere.
     await p.goto(SITE + "/screen", { waitUntil: "domcontentloaded" });
-    await p.waitForTimeout(SETTLE + 5000);
+    await settled(p, SETTLE + 5000);
     await p.evaluate(s => { window.__t = s; }, sym);
     await p.waitForTimeout(400);
     const opened = await p.evaluate(async (s) => {
@@ -835,7 +910,7 @@ try {
    * compare between two pages is worth a test. */
   console.log("\n  one population across surfaces");
   await p.goto(SITE + "/brief", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE + 5000);
+  await settled(p, SETTLE + 5000);
   const briefTxt = await p.locator("main").innerText();
   const briefN = Number((briefTxt.match(/highest-scoring of the\s+([\d,]+)\s+signals/) || [])[1]?.replace(/,/g, ""));
   ok("the brief names the population it ranked within", /signals open since \d{4}-\d{2}-\d{2}/.test(briefTxt.replace(/\s+/g, " ")));
@@ -844,7 +919,7 @@ try {
     // reaches back before launch and is several times larger.
     ok("the brief counts since launch, not all time", briefN < 120, briefN);
     await p.goto(SITE + "/", { waitUntil: "domcontentloaded" });
-    await p.waitForTimeout(SETTLE + 4000);
+    await settled(p, SETTLE + 4000);
     const homeTxt = await p.locator("main").innerText();
     const homeN = Number((homeTxt.match(/([\d,]+)\s+published since/) || [])[1]?.replace(/,/g, ""));
     if (Number.isFinite(homeN)) {
@@ -857,7 +932,7 @@ try {
    * row ever and reported 182 open positions while the brief said 33. Any
    * surface that shows an open count must draw from the same population. */
   await p.goto(SITE + "/engines", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE + 5000);
+  await settled(p, SETTLE + 5000);
   const floorTxt = await p.locator("main").innerText();
   const floorOpen = Number((floorTxt.match(/Open positions\s+([\d,]+)/i) || [])[1]?.replace(/,/g, ""));
   if (Number.isFinite(floorOpen)) {
@@ -868,7 +943,7 @@ try {
    * 61 IPO rows of eight columns each and no way to open one. */
   console.log("\n  expanding rows");
   await p.goto(SITE + "/ipo", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE + 5000);
+  await settled(p, SETTLE + 5000);
   /* The listings table moved behind a disclosure when /ipo was decluttered —
      it was 1,823px of a 6.7-screen page. The rows still expand; they are one
      tap further in. Opening every fold on the route rather than naming this
@@ -913,7 +988,7 @@ try {
   for (const [route, wantIn] of [["/markets", "Markets"], ["/screen", "Screen"],
                                  ["/signals", "ledger"], ["/engines", "floor"]]) {
     await p.goto(SITE + route, { waitUntil: "domcontentloaded" });
-    await p.waitForTimeout(SETTLE + 2500);
+    await settled(p, SETTLE + 2500);
     const title = await p.title();
     ok(`${route} serves its own <title>`, title.toLowerCase().includes(wantIn.toLowerCase()), title);
     const canon = await p.evaluate(() => document.querySelector('link[rel="canonical"]')?.getAttribute("href"));
@@ -923,7 +998,7 @@ try {
   }
   // The shim: an old shared link must land on the page it named.
   await p.goto(SITE + "/#/engines", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE + 2500);
+  await settled(p, SETTLE + 2500);
   ok("an old #/ link is rewritten to the real path",
      (await p.evaluate(() => location.pathname)) === "/engines",
      await p.evaluate(() => location.pathname));
@@ -932,13 +1007,13 @@ try {
 
   // The company page: a card with a URL.
   await p.goto(SITE + "/stock/RELIANCE", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE + 6000);
+  await settled(p, SETTLE + 6000);
   ok("/stock/:sym renders the company", (await p.title()).startsWith("RELIANCE"), await p.title());
   ok("the company page sets its own og:title",
      (await p.evaluate(() => document.querySelector('meta[property="og:title"]')?.getAttribute("content") || "")).startsWith("RELIANCE"));
   ok("an unknown symbol says so rather than erroring", await (async () => {
     await p.goto(SITE + "/stock/NOTAREALTICKER", { waitUntil: "domcontentloaded" });
-    await p.waitForTimeout(SETTLE + 5000);
+    await settled(p, SETTLE + 5000);
     const txt = await p.locator("main").innerText();
     // NOT "750-name": the copy correctly stopped naming a size when the
     // universe was widened, and this regex kept the old number — so the
@@ -952,7 +1027,7 @@ try {
    * the screen", a sentence about the universe used for a string format
    * problem. */
   await p.goto(SITE + "/stock/PAYTM.NS", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE + 6000);
+  await settled(p, SETTLE + 6000);
   ok("a .NS symbol resolves to the bare one",
      !/not in the 750-name screen/i.test(await p.locator("main").innerText()),
      await p.title());
@@ -963,7 +1038,7 @@ try {
    * its working and never contradicts its own components. */
   console.log("\n  signal radar");
   await p.goto(SITE + "/radar", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE + 7000);
+  await settled(p, SETTLE + 7000);
   const rdRows = await p.locator(".rd-row").count();
   ok("the radar ranks names", rdRows > 2, rdRows);
   ok("the market core states a score", /\d+\/100/.test(await p.locator(".rd-core-n").innerText()));
@@ -1133,7 +1208,7 @@ try {
    * four times at four entries, which reads as four ideas about one company. */
   console.log("\n  ideas");
   await p.goto(SITE + "/ideas", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE + 6000);
+  await settled(p, SETTLE + 6000);
   const ideaSyms = await p.evaluate(() =>
     [...document.querySelectorAll(".aic .aic-s")].map(x => x.textContent.trim()));
   if (ideaSyms.length) {
@@ -1163,7 +1238,7 @@ try {
    * saying why. The width is checked separately, at 320px, further down. */
   console.log("\n  app shell");
   await p.goto(SITE + "/", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE + 3000);
+  await settled(p, SETTLE + 3000);
   const shell = await p.evaluate(() => {
     const tabs = [...document.querySelectorAll(".tabs a, .tabs button")];
     return { count: tabs.length,
@@ -1219,7 +1294,7 @@ try {
   ok("Discover lists the discovery pages", discCards >= 6, discCards);
 
   await p.goto(SITE + "/watch", { waitUntil: "domcontentloaded" });
-  await p.waitForTimeout(SETTLE + 4000);
+  await settled(p, SETTLE + 4000);
   ok("the watchlist shows the starred name",
      (await p.locator("main").innerText()).includes(wSym));
   // Reworded in plain language: "lives in this browser" read as jargon.
@@ -1245,10 +1320,10 @@ try {
 
   /* ── REDUCED MOTION ──────────────────────────────────────────────────── */
   console.log("\n  prefers-reduced-motion: reduce");
-  const rmCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
+  const rmCtx = await newCtx({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
   const rp = await rmCtx.newPage();
   await rp.goto(SITE + "/brief", { waitUntil: "domcontentloaded" });
-  await rp.waitForTimeout(SETTLE);
+  await settled(rp, SETTLE);
   ok("every section is visible", await rp.locator(".b-reveal:not(.in)").count() === 0);
   ok("every chart overlay is visible", await rp.locator(".b-ov:not(.on)").count() === 0);
   await openWorkup(rp);
@@ -1272,10 +1347,10 @@ try {
    * So the assertions below check that a value the FEED CARRIES actually
    * reaches the DOM, which is the only failure mode this route has. */
   console.log("\n  /funds — the screen, and one fund's sheet");
-  const fCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const fCtx = await newCtx({ viewport: { width: 1440, height: 900 } });
   const page = await fCtx.newPage();
   await page.goto(SITE + "/funds", { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(SETTLE);
+  await settled(page, SETTLE);
 
   const feed = await page.evaluate(async () => {
     const r = await fetch("/funds.json"); return r.ok ? r.json() : null;
@@ -1387,7 +1462,7 @@ try {
   const ROUTES = ["/", "/markets", "/signals", "/brief", "/screen", "/ideas",
                   "/news", "/ipo", "/funds", "/watch", "/engines", "/radar", "/reads", "/join",
                   "/methodology", "/sources", "/terms", "/privacy"];
-  const swCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const swCtx = await newCtx({ viewport: { width: 1440, height: 900 } });
   const sw = await swCtx.newPage();
 
   /* REGISTERED BEFORE THE FIRST NAVIGATION, and that is not a style choice.
@@ -1409,7 +1484,7 @@ try {
   for (const route of ROUTES) {
     routeNow = route;
     await sw.goto(SITE + route, { waitUntil: "domcontentloaded" });
-    await sw.waitForTimeout(SETTLE);
+    await settled(sw, SETTLE);
     // The panel names what failed, so report its text rather than a boolean —
     // a red run should say which section and why without opening the browser.
     // The class alone is too broad: #/terms styles its legal disclaimer with
@@ -1430,7 +1505,7 @@ try {
    * and still read open on the page. Cross-checks the rendered label against
    * what the API says, so the two cannot drift again. */
   await sw.goto(SITE + "#/signals", { waitUntil: "domcontentloaded" });
-  await sw.waitForTimeout(SETTLE + 4000);
+  await settled(sw, SETTLE + 4000);
   const mislabelled = await sw.evaluate(async () => {
     const res = await fetch("/api/signals?limit=400");
     const rows = (await res.json()).signals || [];
@@ -1493,16 +1568,16 @@ try {
    * A table is a claim that a column means something, and that claim is made
    * at every width the site is read at. Most of this site is read at the
    * narrow one. */
-  const colCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const colCtx = await newCtx({ viewport: { width: 1440, height: 900 } });
   const colP = await colCtx.newPage();
-  const colMobCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const colMobCtx = await newCtx({ viewport: { width: 390, height: 844 } });
   const colMobP = await colMobCtx.newPage();
   for (const [label, pg] of [["desktop", colP], ["phone", colMobP]])
   for (const route of ["/", "/signals", "/screen", "/ideas", "/markets", "/ipo",
                        "/brief", "/watch", "/engines", "/radar", "/news", "/funds", "/reads",
                        "/research"]) {
     await pg.goto(SITE + route, { waitUntil: "domcontentloaded" });
-    await pg.waitForTimeout(SETTLE + 3000);
+    await settled(pg, SETTLE + 3000);
     const faults = await pg.evaluate(() => {
       const inflow = el => [...el.children].filter(c => {
         const k = getComputedStyle(c);
@@ -1590,13 +1665,13 @@ try {
    * Visible text only: anything inside a closed <details> is not on the page,
    * so folding a block is not a way to pass this. */
   console.log("\n  the same fact is not printed twice");
-  const dupCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const dupCtx = await newCtx({ viewport: { width: 1440, height: 900 } });
   const dupP = await dupCtx.newPage();
   for (const route of ["/", "/signals", "/screen", "/ideas", "/markets", "/ipo",
                        "/brief", "/engines", "/radar", "/news", "/funds", "/reads", "/watch",
                        "/research"]) {
     await dupP.goto(SITE + route, { waitUntil: "domcontentloaded" });
-    await dupP.waitForTimeout(SETTLE + 3000);
+    await settled(dupP, SETTLE + 3000);
     const found = await dupP.evaluate(() => {
       /* ── A REPEATED DATA FIELD IS NOT REPEATED PROSE ──────────────────────
        * This check earns its place — it caught the management-rule caveat
@@ -1709,7 +1784,7 @@ try {
   await dupCtx.close();
 
   console.log("\n  320 x 568 — the narrowest phone in use");
-  const mCtx = await browser.newContext({ viewport: { width: 320, height: 568 } });
+  const mCtx = await newCtx({ viewport: { width: 320, height: 568 } });
   const mp = await mCtx.newPage();
   // EVERY route, not five of them. The narrow-phone check covered #/, markets,
   // brief, signals and methodology — so screen, ideas, news, ipo, funds and
@@ -1739,10 +1814,10 @@ try {
    * The page's whole claim is its second channel: brightness is the move in
    * each name's OWN average range, not in percent. So the assertions are about
    * the ramp being real and honest, not about tiles existing. */
-  const hCtx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const hCtx = await newCtx({ viewport: { width: 1440, height: 1000 } });
   const hp = await hCtx.newPage();
   await hp.goto(SITE + "/heat", { waitUntil: "domcontentloaded" });
-  await hp.waitForTimeout(SETTLE + 6000);
+  await settled(hp, SETTLE + 6000);
 
   const heat = await hp.evaluate(() => {
     const tiles = [...document.querySelectorAll(".ht[data-hsym]")];
@@ -1876,7 +1951,7 @@ try {
    * /api/ticker's ledger and the company page quotes /api/signals?px=, and if
    * those ever diverge the site reports two prices for one stock in one
    * minute, which is the complaint that started this. */
-  const px = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const px = await newCtx({ viewport: { width: 1440, height: 1000 } });
   const pp = await px.newPage();
   await pp.goto(SITE + "/api/ticker", { waitUntil: "domcontentloaded" });
   const tickJson = await pp.evaluate(() => JSON.parse(document.body.innerText));
@@ -1890,7 +1965,7 @@ try {
        b != null && Math.abs(a - b) / b * 100 < 1, { sym: someSym, ticker: a, px: b });
 
     await pp.goto(SITE + "/stock/" + someSym, { waitUntil: "domcontentloaded" });
-    await pp.waitForTimeout(SETTLE + 6000);
+    await settled(pp, SETTLE + 6000);
     const mark = await pp.evaluate(() => {
       const el = document.querySelector(".lmk");
       if (!el) return null;
@@ -1914,10 +1989,10 @@ try {
    * clicks from a page that linked it nowhere. It was live and, to anyone
    * standing on the home page, it did not exist. Something shipped where
    * nobody walks has not been shipped. */
-  const hHome = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const hHome = await newCtx({ viewport: { width: 1440, height: 1000 } });
   const hh = await hHome.newPage();
   await hh.goto(SITE + "/", { waitUntil: "domcontentloaded" });
-  await hh.waitForTimeout(SETTLE + 8000);
+  await settled(hh, SETTLE + 8000);
   const strip = await hh.evaluate(() => {
     const secs = [...document.querySelectorAll("section.sec")];
     const i = secs.findIndex(s => s.querySelector(".hgrid-s"));
@@ -1989,10 +2064,10 @@ try {
    * routing on url.hostname worked live and silently did nothing locally,
    * which is why the Worker reads the Host header. The asset path is the one
    * address that behaves identically in both. */
-  const gCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const gCtx = await newCtx({ viewport: { width: 1440, height: 900 } });
   const g = await gCtx.newPage();
   await g.goto(SITE + "/gems", { waitUntil: "domcontentloaded" });
-  await g.waitForTimeout(SETTLE + 4000);
+  await settled(g, SETTLE + 4000);
 
   const gInfo = await g.evaluate(() => {
     const cs = getComputedStyle(document.body);

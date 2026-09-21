@@ -1283,6 +1283,29 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
     const iAt = dep.indexOf("npm ci");
     ok("the deploy still runs the guard before it installs", gAt > -1 && iAt > -1 && gAt < iAt,
        `guard@${gAt} npm ci@${iAt}`);
+
+    /* ── THE POST-DEPLOY SUITE WAITS ON CONDITIONS, NOT ON A CLOCK ─────────
+     *
+     * Measured on run 202: the deploy took 19m27s, of which ui.mjs was 18m20s
+     * and the sleeps were nearly all of that — 28 navigations at ten seconds
+     * each accounted for 285 of one section's 285 seconds. On a PRIVATE repo
+     * those are metered minutes, and on 2026-09-20 the account's Actions
+     * allowance ran out and the feed sync stopped for a day.
+     *
+     * settled() can never be slower than the sleep it replaced (each call
+     * passes its old duration as the cap), so the way this regresses is not a
+     * timeout creeping up — it is somebody reaching for waitForTimeout(SETTLE)
+     * again because it is the shorter thing to type. */
+    const UI = readFileSync("test/ui.mjs", "utf8");
+    ok("the UI suite has a settled() that waits on the page, not the clock",
+       /const settled = \(page, cap = SETTLE/.test(UI));
+    const uiCode = UI.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
+    const sleeps = (uiCode.match(/waitForTimeout\(SETTLE/g) || []).length;
+    ok("no navigation sleeps on a fixed SETTLE any more", sleeps === 0, sleeps);
+    /* Every context must carry the probe settled() reads, or it silently
+       falls through to the DOM-only half of the condition. */
+    ok("every browser context goes through newCtx, which installs the probe",
+       (uiCode.match(/browser\.newContext\(/g) || []).length === 1, "only newCtx may call it");
   }
 
   ok("the watchdog watches something", WATCH.length === 4, WATCH.length);
