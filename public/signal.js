@@ -4878,7 +4878,12 @@
         pk ? ['Ranked today', pk, 'daily engine'] : null,
         mb ? ['Multibaggers', mb, 'weekly scan', 'ac'] : null,
         wk ? ['This week', wk, 'top picks'] : null,
-        ['Cleared for capital', '0', 'of 7 engines', 'dn'],
+        /* COUNTED, NOT TYPED. This read "of 7 engines" while ENGINE_BOOK
+           holds eight — GUST was promoted out of research tier and the
+           denominator beside it was not. A denominator that is typed is the
+           one number on a page nobody re-checks, and engineTally() already
+           knows the answer both other surfaces print. */
+        ['Cleared for capital', '0', `of ${engineTally().keys} engines`, 'dn'],
       ], 'No engine has 30 closed trades at t&nbsp;≥&nbsp;2, so nothing here is a '
        + 'recommendation. <a href="/signals">The record</a> is the reason.');
     }
@@ -14920,7 +14925,12 @@
   };
 
   R['/discover'] = async () => {
-    paint(head('Discover', `Seven ways into the same ${universeN()} names. Each answers a different question.`,
+    /* COUNTED, NOT SPELLED OUT — the same rule the ticker lead already follows.
+     * This read "Seven ways" over a list of eleven: four doors were added to
+     * DISCOVER and the sentence above them was not, so the page contradicted
+     * itself in the space of one screen. A number typed beside a list is a
+     * claim that the list will never grow, and this one already had. */
+    paint(head('Discover', `${DISCOVER.length} ways into the same ${universeN()} names. Each answers a different question.`,
                'Discover') +
       `<div class="disc">${DISCOVER.map(([href, name, sub, why]) => `
         <a class="disc-c" href="${esc(href)}">
@@ -15754,12 +15764,23 @@
                      'The whole screened market as one picture, coloured by the call, momentum, value, quality, position in its year, or how often each name has risen in this calendar month over eleven years.'],
     '/reads':       ['Weekly reads — seven companies, studied properly',
                      'One company per sector, every Saturday. What it sells, how the money arrives, and what would break it.'],
-    '/discover':    ['Discover — seven ways into the screened names',
-                     'Radar, screen, ideas, markets, IPO, news and funds — what each one answers.'],
+    /* NO COUNT AND NO ROSTER IN THE META. Same rule as /screen above: this
+       table is static and written before DISCOVER is read, so it cannot stay
+       in sync with it. It said "seven ways" and then named seven of the
+       eleven doors — heatmap, map, weekly reads and the research floor were
+       missing from a sentence that reads as exhaustive, and that sentence is
+       what a search result and a link unfurl show. The page itself counts. */
+    '/discover':    ['Discover — every way into the screened names',
+                     'Each section of this site, what question it answers, and which of the same screened names it is looking at.'],
     '/radar':       ['Signal radar — the market, and the names carrying it',
                      'A breadth-based market score with every term printed, and the eight highest-scoring names ranked on trend, momentum, volume and institutional flow.'],
     '/engines':     ['The floor — every engine, what fires it, what it has done',
-                     'Nine engines with their trigger conditions, where each stop comes from, how each can be wrong, and its measured record. Nothing is cleared for capital.'],
+                     /* NO COUNT. It said nine; ENGINE_BOOK.keys() returns eight, and
+                        has since magic was retired. This is the number that once read 8
+                        on one page and 9 on another, still reading 9 in the one place a
+                        search result and a link unfurl quote. The floor states the real
+                        figure from the registry. */
+                     'Every engine with its trigger conditions, where each stop comes from, how it can be wrong, and its measured record. Nothing is cleared for capital.'],
     '/ideas':       ['Ideas — this week’s multibaggers and what they were picked at',
                      'The weekly leadership screen, with the price each name was picked at and what it has done since.'],
     '/ipo':         ['IPO — books open now, and how last year’s listings did',

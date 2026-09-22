@@ -305,6 +305,15 @@ This is the part of the design system that is not about looking like anything.
 - **No section phrases its own freshness.** One badge vocabulary, one snapshot
   per build, or two parts of a page will describe the same number as "0.5d old"
   and "12h old".
+- **A count in copy is read from its registry, never typed.** A number written
+  beside a list is a claim that the list will never grow, and three of them had
+  already been overtaken: `/discover` led with "Seven ways" over eleven doors,
+  `/engines` told search results "Nine engines" over a registry of eight, and
+  the front page's own tile read "0 of 7 engines" after GUST was promoted out
+  of research tier and the denominator beside it was not. Four other figures in
+  the same copy were checked against their sources and are correct, so they
+  stand — the rule is not "no numbers in prose", it is that a figure about a
+  list must be counted from that list.
 - **Nothing predicts.** No probability, no price target, no forecast, no
   confidence score. This is a design rule as much as an editorial one: there is
   no component for a prediction, so one cannot be added by accident.

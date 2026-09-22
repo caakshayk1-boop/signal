@@ -1548,6 +1548,81 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   }
 }
 
+/* ── A NUMBER TYPED BESIDE A LIST IS A CLAIM THE LIST WILL NEVER GROW ────────
+ *
+ * Both of these shipped, and both are the same fault the ticker lead was
+ * already fixed for ("COUNTED, NOT SPELLED OUT"):
+ *
+ *   · /discover led with "Seven ways into the same N names" over a DISCOVER
+ *     registry of ELEVEN. Four doors were added and the sentence above them
+ *     was not. Its meta description then named seven of the eleven in a
+ *     sentence that reads as exhaustive — and a meta description is what a
+ *     search result and a link unfurl quote.
+ *   · /engines' meta description said "Nine engines". ENGINE_BOOK.keys()
+ *     returns EIGHT and has since magic was retired. This is the number the
+ *     sibling repo's notes already record as having read 8 on one page and 9
+ *     on another; it was still reading 9 in the one place nobody re-reads.
+ *
+ * Four other figures in the same copy were checked against their sources and
+ * are CORRECT, so they are left alone rather than scrubbed: /markets' 71 is
+ * 56 static instruments plus three live segments of five, /radar's eight is
+ * slice(0, 8), /research's three is the research roster, and /reads' seven is
+ * the studies in an edition. The rule is not "no numbers in prose". */
+{
+  const SRC = JS.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+  const WORD = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+                 seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+
+  /* The doors, counted out of the registry itself. */
+  const disc = (JS.match(/const DISCOVER = \[([\s\S]*?)\n  \];/) || ["", ""])[1];
+  const nDoors = (disc.match(/\n    \['\//g) || []).length;
+  ok("the DISCOVER registry can be counted", nDoors >= 5, nDoors);
+
+  /* The engines, out of the one registry both bundles share. */
+  const ENG = readFileSync("public/engines.js", "utf8");
+  const w = {};
+  new Function("window", ENG)(w);
+  const nEngines = w.ENGINE_BOOK.keys().length;
+  ok("the engine registry can be counted", nEngines >= 5, nEngines);
+
+  /* THE LEAD COUNTS, IT DOES NOT SPELL. */
+  ok("the discover lead counts the registry rather than asserting a figure",
+     /\$\{DISCOVER\.length\} ways into/.test(JS));
+
+  /* NO STRING MAY SPELL A COUNT THAT DISAGREES WITH ITS REGISTRY. Both the
+   * digit and the word form, because "9 engines" and "nine engines" are the
+   * same claim. */
+  const wrong = [];
+  const num = t => (/^\d+$/.test(t) ? Number(t) : WORD[t.toLowerCase()]);
+  /* THE RESEARCH FLOOR IS A DIFFERENT POPULATION and says so in its own
+   * sentence. "Three engines that have not earned capital" is not a claim
+   * about the published book, and a check that cannot tell them apart would
+   * either fail on correct copy or be switched off. The enclosing sentence is
+   * read, not just the two words around the number. */
+  const ELSEWHERE = /research|not earned|none of them cleared|still being tested|BUOY|ANCHOR|BEDROCK/i;
+  const sentence = (src, i) => {
+    const a = src.lastIndexOf("\n", i), b = src.indexOf("\n", i);
+    return src.slice(a < 0 ? 0 : a, b < 0 ? src.length : b);
+  };
+  const scan = (noun, truth) => {
+    const re = new RegExp(
+      `(\\d{1,3}|${Object.keys(WORD).join("|")})\\s+${noun}`, "gi");
+    for (const m of SRC.matchAll(re)) {
+      const n = num(m[1]);
+      if (n === undefined || n === truth) continue;
+      if (ELSEWHERE.test(sentence(SRC, m.index))) continue;
+      wrong.push(`"${m[0]}" but the registry holds ${truth}  (line ${lineOf(SRC, m.index)})`);
+    }
+  };
+  scan("engines", nEngines);
+  scan("ways into", nDoors);
+  /* The front page's own denominator, which read "of 7 engines" after GUST was
+     promoted out of research tier and the number beside it was not. */
+  ok("the cleared-for-capital tile counts its denominator",
+     /`of \$\{engineTally\(\)\.keys\} engines`/.test(JS));
+  ok("no copy spells a count its own registry contradicts", wrong.length === 0, wrong);
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);
