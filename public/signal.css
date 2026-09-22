@@ -3387,10 +3387,23 @@ html:has(dialog[open]){overflow:hidden}
 
 @keyframes toTopIn{from{opacity:0;transform:translateY(8px) scale(.94)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.totop{animation:none}}
-@media(max-width:760px){
-  .totop{right:14px;bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 14px);
-    width:40px;height:40px}
-}
+/* ── AND IT DOES NOT EXIST ON A PHONE ─────────────────────────────────────
+ * It used to sit above the tab bar at 40x40, floating over the content, and
+ * on a 390px screen there is nothing for it to float over EXCEPT content.
+ * Measured on /radar, 2026-09-22: the circle sat on top of a card's
+ * right-aligned Institutional score, so the one number in that row a reader
+ * could not see was hidden by a control for going somewhere else.
+ *
+ * It is also redundant there. Below 760px the tab bar is pinned to the BOTTOM
+ * of the viewport — it is on screen already — and tapping the tab you are on
+ * scrolls to the top. Above 760px the bar moves to the top of the document
+ * and scrolls away with it, which is where a back-to-top control earns its
+ * place.
+ *
+ * Removed rather than shrunk. A 40px target was under the floor this sheet
+ * holds everywhere else, and making it 44 would have covered MORE of the
+ * number it was already covering. */
+@media(max-width:760px){ .totop{display:none} }
 
 /* ── EVENT ROWS THAT OPEN AND STAR ────────────────────────────────────────
    A name in a list of events is the same object as a name anywhere else on

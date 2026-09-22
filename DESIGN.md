@@ -336,6 +336,14 @@ animation, and that is not an error.
   price, off-high, stop — and must **not** invent a fresh score. A stamped score
   says *at build*. Inventing a number client-side is the fault this site avoids
   everywhere else.
+- **A live overlay re-reads a fact through the same function that rendered it.**
+  "Off its high" must never be a positive number: a price above the 52-week high
+  is not a distance from it, it is a new high, and `+4.1%` under that label reads
+  as 4.1% *below*. `offHigh()` was written for exactly this and the overlay
+  bypassed it — ACMESOLAR rendered "4.1% · Off its high" against a ₹440.70 high
+  printed two cells to the left, in the up colour, so it looked deliberate.
+  **And the label moves with the value**, or a correct number sits under a stale
+  heading — the same defect one element to the left.
 - **A breached stop voids the setup and the call says so.** IFCI once read
   "Buy · 89 Strong" over its own live "−13.1% off its high".
 
@@ -395,6 +403,21 @@ This is the part of the design system that is not about looking like anything.
   **`.wstar` widens on one axis only.** A square 44px area around a star in a
   40px row bleeds 8px into the rows above and below, and a tap meant to open
   one of those would save a name in this one. 44 wide, 36 tall.
+
+  **A floating control that covers a number is worse than no control.** This
+  document first said `.totop` "is simply 44" — it was **40 on a phone**, under
+  the floor, and floating over the content. On a 390px screen there is nothing
+  for it to float over *except* content: measured on `/radar`, the circle sat
+  on top of a card's right-aligned Institutional score, so the one figure in
+  that row a reader could not see was hidden by a control for going somewhere
+  else. Raising it to 44 would have covered more.
+
+  It is **removed below 760px** instead. It is redundant there: the tab bar is
+  pinned to the bottom of the viewport, and tapping the tab you are on scrolls
+  to the top. Above 760px the bar moves to the top of the document and scrolls
+  away with it, which is where a back-to-top control earns its place — and
+  there it is 44. Nothing may size it below that; a guard reads every rule that
+  does.
 - Colour is never the only channel: a direction is a colour **and** a sign.
 - `[hidden]` must actually hide — `display:none !important`, the one rule in the
   sheet allowed to be important, because every row primitive sets `display` and
