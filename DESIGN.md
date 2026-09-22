@@ -323,7 +323,26 @@ This is the part of the design system that is not about looking like anything.
 ## 11. Accessibility floor
 
 - Focus is visible on everything focusable: `2px solid var(--accent)`, offset 2.
-- Touch targets are **44px minimum**.
+- **Touch targets: 44px where the control stands alone, never below WCAG's 24.**
+  The blanket "44px minimum" this document first claimed was false in four
+  places — `.icon-btn` at 32 (the theme toggle, the menu and the search, on
+  every page and the most-tapped controls on the site), `.wstar` at 28,
+  `.totop` at 42, and a range input at 24.
+
+  The fix is a **hit area, not a bigger button**: growing `.icon-btn` to 44
+  puts three 44px boxes in a 64px bar and changes the header's density, and
+  density is the point of this design. A centred `::after` gives the finger 44
+  and the eye 32. Verified at 390px with `elementFromPoint`: the button answers
+  at 21px from its own centre in all four directions.
+
+  **Hit areas must not overlap.** At an 8px gap, two 44px areas around 32px
+  buttons cross by 4px, and in an overlap the later element in the DOM wins —
+  a mis-tap, not a bigger target. The header gap is 12, so the centres sit
+  exactly 44 apart and the areas meet without crossing.
+
+  **`.wstar` widens on one axis only.** A square 44px area around a star in a
+  40px row bleeds 8px into the rows above and below, and a tap meant to open
+  one of those would save a name in this one. 44 wide, 36 tall.
 - Colour is never the only channel: a direction is a colour **and** a sign.
 - `[hidden]` must actually hide — `display:none !important`, the one rule in the
   sheet allowed to be important, because every row primitive sets `display` and

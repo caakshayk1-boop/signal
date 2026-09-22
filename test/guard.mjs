@@ -1623,6 +1623,39 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("no copy spells a count its own registry contradicts", wrong.length === 0, wrong);
 }
 
+/* ── THE TARGET IS BIGGER THAN THE BUTTON ───────────────────────────────────
+ * DESIGN.md claimed "touch targets are 44px minimum" and four controls were
+ * not: .icon-btn at 32 (the theme toggle, the menu and the search — on every
+ * page, and the most-tapped controls on the site), .wstar at 28, .totop at 42,
+ * and a range input at 24. The document was asserting a floor the sheet did
+ * not hold, which is the one thing a design document must never do.
+ *
+ * The fix is a hit area, not a bigger button: growing .icon-btn to 44 puts
+ * three 44px boxes in a 64px bar and changes the header's density, and density
+ * is the point of this design. Verified with elementFromPoint at 390px — the
+ * button answers at 21px from its own centre in all four directions. */
+{
+  const FLAT = CSS.replace(/\s+/g, " ");
+  const hasHit = (cls, w, h) =>
+    new RegExp("\\." + cls + "::after\\{[^}]*width:" + w + "px[^}]*height:" + h + "px").test(FLAT);
+  ok(".icon-btn carries a 44px hit area", hasHit("icon-btn", 44, 44));
+  ok("...and is positioned, or the pseudo resolves against the page instead",
+     /\.icon-btn\{position:relative/.test(CSS));
+  /* AND THE HIT AREAS MUST NOT OVERLAP. At an 8px gap two 44px areas around
+     32px buttons cross by 4px, and in an overlap the later element in the DOM
+     wins — a mis-tap, not a bigger target. 32 + 12 puts the centres exactly
+     44 apart. Measured at 390px: centre gap 44, no overlap. */
+  ok("the header gap keeps two hit areas from crossing",
+     /\.bar-right\{[^}]*gap:var\(--s-3\)/.test(CSS));
+  /* WIDER, NOT TALLER. A square 44px area around the star would bleed 8px into
+     the row above and below, and a tap meant to open that row would save a
+     name in this one. 36 is 4px of bleed inside a 40px row. */
+  ok(".wstar widens its hit area on the safe axis only", hasHit("wstar", 44, 36));
+  ok("...and is positioned", /\.wstar\{position:relative\}/.test(CSS));
+  ok(".totop is the full target size — nothing sits beside it",
+     /\.totop\{[\s\S]{0,400}?width:44px;height:44px/.test(CSS));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

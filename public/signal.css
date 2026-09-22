@@ -354,10 +354,29 @@ a{color:inherit;text-decoration:none}
 .brand{display:flex;align-items:center;gap:8px}
 .brand-name{font:800 var(--t-7)/1 var(--disp);letter-spacing:var(--ls-wide)}
 .brand-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
-.bar-right{display:flex;align-items:center;gap:8px}
+/* 12, NOT 8. The header buttons carry a 44px hit area that is larger than the
+   button; at an 8px gap two of those overlap by 4px, and in an overlap the
+   later element in the DOM wins — which is a mis-tap, not a bigger target.
+   32 + 12 puts the centres 44 apart, so the hit areas meet and never cross. */
+.bar-right{display:flex;align-items:center;gap:var(--s-3)}
 .stat-live{font:400 var(--t-2)/1 var(--mono);color:var(--dim);letter-spacing:var(--ls-wide)}
-.icon-btn{width:32px;height:32px;display:grid;place-items:center;border:1px solid var(--line);
+/* ── THE TARGET IS BIGGER THAN THE BUTTON ─────────────────────────────────
+ * These are 32px: the theme toggle, the menu and the search, on every page,
+ * and the most-tapped controls on the site. 32 clears WCAG 2.5.8 (24px) and
+ * misses the 44px a thumb actually wants by a third.
+ *
+ * The fix is a hit area, NOT a bigger button. Growing the control to 44 would
+ * put three 44px boxes in a 64px bar and change the header's whole density —
+ * and density is the point of this design. A centred ::after gives the finger
+ * 44px and the eye 32.
+ *
+ * position:relative is what makes the pseudo-element resolve against the
+ * button rather than the page; without it the hit area lands at the top left
+ * of the nearest positioned ancestor. */
+.icon-btn{position:relative;width:32px;height:32px;display:grid;place-items:center;border:1px solid var(--line);
   border-radius:var(--r-3);background:none;color:var(--muted);cursor:pointer;font-size:var(--t-5)}
+.icon-btn::after{content:"";position:absolute;top:50%;left:50%;
+  width:44px;height:44px;transform:translate(-50%,-50%)}
 @media (hover:hover) and (pointer:fine){.icon-btn:hover{color:var(--text);border-color:var(--line2)}}
 
 
@@ -2518,6 +2537,21 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
   width:28px;height:28px;display:inline-grid;place-items:center;vertical-align:-8px;
   color:var(--dim);border-radius:var(--r-2);flex:none;
   transition:color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
+/* ── WIDER, NOT TALLER ────────────────────────────────────────────────────
+ * The star sits inside a 40px row that is itself a button, in the screen
+ * table, the rank lists, the card headers and the sheet header. A square 44px
+ * hit area would bleed 8px above and below into the NEXT ROW, and a tap meant
+ * to open that row would save a name in this one instead. Overlapping targets
+ * are a worse defect than a small one.
+ *
+ * So the horizontal axis, where the neighbours are the row's own text and a
+ * stolen click opens the same card, goes to 44; the vertical axis stops at 36,
+ * which is 4px of bleed inside a 40px row and cannot reach the row beside it.
+ * 28x28 already clears WCAG 2.5.8; this buys most of the comfort of 44 without
+ * the mis-tap. Recorded in DESIGN.md as measured rather than claimed. */
+.wstar{position:relative}
+.wstar::after{content:"";position:absolute;top:50%;left:50%;
+  width:44px;height:36px;transform:translate(-50%,-50%)}
 .wstar svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.4;
   stroke-linejoin:round}
 @media (hover:hover) and (pointer:fine){.wstar:hover{color:var(--text);background:var(--raised)}}
@@ -3410,7 +3444,9 @@ html:has(dialog[open]){overflow:hidden}
    control nobody can press. */
 .totop{
   position:fixed;right:20px;bottom:20px;z-index:38;
-  width:42px;height:42px;display:grid;place-items:center;
+  /* 44, not 42. It is a free-floating control with nothing beside it, so
+     there is no reason for it to be two pixels short of the target size. */
+  width:44px;height:44px;display:grid;place-items:center;
   border:1px solid var(--line2);border-radius:var(--r-pill);
   background:var(--surface);color:var(--text);cursor:pointer;
   box-shadow:var(--e-2);
