@@ -1487,6 +1487,67 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   }
 }
 
+/* ── THE LIVE PAGE HAS TO BE LIVE OUT LOUD TOO ──────────────────────────────
+ * The page re-fetches every sixty seconds and marks the cells that moved by
+ * flashing them green or red. That was the ENTIRE feedback channel, and all of
+ * it visual: a screen-reader user was told nothing when a number moved under
+ * them, on a site whose whole subject is numbers moving.
+ *
+ * Four properties, each of which was wrong in a draft of the fix. */
+{
+  ok("the shell carries one polite live region",
+     /id="liveNews"[^>]*role="status"/.test(HTML)
+     && /id="liveNews"[^>]*aria-live="polite"/.test(HTML)
+     && /id="liveNews"[^>]*aria-atomic="true"/.test(HTML));
+
+  /* OUTSIDE <main>. main is replaced wholesale on every repaint, and a live
+   * region that is removed and re-inserted is not announced: assistive tech
+   * tracks the node, and a fresh node with text already in it reads as a new
+   * element rather than a change to an existing one. */
+  {
+    /* Comments stripped first: the note ABOVE the region explains why it is
+       outside <main> and therefore contains the string, which the first
+       version of this check matched before the real tag. */
+    const bare = HTML.replace(/<!--[\s\S]*?-->/g, "");
+    const i = bare.indexOf('id="liveNews"');
+    const m = bare.indexOf('<main');
+    ok("the live region is outside <main>, which is replaced on every repaint",
+       i > 0 && m > 0 && i < m, { liveNews: i, main: m });
+  }
+
+  /* THE DIFF IS TAKEN ONCE AND USED TWICE. It used to be computed inside the
+   * flash, which returns early under prefers-reduced-motion — so for a reader
+   * who had asked for less movement the diff was never taken at all, and an
+   * announcement built on it would have been silent for exactly the readers
+   * most likely to need it. */
+  ok("the diff is its own function", /function diffNums\(before\)/.test(JS));
+  ok("the refresh takes the diff once", /const moved = diffNums\(before\);/.test(JS));
+  ok("...and both consumers are called with it",
+     /flashChanged\(moved\);/.test(JS) && /announceChanged\(moved\);/.test(JS));
+
+  /* AN ANNOUNCEMENT IS NOT AN ANIMATION. Gating it on prefers-reduced-motion
+   * is the one-line change that silently reinstates the whole defect. */
+  {
+    const fn = (JS.match(/function announceChanged\(moved\) \{[\s\S]*?\n  \}/) || [""])[0];
+    ok("announceChanged exists", fn.length > 0);
+    ok("it is not gated on prefers-reduced-motion — an announcement is not an animation",
+       !/reduced-motion/.test(fn));
+    ok("it says nothing when nothing moved", /if \(!moved\.length\)/.test(fn));
+    /* A SUMMARY, NOT A FIREHOSE. A refresh can move sixty cells; reading sixty
+     * aloud takes longer than the interval before the next refresh. */
+    ok("it names a bounded number of movers and counts the rest",
+       /\.slice\(0, 3\)/.test(fn) && /more/.test(fn), fn.slice(0, 0));
+    /* THE CLEAR HAS TO LAND IN A LATER TASK. The accessibility tree is
+     * computed when the task ends, so a clear and a set in the same task are
+     * only ever seen as the set — the first version did exactly that and a
+     * MutationObserver recorded the final text for both records. */
+    ok("the re-announce clears in one task and sets in another",
+       /textContent = '';[\s\S]*setTimeout\(\(\) => \{ el\.textContent = sentence; \}/.test(fn));
+    ok("...and a refresh landing on a pending one replaces it rather than queueing",
+       /clearTimeout\(announceChanged\._t\)/.test(fn));
+  }
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

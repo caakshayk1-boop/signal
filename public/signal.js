@@ -16106,7 +16106,9 @@
     // were rather than wherever the new layout happens to land them.
     if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
 
-    flashChanged(before);
+    const moved = diffNums(before);
+    flashChanged(moved);
+    announceChanged(moved);
   }
 
   /* ── WHAT CHANGED, MADE VISIBLE ─────────────────────────────────────────
@@ -16144,23 +16146,95 @@
     const n = parseFloat(String(t).replace(/[^0-9.+-]/g, ''));
     return isFinite(n) ? n : null;
   };
-  function flashChanged(before) {
-    if (!before || !before.size) return;
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  /* THE DIFF IS COMPUTED ONCE AND USED TWICE.
+   *
+   * It used to be computed inside the flash, which is why only sighted
+   * readers ever learned anything from it: the flash returns early under
+   * prefers-reduced-motion, so the diff was never taken at all for a reader
+   * who had asked for less movement — and the announcement now depends on it.
+   * Separating them means neither can silently disable the other. */
+  function diffNums(before) {
+    const out = [];
+    if (!before || !before.size) return out;
     document.querySelectorAll(NUMSEL).forEach(c => {
       const k = numKey(c);
       if (!k || !before.has(k)) return;
       const was = before.get(k), now = c.textContent.trim();
       if (was === now) return;
       const a = numOf(was), b = numOf(now);
+      const row = c.closest('[data-sym]');
+      out.push({
+        cell: c,
+        sym: (row && row.getAttribute('data-sym')) || '',
+        label: c.getAttribute('data-l') || '',
+        now,
+        dir: a != null && b != null && b !== a ? (b > a ? 1 : -1) : 0,
+      });
+    });
+    return out;
+  }
+
+  function flashChanged(moved) {
+    if (!moved.length) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    moved.forEach(({ cell: c, dir: d }) => {
       c.classList.remove('chg-up', 'chg-dn', 'chg');
       // Force a reflow. Without it a cell that moves on two consecutive ticks
       // keeps the class it already had and sits still through the second one.
       void c.offsetWidth;
-      c.classList.add(a != null && b != null && b !== a
-        ? (b > a ? 'chg-up' : 'chg-dn') : 'chg');
+      c.classList.add(d ? (d > 0 ? 'chg-up' : 'chg-dn') : 'chg');
       setTimeout(() => c.classList.remove('chg-up', 'chg-dn', 'chg'), 1500);
     });
+  }
+
+  /* ── AND THE SAME THING, IN WORDS ───────────────────────────────────────
+   *
+   * NOT GATED ON prefers-reduced-motion. An announcement is not an animation.
+   * A reader who has asked the operating system for less movement has asked
+   * about movement, not about being told what happened — and on a page that
+   * repaints itself every sixty seconds, not being told is the difference
+   * between a live page and a dead one.
+   *
+   * A SUMMARY, NOT A FIREHOSE. A refresh can move sixty cells; reading sixty
+   * of them aloud takes longer than the interval before the next refresh, so
+   * the reader would never hear the end of one update before the next began.
+   * Three named movers and a count is the whole sentence.
+   *
+   * SILENT WHEN NOTHING MOVED. refresh() already returns before painting when
+   * no feed changed, so this is only reached on a real update — but a live
+   * region written with the same text twice announces twice in some screen
+   * readers, and a page that says "3 figures updated" every minute whether or
+   * not they did is the audible version of a flash that fires on every tick.
+   */
+  function announceChanged(moved) {
+    const el = document.getElementById('liveNews');
+    if (!el) return;
+    if (!moved.length) { el.textContent = ''; return; }
+    const named = moved.filter(m => m.sym && m.label);
+    const lead = named.slice(0, 3).map(m =>
+      `${m.sym} ${m.label} ${m.now}${m.dir ? (m.dir > 0 ? ', up' : ', down') : ''}`);
+    const rest = moved.length - lead.length;
+    const sentence = [
+      `${moved.length} figure${moved.length === 1 ? '' : 's'} updated`,
+      lead.length ? lead.join('. ') : '',
+      rest > 0 && lead.length ? `and ${rest} more` : '',
+    ].filter(Boolean).join('. ') + '.';
+    /* ── THE CLEAR HAS TO LAND IN A LATER TASK ──────────────────────────
+     * A live region announces a CHANGE. Assigning the same string twice is
+     * not one, so two identical updates in a row are reported once — and the
+     * obvious remedy, clearing it first, does nothing at all: the
+     * accessibility tree is computed when the task ends, so a clear and a set
+     * in the same task are only ever seen as the set.
+     *
+     * Verified rather than assumed — the first version of this did exactly
+     * that and a MutationObserver recorded the final text for both records.
+     *
+     * The timer is cancelled on re-entry, so a refresh that lands while the
+     * previous announcement is still pending replaces it instead of queueing
+     * two sentences a reader would hear back to back. */
+    clearTimeout(announceChanged._t);
+    el.textContent = '';
+    announceChanged._t = setTimeout(() => { el.textContent = sentence; }, 60);
   }
 
   /* ── THE TICKER ──────────────────────────────────────────────────────────

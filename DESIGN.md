@@ -323,10 +323,21 @@ This is the part of the design system that is not about looking like anything.
 - **Nothing that arrives late may move what someone is reading.** Every async
   block reserves its height first.
 
-**Open item:** live-updating figures are not announced. The site refreshes
-prices on a 60-second timer and there is no `aria-live` region anywhere in
-`signal.js` — a screen-reader user is told nothing when a number changes under
-them.
+- **A live page is live out loud.** The 60-second refresh marks the cells that
+  moved by flashing them; that feedback used to be entirely visual. One polite
+  `role="status"` region, outside `<main>` because `<main>` is replaced
+  wholesale on every repaint, now says what changed in words.
+
+  Three rules govern it, and each was wrong in a draft:
+  **an announcement is not an animation** — it is *not* gated on
+  `prefers-reduced-motion`, because a reader who asked for less movement asked
+  about movement, not about being kept informed;
+  **it is a summary, not a firehose** — a refresh can move sixty cells and
+  reading sixty aloud takes longer than the interval before the next one, so
+  it names three and counts the rest;
+  **the clear lands in a later task** — the accessibility tree is computed when
+  the task ends, so clearing and setting a region in one task is only ever seen
+  as the set, and two identical updates would be announced once.
 
 ---
 
