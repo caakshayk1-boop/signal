@@ -4633,6 +4633,10 @@
       const B = BP ? (() => {
         const t = BP.today;
         return { score: t.score, band: t.band, counted: t.counted,
+                 /* barometer.py ships this; the browser fallback below
+                    computes its own. Either way the score must arrive with
+                    the share of its own weight that produced it. */
+                 coverage: t.coverage || null,
                  parts: (t.parts || []).map(x => ({ ...x, score: Number(x.score) })),
                  acc: t.stage ? { stage: t.stage, hits: [], dd: t.drawdown_pct,
                                   aboveP: t.above_200dma_pct } : null,
@@ -4644,7 +4648,14 @@
             <div class="baro-s ${esc(B.band.c)}">
               ${ringGauge(B.score, B.band.t, B.band.c, 132)}
             </div>
-            <div class="baro-p">${B.parts.map(pt => `
+            <div class="baro-p">${(B.coverage && !B.coverage.complete
+              ? `<p class="baro-cov">Built on <b>${B.coverage.parts}</b> of
+                 <b>${B.coverage.partsTotal || B.coverage.parts_total}</b>
+                 components — <b>${B.coverage.weightUsed || B.coverage.weight_used}%</b>
+                 of the score's weight.
+                 ${esc((B.coverage.missing || []).join(' and '))} did not
+                 answer, so this is not comparable with a full reading.</p>`
+              : '')}${B.parts.map(pt => `
               <div class="baro-i">
                 <span class="baro-k">${esc(pt.label)}<i>${pt.weight}%</i></span>
                 ${meter(pt.score, pt.score >= 55 ? 'up' : pt.score <= 30 ? 'dn' : '')}
@@ -9228,8 +9239,24 @@
           `${hi} of ${counted} at a 52-week high`);
     }
 
+    /* ── THE DENOMINATOR HAS TO TRAVEL WITH THE SCORE ────────────────────
+       wsum is the weight of the components that ANSWERED, not the weight
+       this model declares. Dividing by it renormalises over whatever had
+       data and then publishes "N out of 100" — the same number a complete
+       reading gives, with nothing to tell them apart.
+
+       Measured 2026-09-21: trend and volatility both came back null, so 45
+       of the declared 100 weight was missing — including trend, the single
+       heaviest at 30 — and the page printed 42/100 from 55% of its own
+       scale. barometer.py had this fault too, written independently in the
+       other language; both are fixed the same way. */
     const wsum = parts.reduce((a, p) => a + p.weight, 0);
     if (!wsum) return null;
+    const wTotal = Object.values(BARO_W).reduce((a, b) => a + b, 0);
+    const missing = Object.keys(BARO_W).filter(k => !parts.some(p => p.key === k));
+    const coverage = { parts: parts.length, partsTotal: Object.keys(BARO_W).length,
+                       weightUsed: wsum, weightTotal: wTotal,
+                       missing, complete: wsum === wTotal };
     const score = Math.round(parts.reduce((a, p) => a + p.score * p.weight, 0) / wsum);
     const band = score >= 70 ? { k: 'strong', t: 'Strong', c: 'up' }
                : score >= 55 ? { k: 'firm', t: 'Firm', c: 'up' }
@@ -9282,7 +9309,7 @@
       return { stage, hits, dd, aboveP };
     })();
 
-    return { score, band, parts, acc, counted };
+    return { score, band, parts, acc, counted, coverage };
   };
 
   /* Each index, scored the same way on the two things an index can tell you

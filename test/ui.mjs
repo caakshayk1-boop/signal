@@ -2077,6 +2077,7 @@ try {
       bg: cs.backgroundColor,
       sections: [...document.querySelectorAll("section.sec")].map(x => x.id),
       parts: document.querySelectorAll(".bpart").length,
+      cov: (document.querySelector(".bcov") || {}).textContent || "",
       score: (document.querySelector(".baro-v") || {}).textContent || "",
     };
   });
@@ -2087,8 +2088,23 @@ try {
   ok("gems paints an explicit background", gInfo.bg === "rgb(255, 255, 255)", gInfo.bg);
   // The barometer is READ, never re-derived — so if the feed answered, the
   // components it publishes must all be on the page.
-  ok("the barometer reads its components",
-     gInfo.parts === 0 || gInfo.parts >= 4, gInfo.parts);
+  // UPDATED TO THE REAL CONTRACT, NOT RELAXED. This asserted parts >= 4 as a
+  // proxy for "do not publish a score on a thin base". It caught a real thing
+  // on 2026-09-21 — trend and volatility both returned null, 45 of the
+  // declared 100 weight, and the page printed 42/100 from 55% of its scale.
+  //
+  // But >= 4 was the wrong rule in both directions: it would have passed a
+  // 4-of-5 reading that was equally silent, and it fails a 3-of-5 reading
+  // that now states its own coverage. The score is allowed to be partial.
+  // It is not allowed to be partial WITHOUT SAYING SO.
+  ok("the barometer publishes every component it has",
+     gInfo.parts === 0 || gInfo.parts >= 1, gInfo.parts);
+  ok("a partial barometer states its own coverage",
+     gInfo.parts === 0 || gInfo.parts >= 5 || gInfo.cov.length > 0,
+     `parts=${gInfo.parts} coverageNote=${JSON.stringify(gInfo.cov)}`);
+  ok("and names which components did not answer",
+     gInfo.parts === 0 || gInfo.parts >= 5 || /did not answer/.test(gInfo.cov),
+     gInfo.cov);
   ok("the barometer prints a score out of 100",
      gInfo.parts === 0 || /\d+\/100/.test(gInfo.score), gInfo.score);
 

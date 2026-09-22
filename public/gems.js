@@ -1071,6 +1071,20 @@
            is the exact complaint that started this pass. The bar, the weight,
            the score and the sentence behind it belong to one component and
            now sit in one block. */
+        /* THE SCORE IS RENORMALISED WHEN A COMPONENT DOES NOT ANSWER, and
+           until 2026-09-22 nothing said so. On 2026-09-21 trend and
+           volatility both came back empty — 45 of the declared 100 weight,
+           including the heaviest component — and this printed "42 out of
+           100" from 55% of its own scale, identical to a complete reading.
+           barometer.py now ships `coverage`; a score built on part of its
+           weight has to say which part. */
+        (bt.coverage && !bt.coverage.complete
+          ? `<p class="bcov">Built on <b>${bt.coverage.parts}</b> of
+             <b>${bt.coverage.parts_total}</b> components —
+             ${bt.coverage.weight_used}% of the score's weight.
+             ${esc((bt.coverage.missing || []).join(' and '))} did not answer,
+             so this is not comparable with a full reading.</p>`
+          : '') +
         `<div class="bparts">${(bt.parts || []).map(pt => `
           <div class="bpart">
             <div class="bp-h"><span class="bp-l">${esc(pt.label)}</span>

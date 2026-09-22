@@ -6192,3 +6192,13 @@ button:not(.chip):not(.tabg):not(.tabs):not(.tab-more):not(.foldb):active {
  * remembered. Letters read further apart as they grow; at 36px and 44px the
  * default is visibly loose. This makes it the rule rather than the habit. */
 h1, .sec-lead { letter-spacing: var(--ls-tight); }
+
+
+/* A barometer score built on part of its declared weight states which part.
+   Warn tone, not muted: this is a limitation of the reading, not a footnote.
+   Spans the component grid so it reads as a condition on all of them. */
+.baro-cov{grid-column:1/-1;margin:0 0 var(--s-3);padding:var(--s-3);
+  border-radius:var(--r-2);background:var(--warn-soft,rgba(176,122,8,.10));
+  border:1px solid var(--line);font-size:var(--t-4);line-height:1.5;
+  color:var(--muted)}
+.baro-cov b{color:var(--text);font-variant-numeric:tabular-nums}
