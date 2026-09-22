@@ -52,6 +52,23 @@
   --r:16px; --r2:12px; --r3:8px;
   --wrap:760px; --toph:122px;
 
+  /* ── ONE MOTION VOCABULARY, WHICH THIS FILE NEVER HAD ───────────────────
+   * signal.css declares three durations and two curves and says why: so that
+   * nothing on the page animates at a speed nothing else uses, which is what
+   * makes motion read as noise. This file had five hardcoded durations —
+   * 160ms three times, 180ms, and .5s — plus one cubic-bezier written inline.
+   * That is the same drift the palette above was copied to avoid, left
+   * running in the one dimension nobody checks.
+   *
+   * Same values as signal.css, for the same reason the colours are the same
+   * values: these are two surfaces of one product and a reader moves between
+   * them. Press is 160ms because a press is not a transition — it is
+   * feedback, and both skills put it at 100-160ms. */
+  --t-fast:140ms; --t-mid:220ms; --t-slow:380ms;
+  --t-press:160ms;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+
   /* ── WHAT heat.css ASKS FOR ────────────────────────────────────────────
    * The heatmap's tiles are a shared stylesheet, loaded by this page and by
    * signal.askakshay.com, so one ramp serves both products. It reads seven
@@ -120,7 +137,7 @@ a{color:var(--acc)}
    only way to move around it — and a 34px chip is a thumb target that misses. */
 .jump button{flex:none;font:600 12.5px/1 var(--ui);padding:12px 14px;min-height:44px;
   border-radius:999px;border:1px solid var(--line);background:none;color:var(--dim);
-  cursor:pointer;white-space:nowrap;transition:color 160ms,border-color 160ms,background 160ms}
+  cursor:pointer;white-space:nowrap;transition:color var(--t-press) var(--ease),border-color var(--t-press) var(--ease),background var(--t-press) var(--ease)}
 .jump button[aria-current="true"]{color:var(--ink);border-color:var(--acc);background:var(--acc-soft)}
 
 main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
@@ -143,7 +160,8 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 
 .more{display:inline-flex;align-items:center;gap:6px;font:600 13px/1 var(--ui);
   color:var(--acc);text-decoration:none;padding:10px 0;min-height:44px}
-.more:hover{text-decoration:underline;text-underline-offset:3px}
+@media (hover:hover) and (pointer:fine){.more:hover{text-decoration:underline;text-underline-offset:3px}}
+
 
 /* ── figure row ─────────────────────────────────────────────────────────── */
 .figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));
@@ -165,8 +183,9 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 .row{display:grid;grid-template-columns:auto 1fr auto;gap:2px var(--s3);
   align-items:center;padding:12px 13px;border:1px solid var(--line);
   border-radius:var(--r2);background:var(--surf);text-decoration:none;color:inherit;
-  min-height:44px;transition:border-color 160ms}
-.row:hover{border-color:var(--line2)}
+  min-height:44px;transition:border-color var(--t-press) var(--ease)}
+@media (hover:hover) and (pointer:fine){.row:hover{border-color:var(--line2)}}
+
 .rk{font:500 12px/1 var(--mono);color:var(--dim);width:16px}
 .rn{min-width:0}
 .rn b{display:block;font:700 15px/1.2 var(--ui);letter-spacing:-.005em}
@@ -230,7 +249,7 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 
 /* ── expanding row ──────────────────────────────────────────────────────── */
 .xr{border:1px solid var(--line);border-radius:var(--r2);background:var(--surf);
-  overflow:hidden;transition:border-color 160ms}
+  overflow:hidden;transition:border-color var(--t-press) var(--ease)}
 .xr[open]{border-color:var(--line2)}
 .xr>summary.row{border:0;border-radius:0;background:none;list-style:none;
   cursor:pointer;padding-right:34px;position:relative}
@@ -389,7 +408,7 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 .baro-t{flex:1;height:14px;border-radius:999px;background:var(--raise);
   overflow:hidden;border:1px solid var(--line)}
 .baro-t i{display:block;height:100%;border-radius:999px;background:var(--dim);
-  transition:width .5s cubic-bezier(.22,.61,.36,1)}
+  transition:width .5s var(--ease)}
 .baro-t i.up{background:var(--up)} .baro-t i.dn{background:var(--dn)}
 .baro-t i.flat{background:var(--acc)}
 .baro-v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;
@@ -460,7 +479,8 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 .wire li{padding:var(--s3) var(--s4);background:var(--raise2);border:1px solid var(--line);
   border-radius:var(--r2)}
 .wire a{font-weight:650;line-height:1.45;text-decoration:none}
-.wire a:hover{text-decoration:underline}
+@media (hover:hover) and (pointer:fine){.wire a:hover{text-decoration:underline}}
+
 .wire-s{display:inline-block;margin-left:var(--s2);color:var(--dim);font-size:.72rem;
   text-transform:uppercase;letter-spacing:.05em}
 .wire p{margin:var(--s2) 0 0;color:var(--mut);font-size:.85rem;line-height:1.55}
@@ -579,7 +599,8 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 .hpick-x{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;
   border:1px solid var(--line);background:var(--bg);color:var(--mut);cursor:pointer;
   font-size:1.05rem;line-height:1}
-.hpick-x:hover{color:var(--ink);border-color:var(--line2)}
+@media (hover:hover) and (pointer:fine){.hpick-x:hover{color:var(--ink);border-color:var(--line2)}}
+
 .hpick-h{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--s3);
   flex-wrap:wrap;padding-right:34px;margin-bottom:var(--s3)}
 .hpick-s{display:block;font-weight:800;font-size:1.05rem}
@@ -589,7 +610,8 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
   font-size:1.2rem;font-weight:700}
 .hpick-p span{font-family:var(--mono);font-size:.78rem}
 .lv-bk[role="button"]{cursor:pointer}
-.lv-bk[role="button"]:hover{border-color:var(--line2)}
+@media (hover:hover) and (pointer:fine){.lv-bk[role="button"]:hover{border-color:var(--line2)}}
+
 .lv-bk[role="button"]:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 
 /* The open ticket, inside the tile's panel. Bordered because it is a different
@@ -601,7 +623,8 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 
 /* Everything that opens a panel says so by the cursor. */
 .mov[role="button"],.cal-c[role="button"]{cursor:pointer}
-.mov[role="button"]:hover,.cal-c[role="button"]:hover{border-color:var(--line2)}
+@media (hover:hover) and (pointer:fine){.mov[role="button"]:hover,.cal-c[role="button"]:hover{border-color:var(--line2)}}
+
 .mov[role="button"]:focus-visible,.cal-c[role="button"]:focus-visible{
   outline:2px solid var(--acc);outline-offset:2px}
 .lv-key{border-left:3px solid var(--line2);padding-left:var(--s3);margin-top:var(--s2)}
@@ -635,3 +658,74 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
 .dscl a{color:var(--acc);text-decoration:underline;text-underline-offset:2px;
   white-space:nowrap}
 @media(max-width:560px){ .dscl{padding:7px 14px} .dscl p{font-size:11px;line-height:1.4} }
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   FEEL PASS — 2026-09-22, audited against the apple-design and
+   emil-design-eng skills. Counts are measurements of this file.
+
+     :hover rules                  6
+     of those gated                0
+     :active press states          0     <-- the whole page
+     prefers-reduced-transparency  0
+     prefers-contrast              0
+     motion tokens                 0     (5 hardcoded durations)
+
+   THE SIX THINGS THAT RESPOND TO HOVER ARE EXACTLY THE SIX WITH NO PRESS
+   STATE. .row, .more, .wire a, .hpick-x, .lv-bk, .mov and .cal-c all change
+   on hover and none of them answers a tap. On a touch device hover fires on
+   tap and then STICKS until you tap elsewhere, so the only feedback this page
+   gave was a state that could not leave — and this is the page whose own
+   header calls it a one-page digest, read on a phone.
+
+   Gems is the surface where this matters most: signal has a nav, routes and
+   a command palette to tell you the tap registered. Gems is one column you
+   scroll. If a row does not answer, nothing does.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Press response on every interactive primitive, which is the same list as
+ * the hover one above. scale(.985) rather than signal's .97: these are
+ * full-width rows and panels, not buttons, and a wide element scaled 3% moves
+ * its edges far enough to read as a layout shift rather than a press. */
+.row, .hpick-x, .lv-bk[role="button"], .mov[role="button"], .cal-c[role="button"] {
+  transition: border-color var(--t-press) var(--ease),
+              transform var(--t-press) var(--ease-out);
+}
+.row:active, .hpick-x:active, .lv-bk[role="button"]:active,
+.mov[role="button"]:active, .cal-c[role="button"]:active {
+  transform: scale(.985);
+}
+/* Text links get the press without the scale — scaling a line of copy shifts
+ * the baseline of everything beside it. */
+.more:active, .wire a:active { opacity: .62; }
+
+/* Reduced motion keeps the answer and drops the movement. Gentler, not none. */
+@media (prefers-reduced-motion: reduce) {
+  .row:active, .hpick-x:active, .lv-bk[role="button"]:active,
+  .mov[role="button"]:active, .cal-c[role="button"]:active {
+    transform: none; border-color: var(--acc);
+  }
+}
+
+/* ── THE TWO SIGNALS THIS FILE NEVER READ ────────────────────────────────────
+ * reduced-motion had five rules; these had none. This page declares no
+ * backdrop-filter at all, so reduced-transparency is about the soft tint
+ * tokens — --acc-soft, --up-soft, --dn-soft, --warn-soft are translucent
+ * fills over the surface, and "reduce transparency" means those become the
+ * flat tones they approximate rather than a wash. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --acc-soft:#EEF0FF; --up-soft:#E6F5F0; --dn-soft:#FCECEA; --warn-soft:#F7F1E0;
+  }
+  :root[data-theme="dark"] {
+    --acc-soft:#1B2040; --up-soft:#0E2A23; --dn-soft:#2E1614; --warn-soft:#2A2310;
+  }
+}
+
+/* contrast:more wants a DEFINED border, not a tonal step you have to infer.
+ * Every surface here is already solid, so this is entirely about edges and
+ * about --dim, which is the lightest text on the page. */
+@media (prefers-contrast: more) {
+  .row, .hpick-x, .lv-bk, .mov, .cal-c, .sec { border-color: var(--ink); }
+  :root { --dim: var(--mut); }
+}
