@@ -4648,14 +4648,28 @@
             <div class="baro-s ${esc(B.band.c)}">
               ${ringGauge(B.score, B.band.t, B.band.c, 132)}
             </div>
-            <div class="baro-p">${(B.coverage && !B.coverage.complete
-              ? `<p class="baro-cov">Built on <b>${B.coverage.parts}</b> of
-                 <b>${B.coverage.partsTotal || B.coverage.parts_total}</b>
-                 components — <b>${B.coverage.weightUsed || B.coverage.weight_used}%</b>
-                 of the score's weight.
-                 ${esc((B.coverage.missing || []).join(' and '))} did not
-                 answer, so this is not comparable with a full reading.</p>`
-              : '')}${B.parts.map(pt => `
+            <div class="baro-p">${(() => {
+              /* DERIVED WHEN THE PRODUCER DOES NOT SAY. The payload path
+                 reads a committed barometer.json that may predate the
+                 `coverage` field; BARO_W is always here, so the page counts
+                 the gap itself rather than waiting to be told about it. */
+              const cv = B.coverage;
+              const have = (B.parts || []).map(x => x.key).filter(Boolean);
+              const total = (cv && (cv.partsTotal || cv.parts_total))
+                || Object.keys(BARO_W).length;
+              const n = cv ? cv.parts : have.length;
+              if (!total || n >= total) return '';
+              const miss = (cv && cv.missing && cv.missing.length) ? cv.missing
+                : Object.keys(BARO_W).filter(k => !have.includes(k));
+              const used = (cv && (cv.weightUsed || cv.weight_used))
+                || have.reduce((a, k) => a + (Number(BARO_W[k]) || 0), 0);
+              const all = Object.values(BARO_W).reduce((a, b) => a + b, 0);
+              const pct = all ? Math.round(used / all * 100) : null;
+              return `<p class="baro-cov">Built on <b>${n}</b> of <b>${total}</b>
+                components${pct != null ? ` — <b>${pct}%</b> of the score's weight` : ''}.
+                ${miss.length ? esc(miss.join(' and ')) + ' did not answer, so this'
+                  : 'This'} is not comparable with a full reading.</p>`;
+            })()}${B.parts.map(pt => `
               <div class="baro-i">
                 <span class="baro-k">${esc(pt.label)}<i>${pt.weight}%</i></span>
                 ${meter(pt.score, pt.score >= 55 ? 'up' : pt.score <= 30 ? 'dn' : '')}

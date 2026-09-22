@@ -1078,13 +1078,33 @@
            100" from 55% of its own scale, identical to a complete reading.
            barometer.py now ships `coverage`; a score built on part of its
            weight has to say which part. */
-        (bt.coverage && !bt.coverage.complete
-          ? `<p class="bcov">Built on <b>${bt.coverage.parts}</b> of
-             <b>${bt.coverage.parts_total}</b> components —
-             ${bt.coverage.weight_used}% of the score's weight.
-             ${esc((bt.coverage.missing || []).join(' and '))} did not answer,
-             so this is not comparable with a full reading.</p>`
-          : '') +
+        /* DERIVED WHEN THE PRODUCER DOES NOT SAY, which is the case that
+           actually shipped. barometer.py grew a `coverage` field, but the
+           file this page reads is a committed snapshot written by the
+           PREVIOUS generator — so the field was absent and this stayed
+           silent about a partial reading it could have counted itself.
+           A page that can see the gap must not wait to be told about it:
+           `weights` is in the payload, `parts` is in the payload, and the
+           difference between them is the statement. */
+        (() => {
+          const cv = bt.coverage;
+          const W = (baro && baro.weights) || {};
+          const total = (cv && cv.parts_total) || Object.keys(W).length || 0;
+          const have = (bt.parts || []).map(x => x.key).filter(Boolean);
+          const n = cv ? cv.parts : have.length;
+          if (!total || n >= total) return '';
+          const miss = (cv && cv.missing && cv.missing.length)
+            ? cv.missing
+            : Object.keys(W).filter(k => !have.includes(k));
+          const used = (cv && cv.weight_used) ||
+            have.reduce((a, k) => a + (Number(W[k]) || 0), 0);
+          const all = Object.values(W).reduce((a, b) => a + (Number(b) || 0), 0);
+          const pct = all ? Math.round(used / all * 100) : null;
+          return `<p class="bcov">Built on <b>${n}</b> of <b>${total}</b>
+            components${pct != null ? ` — <b>${pct}%</b> of the score's weight` : ''}.
+            ${miss.length ? esc(miss.join(' and ')) + ' did not answer, so this'
+              : 'This'} is not comparable with a full reading.</p>`;
+        })() +
         `<div class="bparts">${(bt.parts || []).map(pt => `
           <div class="bpart">
             <div class="bp-h"><span class="bp-l">${esc(pt.label)}</span>
