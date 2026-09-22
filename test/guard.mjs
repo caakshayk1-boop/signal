@@ -1388,6 +1388,105 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      paper.graceMin >= 120, paper.graceMin);
 }
 
+/* ── THE DESIGN DNA IS EXECUTABLE, OR IT WAS TRUE ONCE ───────────────────────
+ * DESIGN.md states the rules the three stylesheets are built on. A design
+ * document nobody checks is a document that described the CSS on the day it
+ * was written; every one of the forty decisions already recorded in comments
+ * got there BECAUSE the previous statement of it had drifted.
+ *
+ * Five rules, each with the incident behind it named in DESIGN.md itself. */
+{
+  const DNA = existsSync("DESIGN.md") ? readFileSync("DESIGN.md", "utf8") : "";
+  const GEMSCSS = readFileSync("public/gems.css", "utf8");
+  ok("DESIGN.md exists — the stylesheets have a stated brief", DNA.length > 2000, DNA.length);
+
+  /* 1. Every token the document names is really declared. A DNA that cites a
+   *    token the CSS does not define is the var()-resolves-to-nothing fault
+   *    one level up: it reads correct and specifies nothing. */
+  {
+    const declared = new Set();
+    for (const src of [CSS, GEMSCSS]) {
+      for (const m of src.matchAll(/(--[a-z0-9][a-z0-9-]*)\s*:/g)) declared.add(m[1]);
+    }
+    const named = new Set([...DNA.matchAll(/(--[a-z0-9][a-z0-9-]*)/g)].map(x => x[1]));
+    const ghosts = [...named].filter(t => !declared.has(t));
+    ok("every token DESIGN.md names is declared in a stylesheet", ghosts.length === 0, ghosts);
+    ok("DESIGN.md names enough tokens to be a specification", named.size >= 25, named.size);
+  }
+
+  /* 2. Elevation exists in BOTH themes of BOTH sheets. The incident: five
+   *    bespoke shadows, every one rgba(0,0,0,..), so on the dark theme the
+   *    command palette, the tab menu, the toast and the to-top button had no
+   *    separation from a #0C1017 page and nothing reported it. A step declared
+   *    only in light is that bug with a token name on it. */
+  for (const [label, src] of [["signal.css", CSS], ["gems.css", GEMSCSS]]) {
+    const dark = (src.match(/:root\[data-theme="dark"\]\s*\{[\s\S]*?\n\}/) || [""])[0];
+    const light = src.slice(0, src.indexOf(dark) >= 0 ? src.indexOf(dark) : src.length);
+    for (const n of [1, 2, 3, 4]) {
+      ok(`${label} declares --e-${n} in light`, new RegExp(`--e-${n}\\s*:`).test(light));
+      ok(`${label} declares --e-${n} in dark`, new RegExp(`--e-${n}\\s*:`).test(dark));
+    }
+  }
+
+  /* 3. No elevation is written by hand. Rings (inset 0 0 0 1px) and the
+   *    keyframes that flash a changed figure are not elevation and are not
+   *    caught by this — a shadow with a BLUR and an offset is. */
+  {
+    const hand = [];
+    for (const [label, src] of [["signal.css", CSS], ["gems.css", GEMSCSS]]) {
+      const body = src.replace(/\/\*[\s\S]*?\*\//g, "");
+      for (const m of body.matchAll(/box-shadow:\s*([^;}]+)/g)) {
+        const v = m[1];
+        if (/var\(--e-[1-4]\)/.test(v)) continue;
+        if (/^\s*none/.test(v)) continue;
+        if (/inset\s+0\s+0\s+0/.test(v)) continue;          // a ring
+        if (/0\s+0\s+0\s+\d/.test(v)) continue;             // a pulse/flash ring
+        hand.push(`${label}:${lineOf(body, m.index)}  ${v.trim().slice(0, 48)}`);
+      }
+    }
+    ok("no drop shadow is written by hand — elevation goes through --e-1..4",
+       hand.length === 0, hand);
+  }
+
+  /* 4. The type scale is complete in signal.css. It was 25 distinct sizes
+   *    before the scale was declared and 6 after — 11.5px beside 12px is not a
+   *    level of hierarchy, it is two people guessing on different days. */
+  {
+    const body = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+    const lits = [
+      ...body.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px(?![\w(])/g),
+      ...body.matchAll(/font:\s*(?:\d{3}\s+|italic\s+|normal\s+)*(\d+(?:\.\d+)?)px\//g),
+    ].map(m => m[1]);
+    ok("signal.css writes no literal font-size — every size is a scale step",
+       lits.length === 0, [...new Set(lits)]);
+  }
+
+  /* 5. gems.css is a RATCHET, not a rule. It carries 21 distinct literal sizes
+   *    and three of them are smaller than --t-1, so snapping them up is a real
+   *    change to a dense sheet that could not be verified when the scale was
+   *    added. The count may fall. It may not rise. */
+  {
+    const body = GEMSCSS.replace(/\/\*[\s\S]*?\*\//g, "");
+    const n = [
+      ...body.matchAll(/font-size:\s*\d+(?:\.\d+)?px(?![\w(])/g),
+      ...body.matchAll(/font:\s*(?:\d{3}\s+|italic\s+|normal\s+)*\d+(?:\.\d+)?px\//g),
+    ].length;
+    /* 46 as measured on 2026-09-22, across 21 distinct values. Lower this
+       number as rules are converted; never raise it. */
+    const CEILING = 46;
+    ok(`gems.css literal font-sizes have not grown past ${CEILING}`, n <= CEILING, n);
+  }
+
+  /* 6. One motion vocabulary across both bundles. --t-press lived in gems.css
+   *    alone, so the two sheets deliberately brought onto one vocabulary
+   *    disagreed about the single duration a finger can feel. */
+  for (const [label, src] of [["signal.css", CSS], ["gems.css", GEMSCSS]]) {
+    for (const t of ["--t-press", "--t-fast", "--t-mid", "--t-slow", "--ease", "--ease-out"]) {
+      ok(`${label} declares ${t}`, new RegExp(`${t}\\s*:`).test(src));
+    }
+  }
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

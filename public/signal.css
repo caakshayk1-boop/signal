@@ -156,6 +156,34 @@
   --t-fast:140ms; --t-mid:220ms; --t-slow:380ms;
   --ease:cubic-bezier(.22,.61,.36,1);
   --ease-out:cubic-bezier(.16,1,.3,1);
+  /* THE PRESS. gems.css has declared --t-press since the feel pass and this
+     sheet did not, so the two bundles that were deliberately brought onto one
+     motion vocabulary disagreed about the one duration a finger can feel.
+     Shorter than --t-fast on purpose: a press must land before the release. */
+  --t-press:160ms;
+
+  /* ── ELEVATION, DECLARED ─────────────────────────────────────────────────
+   * The palette note above says "FLAT, WITH HAIRLINES. Neither site uses a
+   * single box-shadow." That was true of the two sites it measured and has
+   * never been true of this one: five bespoke shadows were in the sheet when
+   * it was written, at alphas .07 / .14 / .16 / .24 / .28, none of them named
+   * and no two agreeing on a blur.
+   *
+   * Worse than undeclared — every one of them was rgba(0,0,0,…), so on the
+   * dark theme a black shadow spread over a #0C1017 page renders NOTHING. The
+   * command palette, the tab menu, the toast and the float-to-top button all
+   * lost their separation from the page at night and nothing said so. A thing
+   * that quietly does half its job is the fault this site is built to avoid.
+   *
+   * Four steps, because there are four jobs: a resting card, a floating
+   * control, a popover, a modal. Each theme declares the whole string rather
+   * than scaling one alpha — the dark values are not the light ones times a
+   * factor, they are what actually separates a surface from a near-black
+   * page, which is a much heavier shadow plus a light rim. */
+  --e-1:0 1px 2px rgba(12,18,32,.04), 0 3px 14px rgba(12,18,32,.07);
+  --e-2:0 2px 6px rgba(12,18,32,.06), 0 6px 20px rgba(12,18,32,.13);
+  --e-3:0 4px 12px rgba(12,18,32,.08), 0 18px 44px rgba(12,18,32,.16);
+  --e-4:0 8px 24px rgba(12,18,32,.12), 0 24px 70px rgba(12,18,32,.26);
 
   /* LIGHT IS THE DEFAULT NOW. The reference site is a white page with
      near-black type and black buttons, and that is the look this was asked to
@@ -269,6 +297,13 @@
   --up:#2ECC93; --down:#FF6B60; --warn:#F0B429;
   --up-soft:rgba(46,204,147,.14); --down-soft:rgba(255,107,96,.14); --warn-soft:rgba(240,180,41,.13);
   --up-rgb:46 204 147; --down-rgb:255 107 96;
+  /* A rim, then a shadow. On a near-black page the shadow alone cannot show
+     where a surface ends, so the top inset hairline does the separating and
+     the black does the depth. */
+  --e-1:inset 0 1px 0 rgba(255,255,255,.04), 0 2px 10px rgba(0,0,0,.40);
+  --e-2:inset 0 1px 0 rgba(255,255,255,.05), 0 6px 20px rgba(0,0,0,.50);
+  --e-3:inset 0 1px 0 rgba(255,255,255,.06), 0 18px 44px rgba(0,0,0,.58);
+  --e-4:inset 0 1px 0 rgba(255,255,255,.07), 0 24px 70px rgba(0,0,0,.66);
 }
 /* The old light-theme block is gone. Light IS :root now, so a separate
    [data-theme="light"] block could only ever disagree with it — and it did:
@@ -2274,7 +2309,7 @@ body::before{display:none}
 .cmd::backdrop{background:color-mix(in srgb,#000 46%,transparent);backdrop-filter:blur(3px)}
 .cmd-in{position:fixed;left:50%;top:clamp(48px,9vh,110px);transform:translateX(-50%);
   width:min(94vw,600px);background:var(--surface);border:1px solid var(--line2);
-  border-radius:var(--r-4);box-shadow:0 24px 70px rgba(0,0,0,.28);overflow:hidden}
+  border-radius:var(--r-4);box-shadow:var(--e-4);overflow:hidden}
 .cmd-in input{width:100%;border:0;border-bottom:1px solid var(--line);background:none;
   color:var(--text);font:400 var(--t-6)/1 var(--ui);padding:16px 20px;outline:none}
 .cmd-in input::placeholder{color:var(--dim)}
@@ -2519,7 +2554,7 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
   display:grid;gap:8px;max-width:min(92vw,340px)}
 @media(min-width:760px){#toasts{bottom:18px}}
 .toast{background:var(--text);color:var(--bg);border-radius:var(--r-3);padding:12px 40px 12px 16px;
-  position:relative;box-shadow:0 12px 34px rgba(0,0,0,.24);
+  position:relative;box-shadow:var(--e-3);
   animation:toastIn 240ms var(--ease-out) both}
 .toast b{display:block;font:600 var(--t-5)/1.3 var(--ui)}
 .toast span{display:block;font:400 var(--t-4)/1.45 var(--ui);opacity:.78;margin-top:3px}
@@ -3378,7 +3413,7 @@ html:has(dialog[open]){overflow:hidden}
   width:42px;height:42px;display:grid;place-items:center;
   border:1px solid var(--line2);border-radius:var(--r-pill);
   background:var(--surface);color:var(--text);cursor:pointer;
-  box-shadow:0 6px 20px rgba(0,0,0,.14);
+  box-shadow:var(--e-2);
   animation:toTopIn var(--t-mid) var(--ease-out) both;
 }
 .totop svg{width:16px;height:16px}
@@ -3515,7 +3550,7 @@ html:has(dialog[open]){overflow:hidden}
 .tabg-m{
   position:absolute;top:100%;left:8px;z-index:60;min-width:296px;
   background:var(--surface);border:1px solid var(--line2);
-  border-radius:var(--r-4);box-shadow:0 18px 44px rgba(0,0,0,.16);
+  border-radius:var(--r-4);box-shadow:var(--e-3);
   padding:7px;display:flex;flex-direction:column;
   animation:tabgIn var(--t-fast) var(--ease-out) both;
 }
@@ -4339,19 +4374,19 @@ html:has(dialog[open]){overflow:hidden}
 .vd-avoid{border-left-color:var(--down)}
 .vd-watch,.vd-unrated{border-left-color:var(--line)}
 .vd-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
-.vd-head b{font-size:14px;letter-spacing:-.01em}
-.vd-conf{font:400 11px/1 var(--mono);color:var(--dim);margin-left:auto;
+.vd-head b{font-size:var(--t-5);letter-spacing:-.01em}
+.vd-conf{font:400 var(--t-2)/1 var(--mono);color:var(--dim);margin-left:auto;
          text-transform:uppercase;letter-spacing:.06em;cursor:help}
-.vd-line{margin:0;font-size:13.5px;line-height:1.5}
-.vd-trig{margin:7px 0 0;font-size:12.5px;line-height:1.5;color:var(--dim)}
-.vd-trig i{font-style:normal;font:600 10.5px/1 var(--mono);text-transform:uppercase;
+.vd-line{margin:0;font-size:var(--t-5);line-height:1.5}
+.vd-trig{margin:7px 0 0;font-size:var(--t-4);line-height:1.5;color:var(--dim)}
+.vd-trig i{font-style:normal;font:600 var(--t-2)/1 var(--mono);text-transform:uppercase;
            letter-spacing:.08em;color:var(--warn);margin-right:6px}
-.vd-also{margin:6px 0 0;font-size:12.5px;color:var(--dim)}
+.vd-also{margin:6px 0 0;font-size:var(--t-4);color:var(--dim)}
 .vd-flag{margin-top:7px;padding-left:8px;border-left:2px solid var(--down)}
-.vd-flag b{display:block;font-size:12.5px;color:var(--down)}
-.vd-flag span{font:400 11.5px/1.45 var(--mono);color:var(--dim)}
+.vd-flag b{display:block;font-size:var(--t-4);color:var(--down)}
+.vd-flag span{font:400 var(--t-3)/1.45 var(--mono);color:var(--dim)}
 .vd-foot{margin:8px 0 0;padding-top:7px;border-top:1px solid var(--line);
-         font-size:11px;line-height:1.5;color:var(--dim)}
+         font-size:var(--t-2);line-height:1.5;color:var(--dim)}
 .vd-foot code{font:inherit;font-family:var(--mono)}
 @media (max-width:520px){
   .vd-conf{margin-left:0;flex-basis:100%}
@@ -4364,24 +4399,24 @@ html:has(dialog[open]){overflow:hidden}
  * time. Colour encodes that, so it reads before the number does. */
 .lad{border:1px solid var(--line);border-radius:4px;padding:8px 12px;margin:0 0 14px}
 .lad-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-.lad-head b{font-size:13.5px;letter-spacing:-.01em}
-.lad-risk{font:400 11.5px/1 var(--mono);color:var(--dim);margin-left:auto}
+.lad-head b{font-size:var(--t-5);letter-spacing:-.01em}
+.lad-risk{font:400 var(--t-3)/1 var(--mono);color:var(--dim);margin-left:auto}
 .scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.lad-tbl{border-collapse:collapse;width:100%;font-size:12.5px;min-width:400px}
-.lad-tbl th{font:500 10px/1 var(--mono);text-transform:uppercase;letter-spacing:.09em;
+.lad-tbl{border-collapse:collapse;width:100%;font-size:var(--t-4);min-width:400px}
+.lad-tbl th{font:500 var(--t-1)/1 var(--mono);text-transform:uppercase;letter-spacing:.09em;
             color:var(--dim);text-align:left;padding:0 8px 5px 0;white-space:nowrap}
 .lad-tbl td{padding:5px 8px 5px 0;border-top:1px solid var(--line)}
-.lad-t{font:600 11px/1 var(--mono);color:var(--dim)}
+.lad-t{font:600 var(--t-2)/1 var(--mono);color:var(--dim)}
 .lad-px,.lad-r{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
 .lad-px{font-weight:600}
 .lad-r{color:var(--dim)}
-.lad-why{color:var(--dim);font-size:11.5px;line-height:1.4}
-.lad-wall{margin:8px 0 0;font-size:12px;line-height:1.5;color:var(--dim)}
-.lad-wall i{font-style:normal;font:600 10px/1 var(--mono);text-transform:uppercase;
+.lad-why{color:var(--dim);font-size:var(--t-3);line-height:1.4}
+.lad-wall{margin:8px 0 0;font-size:var(--t-3);line-height:1.5;color:var(--dim)}
+.lad-wall i{font-style:normal;font:600 var(--t-1)/1 var(--mono);text-transform:uppercase;
             letter-spacing:.08em;color:var(--down);margin-right:6px}
-.lad-trail{margin:8px 0 0;font-size:12.5px;line-height:1.5}
+.lad-trail{margin:8px 0 0;font-size:var(--t-4);line-height:1.5}
 .lad-foot{margin:8px 0 0;padding-top:7px;border-top:1px solid var(--line);
-          font-size:11px;line-height:1.5;color:var(--dim)}
+          font-size:var(--t-2);line-height:1.5;color:var(--dim)}
 @media (max-width:520px){ .lad-risk{margin-left:0;flex-basis:100%} }
 
 /* ── ROLLING 3-YEAR BAND ─────────────────────────────────────────────────────
@@ -4402,9 +4437,9 @@ html:has(dialog[open]){overflow:hidden}
 .fd-band-lb span{display:flex;flex-direction:column;gap:1px;min-width:0}
 .fd-band-lb span.mid{align-items:center;flex:1}
 .fd-band-lb span:last-child{align-items:flex-end;text-align:right}
-.fd-band-lb b{font:600 13.5px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.fd-band-lb b{font:600 var(--t-5)/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
 .fd-band-lb span.dn b{color:var(--down)}
-.fd-band-lb i{font:400 10px/1 var(--mono);font-style:normal;text-transform:uppercase;
+.fd-band-lb i{font:400 var(--t-1)/1 var(--mono);font-style:normal;text-transform:uppercase;
               letter-spacing:.09em;color:var(--dim)}
 
 /* ── INSTITUTIONAL MOVEMENT ──────────────────────────────────────────────────
@@ -4841,16 +4876,16 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .rd-hub{fill:var(--raised);stroke:var(--accent);stroke-width:1.5}
 .rd-hubc{display:flex;flex-direction:column;align-items:center;justify-content:center;
   height:80px;gap:1px;font-family:var(--ui)}
-.rd-hubc span{font:600 9px/1 var(--ui);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
-.rd-hubc b{font:700 30px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
-.rd-hubc em{font:600 10px/1 var(--ui);font-style:normal;color:var(--muted)}
+.rd-hubc span{font:600 var(--t-1)/1 var(--ui);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.rd-hubc b{font:700 var(--t-10)/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
+.rd-hubc em{font:600 var(--t-1)/1 var(--ui);font-style:normal;color:var(--muted)}
 
 /* One card component, on the ring and in the strip. */
 .rd-card,.rd-u{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left;
   padding:8px 8px;border:1px solid var(--line2);border-radius:var(--r-3);
   background:var(--surface);cursor:pointer;font-family:var(--ui);
   transition:border-color 180ms var(--ease),transform 180ms var(--ease),opacity 180ms var(--ease)}
-.rd-card{height:92px;box-shadow:0 3px 14px rgba(0,0,0,.07)}
+.rd-card{height:92px;box-shadow:var(--e-1)}
 @media (hover:hover) and (pointer:fine){.rd-card:hover,.rd-u:hover{border-color:var(--accent);transform:translateY(-1px)}}
 
 .rd-card:focus-visible,.rd-u:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -4859,7 +4894,7 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .rdc-t b{font:700 var(--t-4)/1 var(--disp);letter-spacing:var(--ls-snug);color:var(--text)}
 .rdc-t i{font:500 var(--t-1)/1 var(--mono);font-style:normal;font-variant-numeric:tabular-nums}
 .rdc-t i.up{color:var(--up)} .rdc-t i.dn{color:var(--down)}
-.rdc-v{font:600 9px/1.2 var(--ui);letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.rdc-v{font:600 var(--t-1)/1.2 var(--ui);letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
 .rdc-v.up{color:var(--up)} .rdc-v.dn{color:var(--down)} .rdc-v.warn{color:var(--warn)}
 .rdc-b{display:block;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
 .rdc-b i{display:block;height:100%;background:var(--accent);border-radius:2px}
@@ -4870,8 +4905,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .rdc-spl{fill:none;stroke-width:1.4}
 .rdc-sp.up .rdc-spl{stroke:var(--up)} .rdc-sp.dn .rdc-spl{stroke:var(--down)}
 .rdc-sp.up .rdc-spa{fill:var(--up-soft)} .rdc-sp.dn .rdc-spa{fill:var(--down-soft)}
-.rdc-nosp{font:400 9px/1 var(--ui);font-style:normal;color:var(--dim)}
-.rdc-fii{font:600 10px/1 var(--mono);font-style:normal;margin-left:auto}
+.rdc-nosp{font:400 var(--t-1)/1 var(--ui);font-style:normal;color:var(--dim)}
+.rdc-fii{font:600 var(--t-1)/1 var(--mono);font-style:normal;margin-left:auto}
 .rdc-fii.up{color:var(--up)} .rdc-fii.dn{color:var(--down)}
 
 /* min-width:0 is what makes the horizontal scroll actually contain itself.
@@ -4921,7 +4956,7 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .tabs svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;
   stroke-linecap:round;stroke-linejoin:round;flex:none}
 .tabs svg circle[r="1.6"]{fill:currentColor;stroke:none}
-.tabs a span,.tabs .tab-more span{font:600 10.5px/1 var(--ui);letter-spacing:.01em}
+.tabs a span,.tabs .tab-more span{font:600 var(--t-2)/1 var(--ui);letter-spacing:.01em}
 .tabs a[aria-current="page"]{color:var(--accent);background:none}
 .tabs a[aria-current="page"] svg{stroke-width:2.1}
 .tabs a:active,.tabs .tab-more:active{opacity:.6}
@@ -5258,7 +5293,7 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   margin:8px 0 0;padding:8px 10px;border-radius:8px;
   background:color-mix(in srgb, var(--dn, #d9534f) 10%, transparent);
   border:1px solid color-mix(in srgb, var(--dn, #d9534f) 34%, transparent);
-  color:var(--text, #111);font-size:12.5px;line-height:1.45}
+  color:var(--text, #111);font-size:var(--t-4, 13px);line-height:1.45}
 .cv-void b{color:var(--dn, #d9534f);letter-spacing:.02em}
 .kv.lv-plan.is-void .vv{color:var(--dim, #777) !important;text-decoration:line-through}
 .kv.lv-plan.is-void .vv i{text-decoration:line-through}
