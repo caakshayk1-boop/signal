@@ -323,7 +323,8 @@ a{color:inherit;text-decoration:none}
 .stat-live{font:400 var(--t-2)/1 var(--mono);color:var(--dim);letter-spacing:var(--ls-wide)}
 .icon-btn{width:32px;height:32px;display:grid;place-items:center;border:1px solid var(--line);
   border-radius:var(--r-3);background:none;color:var(--muted);cursor:pointer;font-size:var(--t-5)}
-.icon-btn:hover{color:var(--text);border-color:var(--line2)}
+@media (hover:hover) and (pointer:fine){.icon-btn:hover{color:var(--text);border-color:var(--line2)}}
+
 
 /* ── TABS — bottom on a phone, where the thumb is ─────────────────────────── */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:41;height:calc(var(--tabh) + env(safe-area-inset-bottom));
@@ -406,8 +407,9 @@ a{color:inherit;text-decoration:none}
     position:relative;padding:0 14px;margin:0;min-height:46px;border-radius:0;
     background:none;
   }
-  .tabs .tabg[open] > summary,
-  .tabs .tabg > summary:hover{color:var(--text)}
+@media (hover:hover) and (pointer:fine){.tabs .tabg[open] > summary,
+  .tabs .tabg > summary:hover{color:var(--text)}}
+
   /* The active marker is the underline the flat tabs use, not the phone's
      filled pill — a pill in a horizontal desktop nav reads as a button. */
   .tabs .tabg.is-here > summary{background:none;color:var(--text)}
@@ -592,7 +594,8 @@ main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh
 .heat-t{flex:1 1 auto;min-width:82px;padding:12px 8px 8px;border-radius:var(--r-2);
   display:flex;flex-direction:column;gap:3px;position:relative;overflow:hidden;
   transition:transform .18s var(--ease,ease)}
-.heat-t:hover{transform:translateY(-2px)}
+@media (hover:hover) and (pointer:fine){.heat-t:hover{transform:translateY(-2px)}}
+
 .heat-t .hs{font:500 var(--t-2)/1.25 var(--ui);color:var(--text);opacity:.92;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The number is --text at FULL strength, never the semantic red or green.
@@ -643,7 +646,8 @@ main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh
   border-radius:var(--r);overflow:hidden}
 .wire a{background:var(--surface);padding:14px 16px;display:grid;gap:5px;
   transition:background var(--t-fast) var(--ease,ease)}
-.wire a:hover{background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.wire a:hover{background:var(--raised)}}
+
 .wire .wt{font:600 var(--t-5)/1.4 var(--ui);color:var(--text)}
 .wire .ws{font:400 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--accent)}
 .wire .wd{font-size:var(--t-4);color:var(--muted);line-height:1.5}
@@ -683,8 +687,15 @@ main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;font:500 var(--t-3)/1 var(--ui);padding:8px 12px;border-radius:var(--r-pill);
   border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;
-  white-space:nowrap;min-height:36px;transition:all var(--t-fast) var(--ease,ease)}
-.chip:hover{border-color:var(--line2);color:var(--text)}
+  white-space:nowrap;min-height:36px;
+  /* was `all`: a chip animates three properties and `all` also transitions
+     width when the label changes, which is what made the filter row shuffle. */
+  transition:border-color var(--t-fast) var(--ease,ease),
+             color var(--t-fast) var(--ease,ease),
+             background var(--t-fast) var(--ease,ease),
+             transform var(--t-fast) var(--ease-out,ease-out)}
+@media (hover:hover) and (pointer:fine){.chip:hover{border-color:var(--line2);color:var(--text)}}
+
 .chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 
 /* ── RANK LIST — movers, volume, breakouts ───────────────────────────────── */
@@ -738,7 +749,8 @@ main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh
 .lnks a{font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);text-transform:uppercase;
   color:var(--accent);border:1px solid var(--line);border-radius:var(--r-1);
   padding:7px 8px;min-height:30px;display:inline-flex;align-items:center}
-.lnks a:hover{border-color:var(--accent);background:var(--accent-soft)}
+@media (hover:hover) and (pointer:fine){.lnks a:hover{border-color:var(--accent);background:var(--accent-soft)}}
+
 
 /* Column headers on the rank lists. "₹1,036cr" and "16.1" with no header is
    two numbers nobody can identify — the honest fix is a label, not a tooltip. */
@@ -833,10 +845,12 @@ main,.foot{position:relative;z-index:1}
 /* Heat tiles are buttons now. */
 .heat-t{border:0;text-align:left;cursor:pointer;font:inherit;
   outline:1px solid transparent;transition:transform .18s,outline-color .18s}
-.heat-t:hover,.heat-t:focus-visible{outline-color:var(--live);transform:translateY(-2px)}
+@media (hover:hover) and (pointer:fine){.heat-t:hover,.heat-t:focus-visible{outline-color:var(--live);transform:translateY(-2px)}}
+
 .heat-t::after{content:"→";position:absolute;right:9px;bottom:8px;font:600 var(--t-2)/1 var(--mono);
   color:var(--text);opacity:0;transition:opacity .18s}
-.heat-t:hover::after{opacity:.55}
+@media (hover:hover) and (pointer:fine){.heat-t:hover::after{opacity:.55}}
+
 
 /* ── SHEET ────────────────────────────────────────────────────────────────
    <dialog> for the focus trap and Escape. Bottom sheet on a phone because
@@ -916,7 +930,8 @@ h4.sh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-tran
    than a missing column. */
 .scr-r{grid-template-columns:20px minmax(150px,.55fr) repeat(7,auto) 52px;gap:8px;cursor:pointer}
 @media(min-width:1040px){.scr-r{grid-template-columns:20px minmax(180px,.42fr) repeat(7,auto) 52px}}
-.scr-r:hover{background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.scr-r:hover{background:var(--raised)}}
+
 .scr-r .x{font:500 var(--t-3)/1 var(--mono);font-variant-numeric:tabular-nums;text-align:right;min-width:44px}
 .segh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-widest);text-transform:uppercase;color:var(--live);
   margin:16px 0 7px}
@@ -981,13 +996,15 @@ h4.sh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-tran
 .rank{overflow-x:auto}
 .lvl-r{grid-template-columns:20px minmax(120px,1fr) repeat(5,auto) 52px;gap:8px;
   cursor:pointer;min-width:520px}
-.lvl-r:hover{background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.lvl-r:hover{background:var(--raised)}}
+
 .lvl-r .x{font:500 var(--t-3)/1 var(--mono);font-variant-numeric:tabular-nums;text-align:right;min-width:42px}
 
 /* Cards that open a company. The cursor and the lift say so — a card that
    does something must look like it does something. */
 .card[data-sym],.ipo[data-sym]{cursor:pointer;transition:border-color var(--t-fast),transform var(--t-fast)}
-.card[data-sym]:hover,.ipo[data-sym]:hover{border-color:var(--line2);transform:translateY(-1px)}
+@media (hover:hover) and (pointer:fine){.card[data-sym]:hover,.ipo[data-sym]:hover{border-color:var(--line2);transform:translateY(-1px)}}
+
 .card[data-sym]:focus-visible,.ipo[data-sym]:focus-visible{outline:2px solid var(--live);outline-offset:2px}
 /* The plan block on a conviction card — separated from the measured stats
    above it, because levels are a proposal and the stats are facts. */
@@ -1018,7 +1035,8 @@ h4.sh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-tran
 .btn-cta{background:var(--text);color:var(--bg);font:600 var(--t-3)/1 var(--ui);
   padding:8px 14px;border-radius:var(--r-2);white-space:nowrap;min-height:34px;
   display:inline-flex;align-items:center;transition:opacity var(--t-fast)}
-.btn-cta:hover{opacity:.86}
+@media (hover:hover) and (pointer:fine){.btn-cta:hover{opacity:.86}}
+
 @media(max-width:560px){.btn-cta{display:none}}
 
 /* ── JOIN ─────────────────────────────────────────────────────────────────── */
@@ -1040,7 +1058,8 @@ h4.sh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-tran
 .btn-primary{width:100%;margin-top:12px;background:var(--live);color:#06231F;border:0;
   border-radius:var(--r-3);padding:14px;font:600 var(--t-6)/1 var(--ui);cursor:pointer;min-height:50px;
   transition:opacity var(--t-fast)}
-.btn-primary:hover{opacity:.9}
+@media (hover:hover) and (pointer:fine){.btn-primary:hover{opacity:.9}}
+
 .btn-primary:disabled{opacity:.55;cursor:default}
 .join-note{margin-top:12px;font-size:var(--t-3);line-height:1.5;color:var(--dim)}
 .join-note.bad{color:var(--down)}
@@ -1442,7 +1461,8 @@ body::before{display:none}
 .brief-link{font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);text-transform:uppercase;
   color:var(--accent);border:1px solid var(--line);border-radius:var(--r-1);padding:7px 8px;
   min-height:30px;display:inline-flex;align-items:center}
-.brief-link:hover{border-color:var(--accent);background:var(--accent-soft)}
+@media (hover:hover) and (pointer:fine){.brief-link:hover{border-color:var(--accent);background:var(--accent-soft)}}
+
 
 /* ═══════════════ SHARED INSTRUMENTS ══════════════════════════════════════
    Everything below is used by more than one route. It exists because the
@@ -1503,7 +1523,8 @@ body::before{display:none}
   align-items:center;gap:0 14px;padding:12px 14px;width:100%;text-align:left;
   border:0;border-radius:0;font:inherit;color:inherit;cursor:pointer;
   transition:background var(--t-fast) var(--ease)}
-.mk:hover{background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.mk:hover{background:var(--raised)}}
+
 .mk[aria-expanded="true"]{background:var(--raised)}
 .mk-n{grid-area:n;display:flex;align-items:center;gap:7px;min-width:0}
 .mk-nm{font-size:var(--t-5);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1567,7 +1588,8 @@ body::before{display:none}
   width:7px;height:7px;border-right:1.5px solid var(--dim);border-bottom:1.5px solid var(--dim);
   transform:rotate(45deg);transition:transform var(--t-fast,var(--t-fast)) ease}
 .foldb[open] > summary::after{transform:rotate(-135deg);top:calc(50% - 2px)}
-.foldb > summary:hover{color:var(--text);background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.foldb > summary:hover{color:var(--text);background:var(--raised)}}
+
 .foldb > summary:focus-visible{outline:2px solid var(--live);outline-offset:-2px}
 .foldb[open] > summary{border-bottom:1px solid var(--line)}
 .foldb > *:not(summary){margin:14px 16px}
@@ -1584,7 +1606,8 @@ body::before{display:none}
   border-right:1.5px solid var(--dim);border-bottom:1.5px solid var(--dim);
   transform:rotate(45deg);transition:transform var(--t-fast,var(--t-fast)) ease}
 .segd[open] > .segh::after{transform:rotate(-135deg);top:5px}
-.segd > .segh:hover{color:var(--accent)}
+@media (hover:hover) and (pointer:fine){.segd > .segh:hover{color:var(--accent)}}
+
 .segd > .segh:focus-visible{outline:2px solid var(--live);outline-offset:3px;border-radius:var(--r-2)}
 .segd + .segd{border-top:1px solid var(--line)}
 .segd[open] > .board{margin-bottom:14px}
@@ -1615,8 +1638,7 @@ body::before{display:none}
   .mk-rng{margin-top:0}
 }
 @media(min-width:1300px){.mk{grid-template-columns:minmax(170px,.5fr) 118px minmax(240px,1.2fr) 120px 90px}}
-
-/* ── SMART TOOLTIP ────────────────────────────────────────────────────────
+@media (hover:hover) and (pointer:fine){/* ── SMART TOOLTIP ────────────────────────────────────────────────────────
    One component, hover AND focus AND tap. Hover alone is unusable on a phone
    and invisible to a keyboard, so the trigger is a real <button> and the tip
    is toggled by class, not by :hover. */
@@ -1626,11 +1648,14 @@ body::before{display:none}
 .tipb{background:none;margin:0;cursor:help;color:var(--dim);
   font:500 var(--t-1)/1 var(--mono);display:inline-grid;place-items:center;
   width:24px;height:24px;padding:0;border:0;border-radius:50%;position:relative;
-  transition:color var(--t-fast) var(--ease)}
+  transition:color var(--t-fast) var(--ease)}}
+
 .tipb::before{content:"";position:absolute;width:14px;height:14px;border-radius:50%;
   border:1px solid var(--line2);transition:border-color var(--t-fast) var(--ease)}
-.tipb:hover::before,.tipb[aria-expanded="true"]::before{border-color:currentColor}
-.tipb:hover,.tipb[aria-expanded="true"]{color:var(--text)}
+@media (hover:hover) and (pointer:fine){.tipb:hover::before,.tipb[aria-expanded="true"]::before{border-color:currentColor}}
+
+@media (hover:hover) and (pointer:fine){.tipb:hover,.tipb[aria-expanded="true"]{color:var(--text)}}
+
 /* POSITION: FIXED, NOT ABSOLUTE.
    An absolutely-positioned card that is merely visibility:hidden still takes
    part in its ancestor's scrollable overflow. Every closed tooltip near the
@@ -1687,7 +1712,8 @@ body::before{display:none}
   font:500 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-widest);text-transform:uppercase;
   color:var(--b-dim);min-height:32px;display:inline-flex;align-items:center;gap:7px;
   transition:color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
-.b-qnav a:hover{color:var(--b-ink);background:var(--b-hi)}
+@media (hover:hover) and (pointer:fine){.b-qnav a:hover{color:var(--b-ink);background:var(--b-hi)}}
+
 .b-qnav a[aria-current="true"]{color:var(--b-ink);background:var(--b-hi)}
 /* PROGRESS, ON THE NAV THAT IS ALSO THE CONTROL.
    A separate six-node rail used to carry "which of these is behind you"; it
@@ -1732,7 +1758,8 @@ body::before{display:none}
   color:var(--b-dim);font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);padding:6px 8px;
   min-height:28px;cursor:pointer;transition:color var(--t-fast) var(--ease),
     border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
-.b-px-h .rgs button:hover{color:var(--b-ink);background:var(--b-hi)}
+@media (hover:hover) and (pointer:fine){.b-px-h .rgs button:hover{color:var(--b-ink);background:var(--b-hi)}}
+
 .b-px-h .rgs button[aria-pressed="true"]{color:var(--b-ink);border-color:var(--b-line2)}
 .b-px-c{position:relative;touch-action:pan-y;color:var(--b-acc)}
 .b-px-c svg{display:block;width:100%;height:clamp(240px,32vw,340px)}
@@ -1778,8 +1805,10 @@ body::before{display:none}
 .b-lvl.hot .b-lvl-tag,.b-lvl.hot .b-lvl-val{color:var(--b-ink)}
 .b-lvl-d{font:500 var(--t-2)/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--b-dim);
   flex:none;min-width:96px;text-align:right;opacity:0;transition:opacity var(--t-fast) var(--ease)}
-.b-lvl:hover .b-lvl-d,.b-lvl.hot .b-lvl-d,.b-lvl:focus-within .b-lvl-d{opacity:1}
-.b-lvl:hover .b-lvl-line{opacity:1}
+@media (hover:hover) and (pointer:fine){.b-lvl:hover .b-lvl-d,.b-lvl.hot .b-lvl-d,.b-lvl:focus-within .b-lvl-d{opacity:1}}
+
+@media (hover:hover) and (pointer:fine){.b-lvl:hover .b-lvl-line{opacity:1}}
+
 
 /* ── ENTRY STATE ─────────────────────────────────────────────────────────── */
 .b-zone{margin-top:24px;border:1px solid var(--b-line);border-radius:var(--r-4);background:var(--b-sur);
@@ -1814,7 +1843,8 @@ body::before{display:none}
 .b-dial .trk{fill:none;stroke:var(--b-hi);stroke-width:10}
 .b-dial .seg{fill:none;stroke-width:10;stroke-linecap:butt;cursor:pointer;
   transition:stroke-width var(--t-fast) var(--ease),opacity var(--t-fast) var(--ease)}
-.b-dial .seg:hover,.b-dial .seg.hot{stroke-width:15}
+@media (hover:hover) and (pointer:fine){.b-dial .seg:hover,.b-dial .seg.hot{stroke-width:15}}
+
 .b-dial .seg.dim{opacity:.28}
 .b-dial-c{position:absolute;text-align:center;pointer-events:none}
 .b-dial-c b{display:block;font:400 clamp(38px,6vw,54px)/1 var(--b-serif);color:var(--b-ink);
@@ -1855,7 +1885,8 @@ body::before{display:none}
 .b-mxr{background:none;border:0;border-top:1px solid var(--b-line);width:100%;
   font:inherit;color:inherit;text-align:left;cursor:pointer;align-items:center;
   transition:background var(--t-fast) var(--ease)}
-.b-mxr:hover{background:var(--b-hi)}
+@media (hover:hover) and (pointer:fine){.b-mxr:hover{background:var(--b-hi)}}
+
 .b-mxr .f{padding:12px 12px;font:500 var(--t-3)/1 var(--mono);letter-spacing:var(--ls-wider);
   text-transform:uppercase;color:var(--b-mut)}
 .b-mxr .c{padding:12px 12px;display:grid;place-items:center}
@@ -1889,7 +1920,8 @@ body::before{display:none}
   padding:12px 16px;min-height:38px;
   transition:color var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),
              background var(--t-fast) var(--ease)}
-.b-scb button:hover{color:var(--b-ink)}
+@media (hover:hover) and (pointer:fine){.b-scb button:hover{color:var(--b-ink)}}
+
 .b-scb button[aria-pressed="true"]{color:var(--b-ink);border-color:currentColor}
 .b-scb button.bull[aria-pressed="true"]{color:var(--b-bull);background:color-mix(in srgb,var(--b-bull) 12%,transparent)}
 .b-scb button.base[aria-pressed="true"]{color:var(--b-acc);background:color-mix(in srgb,var(--b-acc) 12%,transparent)}
@@ -1932,7 +1964,8 @@ body::before{display:none}
 .b-reset{background:none;border:1px solid var(--b-line2);border-radius:var(--r-2);color:var(--b-dim);
   font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-transform:uppercase;padding:8px 12px;
   min-height:32px;cursor:pointer;justify-self:start}
-.b-reset:hover{color:var(--b-ink);border-color:var(--b-ink)}
+@media (hover:hover) and (pointer:fine){.b-reset:hover{color:var(--b-ink);border-color:var(--b-ink)}}
+
 .b-sim{font-size:var(--t-4);line-height:1.6;color:var(--b-gold);margin-top:14px;
   border-left:2px solid var(--b-gold);padding-left:12px}
 
@@ -1957,7 +1990,8 @@ body::before{display:none}
 /* ── MICRO-INTERACTION BASELINE ──────────────────────────────────────────── */
 .brief .b-m,.brief .b-vi,.brief .b-sc,.brief .b-scg > div{
   transition:background var(--t-fast) var(--ease)}
-.brief .b-m:hover,.brief .b-vi:hover{background:var(--b-hi)}
+@media (hover:hover) and (pointer:fine){.brief .b-m:hover,.brief .b-vi:hover{background:var(--b-hi)}}
+
 .brief button:focus-visible,.brief a:focus-visible,.brief input:focus-visible{
   outline:2px solid var(--b-acc);outline-offset:2px}
 .b-reveal{opacity:0;transform:translateY(14px);
@@ -1995,7 +2029,8 @@ body::before{display:none}
    inverted there instead — otherwise it reads as a hole in the page. */
 .brief .tipb{color:var(--b-dim)}
 .brief .tipb::before{border-color:var(--b-line2)}
-.brief .tipb:hover,.brief .tipb[aria-expanded="true"]{color:var(--b-ink)}
+@media (hover:hover) and (pointer:fine){.brief .tipb:hover,.brief .tipb[aria-expanded="true"]{color:var(--b-ink)}}
+
 /* The forced-dark tooltip variant is gone. .tipc is painted with --text on
    --bg, which invert with the theme by themselves — it only needed overriding
    while the brief was dark on a light site, and the brief follows the theme
@@ -2028,7 +2063,8 @@ body::before{display:none}
 .b-lvl-tag::after{content:"";position:absolute;left:100%;width:6px;top:50%;
   height:1px;background:currentColor;opacity:0;transition:opacity var(--t-fast) var(--ease)}
 .b-lvl{--lnudge:0px}
-.b-lvl:hover .b-lvl-line,.b-lvl.hot .b-lvl-line{opacity:1}
+@media (hover:hover) and (pointer:fine){.b-lvl:hover .b-lvl-line,.b-lvl.hot .b-lvl-line{opacity:1}}
+
 /* The "no brief for that name" note, under the hero. */
 .b-miss{margin-top:20px;border:1px solid var(--b-line2);border-left:3px solid var(--b-gold);
   border-radius:0 var(--r-3) var(--r-3) 0;background:var(--b-sur);padding:14px 16px;
@@ -2051,7 +2087,8 @@ body::before{display:none}
   border:1px solid var(--line);border-radius:var(--r-2);padding:0 8px;min-height:32px;
   font:500 var(--t-2)/1 var(--mono);color:var(--dim);letter-spacing:var(--ls-wide);
   transition:color var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease)}
-.fresh:hover{color:var(--text);border-color:var(--line2)}
+@media (hover:hover) and (pointer:fine){.fresh:hover{color:var(--text);border-color:var(--line2)}}
+
 .fresh i{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
 .fresh.all{color:var(--up)} .fresh.most{color:var(--warn)} .fresh.few{color:var(--down)}
 
@@ -2059,7 +2096,8 @@ body::before{display:none}
   border:1px solid var(--line);border-radius:var(--r-2);padding:0 8px 0 12px;min-height:32px;
   font:400 var(--t-4)/1 var(--ui);color:var(--dim);
   transition:color var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease)}
-.cmdk:hover{color:var(--text);border-color:var(--line2)}
+@media (hover:hover) and (pointer:fine){.cmdk:hover{color:var(--text);border-color:var(--line2)}}
+
 .cmdk kbd{font:500 var(--t-1)/1 var(--mono);border:1px solid var(--line2);border-radius:var(--r-1);
   padding:3px 4px;color:var(--dim)}
 @media(max-width:900px){.cmdk .cmdk-l{display:none} .cmdk{padding:0 8px}}
@@ -2111,12 +2149,14 @@ body::before{display:none}
   color:var(--on-ink);border-radius:var(--r-3);padding:12px 20px;min-height:52px;justify-content:center;
   font:600 var(--t-6)/1.2 var(--ui);transition:transform var(--t-fast) var(--ease),opacity var(--t-fast) var(--ease)}
 .btn-hero em{font:400 var(--t-2)/1 var(--mono);font-style:normal;opacity:.7;letter-spacing:var(--ls-wide)}
-.btn-hero:hover{transform:translateY(-1px);opacity:.92}
+@media (hover:hover) and (pointer:fine){.btn-hero:hover{transform:translateY(-1px);opacity:.92}}
+
 .btn-ghost{font:500 var(--t-5)/1 var(--ui);color:var(--muted);min-height:44px;
   display:inline-flex;align-items:center;padding:0 4px;
   border-bottom:1px solid transparent;transition:color var(--t-fast) var(--ease),
     border-color var(--t-fast) var(--ease)}
-.btn-ghost:hover{color:var(--text);border-bottom-color:var(--line2)}
+@media (hover:hover) and (pointer:fine){.btn-ghost:hover{color:var(--text);border-bottom-color:var(--line2)}}
+
 /* ── THE MARKET RAIL ──────────────────────────────────────────────────────
  * Four readings — Nifty, Sensex, VIX, the flows. One under another at 16px
  * padding they ran to 431px on a phone to carry 250 characters, so the whole
@@ -2188,7 +2228,8 @@ body::before{display:none}
 .btn-hero-2{background:transparent;color:var(--text);
   box-shadow:inset 0 0 0 1px var(--line2)}
 .btn-hero-2 em{color:var(--muted)}
-.btn-hero-2:hover{box-shadow:inset 0 0 0 1px var(--text)}
+@media (hover:hover) and (pointer:fine){.btn-hero-2:hover{box-shadow:inset 0 0 0 1px var(--text)}}
+
 
 /* A zero in the reconciliation is information, so it is legible rather than
    hidden — dimmed to say "nothing here", never removed. */
@@ -2220,7 +2261,8 @@ body::before{display:none}
 .dscl span{color:var(--muted)}
 .dscl a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;
   white-space:nowrap}
-.dscl a:hover{text-decoration-thickness:2px}
+@media (hover:hover) and (pointer:fine){.dscl a:hover{text-decoration-thickness:2px}}
+
 @media(max-width:560px){
   .dscl{padding:7px 16px}
   .dscl p{font-size:var(--t-2);line-height:1.4}
@@ -2359,7 +2401,8 @@ body::before{display:none}
 .pg{background:none;border:1px solid var(--line2);border-radius:var(--r-3);cursor:pointer;
   color:var(--text);font:500 var(--t-4)/1 var(--ui);padding:0 14px;min-height:40px;
   transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease)}
-.pg:hover:not(:disabled){background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.pg:hover:not(:disabled){background:var(--raised)}}
+
 .pg:disabled{opacity:.38;cursor:default}
 .pg-n{font:400 var(--t-4)/1.5 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums;
   text-align:center;flex:1 1 auto;min-width:0}
@@ -2442,7 +2485,8 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
   transition:color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
 .wstar svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.4;
   stroke-linejoin:round}
-.wstar:hover{color:var(--text);background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.wstar:hover{color:var(--text);background:var(--raised)}}
+
 .wstar[aria-pressed="true"]{color:var(--saved)}
 .wstar[aria-pressed="true"] svg{fill:currentColor;stroke:currentColor}
 
@@ -2457,10 +2501,12 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
 .alform input:focus,.alform select:focus{outline:2px solid var(--accent);outline-offset:1px}
 .btn-ghost-solid{background:var(--ink-btn);color:var(--on-ink);border:0;border-radius:var(--r-3);
   min-height:44px;padding:0 16px;font:600 var(--t-5)/1 var(--ui);cursor:pointer}
-.btn-ghost-solid:hover{opacity:.92}
+@media (hover:hover) and (pointer:fine){.btn-ghost-solid:hover{opacity:.92}}
+
 .alx{background:none;border:0;color:var(--dim);cursor:pointer;font-size:var(--t-4);
   min-width:32px;min-height:32px;border-radius:var(--r-2)}
-.alx:hover{color:var(--down);background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.alx:hover{color:var(--down);background:var(--raised)}}
+
 .lnk{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;
   font:inherit;text-decoration:underline;text-underline-offset:2px}
 .board-row:has(.alx){grid-template-columns:1fr auto auto 32px}
@@ -2479,13 +2525,15 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
 .toast span{display:block;font:400 var(--t-4)/1.45 var(--ui);opacity:.78;margin-top:3px}
 .toast button{position:absolute;top:8px;right:8px;background:none;border:0;color:inherit;
   opacity:.6;cursor:pointer;min-width:28px;min-height:28px;border-radius:var(--r-2)}
-.toast button:hover{opacity:1}
+@media (hover:hover) and (pointer:fine){.toast button:hover{opacity:1}}
+
 @keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.toast{animation:none}}
 /* The footer carries the author's own links — the same set the Person schema
    declares in sameAs, so a crawler and a reader see one consistent identity. */
 .foot a{color:var(--accent)}
-.foot a:hover{text-decoration:underline;text-underline-offset:2px}
+@media (hover:hover) and (pointer:fine){.foot a:hover{text-decoration:underline;text-underline-offset:2px}}
+
 .foot p + p{margin-top:7px}
 
 /* ═══════════ THE DATA TABLES, ALIGNED ════════════════════════════════════
@@ -2803,7 +2851,8 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
   flex:none;border:0;background:none;cursor:pointer;
   font-size:var(--t-7);line-height:1;color:var(--dim);padding:4px 6px;border-radius:var(--r-1);
 }
-.ed-x:hover{color:var(--text);background:color-mix(in srgb, var(--text) 8%, transparent)}
+@media (hover:hover) and (pointer:fine){.ed-x:hover{color:var(--text);background:color-mix(in srgb, var(--text) 8%, transparent)}}
+
 
 /* ── CHANGED SINCE THE LAST TICK ─────────────────────────────────────────
    Marks the cells whose printed value actually moved on a repaint, in the
@@ -2845,7 +2894,8 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
   margin:0 0 6px;max-width:64ch;text-wrap:balance}
 .nw-t a{color:var(--text);text-decoration:none;background-image:linear-gradient(var(--line2),var(--line2));
   background-size:100% 1px;background-repeat:no-repeat;background-position:0 100%}
-.nw-t a:hover{color:var(--accent);background-image:linear-gradient(var(--accent),var(--accent))}
+@media (hover:hover) and (pointer:fine){.nw-t a:hover{color:var(--accent);background-image:linear-gradient(var(--accent),var(--accent))}}
+
 .nw-d{font:400 var(--t-5)/1.55 var(--ui);color:var(--muted);margin:0;max-width:70ch}
 
 /* The join. Chips are links to the screen, coloured by the move the name
@@ -2859,9 +2909,11 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
 .nw-c b{font:600 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-0);color:var(--text)}
 .nw-c i{font:500 var(--t-2)/1 var(--mono);font-style:normal;color:var(--dim)}
 .nw-c.up i{color:var(--up)} .nw-c.dn i{color:var(--down)}
-.nw-c:hover{border-color:var(--line2);background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.nw-c:hover{border-color:var(--line2);background:var(--raised)}}
+
 .more-l{color:var(--accent);text-decoration:none;font-weight:500}
-.more-l:hover{text-decoration:underline}
+@media (hover:hover) and (pointer:fine){.more-l:hover{text-decoration:underline}}
+
 .chips-hint{margin:-6px 0 14px}
 
 @media(max-width:700px){
@@ -3050,7 +3102,8 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
    a new build — and absent for a new data edition, which needs no action. */
 .ed-go{flex:none;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);
   font:600 var(--t-3)/1 var(--ui);padding:7px 12px;border-radius:var(--r-pill);cursor:pointer}
-.ed-go:hover{filter:brightness(1.08)}
+@media (hover:hover) and (pointer:fine){.ed-go:hover{filter:brightness(1.08)}}
+
 .ed-t b{font-weight:600}
 
 /* FII & DII in the hero. Two rows and a caption — the flows are a pair and
@@ -3102,7 +3155,8 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
   background:color-mix(in srgb,var(--accent) 7%,transparent)}
 .nwc-t{font:400 var(--t-7)/1.32 var(--serif);letter-spacing:var(--ls-snug);margin:0 0 7px;text-wrap:balance}
 .nwc-t a{color:var(--text);text-decoration:none}
-.nwc-t a:hover{color:var(--accent);text-decoration:underline}
+@media (hover:hover) and (pointer:fine){.nwc-t a:hover{color:var(--accent);text-decoration:underline}}
+
 .nwc-d{font:400 var(--t-5)/1.55 var(--ui);color:var(--muted);margin:0 0 12px}
 .nwc-w{margin-top:auto;padding-top:12px;border-top:1px solid var(--line)}
 .nwc-wl{display:block;font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-transform:uppercase;
@@ -3121,7 +3175,8 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
 .mk-card{width:100%;text-align:left;border:1px solid var(--line2);background:var(--bg);
   color:var(--accent);font:500 var(--t-4)/1 var(--ui);padding:12px 12px;border-radius:var(--r-3);
   cursor:pointer;min-height:40px}
-.mk-card:hover{background:var(--raised);border-color:var(--accent)}
+@media (hover:hover) and (pointer:fine){.mk-card:hover{background:var(--raised);border-color:var(--accent)}}
+
 
 /* The component that is listed but deliberately not averaged in. */
 .sc-x{display:block;font:400 var(--t-1)/1 var(--mono);font-style:normal;letter-spacing:var(--ls-wide);
@@ -3137,15 +3192,18 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
   transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
 .tile-go::after{content:"›";position:absolute;top:11px;right:13px;color:var(--dim);
   font-size:var(--t-6);line-height:1;transition:transform var(--t-fast) var(--ease-out),color var(--t-fast) var(--ease)}
-.tile-go:hover{border-color:var(--line2);background:var(--raised)}
-.tile-go:hover::after{transform:translateX(3px);color:var(--accent)}
+@media (hover:hover) and (pointer:fine){.tile-go:hover{border-color:var(--line2);background:var(--raised)}}
+
+@media (hover:hover) and (pointer:fine){.tile-go:hover::after{transform:translateX(3px);color:var(--accent)}}
+
 
 .t5l{display:flex;flex-direction:column}
 .t5i{display:block;width:100%;text-align:left;padding:14px 0;border-top:1px solid var(--line);
   border-left:0;border-right:0;border-bottom:0;background:none;text-decoration:none;color:inherit;font:inherit}
 .t5i:first-child{border-top:0}
 .t5b{cursor:pointer}
-.t5b:hover .t5t,.t5i[href]:hover .t5t{color:var(--accent)}
+@media (hover:hover) and (pointer:fine){.t5b:hover .t5t,.t5i[href]:hover .t5t{color:var(--accent)}}
+
 .t5s{display:block;font:500 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-wider);text-transform:uppercase;
   color:var(--dim);margin-bottom:6px}
 .t5t{display:block;font:400 var(--t-6)/1.35 var(--serif);color:var(--text);margin-bottom:4px}
@@ -3324,7 +3382,8 @@ html:has(dialog[open]){overflow:hidden}
   animation:toTopIn var(--t-mid) var(--ease-out) both;
 }
 .totop svg{width:16px;height:16px}
-.totop:hover{border-color:var(--accent);color:var(--accent)}
+@media (hover:hover) and (pointer:fine){.totop:hover{border-color:var(--accent);color:var(--accent)}}
+
 @keyframes toTopIn{from{opacity:0;transform:translateY(8px) scale(.94)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.totop{animation:none}}
 @media(max-width:760px){
@@ -3341,7 +3400,8 @@ html:has(dialog[open]){overflow:hidden}
 .t5row{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
 .t5name{flex:1 1 auto;min-width:0;text-align:left;border:0;background:none;padding:0;
   cursor:pointer;font:400 var(--t-6)/1.35 var(--serif);color:var(--text)}
-.t5name:hover{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+@media (hover:hover) and (pointer:fine){.t5name:hover{color:var(--accent);text-decoration:underline;text-underline-offset:2px}}
+
 .t5v .wstar{flex:none}
 
 .t5tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
@@ -3372,7 +3432,8 @@ html:has(dialog[open]){overflow:hidden}
 .mbc-h{display:flex;align-items:center;gap:8px;margin-bottom:12px}
 .mbc-s{flex:1 1 auto;min-width:0;text-align:left;border:0;background:none;padding:0;cursor:pointer;
   font:600 var(--t-6)/1.2 var(--mono);letter-spacing:var(--ls-snug);color:var(--text)}
-.mbc-s:hover{color:var(--accent)}
+@media (hover:hover) and (pointer:fine){.mbc-s:hover{color:var(--accent)}}
+
 .mbc-sc{flex:none;font:600 var(--t-2)/1 var(--mono);color:var(--accent);
   background:color-mix(in srgb,var(--accent) 10%,transparent);padding:5px 7px;border-radius:var(--r-1)}
 .mbc-px{display:flex;gap:6px 16px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--line)}
@@ -3433,7 +3494,8 @@ html:has(dialog[open]){overflow:hidden}
   border:0;background:none;position:relative;
 }
 .tabg > summary::-webkit-details-marker{display:none}
-.tabg > summary:hover{color:var(--text)}
+@media (hover:hover) and (pointer:fine){.tabg > summary:hover{color:var(--text)}}
+
 .tabg > summary i{
   width:0;height:0;flex:none;
   border-left:3.5px solid transparent;border-right:3.5px solid transparent;
@@ -3463,7 +3525,8 @@ html:has(dialog[open]){overflow:hidden}
   display:block;padding:8px 12px;border-radius:var(--r-3);text-decoration:none;
   color:var(--text);
 }
-.tabg-m a:hover{background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.tabg-m a:hover{background:var(--raised)}}
+
 .tabg-m a[aria-current="page"]{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 .tabg-m b{display:block;font:600 var(--t-5)/1.25 var(--ui)}
 .tabg-m em{display:block;margin-top:2px;font:400 var(--t-3)/1.45 var(--ui);
@@ -3615,7 +3678,9 @@ html:has(dialog[open]){overflow:hidden}
    regardless of ITS size: 11px text came out at -0.033em, 64% tighter than the
    token intends. `font:` shorthand does not reset letter-spacing, so the child
    rules that set their own font never cleared it. Reset on the children. */
-.aic-s > *{letter-spacing:normal}.aic-s:hover{color:var(--accent)}
+.aic-s > *{letter-spacing:normal}
+@media (hover:hover) and (pointer:fine){.aic-s:hover{color:var(--accent)}}
+
 /* Green on a 14% green tint measures 4.33:1 in light — under AA. Darkened
    toward the ink rather than swapping the hue, the same fix as .b-zst.active. */
 .aic-g{font:600 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-wide);padding:5px 8px;
@@ -3909,7 +3974,8 @@ html:has(dialog[open]){overflow:hidden}
 .b-fold[open] > summary span::after{transform:rotate(-135deg) translateY(-2px)}
 .b-fold > summary i{font:400 var(--t-3)/1.5 var(--ui);font-style:normal;color:var(--dim);
   max-width:62ch}
-.b-fold > summary:hover span{color:var(--accent)}
+@media (hover:hover) and (pointer:fine){.b-fold > summary:hover span{color:var(--accent)}}
+
 /* The sections inside keep their own rhythm; the first loses its top rule so
    the fold's own border is not doubled. */
 .b-fold > .b-sec:first-of-type{border-top:0;padding-top:4px}
@@ -3953,7 +4019,8 @@ html:has(dialog[open]){overflow:hidden}
 .fd-sip b{font:600 var(--t-7)/1.1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text)}
 .fd-sip b.up{color:var(--up)}
 .rank-r.fnd[data-fund]{cursor:pointer}
-.rank-r.fnd[data-fund]:hover{background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.rank-r.fnd[data-fund]:hover{background:var(--raised)}}
+
 
 /* Fund rows: scheme name gets the room, three figures line up on the right. */
 .rank-r.fnd{grid-template-columns:30px minmax(0,1fr) 80px 80px 80px 88px 84px;gap:0 8px;align-items:center}
@@ -3975,7 +4042,8 @@ html:has(dialog[open]){overflow:hidden}
 /* The category leaders' board. Seven cells, seven tracks. */
 .rank-r.fld{grid-template-columns:30px minmax(0,1fr) 76px 76px 88px 84px 62px;gap:0 8px;
   align-items:center;cursor:pointer}
-.rank-r.fld:hover{background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.rank-r.fld:hover{background:var(--raised)}}
+
 .rank-r.fld .s b{font:600 var(--t-4)/1.25 var(--ui);display:block;color:var(--text)}
 .rank-r.fld .s span{display:block;margin-top:2px;font:400 var(--t-2)/1.35 var(--ui);color:var(--dim)}
 .rank-r.fld .x,.rank-r.fld .m{font:500 var(--t-4)/1.2 var(--mono);
@@ -4178,7 +4246,8 @@ html:has(dialog[open]){overflow:hidden}
 .tkr-h{display:flex;align-items:center}
 /* HELD STILL ON DEMAND. A price you cannot stop is a price you cannot read;
  * hover and keyboard focus both pause it. */
-.tkr:hover .tkr-t,.tkr-row:focus-within .tkr-t{animation-play-state:paused}
+@media (hover:hover) and (pointer:fine){.tkr:hover .tkr-t,.tkr-row:focus-within .tkr-t{animation-play-state:paused}}
+
 @keyframes tkr-run{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
 .tkr-i{display:flex;align-items:baseline;gap:7px;padding:7px 14px;white-space:nowrap;
   border-right:1px solid var(--line)}
@@ -4381,7 +4450,8 @@ html:has(dialog[open]){overflow:hidden}
   border-right:1.5px solid var(--dim);border-bottom:1.5px solid var(--dim);
   transform:rotate(45deg);transition:transform var(--t-fast,var(--t-fast)) ease}
 .insti-g[open] > .insti-h::after{transform:rotate(-135deg)}
-.insti-h:hover h3{color:var(--accent)}
+@media (hover:hover) and (pointer:fine){.insti-h:hover h3{color:var(--accent)}}
+
 .insti-h:focus-visible{outline:2px solid var(--live);outline-offset:3px;border-radius:var(--r-2)}
 /* Says the panel is narrowing the table even while it is shut — a closed
    filter that is still filtering has to announce itself. */
@@ -4406,7 +4476,8 @@ html:has(dialog[open]){overflow:hidden}
 .insti-adv>summary::-webkit-details-marker{display:none}
 .insti-adv>summary::after{content:'+';margin-left:6px;color:var(--dim);font:400 var(--t-5)/1 var(--mono)}
 .insti-adv[open]>summary::after{content:'−'}
-.insti-adv>summary:hover{color:var(--text)}
+@media (hover:hover) and (pointer:fine){.insti-adv>summary:hover{color:var(--text)}}
+
 .ia-grid{display:grid;gap:8px;padding:4px 0 8px}
 .ia-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ia-row>b{flex:0 0 100%;font:500 var(--t-2)/1 var(--ui);color:var(--muted);
@@ -4521,7 +4592,8 @@ html:has(dialog[open]){overflow:hidden}
 .ef-c{padding:14px;border:1px solid var(--line);border-radius:var(--r-4);
   background:var(--surface);cursor:pointer;min-width:0;
   transition:border-color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
-.ef-c:hover{border-color:var(--line2)}
+@media (hover:hover) and (pointer:fine){.ef-c:hover{border-color:var(--line2)}}
+
 .ef-c:active{transform:scale(.995)}
 .ef-c:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .ef-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
@@ -4591,7 +4663,8 @@ html:has(dialog[open]){overflow:hidden}
  * hold. The panel is a SIBLING of the row, because a grid row cannot contain a
  * full-width block without breaking its own column template. */
 .xr{cursor:pointer;position:relative;padding-right:24px}
-.xr:hover{background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.xr:hover{background:var(--raised)}}
+
 .xr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 /* A chevron, so a row that opens is distinguishable from one that does not
    before you tap it. Rotates rather than swapping glyphs, so nothing reflows. */
@@ -4628,7 +4701,8 @@ html:has(dialog[open]){overflow:hidden}
 }
 /* The roster rows are links now; they must not pick up link underline/colour. */
 a.rank-r.eng{text-decoration:none;color:inherit}
-a.rank-r.eng:hover{background:var(--raised)}
+@media (hover:hover) and (pointer:fine){a.rank-r.eng:hover{background:var(--raised)}}
+
 a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 /* The core's sweep is an ::after overlay across the whole panel; without a
    stacking context of its own the text sits underneath it and dims as the
@@ -4690,7 +4764,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .rd-node circle{fill:var(--surface);stroke:var(--line2);stroke-width:1.5;cursor:pointer;
   transition:stroke var(--t-fast) var(--ease)}
 .rd-node.is-up circle{stroke:var(--up)} .rd-node.is-dn circle{stroke:var(--down)}
-.rd-node:hover circle,.rd-node:focus-visible circle{stroke-width:2.5}
+@media (hover:hover) and (pointer:fine){.rd-node:hover circle,.rd-node:focus-visible circle{stroke-width:2.5}}
+
 .rd-node text{fill:var(--text);font:600 12px var(--ui);text-anchor:middle;pointer-events:none}
 .rd-node .rd-ns{fill:var(--dim);font:500 11px var(--mono)}
 .rd-hub{fill:var(--raised);stroke:var(--accent);stroke-width:1.5}
@@ -4701,7 +4776,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   border-radius:var(--r-3);background:var(--surface);cursor:pointer;
   grid-template-columns:22px minmax(0,1fr) minmax(0,auto);align-items:start}
 .rd-row > *{min-width:0}
-.rd-row:hover{border-color:var(--line2)}
+@media (hover:hover) and (pointer:fine){.rd-row:hover{border-color:var(--line2)}}
+
 .rd-row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .rd-rank{font:600 var(--t-3)/1.4 var(--mono);color:var(--dim)}
 .rd-id{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -4750,7 +4826,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   font:600 var(--t-2)/1 var(--ui);padding:8px 12px;min-height:38px;
   border:1px solid var(--line2);border-radius:var(--r-pill);
   background:var(--surface);color:var(--muted);cursor:pointer}
-.rd-full:hover{color:var(--text);border-color:var(--line2)}
+@media (hover:hover) and (pointer:fine){.rd-full:hover{color:var(--text);border-color:var(--line2)}}
+
 .rd-stage.is-full{position:fixed;inset:0;z-index:80;background:var(--bg);
   display:grid;place-items:center;padding:14px;margin:0;overflow:auto}
 .rd-stage.is-full .rd-svg{max-height:92vh}
@@ -4774,7 +4851,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   background:var(--surface);cursor:pointer;font-family:var(--ui);
   transition:border-color 180ms var(--ease),transform 180ms var(--ease),opacity 180ms var(--ease)}
 .rd-card{height:92px;box-shadow:0 3px 14px rgba(0,0,0,.07)}
-.rd-card:hover,.rd-u:hover{border-color:var(--accent);transform:translateY(-1px)}
+@media (hover:hover) and (pointer:fine){.rd-card:hover,.rd-u:hover{border-color:var(--accent);transform:translateY(-1px)}}
+
 .rd-card:focus-visible,.rd-u:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .rd-u{flex:0 0 156px;scroll-snap-align:start}
 .rdc-t{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
@@ -4828,7 +4906,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 
 @media(prefers-reduced-motion:reduce){
   .rd-card,.rd-u{transition:none}
-  .rd-card:hover,.rd-u:hover{transform:none}
+@media (hover:hover) and (pointer:fine){.rd-card:hover,.rd-u:hover{transform:none}}
+
 }
 
 /* ── FIVE FLAT DESTINATIONS ──────────────────────────────────────────────────
@@ -4855,13 +4934,15 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   padding:16px;border:1px solid var(--line);border-radius:var(--r-4);
   background:var(--surface);text-decoration:none;color:inherit;
   transition:border-color var(--t-fast) var(--ease)}
-.disc-c:hover{border-color:var(--accent)}
+@media (hover:hover) and (pointer:fine){.disc-c:hover{border-color:var(--accent)}}
+
 .disc-c:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .disc-n{font:700 var(--t-6)/1.2 var(--disp);letter-spacing:var(--ls-snug);color:var(--text)}
 .disc-s{grid-column:1;font:500 var(--t-3)/1.4 var(--ui);color:var(--muted)}
 .disc-w{grid-column:1;margin-top:5px;font:400 var(--t-3)/1.5 var(--ui);color:var(--dim)}
 .disc-go{grid-row:1/3;align-self:center;font:400 var(--t-7)/1 var(--mono);color:var(--line2)}
-.disc-c:hover .disc-go{color:var(--accent)}
+@media (hover:hover) and (pointer:fine){.disc-c:hover .disc-go{color:var(--accent)}}
+
 
 /* ── MORE SHEET ──────────────────────────────────────────────────────────── */
 .more{display:grid;gap:20px}
@@ -4871,7 +4952,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-3);
   background:var(--surface);color:inherit;text-decoration:none;cursor:pointer;
   margin-bottom:7px;min-height:44px}
-.more-i:hover{border-color:var(--line2);background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.more-i:hover{border-color:var(--line2);background:var(--raised)}}
+
 .more-i:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .more-i b{font:600 var(--t-5)/1.25 var(--ui)}
 .more-i span{font:400 var(--t-2)/1.4 var(--ui);color:var(--dim)}
@@ -5193,7 +5275,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
    visible before the click: a heading that only reveals it is sortable after
    you have already sorted it is a control nobody finds. */
 .scr-h{cursor:pointer;user-select:none;border-radius:4px;transition:color var(--t-fast) var(--ease,ease)}
-.scr-h:hover{color:var(--text)}
+@media (hover:hover) and (pointer:fine){.scr-h:hover{color:var(--text)}}
+
 .scr-h:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .scr-h.on{color:var(--text);font-weight:600}
 .scr-ar{font-style:normal;font-size:.8em;opacity:.7;margin-left:.25em}
@@ -5212,7 +5295,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 
 /* The alerts ledger's headings sort, same as the screen's. */
 .sg-h{cursor:pointer;user-select:none;transition:color var(--t-fast) var(--ease,ease)}
-.sg-h:hover{color:var(--text)}
+@media (hover:hover) and (pointer:fine){.sg-h:hover{color:var(--text)}}
+
 .sg-h:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .sg-h.on{color:var(--text);font-weight:600}
 
@@ -5225,7 +5309,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .idm-r{display:grid;grid-template-columns:minmax(0,1fr) 64px 58px minmax(0,1.1fr);
   gap:0 12px;align-items:center;padding:12px 14px;background:var(--surface);
   text-decoration:none;color:inherit;transition:background var(--t-fast) var(--ease,ease)}
-.idm-r:hover{background:var(--raised)}
+@media (hover:hover) and (pointer:fine){.idm-r:hover{background:var(--raised)}}
+
 .idm-s{min-width:0}
 .idm-s b{display:block;font:600 var(--t-3)/1.2 var(--mono)}
 .idm-s span{display:block;font-size:var(--t-2);color:var(--dim);margin-top:2px;
@@ -5534,7 +5619,8 @@ a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,
   border-radius:var(--r);
 }
 .card,.disc-c{box-shadow:none;background:var(--surface);border:1px solid var(--line)}
-.card:hover,.disc-c:hover{border-color:var(--line2);background:var(--raised2)}
+@media (hover:hover) and (pointer:fine){.card:hover,.disc-c:hover{border-color:var(--line2);background:var(--raised2)}}
+
 .rank{background:var(--surface);border:1px solid var(--line);overflow:hidden}
 .foldb{background:var(--raised2)}
 .foldb[open]{background:var(--surface)}
@@ -5542,7 +5628,8 @@ a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,
 /* Tiles: the numbers a page is about. Tinted, flat, generous. */
 .grid > .tile,.snap > *{background:var(--raised);border:1px solid transparent;
   border-radius:var(--r);transition:background var(--t-fast) var(--ease)}
-.grid > .tile:hover,.snap > *:hover{background:var(--raised2);border-color:var(--line)}
+@media (hover:hover) and (pointer:fine){.grid > .tile:hover,.snap > *:hover{background:var(--raised2);border-color:var(--line)}}
+
 
 /* ── COUNT-UP ─────────────────────────────────────────────────────────────
    The final value is IN THE MARKUP and styled normally; countUp() only
@@ -5595,7 +5682,8 @@ a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,
 .spk{display:flex;flex-direction:column;gap:6px;padding:14px 16px;
   background:var(--raised);border-radius:var(--r);border:1px solid transparent;
   transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
-.spk:hover{background:var(--surface);border-color:var(--line)}
+@media (hover:hover) and (pointer:fine){.spk:hover{background:var(--surface);border-color:var(--line)}}
+
 .spk-k{font:600 var(--t-2)/1 var(--ui);letter-spacing:var(--ls-wide);
   text-transform:uppercase;color:var(--dim)}
 .spk-v{font:700 var(--t-8)/1.05 var(--serif);font-variant-numeric:tabular-nums;
@@ -5820,7 +5908,8 @@ main.is-nav{animation:routein var(--t-mid) var(--ease-out) backwards}
   border-radius:var(--r-2);cursor:pointer;text-align:left;overflow:hidden;
   font:inherit;color:var(--text);
   transition:transform var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease)}
-.mcell:hover{border-color:var(--text);z-index:1}
+@media (hover:hover) and (pointer:fine){.mcell:hover{border-color:var(--text);z-index:1}}
+
 .mcell:active{transform:scale(.97)}
 .mcell b{font:700 var(--t-2)/1.1 var(--ui);letter-spacing:-.01em;
   max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -6004,3 +6093,102 @@ main.is-nav{animation:routein var(--t-mid) var(--ease-out) backwards}
    quietly but in words — never colour alone, and never silently. */
 .t5stale{font-style:normal;font-size:var(--t-1);letter-spacing:var(--ls-wide);
   text-transform:uppercase;color:var(--dim)}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   FEEL PASS — press response, and the two accessibility signals that were
+   never handled. Appended as one block so it is one thing to read and one
+   thing to revert.
+
+   Audited against the apple-design and emil-design-eng skills, 2026-09-22.
+   The counts below are measurements of this file, not impressions.
+
+   WHAT WAS WRONG, AND WHY IT IS A BUG RATHER THAN POLISH
+   ------------------------------------------------------
+   83 :hover rules. 0 behind @media (hover:hover). 10 :active rules.
+
+   This file's own header calls it "the mobile-first surface". On a touch
+   device :hover fires on tap AND STICKS until you tap elsewhere, so every one
+   of those 83 rules was painting a hover state that had no way to leave. The
+   feedback that does work on touch — the press state — had ten rules against
+   eighty-three. The primary device had the broken mechanism everywhere and
+   the working one almost nowhere.
+
+   The 83 are now each wrapped in (hover:hover) and (pointer:fine). That
+   transform was verified declaration-by-declaration: 8851 before, 8934 after,
+   nothing lost, the 83 added being the media conditions themselves.
+
+   WHAT IS DELIBERATELY NOT DONE
+   -----------------------------
+   The skills call for translucent chrome — backdrop-filter with a
+   semi-transparent background, content scrolling under. This site's .bar is
+   OPAQUE ON PURPOSE and stays that way: WebKit does not apply backdrop-filter
+   on a sticky element, reported support and all, and the header was readable
+   straight through in Safari. That is measured, reproduced in Playwright, and
+   written up at the .bar rule. A general design rule does not outrank a
+   reproduction.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── PRESS RESPONSE ──────────────────────────────────────────────────────────
+ * "Respond on pointer-down, not on release" and "buttons must feel responsive
+ * to press" are the first rule of both skills. 160ms ease-out on the way in;
+ * the release is the same curve because a press has no momentum to carry.
+ *
+ * Scoped to elements that do NOT already define :active, so nothing here
+ * overrides a press state somebody already tuned — .card, .chip, .tabg,
+ * .rank-r, .disc-c, .ef-c, .foldb, .mcell, .rd-c, .tab-more, .tabs and .xr
+ * keep theirs untouched.
+ *
+ * scale() takes children with it, which is the point: the label presses with
+ * the button rather than sliding inside it. 0.97 is the subtle end of the
+ * 0.95–0.98 band — a data-dense page cannot afford a big squash. */
+.tipb, .heat-t, .brief, .b-lvl, .tile-go, .rd-u, .rd-card, .wstar, .wire,
+button:not(.chip):not(.tabg):not(.tabs):not(.tab-more):not(.foldb) {
+  transition: transform 160ms var(--ease-out, cubic-bezier(.16,1,.3,1));
+}
+.tipb:active, .heat-t:active, .brief:active, .b-lvl:active, .tile-go:active,
+.rd-u:active, .rd-card:active, .wstar:active, .wire:active,
+button:not(.chip):not(.tabg):not(.tabs):not(.tab-more):not(.foldb):active {
+  transform: scale(.97);
+}
+/* The chip already had a press state's worth of colour change and no motion.
+   It gets the same 0.97 so the whole filter row answers a tap the same way. */
+.chip:active { transform: scale(.97); }
+
+/* A press must not be swallowed by a reduced-motion preference: the skill is
+   explicit that reduced motion means gentler feedback, not none. Scale is
+   vestibular, so it goes; the surface still answers with a tone change. */
+@media (prefers-reduced-motion: reduce) {
+  .tipb:active, .heat-t:active, .brief:active, .b-lvl:active, .tile-go:active,
+  .rd-u:active, .rd-card:active, .wstar:active, .wire:active, .chip:active,
+  button:active { transform: none; filter: brightness(.94); }
+}
+
+/* ── THE TWO SIGNALS THAT WERE NEVER READ ────────────────────────────────────
+ * prefers-reduced-motion had 36 rules. prefers-reduced-transparency and
+ * prefers-contrast had none. They are independent preferences, not degrees of
+ * one, and a reader who sets either was getting the default surface.
+ *
+ * Only the two ::backdrop surfaces actually blur here — the sticky chrome is
+ * opaque by the WebKit note above — so this is small on purpose. */
+@media (prefers-reduced-transparency: reduce) {
+  .sheet::backdrop { background: rgba(4,7,11,.94); backdrop-filter: none; }
+  .cmd::backdrop   { background: rgba(4,7,11,.94); backdrop-filter: none; }
+}
+
+/* prefers-contrast: more wants near-solid surfaces with a DEFINED border —
+ * the failure it addresses is a boundary you have to infer from a tonal step.
+ * Every surface here is already solid, so this is entirely about the edges. */
+@media (prefers-contrast: more) {
+  .card, .rd-card, .chip, .sheet, .cmd { border-color: var(--text); }
+  .bar, .nav { border-color: var(--text); }
+  :root { --muted: var(--text); }
+}
+
+/* ── TRACKING IS SIZE-SPECIFIC ───────────────────────────────────────────────
+ * "A fixed letter-spacing is wrong somewhere." The file has six tracking
+ * tokens and applies them by hand, so the two display steps added for
+ * headlines — --t-11 and --t-12 — pick up tracking only where somebody
+ * remembered. Letters read further apart as they grow; at 36px and 44px the
+ * default is visibly loose. This makes it the rule rather than the habit. */
+h1, .sec-lead { letter-spacing: var(--ls-tight); }
