@@ -1694,6 +1694,38 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      CSS.match(/--s-\d+h\s*:/g));
 }
 
+/* ── ONE SERIF EXCEPTION, AND IT IS NAMED ───────────────────────────────────
+ * The note at the top of signal.css said "nothing calls --serif any more; the
+ * file is no longer preloaded, so it costs a reader nothing" — true of the
+ * TOKEN and misleading about the FACE. The brief's sub-theme reaches Newsreader
+ * through --b-serif and sets nine headline roles in it, so every reader who
+ * opens /brief downloads it.
+ *
+ * That is the intended design. What must not happen is the face spreading back
+ * across the site one rule at a time, which is exactly how there came to be two
+ * display voices the first time. */
+{
+  const body = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+  const refs = [...body.matchAll(/Newsreader/g)];
+  /* Three, exactly: the @font-face family, the woff2 it points at, and
+     --b-serif. Nothing else may name it. */
+  ok("Newsreader is named exactly three times — its family, its file, its one token",
+     refs.length === 3, refs.length);
+  ok("...and the second is --b-serif", /--b-serif:'Newsreader'/.test(body));
+  /* THE SITE-WIDE TOKENS MUST NOT POINT AT IT. --serif, --disp and --ui are
+     the three every other rule reaches through. */
+  for (const t of ["--serif", "--disp", "--ui"]) {
+    const m = body.match(new RegExp(`${t}:([^;]+);`));
+    ok(`${t} resolves to the interface face, not the serif`,
+       !!m && !/Newsreader/.test(m[1]), m && m[1]);
+  }
+  /* AND IT IS NOT PRELOADED. A preload is the highest-priority fetch a page can
+     make; spending one on a face used by a single route would cost every other
+     route the bandwidth. */
+  ok("the serif is not preloaded — one route uses it",
+     !/rel="preload"[^>]*Newsreader/.test(HTML));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

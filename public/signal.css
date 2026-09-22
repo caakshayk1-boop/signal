@@ -71,8 +71,20 @@
  * same 27KB file five times over — 136KB for the identical glyphs. Declared
  * once with a weight RANGE so every weight below resolves from it.
  *
- * Newsreader's @font-face stays declared but nothing calls --serif any more;
- * the file is no longer preloaded, so it costs a reader nothing. */
+ * NEWSREADER IS NOT GONE, AND THIS SENTENCE USED TO IMPLY IT WAS. It read
+ * "nothing calls --serif any more; the file is no longer preloaded, so it
+ * costs a reader nothing" — true of the TOKEN and misleading about the FACE.
+ * The brief's sub-theme reaches it through --b-serif and sets NINE headline
+ * roles in it: the hero, the direction line, both heading levels, the step
+ * titles, the 104px score, the dial figure and the regime value. Every reader
+ * who opens /brief downloads Newsreader-400-latin.woff2.
+ *
+ * Which is the intended design, not an oversight — the brief is the one page
+ * whose job is to read like an argument rather than a board, and it is not
+ * preloaded, so it costs nothing on any other route. What was wrong is a
+ * comment saying a face is unused while nine rules use it. The exception is
+ * --b-serif and ONLY --b-serif; a guard fails if the family is reached any
+ * other way. */
 @font-face{font-family:'Jakarta';font-style:normal;font-weight:200 800;font-display:swap;
   src:url('/fonts/PlusJakarta-var-latin.woff2') format('woff2-variations')}
 

@@ -149,8 +149,19 @@ these tokens.
 ```
 
 **One family for everything a person reads; mono for anything that must line
-up in a column.** Newsreader's `@font-face` is still declared and nothing calls
-it; a serif headline over a blue-grey fintech page was two products arguing.
+up in a column.** A serif headline over a blue-grey fintech page was two
+products arguing, so `--disp`, `--ui` and `--serif` all resolve to Jakarta.
+
+**One route is an exception, and it is a real one.** `/brief` declares its own
+sub-theme, a `b`-prefixed namespace, and sets nine headline roles in Newsreader through
+`--b-serif` — the hero, the direction line, both heading levels, the step
+titles, the 104px score, the dial figure and the regime value. The note at the
+top of `signal.css` said "nothing calls `--serif` any more", which is true of
+that token and misleading about the face: `Newsreader-400-latin.woff2` is
+downloaded by every reader who opens the brief. It is not preloaded, so it
+costs nothing on any other route, and the brief is the one page whose job is
+to read like an argument rather than a board. **The exception is `--b-serif`
+and only `--b-serif`** — a guard fails if the face is reached any other way.
 
 Body text is set from the **system stack on the first frame** — the webfont is
 `font-display: swap` and never blocks paint. Latin subset only; this site
@@ -284,8 +295,11 @@ tokens was considered and **not done**: it changes zero pixels, produces an
 Nothing on the page may animate at a speed nothing else uses — that is what
 makes motion read as noise rather than response.
 
-**Hover is not a state on a touch device.** All 83 hover rules are inside
-`@media (hover:hover) and (pointer:fine)`. Without that gate a tap leaves a
+**Hover is not a state on a touch device.** All **89 hover selectors**, in 83
+gated blocks, sit inside `@media (hover:hover) and (pointer:fine)` — counted by
+excluding the `hover:hover` inside each at-rule's own condition, which a naive
+grep counts as a rule and which made the first draft of this sentence report
+the wrong number. Without that gate a tap leaves a
 card stuck in its hover paint until the next tap elsewhere.
 
 **Every hoverable primitive has a press.** `scale(.97)` at `--t-press`. A
@@ -309,7 +323,15 @@ animation, and that is not an error.
   be laid at five alphas without `color-mix`. No rainbow, no sequential ramp
   that requires a legend to decode.
 - **No chart junk**: no gridline that is not read off, no axis that is not
-  labelled, no gradient fill under a line.
+  labelled.
+- **One gradient, and the argument against it is recorded.** The brief's price
+  chart and the radar's both close their path and wash it with a 16%-to-0
+  linear fill. The purist objection is sound — the area under a price line is
+  not a quantity, so filling it encodes nothing — and it is kept anyway because
+  it reads as the shape of the move on the one page whose job is to make an
+  argument, and because it carries no second encoding: same hue as the line,
+  no legend, nothing derived from it. It is the only decorative gradient on the
+  site; the other 19 are grid rules, edge fades and progress bars.
 - **Nothing is recomputed in the browser.** A live overlay may re-read facts —
   price, off-high, stop — and must **not** invent a fresh score. A stamped score
   says *at build*. Inventing a number client-side is the fault this site avoids
