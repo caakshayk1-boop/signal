@@ -729,3 +729,11 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
   .row, .hpick-x, .lv-bk, .mov, .cal-c, .sec { border-color: var(--ink); }
   :root { --dim: var(--mut); }
 }
+
+
+/* A score built on part of its weight says so, in the warn tone rather than
+   the muted one — this is a limitation of the reading, not a footnote. */
+.bcov{margin:0 0 var(--s3);padding:var(--s3);border-radius:var(--r3);
+  background:var(--warn-soft);border:1px solid var(--line);
+  font-size:13px;line-height:1.5;color:var(--mut)}
+.bcov b{color:var(--ink);font-variant-numeric:tabular-nums}
