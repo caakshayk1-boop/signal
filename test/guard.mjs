@@ -1848,9 +1848,12 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   const unreachable = [...styled]
     .filter(c => !EMITTERS.includes(c) && ![...dynamic].some(p => c.startsWith(p)))
     .sort();
-  /* 37 as measured on 2026-09-22 — 107 rules and 314 declarations, 5.4% of the
-     sheet, styling components nothing renders. */
-  const UNREACHABLE_CEILING = 37;
+  /* ZERO. It was 37 — 107 rules and 314 declarations, 5.4% of the sheet,
+     styling components nothing renders — and they are gone, so the ratchet
+     sits on the floor. A rule written before its markup will fail here; that
+     is the intended cost, and raising this number is a one-line change that
+     has to carry a reason. */
+  const UNREACHABLE_CEILING = 0;
   ok(`rules with no emitter have not grown past ${UNREACHABLE_CEILING}`,
      unreachable.length <= UNREACHABLE_CEILING,
      { count: unreachable.length, unreachable });
