@@ -440,7 +440,42 @@ This is the part of the design system that is not about looking like anything.
 
 ---
 
-## 13. How this file is kept true
+## 13. Dead rules, and rules with no style — both counted
+
+The class check in `guard.mjs` ran **one way, over nine prefixes**: did the
+classes the renderer emits with those prefixes have rules? That is the same
+shape as the engine-roster fault recorded in the sibling repo — *"each check
+used to run one way, from a key somebody had already remembered to name"* — so
+everything outside those nine prefixes was unchecked in both directions.
+
+It now runs both ways over every class, read out of the source, with a floor on
+the match count so a pattern that stops matching fails rather than passing
+everything.
+
+- **12 classes the renderer emits have no rule in any loaded sheet.** Most are
+  not defects: `.hero-l` is a bare wrapper inside `.hero` and needs nothing,
+  and `.said`, `.fig` and `.figs` are semantic hooks. Some will be a refactor
+  that renamed an element and left the style on the old name, which is the
+  incident the original check was written for.
+- **37 classes are styled and emitted nowhere** — 107 rules, 314 declarations,
+  **5.4% of the sheet**. That is dead weight in a Worker bundle, and it
+  misleads: this document cited `.tabg-m` as a live example of elevation while
+  the token was being written, and nothing in this repo emits `.tabg-m`.
+
+Both are ratchets. They may fall; they may not rise. **The 37 are not deleted
+here**, for the same reason the 796 on-scale spacing literals were not renamed
+here: it is a self-contained change that deserves its own diff, and folding it
+into one about news copy would bury both.
+
+Two detector bugs were found and fixed while measuring, and each had made the
+numbers look worse than they are: `brief_fundamentals.js` carries its own
+`<style>` block on purpose, so scanning it as an emitter but not as a sheet
+reported eighteen of its own classes as unstyled; and `heatcore.js` builds its
+tiles with the prefix at the *end* of a long string literal, so a pattern
+anchored to the opening quote found nothing and reported nine live classes as
+dead. A ceiling that absorbs a detector bug is a ceiling that means nothing.
+
+## 14. How this file is kept true
 
 `test/guard.mjs` asserts, on every deploy:
 

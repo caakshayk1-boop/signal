@@ -1726,6 +1726,136 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      !/rel="preload"[^>]*Newsreader/.test(HTML));
 }
 
+/* ── A PAGE MAY NOT DENY A CAPABILITY IT RENDERS ────────────────────────────
+ *
+ * /news carried a section called "What is not here" which read: "There is no
+ * timestamp, no story clustering and no analysis in it, so this page cannot
+ * show time since publication, '+N more sources', an impact grade, or a
+ * written why it matters."
+ *
+ * Three of those four were on the screen directly above it. storyAge(x.at)
+ * prints the age on every story the live wire carries; dedupeWire() is TF-IDF
+ * clustering with an exact body-match pass in front of it, and the "+N more"
+ * byline is its output; the Merged tile counts the clusters it found. The text
+ * was written for the MIRRORED daily file — true of that file's timestamps and
+ * nothing else — and printed unconditionally.
+ *
+ * That matters more than a stale sentence, because the fourth item is not a
+ * limitation at all: it is this site's central refusal. A reader who notices
+ * three of the four claims are false has no reason to read the fourth as a
+ * principle rather than another excuse. Both directions fail here — denying a
+ * shipped capability, and dropping the refusal. */
+{
+  const route = (JS.match(/R\['\/news'\] = async \(\) => \{[\s\S]*?\n  \};/) || [""])[0];
+  ok("the news route can be read", route.length > 500, route.length);
+
+  /* The three capabilities the page actually ships. */
+  ok("the wire prints a story's age", /storyAge\(x\.at\)/.test(route));
+  ok("...and the other desks that filed it", /\+\$\{x\._also\.length\} more/.test(route));
+  ok("...over real clustering, not a sort", /function dedupeWire\(/.test(JS)
+     && /dedupeWire\(/.test(route));
+
+  const copy = (route.match(/sec\('What this page will not do'[\s\S]*?\}\)\);/) || [""])[0];
+  ok("the page still says what it will not do", copy.length > 200, copy.length);
+
+  /* IT MUST NOT DENY WHAT IT SHIPS. */
+  const denied = [
+    ["no story clustering", /no story clustering/i],
+    ["cannot show time since publication", /cannot\s+show[^<]*time since publication/i],
+    ["denies the +N more byline", /cannot\s+show[^<]*more sources/i],
+  ].filter(([, re]) => re.test(copy)).map(([label]) => label);
+  ok("it denies nothing the page renders", denied.length === 0, denied);
+
+  /* A TIMESTAMP CLAIM MUST BE SCOPED TO THE FEED ON SCREEN. The live wire
+     stamps every story; the mirrored daily file carries none. One sentence
+     cannot be true of both, so the section branches on which is serving. */
+  ok("the timestamp claim is scoped to the feed actually serving",
+     /\$\{live \?/.test(copy));
+
+  /* AND THE REFUSAL MUST SURVIVE. Ranking a headline's importance is the thing
+     this site does not do; losing that sentence while tidying the stale ones
+     is the opposite failure and just as bad. */
+  ok("the refusal to grade a story is still stated",
+     /No impact grade/i.test(copy) && /choice, not a\s*\n?\s*missing feed/i.test(copy), copy.slice(0, 0));
+}
+
+/* ── THE CLASS CHECK RUNS BOTH WAYS NOW ─────────────────────────────────────
+ *
+ * Check 4 above runs ONE WAY and over NINE PREFIXES: it asks whether the
+ * classes the renderer emits with those prefixes have rules. That is the same
+ * shape as the engine roster faults recorded in the sibling repo — "each check
+ * used to run one way, from a key somebody had already remembered to name" —
+ * so three prefixes nobody thought to add were unchecked in both directions.
+ *
+ * Read out of the source instead, with a floor on the match count so a pattern
+ * that stops matching fails rather than passing everything.
+ *
+ * NEITHER NUMBER IS ALL DEFECT, and the names say so:
+ *
+ *  · A class with no rule is usually a WRAPPER or a semantic hook — .hero-l is
+ *    a bare div inside .hero and needs nothing. Sometimes it is a refactor that
+ *    renamed an element and left the style on the old name, which is the
+ *    incident check 4 was written for.
+ *  · A rule with no emitter is dead weight, and it misleads: DESIGN.md cited
+ *    .tabg-m as a live example of elevation while writing the token, and
+ *    nothing in this repo emits .tabg-m.
+ *
+ * So both are ratchets. They may fall. They may not rise. */
+{
+  const BF = readFileSync("public/brief_fundamentals.js", "utf8");
+  /* BF IS BOTH. It carries its own <style> block on purpose — a companion .css
+     would need allow-listing in four places here and a fifth over there, and
+     the markup could then reach a page whose stylesheet did not. So it is a
+     sheet as well as an emitter, and scanning it as only the latter reported
+     eighteen bf- classes as unstyled when every one of them is styled inside
+     the file that emits it. */
+  const SHEETS = CSS + readFileSync("public/heat.css", "utf8") + BF;
+  const EMITTERS = JS + HTML + BF + readFileSync("public/heatcore.js", "utf8");
+
+  /* ── forward: emitted, styled nowhere ── */
+  const emitted = new Set();
+  for (const m of EMITTERS.matchAll(/class="([a-z0-9 _-]+)"/g)) {
+    for (const c of m[1].split(/\s+/)) if (c) emitted.add(c);
+  }
+  /* THE FLOOR. A regex that stops matching would otherwise report zero
+     unstyled classes and pass, which is the failure mode of every check that
+     scans rather than enumerates. */
+  ok("the emitter scan still finds classes", emitted.size > 600, emitted.size);
+  const unstyled = [...emitted].filter(c => !SHEETS.includes("." + c)).sort();
+  /* 12 as measured on 2026-09-22, across signal.css and heat.css together —
+     the two sheets index.html actually loads. Checking against one of them was
+     what made this look like 38. */
+  const UNSTYLED_CEILING = 12;
+  ok(`classes with no rule anywhere have not grown past ${UNSTYLED_CEILING}`,
+     unstyled.length <= UNSTYLED_CEILING, { count: unstyled.length, unstyled });
+
+  /* ── reverse: styled, emitted nowhere ── */
+  const bare = SHEETS.replace(/\/\*[\s\S]*?\*\//g, "");
+  const styled = new Set([...bare.matchAll(/\.([a-zA-Z][\w-]*)/g)].map(m => m[1]));
+  ok("the stylesheet scan still finds classes", styled.size > 800, styled.size);
+  /* A class BUILT from a prefix and a variable cannot be found by name, so the
+     prefixes are read out of the source too rather than listed by hand. */
+  const dynamic = new Set([
+    ...[...EMITTERS.matchAll(/([a-z][\w-]*-)\$\{/g)].map(m => m[1]),
+    /* THE PREFIX IS RARELY THE WHOLE STRING. heatcore builds its tiles with
+       `'<button class="ht ht-' + d + k + ...'` — the prefix sits at the END of
+       a long literal, so a pattern anchored to the opening quote finds nothing
+       and nine live ht- classes were reported as dead. Anchored to the closing
+       quote and the concatenation instead. */
+    ...[...EMITTERS.matchAll(/([a-z][\w-]*-)['"]\s*\+/g)].map(m => m[1]),
+  ]);
+  ok("the dynamic-prefix scan still finds prefixes", dynamic.size >= 8, dynamic.size);
+  const unreachable = [...styled]
+    .filter(c => !EMITTERS.includes(c) && ![...dynamic].some(p => c.startsWith(p)))
+    .sort();
+  /* 37 as measured on 2026-09-22 — 107 rules and 314 declarations, 5.4% of the
+     sheet, styling components nothing renders. */
+  const UNREACHABLE_CEILING = 37;
+  ok(`rules with no emitter have not grown past ${UNREACHABLE_CEILING}`,
+     unreachable.length <= UNREACHABLE_CEILING,
+     { count: unreachable.length, unreachable });
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

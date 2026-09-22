@@ -12814,14 +12814,48 @@
             ? ` · live from ${live.sources} wires`
             : (wireH != null ? ` · daily file, ${ageWord(wireH)}` : '')}`,
           'A story is linked to a company only when it names it as a proper noun. Everything under a headline here is measured — which names it mentions, and what those names did. Nothing on this page grades a story’s importance, because this feed carries no data that would support it.') +
-        sec('What is not here', `<p class="hint" style="margin-top:0">
-          This wire carries a headline, a summary, a source and a link — and nothing else.
-          There is no timestamp, no story clustering and no analysis in it, so this page cannot
-          show <b>time since publication</b>, <b>“+N more sources”</b>, an <b>impact grade</b>, or a
-          written <b>why it matters</b>. Those exist on news.askakshay.com because they are
-          generated during that site’s daily build and written into its pages; they are not
-          published as a feed, so there is nothing here to mirror. Producing them on this site
-          needs either a feed added to that build, or a language-model key on this Worker.</p>`));
+        /* ── THIS SECTION DENIED THREE THINGS THE PAGE DOES ─────────────────
+         *
+         * It read: "There is no timestamp, no story clustering and no analysis
+         * in it, so this page cannot show time since publication, '+N more
+         * sources', an impact grade, or a written why it matters."
+         *
+         * Three of those four are on the screen directly above it:
+         *   · storyAge(x.at) prints the age on every story the LIVE wire
+         *     carries — /api/wire stamps each one;
+         *   · dedupeWire() is TF-IDF clustering with an exact body-match pass
+         *     in front of it, and the "+N more" byline is its output;
+         *   · the Merged tile counts the clusters it found.
+         *
+         * The text was written for the MIRRORED daily file, which carries only
+         * link, source, summary and title — and it is still true of that file's
+         * timestamps and nothing else. Printed unconditionally, it described
+         * the worse of two feeds while the better one was on screen.
+         *
+         * Which matters more than a stale sentence, because the fourth item is
+         * not a limitation at all — it is this site's central refusal. A reader
+         * who notices that three of the four claims are false has no reason to
+         * read the fourth as a principle rather than another excuse. So the
+         * refusal is stated on its own, and the data limitation is stated
+         * separately and only when it applies. */
+        sec('What this page will not do', `<p class="hint" style="margin-top:0">
+          <b>No impact grade, and no written “why it matters”.</b> This is a choice, not a
+          missing feed. Ranking a headline's importance, or writing a sentence about what it
+          means, would put an invented judgement in the typeface this site reserves for measured
+          things — the same rule that keeps a probability off every other page here. What the
+          page does instead is measured all the way down: which screened names a story mentions
+          as proper nouns, and what those names and their sectors actually did today.</p>
+          ${live ? `<p class="hint">Everything else the wire supports is on: each story carries
+          its age, and stories the clustering finds to be the same event are merged with the
+          other desks named on the byline.</p>`
+          : `<p class="hint"><b>No time since publication on this file.</b> The live wire stamps
+          every story; this page is currently serving the mirrored daily file, which carries a
+          headline, a summary, a source and a link and no timestamp. Clustering still runs — it
+          reads the headline and the summary — so the merge count and the “+N more” bylines
+          above are real.</p>`}
+          <p class="hint">news.askakshay.com carries a written brief on each story because it is
+          generated during that site's daily build and written into its pages. It is not
+          published as a feed, so there is nothing here to mirror.</p>`));
 
       const qi = document.getElementById('nwq');
       if (qi) {
