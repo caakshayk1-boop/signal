@@ -13733,12 +13733,42 @@
         r.rsi_m == null ? 'n/m' : Math.round(r.rsi_m)}</b></span>
       <span class="rd-f"><em>1 month</em><b class="${dir(r.r1m)}">${pct(r.r1m)}</b></span>
       <span class="rd-f"><em>3 months</em><b class="${dir(r.r3m)}">${pct(r.r3m)}</b></span>
-      <span class="rd-f"><em>52w range</em><b>${r.low52 == null || r.high52 == null ? '—'
-        : `${price(r.low52)} – ${price(r.high52)}`}</b></span>
-      ${(() => { const o = offHigh(r.from_high); return `<span class="rd-f">
-        <em>${o && o.txt === 'at a new high' ? '52-week high' : 'Off its high'}</em>
-        <b data-fhigh="${esc(String(r.high52 ?? ''))}" class="${o ? o.cls : ''}">${
-          o ? esc(o.txt) : '—'}</b></span>`; })()}
+      ${/* ── A SHORTER WINDOW IS STILL A MEASURED ONE ─────────────────────
+          * These two cells read "—" on 69 of 983 names — LENSKART, GROWW,
+          * EMMVEE and the rest of the recent listings, plus the demerged
+          * tickers whose price series restarts: VEDL, SKFINDIA, TIMEX.
+          *
+          * The screen nulls high52 under 240 bars, correctly, because
+          * everything derived from it CLAIMS A YEAR. But a high is not an
+          * average: the max of 96 bars is the true max of those 96 bars, and
+          * blanking it hid a fact the series plainly contains — on cards that
+          * still carried a BUY with an entry, a stop and a target, where the
+          * screen could not say where the price sat in its own range.
+          *
+          * So the screen now publishes that window under its own keys with
+          * the number of sessions it covers, and this is the one place that
+          * decides what to call it. FOUR MONTHS IS NOT A YEAR and the label
+          * says which it is — including "at a new high", which must not read
+          * as a 52-week high when the window is 96 sessions. */''}
+      ${(() => {
+        const full = r.low52 != null && r.high52 != null;
+        const short = !full && r.rng_lo != null && r.rng_hi != null;
+        const hi   = full ? r.high52 : short ? r.rng_hi : null;
+        const lo   = full ? r.low52  : short ? r.rng_lo : null;
+        const fh   = full ? r.from_high : short ? r.rng_from_hi : null;
+        const sess = short ? Number(r.rng_sessions) : null;
+        const win  = full ? '52w' : sess ? `${sess}-session` : '';
+        const o = offHigh(fh);
+        const since = short
+          ? ` title="The high and low of every session on file — ${sess} of them. Less than a year of trading, so this is not a 52-week range and is not compared with one."`
+          : '';
+        return `<span class="rd-f"${since}><em>${full ? '52w range' : short ? `${win} range` : '52w range'}</em><b>${
+          hi == null || lo == null ? '—' : `${price(lo)} – ${price(hi)}`}</b></span>
+      <span class="rd-f"${since}>
+        <em>${o && o.txt === 'at a new high' ? `${win || '52w'} high` : 'Off its high'}</em>
+        <b data-fhigh="${esc(String(hi ?? ''))}" data-fwin="${esc(win)}" class="${o ? o.cls : ''}">${
+          o ? esc(o.txt) : '—'}</b></span>`;
+      })()}
       ${/* ── NIFTY500 AHIMSA ─────────────────────────────────────────────
           * NSE Indices launched this on 10 July 2026 — the Nifty 500 filtered
           * to companies not engaged in activities harmful to animals, 326 of
@@ -14030,8 +14060,16 @@
               if (o) {
                 fh.textContent = o.txt;
                 fh.className = o.cls;
+                /* THE WINDOW COMES FROM THE CELL, NOT FROM THIS FUNCTION.
+                 * data-fhigh is whatever high the row actually has — a year
+                 * for most names, the sessions on file for the 69 that have
+                 * less than one. Writing "52-week high" here would put a year
+                 * on a 96-session window every time one of those made a new
+                 * high, which is the same false sentence the producer's gate
+                 * exists to prevent. */
+                const win = fh.getAttribute('data-fwin') || '52w';
                 const lab = fh.parentElement && fh.parentElement.querySelector('em');
-                if (lab) lab.textContent = o.txt === 'at a new high' ? '52-week high' : 'Off its high';
+                if (lab) lab.textContent = o.txt === 'at a new high' ? `${win} high` : 'Off its high';
               }
             }
           }
