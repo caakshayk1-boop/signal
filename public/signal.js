@@ -4878,7 +4878,12 @@
         pk ? ['Ranked today', pk, 'daily engine'] : null,
         mb ? ['Multibaggers', mb, 'weekly scan', 'ac'] : null,
         wk ? ['This week', wk, 'top picks'] : null,
-        ['Cleared for capital', '0', 'of 7 engines', 'dn'],
+        /* COUNTED, NOT TYPED. This read "of 7 engines" while ENGINE_BOOK
+           holds eight — GUST was promoted out of research tier and the
+           denominator beside it was not. A denominator that is typed is the
+           one number on a page nobody re-checks, and engineTally() already
+           knows the answer both other surfaces print. */
+        ['Cleared for capital', '0', `of ${engineTally().keys} engines`, 'dn'],
       ], 'No engine has 30 closed trades at t&nbsp;≥&nbsp;2, so nothing here is a '
        + 'recommendation. <a href="/signals">The record</a> is the reason.');
     }
@@ -14920,7 +14925,12 @@
   };
 
   R['/discover'] = async () => {
-    paint(head('Discover', `Seven ways into the same ${universeN()} names. Each answers a different question.`,
+    /* COUNTED, NOT SPELLED OUT — the same rule the ticker lead already follows.
+     * This read "Seven ways" over a list of eleven: four doors were added to
+     * DISCOVER and the sentence above them was not, so the page contradicted
+     * itself in the space of one screen. A number typed beside a list is a
+     * claim that the list will never grow, and this one already had. */
+    paint(head('Discover', `${DISCOVER.length} ways into the same ${universeN()} names. Each answers a different question.`,
                'Discover') +
       `<div class="disc">${DISCOVER.map(([href, name, sub, why]) => `
         <a class="disc-c" href="${esc(href)}">
@@ -15754,12 +15764,23 @@
                      'The whole screened market as one picture, coloured by the call, momentum, value, quality, position in its year, or how often each name has risen in this calendar month over eleven years.'],
     '/reads':       ['Weekly reads — seven companies, studied properly',
                      'One company per sector, every Saturday. What it sells, how the money arrives, and what would break it.'],
-    '/discover':    ['Discover — seven ways into the screened names',
-                     'Radar, screen, ideas, markets, IPO, news and funds — what each one answers.'],
+    /* NO COUNT AND NO ROSTER IN THE META. Same rule as /screen above: this
+       table is static and written before DISCOVER is read, so it cannot stay
+       in sync with it. It said "seven ways" and then named seven of the
+       eleven doors — heatmap, map, weekly reads and the research floor were
+       missing from a sentence that reads as exhaustive, and that sentence is
+       what a search result and a link unfurl show. The page itself counts. */
+    '/discover':    ['Discover — every way into the screened names',
+                     'Each section of this site, what question it answers, and which of the same screened names it is looking at.'],
     '/radar':       ['Signal radar — the market, and the names carrying it',
                      'A breadth-based market score with every term printed, and the eight highest-scoring names ranked on trend, momentum, volume and institutional flow.'],
     '/engines':     ['The floor — every engine, what fires it, what it has done',
-                     'Nine engines with their trigger conditions, where each stop comes from, how each can be wrong, and its measured record. Nothing is cleared for capital.'],
+                     /* NO COUNT. It said nine; ENGINE_BOOK.keys() returns eight, and
+                        has since magic was retired. This is the number that once read 8
+                        on one page and 9 on another, still reading 9 in the one place a
+                        search result and a link unfurl quote. The floor states the real
+                        figure from the registry. */
+                     'Every engine with its trigger conditions, where each stop comes from, how it can be wrong, and its measured record. Nothing is cleared for capital.'],
     '/ideas':       ['Ideas — this week’s multibaggers and what they were picked at',
                      'The weekly leadership screen, with the price each name was picked at and what it has done since.'],
     '/ipo':         ['IPO — books open now, and how last year’s listings did',
@@ -16106,7 +16127,9 @@
     // were rather than wherever the new layout happens to land them.
     if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
 
-    flashChanged(before);
+    const moved = diffNums(before);
+    flashChanged(moved);
+    announceChanged(moved);
   }
 
   /* ── WHAT CHANGED, MADE VISIBLE ─────────────────────────────────────────
@@ -16144,23 +16167,95 @@
     const n = parseFloat(String(t).replace(/[^0-9.+-]/g, ''));
     return isFinite(n) ? n : null;
   };
-  function flashChanged(before) {
-    if (!before || !before.size) return;
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  /* THE DIFF IS COMPUTED ONCE AND USED TWICE.
+   *
+   * It used to be computed inside the flash, which is why only sighted
+   * readers ever learned anything from it: the flash returns early under
+   * prefers-reduced-motion, so the diff was never taken at all for a reader
+   * who had asked for less movement — and the announcement now depends on it.
+   * Separating them means neither can silently disable the other. */
+  function diffNums(before) {
+    const out = [];
+    if (!before || !before.size) return out;
     document.querySelectorAll(NUMSEL).forEach(c => {
       const k = numKey(c);
       if (!k || !before.has(k)) return;
       const was = before.get(k), now = c.textContent.trim();
       if (was === now) return;
       const a = numOf(was), b = numOf(now);
+      const row = c.closest('[data-sym]');
+      out.push({
+        cell: c,
+        sym: (row && row.getAttribute('data-sym')) || '',
+        label: c.getAttribute('data-l') || '',
+        now,
+        dir: a != null && b != null && b !== a ? (b > a ? 1 : -1) : 0,
+      });
+    });
+    return out;
+  }
+
+  function flashChanged(moved) {
+    if (!moved.length) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    moved.forEach(({ cell: c, dir: d }) => {
       c.classList.remove('chg-up', 'chg-dn', 'chg');
       // Force a reflow. Without it a cell that moves on two consecutive ticks
       // keeps the class it already had and sits still through the second one.
       void c.offsetWidth;
-      c.classList.add(a != null && b != null && b !== a
-        ? (b > a ? 'chg-up' : 'chg-dn') : 'chg');
+      c.classList.add(d ? (d > 0 ? 'chg-up' : 'chg-dn') : 'chg');
       setTimeout(() => c.classList.remove('chg-up', 'chg-dn', 'chg'), 1500);
     });
+  }
+
+  /* ── AND THE SAME THING, IN WORDS ───────────────────────────────────────
+   *
+   * NOT GATED ON prefers-reduced-motion. An announcement is not an animation.
+   * A reader who has asked the operating system for less movement has asked
+   * about movement, not about being told what happened — and on a page that
+   * repaints itself every sixty seconds, not being told is the difference
+   * between a live page and a dead one.
+   *
+   * A SUMMARY, NOT A FIREHOSE. A refresh can move sixty cells; reading sixty
+   * of them aloud takes longer than the interval before the next refresh, so
+   * the reader would never hear the end of one update before the next began.
+   * Three named movers and a count is the whole sentence.
+   *
+   * SILENT WHEN NOTHING MOVED. refresh() already returns before painting when
+   * no feed changed, so this is only reached on a real update — but a live
+   * region written with the same text twice announces twice in some screen
+   * readers, and a page that says "3 figures updated" every minute whether or
+   * not they did is the audible version of a flash that fires on every tick.
+   */
+  function announceChanged(moved) {
+    const el = document.getElementById('liveNews');
+    if (!el) return;
+    if (!moved.length) { el.textContent = ''; return; }
+    const named = moved.filter(m => m.sym && m.label);
+    const lead = named.slice(0, 3).map(m =>
+      `${m.sym} ${m.label} ${m.now}${m.dir ? (m.dir > 0 ? ', up' : ', down') : ''}`);
+    const rest = moved.length - lead.length;
+    const sentence = [
+      `${moved.length} figure${moved.length === 1 ? '' : 's'} updated`,
+      lead.length ? lead.join('. ') : '',
+      rest > 0 && lead.length ? `and ${rest} more` : '',
+    ].filter(Boolean).join('. ') + '.';
+    /* ── THE CLEAR HAS TO LAND IN A LATER TASK ──────────────────────────
+     * A live region announces a CHANGE. Assigning the same string twice is
+     * not one, so two identical updates in a row are reported once — and the
+     * obvious remedy, clearing it first, does nothing at all: the
+     * accessibility tree is computed when the task ends, so a clear and a set
+     * in the same task are only ever seen as the set.
+     *
+     * Verified rather than assumed — the first version of this did exactly
+     * that and a MutationObserver recorded the final text for both records.
+     *
+     * The timer is cancelled on re-entry, so a refresh that lands while the
+     * previous announcement is still pending replaces it instead of queueing
+     * two sentences a reader would hear back to back. */
+    clearTimeout(announceChanged._t);
+    el.textContent = '';
+    announceChanged._t = setTimeout(() => { el.textContent = sentence; }, 60);
   }
 
   /* ── THE TICKER ──────────────────────────────────────────────────────────

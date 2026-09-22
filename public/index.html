@@ -225,6 +225,23 @@
   <button type="button" class="ed-x" aria-label="Dismiss">&times;</button>
 </div>
 
+<!-- ── WHAT CHANGED, FOR A READER WHO CANNOT SEE THE FLASH ────────────────
+     The page re-fetches every sixty seconds and marks the cells that moved by
+     flashing them green or red. That is the whole of the feedback, and it is
+     purely visual — a screen-reader user was told nothing when a number moved
+     under them, on a site whose entire subject is numbers moving.
+
+     OUTSIDE <main>, because <main> is replaced wholesale on every repaint and
+     a live region that is removed and re-inserted is not announced at all:
+     assistive technology tracks the node, and a fresh node with text already
+     in it reads as a new element rather than a change to an existing one.
+
+     POLITE and ATOMIC. Polite because a price is never urgent enough to cut
+     off what is being read; atomic because the sentence only means anything
+     whole. Filled by announceChanged() in signal.js — see the note there on
+     why it is NOT gated on prefers-reduced-motion. -->
+<div id="liveNews" class="vh" role="status" aria-live="polite" aria-atomic="true"></div>
+
 <main id="main" tabindex="-1">
 <!--PRERENDER-->
 <section class="pre">

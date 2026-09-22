@@ -1388,6 +1388,344 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      paper.graceMin >= 120, paper.graceMin);
 }
 
+/* ── THE DESIGN DNA IS EXECUTABLE, OR IT WAS TRUE ONCE ───────────────────────
+ * DESIGN.md states the rules the three stylesheets are built on. A design
+ * document nobody checks is a document that described the CSS on the day it
+ * was written; every one of the forty decisions already recorded in comments
+ * got there BECAUSE the previous statement of it had drifted.
+ *
+ * Five rules, each with the incident behind it named in DESIGN.md itself. */
+{
+  const DNA = existsSync("DESIGN.md") ? readFileSync("DESIGN.md", "utf8") : "";
+  const GEMSCSS = readFileSync("public/gems.css", "utf8");
+  ok("DESIGN.md exists — the stylesheets have a stated brief", DNA.length > 2000, DNA.length);
+
+  /* 1. Every token the document names is really declared. A DNA that cites a
+   *    token the CSS does not define is the var()-resolves-to-nothing fault
+   *    one level up: it reads correct and specifies nothing. */
+  {
+    const declared = new Set();
+    for (const src of [CSS, GEMSCSS]) {
+      for (const m of src.matchAll(/(--[a-z0-9][a-z0-9-]*)\s*:/g)) declared.add(m[1]);
+    }
+    const named = new Set([...DNA.matchAll(/(--[a-z0-9][a-z0-9-]*)/g)].map(x => x[1]));
+    const ghosts = [...named].filter(t => !declared.has(t));
+    ok("every token DESIGN.md names is declared in a stylesheet", ghosts.length === 0, ghosts);
+    ok("DESIGN.md names enough tokens to be a specification", named.size >= 25, named.size);
+  }
+
+  /* 2. Elevation exists in BOTH themes of BOTH sheets. The incident: five
+   *    bespoke shadows, every one rgba(0,0,0,..), so on the dark theme the
+   *    command palette, the tab menu, the toast and the to-top button had no
+   *    separation from a #0C1017 page and nothing reported it. A step declared
+   *    only in light is that bug with a token name on it. */
+  for (const [label, src] of [["signal.css", CSS], ["gems.css", GEMSCSS]]) {
+    const dark = (src.match(/:root\[data-theme="dark"\]\s*\{[\s\S]*?\n\}/) || [""])[0];
+    const light = src.slice(0, src.indexOf(dark) >= 0 ? src.indexOf(dark) : src.length);
+    for (const n of [1, 2, 3, 4]) {
+      ok(`${label} declares --e-${n} in light`, new RegExp(`--e-${n}\\s*:`).test(light));
+      ok(`${label} declares --e-${n} in dark`, new RegExp(`--e-${n}\\s*:`).test(dark));
+    }
+  }
+
+  /* 3. No elevation is written by hand. Rings (inset 0 0 0 1px) and the
+   *    keyframes that flash a changed figure are not elevation and are not
+   *    caught by this — a shadow with a BLUR and an offset is. */
+  {
+    const hand = [];
+    for (const [label, src] of [["signal.css", CSS], ["gems.css", GEMSCSS]]) {
+      const body = src.replace(/\/\*[\s\S]*?\*\//g, "");
+      for (const m of body.matchAll(/box-shadow:\s*([^;}]+)/g)) {
+        const v = m[1];
+        if (/var\(--e-[1-4]\)/.test(v)) continue;
+        if (/^\s*none/.test(v)) continue;
+        if (/inset\s+0\s+0\s+0/.test(v)) continue;          // a ring
+        if (/0\s+0\s+0\s+\d/.test(v)) continue;             // a pulse/flash ring
+        hand.push(`${label}:${lineOf(body, m.index)}  ${v.trim().slice(0, 48)}`);
+      }
+    }
+    ok("no drop shadow is written by hand — elevation goes through --e-1..4",
+       hand.length === 0, hand);
+  }
+
+  /* 4. The type scale is complete in signal.css. It was 25 distinct sizes
+   *    before the scale was declared and 6 after — 11.5px beside 12px is not a
+   *    level of hierarchy, it is two people guessing on different days. */
+  {
+    const body = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+    const lits = [
+      ...body.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px(?![\w(])/g),
+      ...body.matchAll(/font:\s*(?:\d{3}\s+|italic\s+|normal\s+)*(\d+(?:\.\d+)?)px\//g),
+    ].map(m => m[1]);
+    ok("signal.css writes no literal font-size — every size is a scale step",
+       lits.length === 0, [...new Set(lits)]);
+  }
+
+  /* 5. gems.css is a RATCHET, not a rule. It carries 21 distinct literal sizes
+   *    and three of them are smaller than --t-1, so snapping them up is a real
+   *    change to a dense sheet that could not be verified when the scale was
+   *    added. The count may fall. It may not rise. */
+  {
+    const body = GEMSCSS.replace(/\/\*[\s\S]*?\*\//g, "");
+    const n = [
+      ...body.matchAll(/font-size:\s*\d+(?:\.\d+)?px(?![\w(])/g),
+      ...body.matchAll(/font:\s*(?:\d{3}\s+|italic\s+|normal\s+)*\d+(?:\.\d+)?px\//g),
+    ].length;
+    /* 46 as measured on 2026-09-22, across 21 distinct values. Lower this
+       number as rules are converted; never raise it. */
+    const CEILING = 46;
+    ok(`gems.css literal font-sizes have not grown past ${CEILING}`, n <= CEILING, n);
+  }
+
+  /* 6. One motion vocabulary across both bundles. --t-press lived in gems.css
+   *    alone, so the two sheets deliberately brought onto one vocabulary
+   *    disagreed about the single duration a finger can feel. */
+  for (const [label, src] of [["signal.css", CSS], ["gems.css", GEMSCSS]]) {
+    for (const t of ["--t-press", "--t-fast", "--t-mid", "--t-slow", "--ease", "--ease-out"]) {
+      ok(`${label} declares ${t}`, new RegExp(`${t}\\s*:`).test(src));
+    }
+  }
+}
+
+/* ── THE LIVE PAGE HAS TO BE LIVE OUT LOUD TOO ──────────────────────────────
+ * The page re-fetches every sixty seconds and marks the cells that moved by
+ * flashing them green or red. That was the ENTIRE feedback channel, and all of
+ * it visual: a screen-reader user was told nothing when a number moved under
+ * them, on a site whose whole subject is numbers moving.
+ *
+ * Four properties, each of which was wrong in a draft of the fix. */
+{
+  ok("the shell carries one polite live region",
+     /id="liveNews"[^>]*role="status"/.test(HTML)
+     && /id="liveNews"[^>]*aria-live="polite"/.test(HTML)
+     && /id="liveNews"[^>]*aria-atomic="true"/.test(HTML));
+
+  /* OUTSIDE <main>. main is replaced wholesale on every repaint, and a live
+   * region that is removed and re-inserted is not announced: assistive tech
+   * tracks the node, and a fresh node with text already in it reads as a new
+   * element rather than a change to an existing one. */
+  {
+    /* Comments stripped first: the note ABOVE the region explains why it is
+       outside <main> and therefore contains the string, which the first
+       version of this check matched before the real tag. */
+    const bare = HTML.replace(/<!--[\s\S]*?-->/g, "");
+    const i = bare.indexOf('id="liveNews"');
+    const m = bare.indexOf('<main');
+    ok("the live region is outside <main>, which is replaced on every repaint",
+       i > 0 && m > 0 && i < m, { liveNews: i, main: m });
+  }
+
+  /* THE DIFF IS TAKEN ONCE AND USED TWICE. It used to be computed inside the
+   * flash, which returns early under prefers-reduced-motion — so for a reader
+   * who had asked for less movement the diff was never taken at all, and an
+   * announcement built on it would have been silent for exactly the readers
+   * most likely to need it. */
+  ok("the diff is its own function", /function diffNums\(before\)/.test(JS));
+  ok("the refresh takes the diff once", /const moved = diffNums\(before\);/.test(JS));
+  ok("...and both consumers are called with it",
+     /flashChanged\(moved\);/.test(JS) && /announceChanged\(moved\);/.test(JS));
+
+  /* AN ANNOUNCEMENT IS NOT AN ANIMATION. Gating it on prefers-reduced-motion
+   * is the one-line change that silently reinstates the whole defect. */
+  {
+    const fn = (JS.match(/function announceChanged\(moved\) \{[\s\S]*?\n  \}/) || [""])[0];
+    ok("announceChanged exists", fn.length > 0);
+    ok("it is not gated on prefers-reduced-motion — an announcement is not an animation",
+       !/reduced-motion/.test(fn));
+    ok("it says nothing when nothing moved", /if \(!moved\.length\)/.test(fn));
+    /* A SUMMARY, NOT A FIREHOSE. A refresh can move sixty cells; reading sixty
+     * aloud takes longer than the interval before the next refresh. */
+    ok("it names a bounded number of movers and counts the rest",
+       /\.slice\(0, 3\)/.test(fn) && /more/.test(fn), fn.slice(0, 0));
+    /* THE CLEAR HAS TO LAND IN A LATER TASK. The accessibility tree is
+     * computed when the task ends, so a clear and a set in the same task are
+     * only ever seen as the set — the first version did exactly that and a
+     * MutationObserver recorded the final text for both records. */
+    ok("the re-announce clears in one task and sets in another",
+       /textContent = '';[\s\S]*setTimeout\(\(\) => \{ el\.textContent = sentence; \}/.test(fn));
+    ok("...and a refresh landing on a pending one replaces it rather than queueing",
+       /clearTimeout\(announceChanged\._t\)/.test(fn));
+  }
+}
+
+/* ── A NUMBER TYPED BESIDE A LIST IS A CLAIM THE LIST WILL NEVER GROW ────────
+ *
+ * Both of these shipped, and both are the same fault the ticker lead was
+ * already fixed for ("COUNTED, NOT SPELLED OUT"):
+ *
+ *   · /discover led with "Seven ways into the same N names" over a DISCOVER
+ *     registry of ELEVEN. Four doors were added and the sentence above them
+ *     was not. Its meta description then named seven of the eleven in a
+ *     sentence that reads as exhaustive — and a meta description is what a
+ *     search result and a link unfurl quote.
+ *   · /engines' meta description said "Nine engines". ENGINE_BOOK.keys()
+ *     returns EIGHT and has since magic was retired. This is the number the
+ *     sibling repo's notes already record as having read 8 on one page and 9
+ *     on another; it was still reading 9 in the one place nobody re-reads.
+ *
+ * Four other figures in the same copy were checked against their sources and
+ * are CORRECT, so they are left alone rather than scrubbed: /markets' 71 is
+ * 56 static instruments plus three live segments of five, /radar's eight is
+ * slice(0, 8), /research's three is the research roster, and /reads' seven is
+ * the studies in an edition. The rule is not "no numbers in prose". */
+{
+  const SRC = JS.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+  const WORD = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+                 seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+
+  /* The doors, counted out of the registry itself. */
+  const disc = (JS.match(/const DISCOVER = \[([\s\S]*?)\n  \];/) || ["", ""])[1];
+  const nDoors = (disc.match(/\n    \['\//g) || []).length;
+  ok("the DISCOVER registry can be counted", nDoors >= 5, nDoors);
+
+  /* The engines, out of the one registry both bundles share. */
+  const ENG = readFileSync("public/engines.js", "utf8");
+  const w = {};
+  new Function("window", ENG)(w);
+  const nEngines = w.ENGINE_BOOK.keys().length;
+  ok("the engine registry can be counted", nEngines >= 5, nEngines);
+
+  /* THE LEAD COUNTS, IT DOES NOT SPELL. */
+  ok("the discover lead counts the registry rather than asserting a figure",
+     /\$\{DISCOVER\.length\} ways into/.test(JS));
+
+  /* NO STRING MAY SPELL A COUNT THAT DISAGREES WITH ITS REGISTRY. Both the
+   * digit and the word form, because "9 engines" and "nine engines" are the
+   * same claim. */
+  const wrong = [];
+  const num = t => (/^\d+$/.test(t) ? Number(t) : WORD[t.toLowerCase()]);
+  /* THE RESEARCH FLOOR IS A DIFFERENT POPULATION and says so in its own
+   * sentence. "Three engines that have not earned capital" is not a claim
+   * about the published book, and a check that cannot tell them apart would
+   * either fail on correct copy or be switched off. The enclosing sentence is
+   * read, not just the two words around the number. */
+  const ELSEWHERE = /research|not earned|none of them cleared|still being tested|BUOY|ANCHOR|BEDROCK/i;
+  const sentence = (src, i) => {
+    const a = src.lastIndexOf("\n", i), b = src.indexOf("\n", i);
+    return src.slice(a < 0 ? 0 : a, b < 0 ? src.length : b);
+  };
+  const scan = (noun, truth) => {
+    const re = new RegExp(
+      `(\\d{1,3}|${Object.keys(WORD).join("|")})\\s+${noun}`, "gi");
+    for (const m of SRC.matchAll(re)) {
+      const n = num(m[1]);
+      if (n === undefined || n === truth) continue;
+      if (ELSEWHERE.test(sentence(SRC, m.index))) continue;
+      wrong.push(`"${m[0]}" but the registry holds ${truth}  (line ${lineOf(SRC, m.index)})`);
+    }
+  };
+  scan("engines", nEngines);
+  scan("ways into", nDoors);
+  /* The front page's own denominator, which read "of 7 engines" after GUST was
+     promoted out of research tier and the number beside it was not. */
+  ok("the cleared-for-capital tile counts its denominator",
+     /`of \$\{engineTally\(\)\.keys\} engines`/.test(JS));
+  ok("no copy spells a count its own registry contradicts", wrong.length === 0, wrong);
+}
+
+/* ── THE TARGET IS BIGGER THAN THE BUTTON ───────────────────────────────────
+ * DESIGN.md claimed "touch targets are 44px minimum" and four controls were
+ * not: .icon-btn at 32 (the theme toggle, the menu and the search — on every
+ * page, and the most-tapped controls on the site), .wstar at 28, .totop at 42,
+ * and a range input at 24. The document was asserting a floor the sheet did
+ * not hold, which is the one thing a design document must never do.
+ *
+ * The fix is a hit area, not a bigger button: growing .icon-btn to 44 puts
+ * three 44px boxes in a 64px bar and changes the header's density, and density
+ * is the point of this design. Verified with elementFromPoint at 390px — the
+ * button answers at 21px from its own centre in all four directions. */
+{
+  const FLAT = CSS.replace(/\s+/g, " ");
+  const hasHit = (cls, w, h) =>
+    new RegExp("\\." + cls + "::after\\{[^}]*width:" + w + "px[^}]*height:" + h + "px").test(FLAT);
+  ok(".icon-btn carries a 44px hit area", hasHit("icon-btn", 44, 44));
+  ok("...and is positioned, or the pseudo resolves against the page instead",
+     /\.icon-btn\{position:relative/.test(CSS));
+  /* AND THE HIT AREAS MUST NOT OVERLAP. At an 8px gap two 44px areas around
+     32px buttons cross by 4px, and in an overlap the later element in the DOM
+     wins — a mis-tap, not a bigger target. 32 + 12 puts the centres exactly
+     44 apart. Measured at 390px: centre gap 44, no overlap. */
+  ok("the header gap keeps two hit areas from crossing",
+     /\.bar-right\{[^}]*gap:var\(--s-3\)/.test(CSS));
+  /* WIDER, NOT TALLER. A square 44px area around the star would bleed 8px into
+     the row above and below, and a tap meant to open that row would save a
+     name in this one. 36 is 4px of bleed inside a 40px row. */
+  ok(".wstar widens its hit area on the safe axis only", hasHit("wstar", 44, 36));
+  ok("...and is positioned", /\.wstar\{position:relative\}/.test(CSS));
+  ok(".totop is the full target size — nothing sits beside it",
+     /\.totop\{[\s\S]{0,400}?width:44px;height:44px/.test(CSS));
+}
+
+/* ── THE SPACING DRIFT IS A RATCHET ─────────────────────────────────────────
+ * 1,340 literal px values across every gap, margin and padding in signal.css;
+ * 796 already exactly on the scale, 324 BELOW the 4px base (hairline insets, a
+ * chip's 2px padding — optical adjustments, not steps), and 220 above the base
+ * and off it. 107 of those 220 were the single value 14px, which is why
+ * --s-3h is declared rather than 107 rules being moved to 12 or 16.
+ *
+ * The remaining 113 are held here. They may fall. They may not rise.
+ *
+ * The 796 on-scale literals are deliberately NOT required to be tokens: the
+ * rename changes zero pixels, produces an 800-line diff on a live stylesheet,
+ * and would bury every real change in it. */
+{
+  const body = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+  const SCALE = new Set([4, 8, 12, 14, 16, 24, 32, 48, 64, 96]);
+  const props = /(?:gap|row-gap|column-gap|margin|padding)(?:-(?:top|bottom|left|right))?:\s*([^;}]+)/g;
+  const off = [];
+  for (const m of body.matchAll(props)) {
+    for (const px of m[1].matchAll(/(?<![\w.-])(\d+)px/g)) {
+      const n = Number(px[1]);
+      if (n < 8 || SCALE.has(n)) continue;   // below the base, or on the scale
+      off.push(n);
+    }
+  }
+  /* 113 as measured on 2026-09-22. Lower it as rules are converted; never
+     raise it — a new off-scale gap must pick a step instead. */
+  const CEILING = 113;
+  ok(`off-scale spacing has not grown past ${CEILING}`, off.length <= CEILING,
+     { count: off.length, values: [...new Set(off)].sort((a, b) => a - b) });
+  ok("the half-step is declared, so 14px has a token to reach for",
+     /--s-3h\s*:\s*14px/.test(CSS));
+  /* THE ONLY HALF-STEP. Three choices inside a 4px range is the drift a scale
+     exists to end, so a second one must fail here rather than be argued about
+     in review. */
+  ok("and it is the only one", (CSS.match(/--s-\d+h\s*:/g) || []).length === 1,
+     CSS.match(/--s-\d+h\s*:/g));
+}
+
+/* ── ONE SERIF EXCEPTION, AND IT IS NAMED ───────────────────────────────────
+ * The note at the top of signal.css said "nothing calls --serif any more; the
+ * file is no longer preloaded, so it costs a reader nothing" — true of the
+ * TOKEN and misleading about the FACE. The brief's sub-theme reaches Newsreader
+ * through --b-serif and sets nine headline roles in it, so every reader who
+ * opens /brief downloads it.
+ *
+ * That is the intended design. What must not happen is the face spreading back
+ * across the site one rule at a time, which is exactly how there came to be two
+ * display voices the first time. */
+{
+  const body = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+  const refs = [...body.matchAll(/Newsreader/g)];
+  /* Three, exactly: the @font-face family, the woff2 it points at, and
+     --b-serif. Nothing else may name it. */
+  ok("Newsreader is named exactly three times — its family, its file, its one token",
+     refs.length === 3, refs.length);
+  ok("...and the second is --b-serif", /--b-serif:'Newsreader'/.test(body));
+  /* THE SITE-WIDE TOKENS MUST NOT POINT AT IT. --serif, --disp and --ui are
+     the three every other rule reaches through. */
+  for (const t of ["--serif", "--disp", "--ui"]) {
+    const m = body.match(new RegExp(`${t}:([^;]+);`));
+    ok(`${t} resolves to the interface face, not the serif`,
+       !!m && !/Newsreader/.test(m[1]), m && m[1]);
+  }
+  /* AND IT IS NOT PRELOADED. A preload is the highest-priority fetch a page can
+     make; spending one on a face used by a single route would cost every other
+     route the bandwidth. */
+  ok("the serif is not preloaded — one route uses it",
+     !/rel="preload"[^>]*Newsreader/.test(HTML));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

@@ -2064,6 +2064,46 @@ try {
    * routing on url.hostname worked live and silently did nothing locally,
    * which is why the Worker reads the Host header. The asset path is the one
    * address that behaves identically in both. */
+  /* ── THE LIVE REGION SURVIVES A REPAINT ────────────────────────────────
+   *
+   * The page re-fetches every sixty seconds and announces which figures moved
+   * through #liveNews. That only works if the node is the SAME node across a
+   * repaint: assistive technology tracks the element, and a region that is
+   * removed and re-inserted with text already in it reads as a new element
+   * rather than a change to an existing one — so nothing is announced.
+   *
+   * <main> is replaced wholesale on every route and every refresh, which is
+   * exactly why the region lives outside it. guard.mjs asserts the position in
+   * the shipped markup; this asserts the consequence on the served page, after
+   * a real navigation has torn <main> down and rebuilt it. */
+  {
+    const lCtx = await newCtx({ viewport: { width: 1440, height: 900 } });
+    const lp = await lCtx.newPage();
+    await lp.goto(SITE + "/", { waitUntil: "domcontentloaded" });
+    await settled(lp, SETTLE);
+    const before = await lp.evaluate(() => {
+      const el = document.getElementById("liveNews");
+      if (!el) return null;
+      el.dataset.probe = "1";                    // mark THIS node
+      return { role: el.getAttribute("role"), live: el.getAttribute("aria-live"),
+               atomic: el.getAttribute("aria-atomic"), inMain: !!el.closest("main"),
+               box: el.getBoundingClientRect().width };
+    });
+    ok("the shell serves a polite live region", !!before && before.role === "status"
+       && before.live === "polite" && before.atomic === "true", before);
+    ok("it is outside <main>", !!before && before.inMain === false, before);
+    ok("it takes no space on the page", !!before && before.box <= 1, before);
+
+    await lp.click('a[data-route="/signals"]').catch(() => {});
+    await settled(lp, SETTLE);
+    const after = await lp.evaluate(() => {
+      const el = document.getElementById("liveNews");
+      return { present: !!el, same: !!(el && el.dataset.probe === "1") };
+    });
+    ok("...and a route change does not replace it", after.present && after.same, after);
+    await lCtx.close();
+  }
+
   const gCtx = await newCtx({ viewport: { width: 1440, height: 900 } });
   const g = await gCtx.newPage();
   await g.goto(SITE + "/gems", { waitUntil: "domcontentloaded" });
