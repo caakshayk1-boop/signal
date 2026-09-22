@@ -13999,13 +13999,40 @@
             if (b) b.title = `${sym} · ${price(v.price)} live`;
           }
           // Re-read the two build-stamped facts against the live price.
+          /* ── THROUGH offHigh(), NOT THE RAW PERCENTAGE ──────────────────
+           * This wrote `d.toFixed(1) + '%'` straight into the cell, so a live
+           * price ABOVE the 52-week high produced a POSITIVE number under a
+           * label reading "Off its high" — which reads as that far below when
+           * it is that far above.
+           *
+           * That is the exact fault offHigh() was written for, reinstated by
+           * a second path that did not call it. Measured on ACMESOLAR,
+           * 2026-09-22: live ₹458.65 against a 52-week high of ₹440.70 on the
+           * same card, rendering "4.1% · Off its high". FINCABLES showed the
+           * same thing at build before offHigh() existed, and the comment on
+           * that helper says so.
+           *
+           * It is the sibling of the bug two blocks below, where the stop
+           * comparison "used to BE the rule, which is why the rule existed
+           * only here". A rule with two call sites and one implementation is
+           * the only shape that cannot drift.
+           *
+           * THE LABEL MOVES WITH THE VALUE. The <em> beside it is chosen at
+           * build — "52-week high" when the name is at one, "Off its high"
+           * otherwise — and writing only the <b> leaves a correct number
+           * under a stale heading, which is the same defect one element to
+           * the left. */
           const fh = el.querySelector('[data-fhigh]');
           if (fh) {
             const hi = Number(fh.getAttribute('data-fhigh'));
             if (Number.isFinite(hi) && hi > 0) {
-              const d = (v.price - hi) / hi * 100;
-              fh.textContent = d.toFixed(1) + '%';
-              fh.className = dir(d);
+              const o = offHigh((v.price - hi) / hi * 100);
+              if (o) {
+                fh.textContent = o.txt;
+                fh.className = o.cls;
+                const lab = fh.parentElement && fh.parentElement.querySelector('em');
+                if (lab) lab.textContent = o.txt === 'at a new high' ? '52-week high' : 'Off its high';
+              }
             }
           }
           const st = el.querySelector('[data-stop]');
@@ -15757,7 +15784,21 @@
    * because it does not fire an event of its own. */
   const go = (path, { replace = false } = {}) => {
     const to = path.startsWith('#') ? path.slice(1) : path;
-    if (to === location.pathname) { render(); return; }
+    /* ── THE SAME ROUTE IS A SCROLL, NOT A REBUILD ──────────────────────────
+     * This called render(), which tears the route down and paints it again
+     * from the feeds. Nothing has changed — it is the page you are already
+     * on — so the cost is a flash of skeletons on a slow connection in
+     * exchange for the scrollTo(0, 0) that render() happens to do first.
+     *
+     * It matters more than it reads, because on a phone this IS the
+     * back-to-top control: the tab bar is pinned to the bottom of the
+     * viewport there and the floating button is gone, so tapping the tab you
+     * are on is how you get back. That has to be a scroll. */
+    if (to === location.pathname) {
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+      return;
+    }
     history[replace ? 'replaceState' : 'pushState'](null, '', to);
     render();
   };

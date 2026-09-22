@@ -1859,6 +1859,65 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      { count: unreachable.length, unreachable });
 }
 
+/* ── THE LIVE OVERLAY MUST NOT RE-IMPLEMENT A RULE ──────────────────────────
+ *
+ * offHigh() exists because "off its high" must not be a positive number: a
+ * price ABOVE the 52-week high is not a distance from it, it is a new high,
+ * and rendering "+0.4%" under that label reads as 0.4% BELOW. FINCABLES showed
+ * it at build before the helper existed.
+ *
+ * The live overlay then wrote `d.toFixed(1) + '%'` straight into the cell and
+ * reinstated the whole thing. Measured on ACMESOLAR, 2026-09-22: live ₹458.65
+ * against a 52-week high of ₹440.70 printed on the same card, rendering
+ * "4.1% · Off its high" — 4.1% above, labelled as below, in the up colour so
+ * it looked deliberate.
+ *
+ * The stop comparison three lines under it carries the same lesson in its own
+ * comment: "stopVoid(), not `v.price <= s`. This comparison used to BE the
+ * rule, which is why the rule existed only here." */
+{
+  const ov = (JS.match(/const fh = el\.querySelector\('\[data-fhigh\]'\);[\s\S]*?\n          \}/) || [""])[0];
+  ok("the live overlay re-reads the 52-week high", ov.length > 100, ov.length);
+  ok("...through offHigh(), not a raw percentage", /offHigh\(\(v\.price - hi\) \/ hi \* 100\)/.test(ov));
+  ok("...and never writes toFixed straight into the cell",
+     !/fh\.textContent\s*=\s*d\.toFixed/.test(ov), ov.slice(0, 0));
+  /* THE LABEL MOVES WITH THE VALUE. The <em> is chosen at build — "52-week
+     high" at one, "Off its high" otherwise — so writing only the <b> leaves a
+     correct number under a stale heading, the same defect one element left. */
+  ok("...and moves the label with it", /lab\.textContent = o\.txt === 'at a new high'/.test(ov));
+
+  /* ── THE BACK-TO-TOP CONTROL DOES NOT EXIST ON A PHONE ──────────────────
+   * It floated over the content at 40x40 above the tab bar, and on a 390px
+   * screen there is nothing to float over except content: measured on /radar,
+   * the circle sat on a card's right-aligned Institutional score. It is also
+   * redundant below 760px, where the tab bar is pinned to the bottom of the
+   * viewport and tapping the tab you are on scrolls to the top. */
+  ok("the back-to-top control is removed below 760px",
+     /@media\(max-width:760px\)\{\s*\.totop\{display:none\}\s*\}/.test(CSS.replace(/\s*\n\s*/g, "")));
+  /* AND NOTHING MAY SHRINK IT BELOW THE FLOOR where it does exist. The old
+     mobile rule set it to 40, under the target size this sheet holds
+     everywhere else — and raising that to 44 would have covered MORE of the
+     number it was already covering, which is why it was removed instead. */
+  {
+    const sized = [...CSS.matchAll(/\.totop\{[^}]*?width:(\d+)px/g)].map(m => Number(m[1]));
+    ok("every .totop rule that sizes it meets the 44px floor",
+       sized.length > 0 && sized.every(n => n >= 44), sized);
+  }
+
+  /* ── THE SAME ROUTE IS A SCROLL, NOT A REBUILD ─────────────────────────
+   * go() called render() when the path had not changed, tearing the route
+   * down and painting it again from the feeds for a page nothing had changed
+   * on. On a phone this IS the back-to-top control now, so it has to be a
+   * scroll rather than a flash of skeletons. */
+  {
+    const fn = (JS.match(/const go = \(path, \{ replace = false \} = \{\}\) => \{[\s\S]*?\n  \};/) || [""])[0];
+    ok("go() exists", fn.length > 100, fn.length);
+    ok("navigating to the route you are on scrolls instead of rebuilding",
+       /if \(to === location\.pathname\) \{[\s\S]*?window\.scrollTo\(\{ top: 0/.test(fn)
+       && !/if \(to === location\.pathname\) \{ render\(\)/.test(fn));
+  }
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);
