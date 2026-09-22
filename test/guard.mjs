@@ -1918,6 +1918,55 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   }
 }
 
+/* ── FOUR MONTHS IS NOT A YEAR, AND THE LABEL HAS TO SAY WHICH ──────────────
+ *
+ * The screen nulls high52 under 240 bars, correctly — everything derived from
+ * it claims a year. But a high is NOT an average: the max of 96 bars is the
+ * true max of those 96 bars, and blanking it published "—" for a fact the
+ * series plainly contains, on 69 of 983 names. LENSKART, GROWW, EMMVEE and the
+ * rest of the recent listings, plus the demerged tickers whose series restarts
+ * — VEDL, SKFINDIA, SKFINDUS, TIMEX. Each still carried a verdict with an
+ * entry, a stop and a target while the screen could not say where the price
+ * sat in its own range.
+ *
+ * The producer now publishes that window under its own keys with the session
+ * count. THIS is the only place that decides what to call it, and the failure
+ * mode in the other direction — printing "52-week" over 96 sessions — is the
+ * false sentence the producer's gate exists to prevent. */
+{
+  const strip = (JS.match(/const factsStrip = \(r, opts\) => \{[\s\S]*?\n  \};/) || [""])[0];
+  ok("the facts strip can be read", strip.length > 500, strip.length);
+
+  ok("it falls back to the shorter window when there is no year",
+     /r\.rng_lo != null && r\.rng_hi != null/.test(strip));
+  ok("...and reads that window's own off-high, not the year's",
+     /r\.from_high : short \? r\.rng_from_hi/.test(strip));
+  /* THE LABEL IS BUILT FROM THE SESSION COUNT. A hardcoded "52w" on the
+     fallback path is the whole bug, re-typed. */
+  ok("...and names the window from its session count",
+     /\$\{sess\}-session/.test(strip));
+  ok("...so a short window never renders as 52w",
+     !/short \? '52w/.test(strip) && !/52w range`/.test(strip.replace(/'52w range'/g, "")));
+
+  /* AT A NEW HIGH IS THE DANGEROUS ONE. offHigh() returns the same "at a new
+     high" string either way, and the label beside it is what says whether the
+     high is a year's or a quarter's. */
+  ok("a new high is labelled with its own window, not with a year",
+     /o\.txt === 'at a new high' \? `\$\{win \|\| '52w'\} high`/.test(strip));
+
+  /* AND THE LIVE OVERLAY MUST NOT RE-TYPE IT EITHER. It rewrites this label
+     on every quote, so a hardcoded year there reinstates the fault sixty
+     seconds after the page loads. */
+  {
+    const ov = (JS.match(/const fh = el\.querySelector\('\[data-fhigh\]'\);[\s\S]*?\n          \}/) || [""])[0];
+    ok("the strip hands the overlay the window", /data-fwin="/.test(strip));
+    ok("...and the overlay reads it rather than assuming a year",
+       /getAttribute\('data-fwin'\)/.test(ov));
+    ok("...and never hardcodes 52-week in the live label",
+       !/'52-week high'/.test(ov), ov.slice(0, 0));
+  }
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);
