@@ -130,6 +130,24 @@
      for. --s-6 and up are the ones a magazine uses and this site never did. */
   --s-1:4px;   --s-2:8px;   --s-3:12px;  --s-4:16px;  --s-5:24px;
   --s-6:32px;  --s-7:48px;  --s-8:64px;  --s-9:96px;
+  /* ── THE ONE HALF-STEP, BECAUSE THE SHEET ALREADY HAD IT ──────────────
+     Counted across every gap, margin and padding here: 1,340 literal px
+     values, 796 of them already exactly on the scale above. Of the 544 that
+     are not, 324 are BELOW the 4px base — hairline insets, a chip's 2px
+     padding, the 5px between a tile's figure and its label — which are
+     optical adjustments rather than steps. That leaves 220 above the base,
+     and 107 of those are this single value: 50 paddings, 19 margins, 17 gaps.
+
+     A number the sheet reaches for 107 times is not drift, it is an
+     undeclared step, and the scale is wrong to omit it for the same reason
+     the type scale is 1px apart at the bottom — between 12 and 16 the eye
+     cannot resolve a ratio anyway.
+
+     IT IS THE ONLY HALF-STEP AND NO OTHER MAY BE ADDED. The point of a scale
+     is that the next rule has one right answer; three choices inside a 4px
+     range is the drift this exists to end. A guard holds the remaining 113
+     off-scale values as a ratchet: the count may fall, never rise. */
+  --s-3h:14px;
 }
 
 :root{

@@ -230,12 +230,42 @@ under every visit and made one section 610px on a phone. The *record itself*
 never folds — folding it would change what the page claims rather than how
 much it shows.
 
-**Open item, measured:** the spacing scale is adopted at **35 sites** against
-683 for the type scale. Margins and gaps are still set to 8, 9, 10, 11, 12, 13,
-14, 16, 18, 20, 22 and 26 in most of the sheet. This is the same drift the type
-scale was written to end, left running in the dimension that actually produces
-the "tight boxes, no air" reading — and it is the largest open design defect in
-the repo.
+### The spacing, measured rather than complained about
+
+The first draft of this document called the spacing scale "the largest open
+design defect in the repo" on the strength of an adoption ratio — 35 uses of a spacing token
+against 683 for the type scale. Then the values themselves were counted,
+and that framing was wrong. Overstating a defect is the same fault as
+understating one.
+
+Across every `gap`, `margin` and `padding` in `signal.css`: **1,340 literal px
+values, of which 796 are already exactly on the scale.** Of the 544 that are
+not:
+
+- **324 are below the 4px base** — 1, 2, 3, 5, 6, 7. Hairline insets, a chip's
+  2px padding, the 5px between a tile's figure and its label. These are optical
+  adjustments, not steps, and declaring nine more tokens for them would produce
+  a scale nobody can hold in their head.
+- **220 are above the base and off-scale**, and **107 of those are the single
+  value 14px** — 50 paddings, 19 margins, 17 gaps and the rest. A value the
+  sheet reaches for 107 times is not drift. It is an undeclared step, and the
+  scale is wrong to omit it for the same reason the type scale is 1px apart at
+  the bottom: between 12 and 16 the eye cannot resolve a ratio anyway.
+
+So `--s-3h: 14px` is declared. **It is the only half-step and no other may be
+added** — the whole point of a scale is that the next rule has one right answer,
+and three choices inside a 4px range is the drift this ends.
+
+That leaves **113 genuinely off-scale values** (10, 18, 19, 20, 22, 28, 30, 34,
+36, 38, 40, 44, 46, 52, 56, 60, 88). They are held by a guard ratchet: the count
+may fall, never rise.
+
+**The density itself is not a defect.** 8px between sibling cards against 16px
+of padding inside one reads as tight, and it is meant to: the reader is an
+operator and the escape is folding, not air. A page that spaced this out would
+be a different product. The mass rename of the 796 already-on-scale literals to
+tokens was considered and **not done**: it changes zero pixels, produces an
+800-line diff on a live stylesheet, and would bury every real change in it.
 
 ---
 

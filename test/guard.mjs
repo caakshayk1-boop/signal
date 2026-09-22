@@ -1656,6 +1656,44 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      /\.totop\{[\s\S]{0,400}?width:44px;height:44px/.test(CSS));
 }
 
+/* ── THE SPACING DRIFT IS A RATCHET ─────────────────────────────────────────
+ * 1,340 literal px values across every gap, margin and padding in signal.css;
+ * 796 already exactly on the scale, 324 BELOW the 4px base (hairline insets, a
+ * chip's 2px padding — optical adjustments, not steps), and 220 above the base
+ * and off it. 107 of those 220 were the single value 14px, which is why
+ * --s-3h is declared rather than 107 rules being moved to 12 or 16.
+ *
+ * The remaining 113 are held here. They may fall. They may not rise.
+ *
+ * The 796 on-scale literals are deliberately NOT required to be tokens: the
+ * rename changes zero pixels, produces an 800-line diff on a live stylesheet,
+ * and would bury every real change in it. */
+{
+  const body = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+  const SCALE = new Set([4, 8, 12, 14, 16, 24, 32, 48, 64, 96]);
+  const props = /(?:gap|row-gap|column-gap|margin|padding)(?:-(?:top|bottom|left|right))?:\s*([^;}]+)/g;
+  const off = [];
+  for (const m of body.matchAll(props)) {
+    for (const px of m[1].matchAll(/(?<![\w.-])(\d+)px/g)) {
+      const n = Number(px[1]);
+      if (n < 8 || SCALE.has(n)) continue;   // below the base, or on the scale
+      off.push(n);
+    }
+  }
+  /* 113 as measured on 2026-09-22. Lower it as rules are converted; never
+     raise it — a new off-scale gap must pick a step instead. */
+  const CEILING = 113;
+  ok(`off-scale spacing has not grown past ${CEILING}`, off.length <= CEILING,
+     { count: off.length, values: [...new Set(off)].sort((a, b) => a - b) });
+  ok("the half-step is declared, so 14px has a token to reach for",
+     /--s-3h\s*:\s*14px/.test(CSS));
+  /* THE ONLY HALF-STEP. Three choices inside a 4px range is the drift a scale
+     exists to end, so a second one must fail here rather than be argued about
+     in review. */
+  ok("and it is the only one", (CSS.match(/--s-\d+h\s*:/g) || []).length === 1,
+     CSS.match(/--s-\d+h\s*:/g));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);
