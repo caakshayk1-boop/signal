@@ -500,10 +500,8 @@ a{color:inherit;text-decoration:none}
   .tabs .tabg.is-here > summary::before{
     content:"";position:absolute;bottom:0;left:14px;right:14px;height:2px;
     background:var(--accent);border-radius:var(--r-1) var(--r-1) 0 0;
-  }
-  /* Anchored to the bar's own edge rather than 8px inside the summary, so the
+  }/* Anchored to the bar's own edge rather than 8px inside the summary, so the
      panel lines up with the label that opened it. */
-  .tabs .tabg-m{left:0;top:calc(100% + 1px)}
 }
 
 /* ── LAYOUT ──────────────────────────────────────────────────────────────── */
@@ -718,9 +716,6 @@ main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh
 .breadth{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 16px}
 .breadth-n{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
 .breadth-n b{font:500 var(--t-8)/1 var(--mono)}
-.breadth-bar{height:8px;border-radius:var(--r-1);background:var(--raised);overflow:hidden;display:flex}
-.breadth-bar i{display:block;height:100%;transition:width .7s var(--ease-out)}
-.breadth-bar .bu{background:var(--up)} .breadth-bar .bd{background:var(--down)}
 .breadth-sub{margin-top:8px;font:400 var(--t-3)/1.5 var(--mono);color:var(--dim)}
 
 /* ── THE WIRE ─────────────────────────────────────────────────────────────
@@ -810,19 +805,12 @@ main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh
 .sec:nth-child(2){animation-delay:.04s} .sec:nth-child(3){animation-delay:.08s}
 .sec:nth-child(4){animation-delay:var(--t-fast)} .sec:nth-child(5){animation-delay:var(--t-fast)}
 @media(prefers-reduced-motion:reduce){.sec{animation:none}
-  .breadth-bar i,.subs-bar i{transition:none}}
+  .subs-bar i{transition:none}}
 
 /* ── EMPTY / COUNT ────────────────────────────────────────────────────────── */
-.hint{font-size:var(--t-3);color:var(--dim);margin-top:8px;line-height:1.5}
-
-/* Data health, in the footer. It answers "can I trust this page", which is a
+.hint{font-size:var(--t-3);color:var(--dim);margin-top:8px;line-height:1.5}/* Data health, in the footer. It answers "can I trust this page", which is a
    question about the page you are on rather than a place to navigate to — so
    it stopped being a tab. */
-.foot-health{display:inline-flex;align-items:center;gap:7px}
-.foot-health b{color:var(--text);font-weight:500}
-.foot-health .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--dim)}
-.foot-health .dot.ok{background:var(--up)}
-.foot-health .dot.warn{background:var(--warn)}
 
 /* ── OUTBOUND DETAIL LINKS ────────────────────────────────────────────────
    Screener.in for the filings, TradingView for the chart. Linking out rather
@@ -1054,9 +1042,6 @@ h4.sh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-tran
 .trail .tr-s{display:flex;flex-direction:column;gap:1px;margin-bottom:7px}
 .trail .tr-s b{font:500 var(--t-4)/1.35 var(--mono);color:var(--text);font-weight:500}
 .trail .tr-s i{font-style:normal;font-size:var(--t-2);color:var(--dim)}
-.trail .tr-n{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);
-  font-size:var(--t-2);line-height:1.5;color:var(--dim)}
-.trail .tr-n b{color:var(--warn)}
 
 /* THE STOP PATH ON ONE LINE. Three prices and two arrows, in place of three
    labelled steps whose labels were the same on every card on the site. The
@@ -1068,12 +1053,8 @@ h4.sh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-tran
 .trail .tr-1 .tr-v{display:block;font:500 var(--t-3)/1.5 var(--mono);
   font-variant-numeric:tabular-nums;letter-spacing:0;text-transform:none;
   color:var(--text);margin:0}
-.trail .tr-1 .tr-v i{font-style:normal;color:var(--dim);padding:0 5px}
-/* What the ladder banks against what holding it all would. Two figures, no
+.trail .tr-1 .tr-v i{font-style:normal;color:var(--dim);padding:0 5px}/* What the ladder banks against what holding it all would. Two figures, no
    paragraph — the paragraph is in TRAIL_NOTE, once for the whole page. */
-.tr-b{margin-top:7px;padding-top:7px;border-top:1px solid var(--line);
-  font:400 var(--t-2)/1.5 var(--mono);color:var(--dim)}
-.tr-b b{color:var(--text);font-weight:600}
 
 /* Level table — eight columns, so it scrolls sideways inside its own box
    rather than squeezing the name to nothing on a phone. */
@@ -1456,21 +1437,9 @@ body::before{display:none}
 .b-mini{display:flex;gap:16px;flex-wrap:wrap;margin-top:16px}
 .b-mini div{display:flex;flex-direction:column;gap:4px}
 .b-mini .k{font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--b-dim)}
-.b-mini .v{font:500 var(--t-5)/1 var(--mono);font-variant-numeric:tabular-nums}
-
-/* ── SCORE ───────────────────────────────────────────────────────────────── */
-.b-score{display:grid;gap:30px;margin-top:24px}
-@media(min-width:820px){.b-score{grid-template-columns:230px 1fr;gap:52px;align-items:center}}
-.b-score-big{font:400 clamp(64px,9vw,104px)/1 var(--b-serif);letter-spacing:var(--ls-tight)}
-.b-score-big span{font-size:.32em;color:var(--b-dim);letter-spacing:0}
-.b-bars{display:grid;gap:16px}
-.b-bar-r{display:grid;grid-template-columns:104px 1fr 38px;gap:14px;align-items:center}
-.b-bar-r .n{font-size:var(--t-5);color:var(--b-mut)}
-.b-bar-r .t{height:2px;background:var(--b-hi);position:relative;overflow:hidden}
-.b-bar-r .t i{display:block;height:100%;background:var(--b-acc);width:0;
-  transition:width 1s var(--ease-out)}
-.b-bar-r .s{font:500 var(--t-4)/1 var(--mono);text-align:right;font-variant-numeric:tabular-nums}
-@media(prefers-reduced-motion:reduce){.b-bar-r .t i{transition:none}}
+.b-mini .v{font:500 var(--t-5)/1 var(--mono);font-variant-numeric:tabular-nums}/* ── SCORE ───────────────────────────────────────────────────────────────── */
+@media(min-width:820px){}
+@media(prefers-reduced-motion:reduce){}
 
 /* THE BUSINESS SECTION'S STYLES ARE NOT HERE.
    They travel inside public/brief_fundamentals.js, which renders that section
@@ -1497,8 +1466,7 @@ body::before{display:none}
 .b-pr .px{font:500 var(--t-6)/1 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
 .b-pr.is-invalid{background:rgba(193,95,84,.07);border-left:2px solid var(--b-bear)}
 .b-pr.is-invalid .st{color:var(--b-bear)}
-.b-scen{display:grid;gap:12px;margin-top:24px}
-@media(min-width:860px){.b-scen{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:860px){}
 .b-sc{background:var(--b-sur);border:1px solid var(--b-line);border-radius:var(--r-4);padding:20px}
 .b-sc h4{font:500 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-widest);text-transform:uppercase;margin-bottom:12px}
 .b-sc.bull h4{color:var(--b-bull)} .b-sc.neu h4{color:var(--b-gold)} .b-sc.bear h4{color:var(--b-bear)}
@@ -1507,14 +1475,11 @@ body::before{display:none}
 
 .b-risk{display:grid;gap:22px;margin-top:24px}
 @media(min-width:860px){.b-risk{grid-template-columns:300px 1fr;gap:40px;align-items:start}}
-.b-inputs{display:grid;gap:12px}
 .b-in label{display:block;font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-widest);
   text-transform:uppercase;color:var(--b-dim);margin-bottom:7px}
 .b-in input{width:100%;background:var(--b-bg);color:var(--b-ink);border:1px solid var(--b-line2);
   border-radius:var(--r-3);padding:12px 12px;font:500 var(--t-6)/1 var(--mono);min-height:46px}
 .b-in input:focus{outline:none;border-color:var(--b-acc)}
-.b-out{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;
-  background:var(--b-line);border:1px solid var(--b-line);border-radius:var(--r-4);overflow:hidden}
 .b-o{background:var(--b-sur);padding:16px 16px}
 .b-o .k{display:block;font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-widest);text-transform:uppercase;color:var(--b-dim)}
 .b-o .v{display:block;font:500 var(--t-7)/1.2 var(--mono);margin-top:8px;font-variant-numeric:tabular-nums}
@@ -1810,26 +1775,7 @@ body::before{display:none}
 .b-qnav a[aria-current="true"] .kb{opacity:1;border-color:currentColor}
 .b-qnav a .kb{font-size:var(--t-1);opacity:.5;border:1px solid currentColor;border-radius:var(--r-1);
   padding:1px 3px;line-height:1}
-@media(max-width:759px){.b-qnav{top:var(--barh)}}
-
-/* ── TRADE JOURNEY — the narrative spine ─────────────────────────────────── */
-.b-jr{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:0;
-  margin:24px 0 0;padding:0;overflow-x:auto;scrollbar-width:none}
-.b-jr::-webkit-scrollbar{display:none}
-.b-jn{position:relative;padding:16px 8px 0;text-align:center;min-width:96px}
-.b-jn::before{content:"";position:absolute;top:5px;left:0;right:0;height:1px;background:var(--b-line2)}
-.b-jn:first-child::before{left:50%} .b-jn:last-child::before{right:50%}
-.b-jn i{position:absolute;top:1px;left:50%;margin-left:-5px;width:9px;height:9px;border-radius:50%;
-  background:var(--b-bg);border:1.5px solid var(--b-line2);
-  transition:background var(--t-mid) var(--ease),border-color var(--t-mid) var(--ease),
-             transform var(--t-mid) var(--ease-out)}
-.b-jn b{display:block;font:500 var(--t-1)/1.2 var(--mono);letter-spacing:var(--ls-widest);text-transform:uppercase;
-  color:var(--b-dim);transition:color var(--t-mid) var(--ease)}
-.b-jn span{display:block;font-size:var(--t-2);line-height:1.4;color:var(--b-dim);opacity:.7;margin-top:4px}
-.b-jn.done i{background:var(--b-line2);border-color:var(--b-line2)}
-.b-jn.on i{background:var(--b-acc);border-color:var(--b-acc);transform:scale(1.25)}
-.b-jn.on b{color:var(--b-acc)}
-.b-jn.done b{color:var(--b-mut)}
+@media(max-width:759px){.b-qnav{top:var(--barh)}}/* ── TRADE JOURNEY — the narrative spine ─────────────────────────────────── */
 
 /* ── THE CHART — real closes, real levels ────────────────────────────────── */
 .b-px{position:relative;margin-top:22px;border:1px solid var(--b-line);border-radius:var(--r-4);
@@ -1861,9 +1807,7 @@ body::before{display:none}
 .b-px-c .lvl.k{stroke:var(--b-gold)}
 .b-px-c .zone.r{fill:var(--b-bear);opacity:.09}
 .b-px-c .zone.g{fill:var(--b-bull);opacity:.09}
-.b-px-c text.ltag{font:500 9px var(--mono);letter-spacing:var(--ls-wider);fill:var(--b-dim)}
 .b-px-c .cross{stroke:var(--b-line2);stroke-width:1;pointer-events:none}
-.b-px-c .cdot{fill:var(--b-acc);stroke:var(--b-sur);stroke-width:2;pointer-events:none}
 .b-px-hit{position:absolute;inset:0;cursor:crosshair}
 /* The floating read-out. Small on purpose: a tooltip that covers the chart is
    worse than no tooltip. */
@@ -2506,8 +2450,6 @@ body::before{display:none}
 .ic.up{color:var(--up)} .ic.dn{color:var(--down)}
 .ic-l{stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
 .ic-l.t{stroke:var(--up);opacity:.75} .ic-l.s{stroke:var(--down);opacity:.75}
-.idea-cxl{position:absolute;right:2px;bottom:-2px;font:400 var(--t-1)/1 var(--mono);
-  letter-spacing:var(--ls-wide);color:var(--dim);opacity:.7;pointer-events:none}
 /* A symbol with no published history keeps its slot and says so, rather than
    collapsing the card and making the grid ragged. */
 .idea-nocx{font:400 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);text-transform:uppercase;
@@ -2985,24 +2927,9 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
    A reading column, not a grid. Headlines are the serif — this is the one
    part of the site that is prose rather than data, and it should look it. */
 .nw{display:flex;flex-direction:column}
-.nw-i{padding:20px 0;border-top:1px solid var(--line)}
-.nw-i:first-child{border-top:0;padding-top:4px}
-.nw-m{display:flex;align-items:center;gap:8px;margin-bottom:7px}
-.nw-s{font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--dim)}
-.nw-t{font:400 clamp(var(--t-7),2.1vw,var(--t-9))/1.28 var(--serif);letter-spacing:var(--ls-snug);
-  margin:0 0 6px;max-width:64ch;text-wrap:balance}
-.nw-t a{color:var(--text);text-decoration:none;background-image:linear-gradient(var(--line2),var(--line2));
-  background-size:100% 1px;background-repeat:no-repeat;background-position:0 100%}
-@media (hover:hover) and (pointer:fine){.nw-t a:hover{color:var(--accent);background-image:linear-gradient(var(--accent),var(--accent))}}
-
-.nw-d{font:400 var(--t-5)/1.55 var(--ui);color:var(--muted);margin:0;max-width:70ch}
-
-/* The join. Chips are links to the screen, coloured by the move the name
+@media (hover:hover) and (pointer:fine){}/* The join. Chips are links to the screen, coloured by the move the name
    actually made — the only editorial claim here is "this story names this
    company", and the number beside it is measured, not inferred. */
-.nw-h{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px}
-.nw-hl{font:500 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-wider);text-transform:uppercase;
-  color:var(--dim);margin-right:2px}
 .nw-c{display:inline-flex;align-items:baseline;gap:6px;text-decoration:none;
   padding:5px 8px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface)}
 .nw-c b{font:600 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-0);color:var(--text)}
@@ -3016,9 +2943,6 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
 .chips-hint{margin:-6px 0 14px}
 
 @media(max-width:700px){
-  .nw-i{padding:16px 0}
-  .nw-t{font-size:var(--t-7);line-height:1.3}
-  .nw-d{font-size:var(--t-5)}
 }
 
 /* ── THE TRADING DAY ──────────────────────────────────────────────────────
@@ -3117,14 +3041,6 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
    price is the only element on that row with nothing to say, so it is the one
    that gives up its width. */
 @media(max-width:640px){
-  .b-jr{grid-auto-flow:row;grid-template-columns:1fr;overflow:visible;
-    margin-top:16px;padding-left:2px}
-  .b-jn{min-width:0;text-align:left;padding:0 0 16px 24px}
-  .b-jn:last-child{padding-bottom:0}
-  .b-jn::before{top:3px;bottom:-3px;left:4px;right:auto;width:1px;height:auto}
-  .b-jn:first-child::before{left:4px;top:9px}
-  .b-jn:last-child::before{bottom:auto;height:0}
-  .b-jn i{top:4px;left:0;margin-left:0}
 }
 @media(max-width:560px){
   /* The tag sizes to its own text; the rule absorbs whatever is left. */
@@ -3151,7 +3067,6 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
   .mk-nosp{font-size:var(--t-2);letter-spacing:var(--ls-wide)}
   .mk-chev{font-size:var(--t-3)}
   .tipb{font-size:var(--t-2)}
-  .nw-s{font-size:var(--t-2)}
   .wc-n{font-size:var(--t-2)}
   .eyebrow{font-size:var(--t-2)}
   .cc-ax{font-size:var(--t-2)}
@@ -3173,8 +3088,6 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
   .sess{font-size:var(--t-2)}
   .b-qnav a .kb{font-size:var(--t-2)}
   .b-px-t i,.rc-t i{font-size:var(--t-2)}
-  .idea-cxl{font-size:var(--t-2)}
-  .b-px-c text.ltag{font-size:var(--t-2)}
   .cc-ax{font-size:var(--t-2)}
 }
 /* The tab strip scrolls horizontally now, so it no longer has to buy room by
@@ -3300,8 +3213,7 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
 .t5i{display:block;width:100%;text-align:left;padding:14px 0;border-top:1px solid var(--line);
   border-left:0;border-right:0;border-bottom:0;background:none;text-decoration:none;color:inherit;font:inherit}
 .t5i:first-child{border-top:0}
-.t5b{cursor:pointer}
-@media (hover:hover) and (pointer:fine){.t5b:hover .t5t,.t5i[href]:hover .t5t{color:var(--accent)}}
+@media (hover:hover) and (pointer:fine){.t5i[href]:hover .t5t{color:var(--accent)}}
 
 .t5s{display:block;font:500 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-wider);text-transform:uppercase;
   color:var(--dim);margin-bottom:6px}
@@ -3373,20 +3285,8 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
 .mk-prov b{color:var(--text);font-weight:600}
 .mk-prov b.up{color:var(--up)} .mk-prov b.dn{color:var(--down)}
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   THE MODERN LAYER
-   Four additions, each one progressive enhancement: every rule below is
-   either inside an @supports guard or degrades to the layout that was
-   already there. Nothing here is required for the page to work, and nothing
-   here runs when the reader has asked for reduced motion.
-   ═════════════════════════════════════════════════════════════════════════ */
-
-/* ── 1. PROSE THAT DOES NOT LEAVE ORPHANS ─────────────────────────────────
-   text-wrap:pretty asks the browser to avoid a single word on the last line
-   of a paragraph and to even out the rag. It costs nothing and it is the
-   difference between typeset and typed. Headings already balance. */
-.hint,.sec-note,.b-p,.nwc-d,.t5d,.alloc-n,.mk-prov,.nw-d,.b-verdict{text-wrap:pretty}
-.route-h h1,.sec-lead,.nwc-t,.nw-t,.t5t{text-wrap:balance}
+.hint,.sec-note,.b-p,.nwc-d,.t5d,.alloc-n,.mk-prov,.b-verdict{text-wrap:pretty}
+.route-h h1,.sec-lead,.nwc-t,.t5t{text-wrap:balance}
 
 /* ── 2. SECTIONS THAT ARRIVE AS YOU REACH THEM ────────────────────────────
    Scroll-driven, in CSS, with no JavaScript and no observer. This matters
@@ -3612,29 +3512,11 @@ html:has(dialog[open]){overflow:hidden}
   content:"";position:absolute;left:15px;right:15px;bottom:0;height:2px;
   background:var(--accent);border-radius:2px 2px 0 0;
 }
-
-.tabg-m{
-  position:absolute;top:100%;left:8px;z-index:60;min-width:296px;
-  background:var(--surface);border:1px solid var(--line2);
-  border-radius:var(--r-4);box-shadow:var(--e-3);
-  padding:7px;display:flex;flex-direction:column;
-  animation:tabgIn var(--t-fast) var(--ease-out) both;
-}
 @keyframes tabgIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){.tabg-m{animation:none}}
-.tabg-m a{
-  display:block;padding:8px 12px;border-radius:var(--r-3);text-decoration:none;
-  color:var(--text);
-}
-@media (hover:hover) and (pointer:fine){.tabg-m a:hover{background:var(--raised)}}
+@media(prefers-reduced-motion:reduce){}
+@media (hover:hover) and (pointer:fine){}
 
-.tabg-m a[aria-current="page"]{background:color-mix(in srgb,var(--accent) 9%,transparent)}
-.tabg-m b{display:block;font:600 var(--t-5)/1.25 var(--ui)}
-.tabg-m em{display:block;margin-top:2px;font:400 var(--t-3)/1.45 var(--ui);
-  font-style:normal;color:var(--dim)}
-
-@media(max-width:760px){
-  /* FIXED, NOT ABSOLUTE — AND THIS IS THE WHOLE BUG.
+@media(max-width:760px){/* FIXED, NOT ABSOLUTE — AND THIS IS THE WHOLE BUG.
    *
    * .tabg is position:relative, so an absolutely-positioned menu resolves
    * left/right against the SUMMARY BUTTON, not the viewport. On desktop the
@@ -3647,12 +3529,6 @@ html:has(dialog[open]){overflow:hidden}
    * fixed but carries no transform, so it creates no containing block and the
    * menu spans the screen as intended. It is pinned above the tab strip and
    * the home indicator rather than to the button. */
-  .tabg-m{
-    position:fixed;top:auto;
-    bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 8px);
-    left:10px;right:10px;min-width:0;width:auto;
-    max-height:60vh;overflow-y:auto;
-  }
   .tabg > summary{padding:0 16px;font-size:var(--t-4)}
   .tabg.is-here > summary::before{top:0;bottom:auto;border-radius:0 0 2px 2px}
 }
@@ -3903,12 +3779,10 @@ html:has(dialog[open]){overflow:hidden}
 .rank-r.eng.eng-h{background:var(--surface2,var(--surface))}
 /* "+2 more" beside a wire's name: how many desks filed the same story. */
 .w-also{font-style:normal;font:500 var(--t-1)/1 var(--mono);color:var(--accent);
-  border:1px solid var(--line);border-radius:3px;padding:1px 4px;margin-left:6px}
-/* A heading INSIDE a section, for the second population in "The record".
+  border:1px solid var(--line);border-radius:3px;padding:1px 4px;margin-left:6px}/* A heading INSIDE a section, for the second population in "The record".
  * Smaller than the section head on purpose: the launch-window figures are the
  * claim, the engine history is context under it, and the type has to say which
  * is which before the prose does. */
-.sub-h{font:600 var(--t-4)/1.3 var(--ui);margin:24px 0 6px;color:var(--text)}
 
 /* ── FUND DETAIL SHEET ────────────────────────────────────────────────────
  * The bar beside each return is the only place on this page a number is drawn
@@ -4721,8 +4595,6 @@ html:has(dialog[open]){overflow:hidden}
 .ef-n b.up{color:var(--up)} .ef-n b.dn{color:var(--down)}
 .ef-n em{font:400 var(--t-1)/1 var(--ui);font-style:normal;color:var(--dim);
   text-transform:uppercase;letter-spacing:var(--ls-wide)}
-.ef-bar{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
-.ef-bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
 .ef-thin{margin:0;font:400 var(--t-2)/1.5 var(--ui);color:var(--dim)}
 .ef-bt{margin:8px 0 0;padding-top:8px;border-top:1px dashed var(--line2);
   font:400 var(--t-2)/1.5 var(--ui);color:var(--muted)}
@@ -4862,15 +4734,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .rd-link{stroke:var(--line2);opacity:.55}
 .rd-link.is-up{stroke:var(--up);opacity:.5}
 .rd-link.is-dn{stroke:var(--down);opacity:.4}
-.rd-node circle{fill:var(--surface);stroke:var(--line2);stroke-width:1.5;cursor:pointer;
-  transition:stroke var(--t-fast) var(--ease)}
-.rd-node.is-up circle{stroke:var(--up)} .rd-node.is-dn circle{stroke:var(--down)}
-@media (hover:hover) and (pointer:fine){.rd-node:hover circle,.rd-node:focus-visible circle{stroke-width:2.5}}
-
-.rd-node text{fill:var(--text);font:600 12px var(--ui);text-anchor:middle;pointer-events:none}
-.rd-node .rd-ns{fill:var(--dim);font:500 11px var(--mono)}
+@media (hover:hover) and (pointer:fine){}
 .rd-hub{fill:var(--raised);stroke:var(--accent);stroke-width:1.5}
-.rd-hubt{fill:var(--accent);font:700 11px var(--ui);letter-spacing:.1em;text-anchor:middle}
 
 .rd-feed{display:grid;gap:8px}
 .rd-row{display:grid;gap:4px 12px;padding:12px 14px;border:1px solid var(--line);
@@ -4917,7 +4782,7 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   .rd-core-h{grid-column:1/-1;margin-top:4px}
   .rd-p{grid-template-columns:70px 1fr 24px}
 }
-@media(prefers-reduced-motion:reduce){.rd-node circle{transition:none}}
+@media(prefers-reduced-motion:reduce){}
 
 /* ── RADAR: CARDS, STRIP, SELECTION, FULL SCREEN ─────────────────────────────
  * The ring, the strip and the list are three views of ONE set. A selection has
@@ -5011,21 +4876,16 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 
 }
 
-/* ── FIVE FLAT DESTINATIONS ──────────────────────────────────────────────────
- * The bar was four items, two of which opened menus — so the ledger took two
- * taps and a guess. Five single-tap destinations with drawn icons: an icon set
- * makes each target recognisable before the label is read, which is what lets
- * five fit where four sat. */
-.tabs a,.tabs .tab-more{display:flex;flex-direction:column;align-items:center;justify-content:center;
+.tabs a{display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:3px;min-height:52px;padding:0 2px;border:0;background:none;cursor:pointer;
   color:var(--dim);text-decoration:none;-webkit-tap-highlight-color:transparent}
 .tabs svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;
   stroke-linecap:round;stroke-linejoin:round;flex:none}
 .tabs svg circle[r="1.6"]{fill:currentColor;stroke:none}
-.tabs a span,.tabs .tab-more span{font:600 var(--t-2)/1 var(--ui);letter-spacing:.01em}
+.tabs a span{font:600 var(--t-2)/1 var(--ui);letter-spacing:.01em}
 .tabs a[aria-current="page"]{color:var(--accent);background:none}
 .tabs a[aria-current="page"] svg{stroke-width:2.1}
-.tabs a:active,.tabs .tab-more:active{opacity:.6}
+.tabs a:active{opacity:.6}
 .tabs a[aria-current="page"]::before{content:none}
 
 /* ── DISCOVER ────────────────────────────────────────────────────────────── */
@@ -5139,8 +4999,6 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
    against, so it reads as the line they sit above and below. */
 .lv-r.now{background:var(--raised)}
 .lv-r.now .lv-k{color:var(--accent)}
-.lv-l{font-size:var(--t-2);color:var(--dim);overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
 .lv-w{min-width:0}
 .lv-w b{display:block;font:500 var(--t-2)/1.3 var(--sans);color:var(--text)}
 .lv-w em{display:block;margin-top:2px;font:400 var(--t-1)/1.45 var(--sans);
@@ -5152,7 +5010,6 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   /* The reason moves under the figures rather than being dropped — it is the
      point of the block, so on a phone it gets its own line. */
   .lv-r{grid-template-columns:46px auto 1fr;gap:4px 8px}
-  .lv-l{display:none}
   .lv-w{grid-column:1/-1;margin-top:3px}
   .lv-d{text-align:right}
 }
@@ -5161,11 +5018,8 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .ef-win{margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
 .ef-win:first-of-type{border-top:0;padding-top:0}
 .ef-wk{display:block;margin-bottom:7px;font:600 var(--t-1)/1 var(--sans);
-  letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
-/* The earlier ledger is real and is not this site's record, so it is set back
+  letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}/* The earlier ledger is real and is not this site's record, so it is set back
    rather than given the same weight as the numbers above it. */
-.ef-prior{opacity:.72}
-.ef-prior .ef-wk{color:var(--warn)}
 
 /* ── the floor's cards expand ─────────────────────────────────────────────── */
 .ag>summary.ag-sum{list-style:none;cursor:pointer;position:relative;
@@ -5275,8 +5129,6 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .rs-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .rs-tf{font:600 var(--t-1)/1 var(--sans);letter-spacing:.08em;
   text-transform:uppercase;color:var(--dim)}
-.rs-hunt{margin:0 0 12px;font-size:var(--t-3);line-height:1.6;color:var(--muted);
-  max-width:62ch}
 /* A rejected engine's note is not the same object as a caution. It gets the
    down colour on its edge so the difference is visible before it is read. */
 .note-dn{border-left:3px solid var(--dn)}
@@ -5658,17 +5510,12 @@ a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,
 .baro-s b{font:700 var(--t-12)/1 var(--serif);letter-spacing:var(--ls-tight);
   font-variant-numeric:tabular-nums}
 .baro-s em{font-style:normal;font-size:var(--t-5);color:var(--dim)}
-.baro-b{display:block;flex:1 1 100%;font:600 var(--t-2)/1.4 var(--ui);
-  letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--dim)}
 .baro-s.up b{color:var(--up)} .baro-s.dn b{color:var(--down)}
 .baro-p{flex:1 1 auto;display:flex;flex-direction:column;gap:var(--s-2);min-width:0}
 .baro-i{display:grid;grid-template-columns:minmax(0,1fr) 84px 32px;gap:0 12px;
   align-items:center}
 .baro-k{font:500 var(--t-3)/1.3 var(--ui);color:var(--muted);min-width:0}
 .baro-k i{font-style:normal;margin-left:6px;font-size:var(--t-1);color:var(--dim)}
-.baro-bar{height:6px;border-radius:999px;background:var(--line);overflow:hidden}
-.baro-bar i{display:block;height:100%;width:var(--w);background:var(--muted);
-  border-radius:999px;transition:width var(--t-slow) var(--ease-out)}
 .baro-v{font:600 var(--t-3)/1 var(--mono);font-variant-numeric:tabular-nums;text-align:right;
   color:var(--muted)}
 .baro-d{grid-column:1/-1;font-size:var(--t-2);color:var(--dim);line-height:1.45}
@@ -5806,7 +5653,7 @@ a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,
 /* The barometer ring replaces the big number, so the column that held it no
    longer needs a fixed minimum — the ring sets its own size. */
 .baro-s{min-width:0}
-.baro-s b,.baro-s em,.baro-b{all:unset}
+.baro-s b,.baro-s em{all:unset}
 .baro-i{grid-template-columns:minmax(0,1fr) 96px 34px}
 @media(max-width:640px){ .baro-i{grid-template-columns:minmax(0,1fr) 64px 30px} }
 
@@ -5824,9 +5671,7 @@ h3,h4,.rd-h{font-family:var(--ui);font-weight:700;letter-spacing:-.016em}
 .hero h1{font-weight:800;letter-spacing:-.038em}
 .hero-sub,.route-h p{font-weight:450;letter-spacing:-.003em;color:var(--muted)}
 
-/* Big figures: heavier and tighter than body, and always tabular so a column
-   of them lines up. */
-.tile .v,.spk-v,.ring-c b,.baro-s b,.t5-v{font-family:var(--ui);font-weight:800;
+.tile .v,.spk-v,.ring-c b,.baro-s b{font-family:var(--ui);font-weight:800;
   letter-spacing:-.03em;font-variant-numeric:tabular-nums}
 
 /* Uppercase labels need the opposite treatment — a geometric caps setting
@@ -6196,60 +6041,10 @@ main.is-nav{animation:routein var(--t-mid) var(--ease-out) backwards}
   text-transform:uppercase;color:var(--dim)}
 
 
-/* ════════════════════════════════════════════════════════════════════════════
-   FEEL PASS — press response, and the two accessibility signals that were
-   never handled. Appended as one block so it is one thing to read and one
-   thing to revert.
-
-   Audited against the apple-design and emil-design-eng skills, 2026-09-22.
-   The counts below are measurements of this file, not impressions.
-
-   WHAT WAS WRONG, AND WHY IT IS A BUG RATHER THAN POLISH
-   ------------------------------------------------------
-   83 :hover rules. 0 behind @media (hover:hover). 10 :active rules.
-
-   This file's own header calls it "the mobile-first surface". On a touch
-   device :hover fires on tap AND STICKS until you tap elsewhere, so every one
-   of those 83 rules was painting a hover state that had no way to leave. The
-   feedback that does work on touch — the press state — had ten rules against
-   eighty-three. The primary device had the broken mechanism everywhere and
-   the working one almost nowhere.
-
-   The 83 are now each wrapped in (hover:hover) and (pointer:fine). That
-   transform was verified declaration-by-declaration: 8851 before, 8934 after,
-   nothing lost, the 83 added being the media conditions themselves.
-
-   WHAT IS DELIBERATELY NOT DONE
-   -----------------------------
-   The skills call for translucent chrome — backdrop-filter with a
-   semi-transparent background, content scrolling under. This site's .bar is
-   OPAQUE ON PURPOSE and stays that way: WebKit does not apply backdrop-filter
-   on a sticky element, reported support and all, and the header was readable
-   straight through in Safari. That is measured, reproduced in Playwright, and
-   written up at the .bar rule. A general design rule does not outrank a
-   reproduction.
-   ════════════════════════════════════════════════════════════════════════ */
-
-/* ── PRESS RESPONSE ──────────────────────────────────────────────────────────
- * "Respond on pointer-down, not on release" and "buttons must feel responsive
- * to press" are the first rule of both skills. 160ms ease-out on the way in;
- * the release is the same curve because a press has no momentum to carry.
- *
- * Scoped to elements that do NOT already define :active, so nothing here
- * overrides a press state somebody already tuned — .card, .chip, .tabg,
- * .rank-r, .disc-c, .ef-c, .foldb, .mcell, .rd-c, .tab-more, .tabs and .xr
- * keep theirs untouched.
- *
- * scale() takes children with it, which is the point: the label presses with
- * the button rather than sliding inside it. 0.97 is the subtle end of the
- * 0.95–0.98 band — a data-dense page cannot afford a big squash. */
-.tipb, .heat-t, .brief, .b-lvl, .tile-go, .rd-u, .rd-card, .wstar, .wire,
-button:not(.chip):not(.tabg):not(.tabs):not(.tab-more):not(.foldb) {
+.tipb,.heat-t,.brief,.b-lvl,.tile-go,.rd-u,.rd-card,.wstar,.wire{
   transition: transform 160ms var(--ease-out, cubic-bezier(.16,1,.3,1));
 }
-.tipb:active, .heat-t:active, .brief:active, .b-lvl:active, .tile-go:active,
-.rd-u:active, .rd-card:active, .wstar:active, .wire:active,
-button:not(.chip):not(.tabg):not(.tabs):not(.tab-more):not(.foldb):active {
+.tipb:active,.heat-t:active,.brief:active,.b-lvl:active,.tile-go:active,.rd-u:active,.rd-card:active,.wstar:active,.wire:active{
   transform: scale(.97);
 }
 /* The chip already had a press state's worth of colour change and no motion.

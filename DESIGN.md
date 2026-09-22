@@ -457,15 +457,24 @@ everything.
   and `.said`, `.fig` and `.figs` are semantic hooks. Some will be a refactor
   that renamed an element and left the style on the old name, which is the
   incident the original check was written for.
-- **37 classes are styled and emitted nowhere** — 107 rules, 314 declarations,
-  **5.4% of the sheet**. That is dead weight in a Worker bundle, and it
-  misleads: this document cited `.tabg-m` as a live example of elevation while
-  the token was being written, and nothing in this repo emits `.tabg-m`.
+- **37 classes were styled and emitted nowhere** — 107 rules, 314 declarations,
+  **5.4% of the sheet**. Dead weight in a Worker bundle, and it misled: this
+  document cited `.tabg-m` as a live example of elevation while the token was
+  being written, and nothing in this repo emits `.tabg-m`.
 
-Both are ratchets. They may fall; they may not rise. **The 37 are not deleted
-here**, for the same reason the 796 on-scale spacing literals were not renamed
-here: it is a self-contained change that deserves its own diff, and folding it
-into one about news copy would bury both.
+  **They are gone** — 96 rules removed, 11 selector lists trimmed of a dead
+  part, 207 declarations and **11,795 bytes (3.1% of the sheet)**. The ratchet
+  now sits at **zero**: a rule written before its markup fails, which is the
+  intended cost.
+
+  The deletion was made safe by the forward check first. It covers all 880
+  emitted classes, so removing a rule for one of them fails the build — and the
+  unstyled count is **unchanged at 12** either side of the delete, which is the
+  proof, not a spot check. Five comments were left adjacent to another comment
+  by the removal; every one still describes a rule that survives, and no comment
+  in the sheet names a deleted class.
+
+The unstyled set is still a ratchet — it may fall, it may not rise.
 
 Two detector bugs were found and fixed while measuring, and each had made the
 numbers look worse than they are: `brief_fundamentals.js` carries its own
