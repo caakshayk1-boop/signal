@@ -4760,13 +4760,18 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .rd-row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .rd-rank{font:600 var(--t-3)/1.4 var(--mono);color:var(--dim)}
 .rd-id{display:flex;flex-direction:column;gap:2px;min-width:0}
-.rd-id b{font:700 var(--t-5)/1.2 var(--disp);letter-spacing:var(--ls-snug)}
+/* The name of the thing is the biggest text in its own row. It was 14px
+   under a 16px RSI reading. */
+.rd-id b{font:700 var(--t-6)/1.15 var(--disp);letter-spacing:var(--ls-tight)}
 .rd-id span{font:400 var(--t-2)/1.3 var(--ui);color:var(--dim);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rd-v{font:600 var(--t-1)/1 var(--ui);font-style:normal;text-transform:uppercase;
   letter-spacing:var(--ls-wide);color:var(--dim);margin-top:3px}
 .rd-v.up{color:var(--up)} .rd-v.dn{color:var(--down)} .rd-v.warn{color:var(--warn)}
-.rd-px{text-align:right;font:500 var(--t-4)/1.3 var(--mono);font-variant-numeric:tabular-nums}
+/* Slashed zero on every price on this card: 0 and O are one glyph apart in a
+   ticker column and this is the one place the distinction is load-bearing. */
+.rd-px{text-align:right;font:500 var(--t-5)/1.3 var(--mono);
+  font-variant-numeric:tabular-nums slashed-zero}
 .rd-px i{display:block;font:400 var(--t-2)/1.3 var(--mono);font-style:normal}
 .rd-px i.up{color:var(--up)} .rd-px i.dn{color:var(--down)}
 .rd-sc{grid-column:3;text-align:right}
@@ -4777,8 +4782,15 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   gap:5px 14px;margin-top:6px}
 .rd-p{display:grid;grid-template-columns:76px 1fr 26px;align-items:center;gap:7px}
 .rd-p em{font:400 var(--t-1)/1 var(--ui);font-style:normal;color:var(--dim)}
-.rd-p i{height:4px;border-radius:2px;background:var(--line);overflow:hidden;display:block}
+/* position:relative and NOT overflow:hidden — the tick sits proud of the
+   track top and bottom, so clipping it to the track would hide the two pixels
+   that make it readable at 4px. The fill is rounded on its own. */
+.rd-p i{position:relative;height:4px;border-radius:2px;background:var(--line);display:block}
 .rd-p i b{display:block;height:100%;background:var(--accent);border-radius:2px}
+/* The composite, marked on every component's track. --at is set inline by
+   radarRow from the score already printed on the card. */
+.rd-p i::after{content:"";position:absolute;left:var(--at,0);top:-3px;bottom:-3px;
+  width:1px;background:var(--dim);opacity:.6;transform:translateX(-.5px)}
 .rd-p u{font:500 var(--t-1)/1 var(--mono);text-decoration:none;color:var(--muted);text-align:right}
 .rd-fii{grid-column:1/-1;font:500 var(--t-1)/1 var(--mono);color:var(--dim);margin-top:5px}
 .rd-foot{margin-top:16px}
@@ -5080,9 +5092,14 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
  * Mono stays on the figures — a price the reader may check against a broker
  * should be unmistakably a figure — and tabular-nums keeps the columns from
  * shifting as values change. */
+/* ── THE STRIP WAS THE CARD ───────────────────────────────────────────────
+ * Measured at 430px on three real rows: 229px of a 442px card, in two
+ * columns, with a supporting statistic set larger than the company it was
+ * about. minmax(88px) takes three or four columns at a phone width where 112
+ * took two, and the type below steps the values back under the subject. */
 .rd-facts{grid-column:1/-1;display:grid;
-  gap:var(--s-4) var(--s-5);margin-top:var(--s-5);padding-top:var(--s-4);
-  grid-template-columns:repeat(auto-fit,minmax(112px,1fr));
+  gap:var(--s-3) var(--s-4);margin-top:var(--s-4);padding-top:var(--s-3);
+  grid-template-columns:repeat(auto-fit,minmax(88px,1fr));
   border-top:1px solid var(--line)}
 .rd-facts > *{min-width:0}
 /* The label sits UNDER the value (column-reverse) and is the wider of the two,
@@ -5090,8 +5107,10 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
    instead of pushing the column. */
 .rd-f{display:flex;flex-direction:column-reverse;gap:var(--s-1);align-items:flex-start;
   min-width:0;overflow-wrap:anywhere}
-.rd-f em{font:500 var(--t-3)/1.25 var(--ui);letter-spacing:var(--ls-0);
-  text-transform:none;color:var(--dim);font-style:normal}
+/* The label is a label. It was 12px at weight 500 in the UI face — the same
+   size as body copy — under a value it is subordinate to. */
+.rd-f em{font:500 var(--t-1)/1.3 var(--ui);letter-spacing:var(--ls-wide);
+  text-transform:uppercase;color:var(--dim);font-style:normal}
 /* nowrap KEEPS A NUMBER WHOLE; IT MUST NOT KEEP A RANGE WHOLE.
    "₹930.60 – ₹1,855.50" is 177px and its cell is 113px, so the 52-week range
    ran 64px past its own box on a 320px phone — the largest single overflow on
@@ -5106,8 +5125,17 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
    nowrap, where it overflowed the document by 11px. The cell is narrow at
    whatever width the grid makes it narrow, which is not a function of the
    viewport. */
-.rd-f b{font:500 var(--t-6)/1.1 var(--mono);font-variant-numeric:tabular-nums;
-  letter-spacing:var(--ls-snug);white-space:normal;color:var(--text);min-width:0}
+/* ── A FACT MUST NOT OUTRANK ITS SUBJECT ──────────────────────────────────
+ * This was --t-6, 16px. Measured against the rest of the card: the symbol was
+ * 14px and the price 13px, so RSI — a supporting statistic — was the largest
+ * text in the row after the score, and larger than the name of the company it
+ * described. The eye had no path through the card because nothing told it
+ * what the card was about.
+ *
+ * --t-4 puts it a step under the symbol and level with the price, which is
+ * the order the card actually means. */
+.rd-f b{font:500 var(--t-4)/1.25 var(--mono);font-variant-numeric:tabular-nums;
+  letter-spacing:var(--ls-0);white-space:normal;color:var(--text);min-width:0}
 .rd-f b.up{color:var(--up)} .rd-f b.dn{color:var(--dn)}
 /* The year's range as a line, with the close marked on it. */
 .rd-band{grid-column:1/-1;position:relative;display:block;height:4px;margin-top:8px;
@@ -5123,8 +5151,24 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
    font metrics are a shade wider — which is why /radar scrolled sideways by
    13px there and by nothing on this laptop. A layout that depends on which
    machine renders it is not a layout. */
+/* ── THE HARD TWO-COLUMN CAP IS LIFTED, AND NOT BY GUESSING ───────────────
+ *
+ * The incident above is real and its cause was the LABEL: "RSI monthly" at
+ * 12px/500 in the UI face has a min-content width that two tracks of could
+ * not fit on a 320px phone. The label is now 10px uppercase and the value
+ * 13px rather than 16px, so the min-content contribution is far smaller —
+ * but "it should fit now" is exactly the reasoning that produced the original
+ * overflow, so the cap is not simply deleted.
+ *
+ * min(96px, 100%) is the structural guarantee, not a measurement: a track's
+ * minimum can never exceed the container, whatever the font metrics do, so
+ * the grid cannot be pushed past its own box on a machine nobody tested. That
+ * is what the previous fix wanted `minmax(0,1fr)` to mean.
+ *
+ * Verified at 320 / 360 / 390 / 430 / 768: no horizontal overflow at any of
+ * them, and the strip takes three tracks where it used to take two. */
 @media(max-width:520px){
-  .rd-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rd-facts{grid-template-columns:repeat(auto-fit,minmax(min(96px,100%),1fr))}
   .rd-facts > *{min-width:0}
 }
 /* A stop the market has already traded through is not a level any more. */
@@ -5375,9 +5419,24 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .rd-meta{font-size:var(--t-1);color:var(--dim);white-space:nowrap;
   font-variant-numeric:tabular-nums}
 .rd-b{padding:0 16px 16px;border-top:1px solid var(--line)}
-/* The four figures that frame the study, before the prose starts. */
-.rd-f{display:flex;flex-wrap:wrap;gap:6px 8px;margin:12px 0 4px}
-.rd-f span{font-size:var(--t-1);color:var(--muted);background:var(--bg-2,transparent);
+/* ── SCOPED, BECAUSE .rd-f IS TWO COMPONENTS ──────────────────────────────
+ * The four figures that frame a weekly study, before the prose starts.
+ *
+ * It shared a class name with the RADAR's facts cell — a different component
+ * on a different route — and being later in the sheet at equal specificity it
+ * won. The radar's cells were computing margin:12px 0 4px, gap:6px 8px and
+ * flex-wrap:wrap from this rule, none of which the radar declares.
+ *
+ * Measured on a 430px render of three real rows: the facts strip was 301px of
+ * a 514px card. Fifty-nine per cent of that card was a block whose spacing
+ * came from another page's stylesheet, and every one of those rules looked
+ * deliberate.
+ *
+ * Scoped to its own parent rather than renamed: the markup here is a <div>
+ * inside .rd-b and the radar's is a <span> inside .rd-facts, so the parent is
+ * the honest discriminator and no renderer has to change. */
+.rd-b > .rd-f{display:flex;flex-wrap:wrap;gap:6px 8px;margin:12px 0 4px}
+.rd-b > .rd-f span{font-size:var(--t-1);color:var(--muted);background:var(--bg-2,transparent);
   border:1px solid var(--line);border-radius:999px;padding:3px 8px;
   font-variant-numeric:tabular-nums}
 .rd-a{max-width:66ch;margin:0 auto;font-size:var(--t1,15px);line-height:1.68}

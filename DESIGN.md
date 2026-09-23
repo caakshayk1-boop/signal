@@ -507,7 +507,67 @@ tiles with the prefix at the *end* of a long string literal, so a pattern
 anchored to the opening quote found nothing and reported nine live classes as
 dead. A ceiling that absorbs a detector bug is a ceiling that means nothing.
 
-## 14. How this file is kept true
+## 14. The references, and what was taken from each
+
+Named by the operator as the direction: **Koyfin** for information
+architecture, **TradingView** for trading interactions, **Linear** for premium
+polish, **Horizon** for terminal patterns — with the warning that matters more
+than any of them: *"it should feel expensive, not busy."*
+
+That is not in tension with §0 once the parts are separated. What was rejected
+there was the terminal's **argument** — density as a claim to coverage this
+book does not have. What is taken here is its **craft**.
+
+| from | taken | not taken |
+|---|---|---|
+| **Koyfin** | labelled, tight fact grids; a value and its label as one unit | custom dashboards, user-arranged layouts — this site has one opinion per page and that is the product |
+| **TradingView** | a range read as a position on a line before it is a number | chart-first architecture; the subject here is a record, not a chart |
+| **Linear** | decisive type hierarchy, restrained motion, one accent | the marketing-site gradients, the glow |
+| **Horizon** | terminal density where the reader is an operator | the Bloomberg costume |
+
+**Nothing gradient, glowing, glassy or animated was added.** The wow, such as
+it is, comes from hierarchy, from the fact grid getting tighter, and from one
+tick on a bar. A trading page that reaches for a gradient is a crypto template
+with a ledger attached.
+
+### Judged by rendering it, not by reading it
+
+Every route is client-rendered from an API, so none can be opened without one
+— which meant CSS was being changed blind and judged by reading the sheet.
+`scripts/gallery.mjs` extracts the **shipped** renderers out of `signal.js` and
+puts them on a page with the real stylesheet and real rows from a real
+screenshot. Two live defects were visible in the first render and in neither
+file:
+
+- **`.rd-f` was two components.** The `/reads` study figures and the radar's
+  facts cell shared a class name; later in the sheet at equal specificity, the
+  study won. The radar's cells were computing `margin:12px 0 4px`,
+  `gap:6px 8px` and `flex-wrap:wrap` from a rule written for another page —
+  **301px of a 514px card**, and every one of those rules looked deliberate.
+- **The hierarchy was inverted.** Measured in the browser: RSI **16px**, the
+  company symbol **14px**, the price **13px**. A supporting statistic set
+  larger than the thing it was about, which is why the card had no path
+  through it.
+
+The card is now **360px at 430px, from 514** — the same information, a third
+less page. The guard checks the hierarchy as an **order**, not as pixel
+values, so a restyle cannot quietly put a fact back on top of its subject.
+
+**A hard two-column cap was lifted, and not by guessing.** The cap existed
+because the 12px label's min-content width overflowed a 320px phone. The label
+is 10px now, but *"it should fit"* is the reasoning that produced the original
+overflow — so the cap was replaced with `minmax(min(96px,100%),1fr)`, which is
+a structural guarantee rather than a measurement: a track's minimum can never
+exceed its container whatever the font metrics do. Verified at 320 / 360 / 390
+/ 430 / 520 / 768, both themes: no overflow anywhere.
+
+**Open item, measured:** 43 class names carry more than one bare top-level
+rule. Most are a component refined twice, which is ordinary; `.rd-f` was two
+components colliding, which is not. A blanket rule would fail 43 legitimate
+cases to catch one, so it is recorded rather than ratcheted — the detector
+cannot yet tell the two apart, and a check that cries wolf gets switched off.
+
+## 15. How this file is kept true
 
 `test/guard.mjs` asserts, on every deploy:
 

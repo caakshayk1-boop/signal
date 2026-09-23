@@ -7,3 +7,6 @@ node_modules/
 # Scratch audit scripts from ad-hoc sessions. Not part of the build, not
 # reproducible, and not worth versioning — they are one-off probes.
 .audit/
+
+# The component workbench — scripts/gallery.mjs regenerates it. Never deployed.
+public/.gallery/

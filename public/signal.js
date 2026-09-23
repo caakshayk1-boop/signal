@@ -13852,8 +13852,19 @@
     const v = (r.vd && r.vd.c) || '';
     const [vcls, vlabel] = VERDICT_LOOK[v] || ['', 'Not rated'];
     const p = nd.parts;
+    /* ── A BAR WITH NOTHING TO READ IT AGAINST ──────────────────────────
+     * Four bars in one colour, each a length and nothing else. A reader can
+     * see that Institutional is shorter than Trend and cannot see whether
+     * either is pulling the score up or down, which is the only question the
+     * four are on the card to answer.
+     *
+     * The tick is the card's OWN composite, already printed two lines above,
+     * placed on each track. Nothing is computed here that is not already on
+     * the card, and no second colour is introduced — length stays the
+     * encoding, the tick is the reference. */
     const bar = (l, val) => `<span class="rd-p"><em>${esc(l)}</em>
-      <i><b style="width:${val == null ? 0 : Math.round(val)}%"></b></i>
+      <i style="--at:${Math.max(0, Math.min(100, Number(nd.score) || 0))}%"
+         ><b style="width:${val == null ? 0 : Math.round(val)}%"></b></i>
       <u>${val == null ? '—' : Math.round(val)}</u></span>`;
     return `<article class="rd-row" data-rsym="${esc(r.sym)}" role="button" tabindex="0">
       <span class="rd-rank">${i + 1}</span>
@@ -13867,7 +13878,7 @@
           * know the same site scores the same name 39.6 on quality, growth and
           * valuation. The number is unchanged; it now says what it is of. */''}
       <span class="rd-sc" title="Trend, momentum, volume and institutional flow, each normalised to 0-100 and averaged. This is a score of the MOVE, not of the business — the screen's fundamental composite (quality, growth, valuation, technical) is a separate number on the stock's own page."><b>${nd.score}</b><em>${esc(strengthWord(nd.score))}</em></span>
-      <span class="rd-parts">${bar('Trend', p.trend)}${bar('Momentum', p.momentum)}${bar('Volume', p.volume)}${bar('Institutional', p.institutional)}</span>
+      <span class="rd-parts" title="Each component normalised to 0-100. The tick on every bar is this name's own composite score, so a bar reaching past it is carrying the score and one falling short is holding it back.">${bar('Trend', p.trend)}${bar('Momentum', p.momentum)}${bar('Volume', p.volume)}${bar('Institutional', p.institutional)}</span>
       ${/* ── THE NUMBERS THE FOUR BARS DO NOT CARRY ────────────────────────
           * Trend/Momentum/Volume/Institutional are the SCORE's components —
           * each normalised to 0-100 and therefore stripped of its own unit.

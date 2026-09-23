@@ -1967,6 +1967,64 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   }
 }
 
+/* ── THE RADAR CARD, AFTER IT WAS ACTUALLY LOOKED AT ────────────────────────
+ *
+ * scripts/gallery.mjs renders the shipped renderers against the shipped
+ * stylesheet. Two defects that had been live were visible in the first
+ * screenshot and in neither the CSS nor the JS.
+ */
+{
+  /* 1. .rd-f WAS TWO COMPONENTS. The /reads study figures and the radar's
+   *    facts cell shared a class name; the study rule is later in the sheet
+   *    at equal specificity, so it won. The radar's cells computed
+   *    margin:12px 0 4px, gap:6px 8px and flex-wrap:wrap from a rule written
+   *    for another page — 301px of a 514px card at 430px.
+   *
+   *    Scoped to its own parent rather than renamed: the study's markup is a
+   *    <div> inside .rd-b, the radar's a <span> inside .rd-facts. */
+  ok("the study's figures are scoped to their own block",
+     /\.rd-b > \.rd-f\{/.test(CSS));
+  ok("...and no bare .rd-f rule can reach the radar again",
+     !/(?:^|\})\s*\.rd-f\s*\{[^}]*margin:12px/m.test(CSS.replace(/\/\*[\s\S]*?\*\//g, "")));
+  ok("the two really are different components",
+     /class="rd-f"/.test(JS) && /<div class="rd-f">/.test(JS));
+
+  /* 2. THE HIERARCHY WAS INVERTED. Measured in the browser: RSI 16px, symbol
+   *    14px, price 13px — a supporting statistic set larger than the company
+   *    it described, so the eye had no path through the card.
+   *
+   *    Checked as an ORDER, not as pixel values, so restyling the card cannot
+   *    quietly put a fact back on top of its own subject. */
+  {
+    const STEP = {};
+    for (const m of CSS.matchAll(/--t-(\d+):(\d+)px/g)) STEP["--t-" + m[1]] = Number(m[2]);
+    ok("the type scale can be read", Object.keys(STEP).length >= 10, Object.keys(STEP).length);
+    const sizeOf = (sel) => {
+      const re = new RegExp(`\\${sel}\\{[^}]*?(?:font|font-size):[^;}]*?var\\((--t-\\d+)\\)`);
+      const m = CSS.match(re);
+      return m ? STEP[m[1]] : null;
+    };
+    const sym = sizeOf(".rd-id b"), fact = sizeOf(".rd-f b"), px = sizeOf(".rd-px");
+    ok("all three sizes resolve", sym && fact && px, { sym, fact, px });
+    ok("the company name is bigger than a statistic about it", sym > fact, { sym, fact });
+    ok("...and the price is not the smallest of the three", px >= fact, { px, fact });
+  }
+
+  /* 3. FOUR BARS IN ONE COLOUR AND NOTHING TO READ THEM AGAINST. A reader
+   *    could see Institutional was shorter than Trend and not whether either
+   *    was pulling the score up or down — the only question the four are on
+   *    the card to answer. The tick is the card's OWN composite, already
+   *    printed two lines above; no second colour, no new computation. */
+  ok("each component bar carries the composite as a reference",
+     /\.rd-p i::after\{[^}]*left:var\(--at/.test(CSS.replace(/\s*\n\s*/g, "")));
+  ok("...positioned from the score the card already shows",
+     /--at:\$\{Math\.max\(0, Math\.min\(100, Number\(nd\.score\)/.test(JS));
+  ok("...and the track no longer clips it", !/\.rd-p i\{[^}]*overflow:hidden/.test(CSS));
+  /* A tick with no explanation is decoration. */
+  ok("the bars say what the tick is",
+     /class="rd-parts" title="[^"]*composite score/.test(JS));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);
