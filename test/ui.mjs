@@ -671,7 +671,9 @@ try {
    * measurement path would look like. */
   const freshTxt = (await p.locator("#freshTxt").innerText()).trim();
   ok("the freshness chip reports a measurement",
-     /\d+\/\d+ current/.test(freshTxt) || /\d+\s*(h|d)\b/.test(freshTxt));
+     /\d+ of \d+ feeds current/.test(freshTxt) || /\d+\s*(h|d)\b/.test(freshTxt));
+  /* "8/8 current" was a fraction with no noun (AUDIT-PHASE0 #15). */
+  ok("the freshness chip says what it counts", !/^\d+\/\d+ current$/.test(freshTxt), freshTxt);
   ok("the freshness chip is never blank", freshTxt.length > 0 && freshTxt !== "—");
   // Empty on Today on purpose — a breadcrumb reading "Today" on Today is noise.
   ok("the contextual label is empty on Today",
@@ -2478,7 +2480,10 @@ try {
     panels: [...document.querySelectorAll(".pn .ph h2")].map((h) => h.textContent.trim()),
     leaders: document.querySelectorAll("#oLead .lst li").length,
     leadersEmpty: !!document.querySelector("#oLead .st"),
-    signalLinks: [...document.querySelectorAll("a[href]")].map((a) => a.href).filter((h) => /signal\.askakshay|gems\.askakshay/.test(h)),
+    /* The ATTRIBUTE, not a.href. This suite serves vision at SIGNAL_URL/vision,
+       so every in-app "#/markets" RESOLVES to signal.askakshay.com and the
+       first version of this check failed deploy 216 on Vision's own links. */
+    signalLinks: [...document.querySelectorAll("a[href]")].map((a) => a.getAttribute("href")).filter((h) => /signal\.askakshay|gems\.askakshay/.test(h)),
     tiles: document.querySelectorAll("#oHeat .hm-t").length,
     ticker: document.querySelectorAll("#tickIn .tk").length,
     badges: [...document.querySelectorAll(".fb")].map((b) => b.textContent.trim()),

@@ -2025,6 +2025,45 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      /class="rd-parts" title="[^"]*composite score/.test(JS));
 }
 
+/* ── PHASE 0 FINDINGS, PINNED (AUDIT-PHASE0.md) ───────────────────────────
+ * Each of these shipped to production once. The checks keep them fixed. */
+{
+  const { extract } = await import("../scripts/verbatim.mjs");
+  const CSSs = readFileSync("public/signal.css", "utf8");
+  const HTMLs = readFileSync("public/index.html", "utf8");
+  /* 1. The empty book. recordOf returned before building `bucket`, and the
+        front page printed "undefined" four times until the first close. Run
+        it, don't pattern-match it. */
+  const code = ["isScored", "withdrawn", "tStat", "lgamma", "betacf", "betai", "tPValue", "recordOf"]
+    .map((n) => extract(JS, n)).join("\n");
+  const recordOf = new Function(code + "; return recordOf;")();
+  const empty = recordOf([{ status: "OPEN", badge: "open" }, { status: "EXPIRED" }]);
+  ok("recordOf returns buckets for a book with nothing closed",
+     empty.bucket && empty.bucket.open === 1 && empty.bucket.expired === 1 && empty.bucket.closed === 0, empty.bucket);
+  const some = recordOf([{ r_multiple: -1, badge: "loss" }, { status: "OPEN" }]);
+  ok("...and still for a book with closes", some.bucket && some.bucket.closed === 1 && some.bucket.open === 1, some.bucket);
+  ok("the Integrity block asserts its sum rather than leaving it to the reader",
+     /const ok = sum === LR\.published;/.test(JS) && /These do not sum to/.test(JS));
+  ok("the tile's open count is the bucket's, not a second definition", /LR\.open = LR\.bucket\.open;/.test(JS));
+
+  /* 2. One barometer. The front page computed its own from weekly breadth. */
+  ok("the front page leads with the published barometer.json",
+     /const HB = BPt \?/.test(JS) && /get\('\/barometer\.json'\)/.test(JS));
+  ok("weekly breadth is never labelled as today's", !/'Advancing today'/.test(JS));
+  ok("wins and losses are not printed as advancing and declining", /u: 'won', f: 'still open', d: 'lost'/.test(JS));
+
+  /* 3. The clock: IST, the session, per minute. */
+  ok("no per-second clock", !/setInterval\(tickClock, 1000\)/.test(JS));
+  ok("no MYT clock in the header", !/timeZone: 'Asia\/Kuala_Lumpur', hour: '2-digit', minute: '2-digit', second/.test(JS));
+
+  /* 4. Phones: no Command key, one-line disclaimer that needs no JS, still ticker. */
+  ok("the ⌘K hint is hidden on a phone, the word is not",
+     /@media\(max-width:900px\)\{\.cmdk kbd\{display:none\}/.test(CSSs) && !/\.cmdk \.cmdk-l\{display:none\}/.test(CSSs));
+  ok("the disclaimer collapses to one line on a phone, in static HTML",
+     /<details class="dscl-m">/.test(HTMLs) && /Not registered with SEBI/.test(HTMLs.split('<details class="dscl-m">')[1] || ""));
+  ok("the ticker does not scroll itself on a touch screen", /@media \(hover:none\)\{\s*\.tkr-t\{animation:none\}/.test(CSSs));
+}
+
 /* ── VISION: ONE MOVE SCORE, AND NO SIGNALS ─────────────────────────────────
  * vision.askakshay.com carries a COPY of the move score so it need not load a
  * 500 KB bundle. A copy is only acceptable if it cannot drift — one name with

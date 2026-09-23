@@ -712,7 +712,7 @@
           foot: 'Ranked by how strongly each name is moving — trend, momentum, volume and institutional holding — with liquidity and coverage as tie-breaks. Names under ₹5 cr a day are left out. A description of the move, not a call to trade.' })}
       </div>
       <div style="height:var(--s-4)"></div>
-      ${panel('Market heatmap', `<div class="hm" id="oHeat">${skel(0, 340)}</div><div id="oSect" style="margin-top:var(--s-3)"></div>`,
+      ${panel('Market heatmap', `<div class="hm" id="oHeat" style="height:${innerWidth < 760 ? 300 : 360}px"></div><div id="oSect" style="margin-top:var(--s-3)"></div>`,
         { fb: 'Screen', more: '#/heatmap', moreText: 'Full heatmap', right: heatLegend('r1d') + ' ', foot: 'Top 150 names by turnover, grouped by sector. Size is turnover; colour is the last session\'s move. Click a tile for the name.' })}
       <div style="height:var(--s-4)"></div>
       <div class="grid g-2">
