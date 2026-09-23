@@ -2064,6 +2064,20 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("the ticker does not scroll itself on a touch screen", /@media \(hover:none\)\{\s*\.tkr-t\{animation:none\}/.test(CSSs));
 }
 
+/* ── WHY THIS SIGNAL? ──────────────────────────────────────────────────────
+ * The card printed the engine's standing rule, unlabelled, where a reader
+ * looks for the reason behind one trade. The panel keeps the kinds apart. */
+{
+  ok("the ledger card no longer prints raw remarks as if they were this trade's reason",
+     !/\$\{r\.remarks \? `<div class="card-body">/.test(JS));
+  ok("measured reasons and the engine's rule are separate, labelled layers",
+     /ek-r">Measured</.test(JS) && /ek-m">Rule</.test(JS) && /Describes every trade this engine files/.test(JS));
+  ok("an engine that files only zeros is shown as unscored, not rated 0",
+     /out\[k\] = !real\.length \? 'none'/.test(JS) && /does not score its signals/.test(JS));
+  ok("the trust gate is drawn against 30 closed and t 2", /n \/ 30 \* 100/.test(JS) && /t ≥ 2/.test(JS));
+  ok("the screen's reading is labelled as the screen's, not the engine's", /not from the engine that filed this/.test(JS));
+}
+
 /* ── VISION: ONE MOVE SCORE, AND NO SIGNALS ─────────────────────────────────
  * vision.askakshay.com carries a COPY of the move score so it need not load a
  * 500 KB bundle. A copy is only acceptable if it cannot drift — one name with

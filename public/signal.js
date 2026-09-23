@@ -8078,6 +8078,87 @@
   /* The screen row behind a ledger symbol. The ledger writes NIACL.NS and the
    * screen keys on NIACL, which is why this goes through bareSym rather than
    * matching the string it was given. */
+  /* ── WHY THIS SIGNAL? ─────────────────────────────────────────────────
+   * The card printed the engine's `remarks` — a standing rule that describes
+   * EVERY trade the engine files — with no label, in the spot where a reader
+   * looks for the reason behind THIS one. The pipeline keeps those two apart
+   * on purpose (engine_names.why_lines vs engine_rule) so a generic rule can
+   * never be printed under a heading that claims it describes one trade. The
+   * card did exactly that.
+   *
+   * So the panel answers in layers, each labelled with what kind of claim it
+   * is: what was MEASURED at filing (metadata.why, only the engines that write
+   * it), the engine's standing RULE, what INVALIDATES it, the engine's RECORD
+   * against the book's own trust gate (30 closed and t ≥ 2), the engine's
+   * SCORE with its scale stated, and how the name reads on the SCREEN today —
+   * which is the screen's view, not the engine's, and says so.
+   *
+   * A <details>, so it costs no vertical space until asked for and needs no
+   * state: a card list re-rendered on every filter change keeps nothing. */
+  const SCORE_SCALE = (rows) => {
+    const by = {};
+    for (const r of rows || []) {
+      const v = r.score == null || r.score === '' ? null : Number(r.score);
+      (by[r.signal_type] = by[r.signal_type] || []).push(Number.isFinite(v) ? v : null);
+    }
+    const out = {};
+    for (const [k, vs] of Object.entries(by)) {
+      const real = vs.filter(v => v != null && v !== 0);
+      /* LEDGE, BREACH and KEEL file 0 on every row: a placeholder, not a
+         rating. VECTOR files a statistic near 3: its own scale, not 0–100. */
+      out[k] = !real.length ? 'none' : Math.max(...real) < 10 ? 'own' : 'pct';
+    }
+    return out;
+  };
+  const gateStrip = (rec) => {
+    const n = rec ? rec.trades : 0, t = rec ? rec.t : null;
+    const nPct = Math.min(100, n / 30 * 100);
+    return `<div class="gate" role="img" aria-label="${n} of 30 closed trades needed; t ${t == null ? 'not measurable' : t} against 2">
+      <div class="gate-r"><span class="gate-k">Sample</span><span class="gate-b"><i style="width:${nPct.toFixed(1)}%"></i><em style="left:100%"></em></span><span class="gate-v">${n} / 30</span></div>
+      <div class="gate-r"><span class="gate-k">t</span><span class="gate-b gate-t">${t == null ? '' : `<i class="${t < 0 ? 'neg' : ''}" style="left:${(Math.max(-4, Math.min(4, t)) + 4) / 8 * 100}%"></i>`}<em style="left:75%"></em><em class="z" style="left:50%"></em></span><span class="gate-v">${t == null ? '—' : t}</span></div>
+    </div>`;
+  };
+  const whyPanel = (r, ctx) => {
+    const k = r.signal_type, eng = ENGINE_BOOK.get(k) || {}, md = (r.metadata && typeof r.metadata === 'object') ? r.metadata : {};
+    const why = Array.isArray(md.why) ? md.why.filter(Boolean) : (md.why ? [String(md.why)] : []);
+    const open = (r.badge || '').toLowerCase() === 'open';
+    const rec = ctx && ctx.rec ? ctx.rec[k] : null;
+    const sc = (ctx && ctx.scale && ctx.scale[k]) || 'none';
+    const v = r.score == null || r.score === '' ? null : Number(r.score);
+    const scoreTxt = sc === 'none' || !Number.isFinite(v) ? `${esc(engName(k))} does not score its signals`
+      : sc === 'own' ? `${v.toFixed(2)} — ${esc(engName(k))}'s own statistic, not on a 0–100 scale`
+      : `${Math.round(v)} / 100 — ${esc(engName(k))}'s own rating at filing, not a probability`;
+    const sent = r.sent_at ? new Date(r.sent_at) : null;
+    const when = sent && Number.isFinite(sent.getTime())
+      ? sent.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) + ' IST'
+      : esc(String(r.alert_date || r.date || '').slice(0, 10));
+    const sr = screenRow(r.symbol);
+    const parts = sr ? radarParts(sr) : null;
+    const PW = { trend: 'Trend', momentum: 'Momentum', volume: 'Volume', institutional: 'Institutional' };
+    const bars = parts ? Object.keys(PW).map(p => {
+      const x = parts[p];
+      return `<div class="why-f"><span>${PW[p]}</span><span class="why-fb${x == null ? ' na' : ''}"><i style="width:${x == null ? 0 : Math.round(x)}%"></i></span><b>${x == null ? 'not measured' : Math.round(x)}</b></div>`;
+    }).join('') : '';
+    const ms = parts ? radarScore(parts) : null;
+    return `<details class="why">
+      <summary><span class="why-q">Why this signal?</span><span class="why-s">${esc(engName(k))} · ${when}${rec ? ` · ${rec.trades} closed` : ''}</span></summary>
+      <div class="why-b">
+        <div class="why-sec"><h4><i class="ek ek-r">Measured</i> On the bar that fired</h4>${why.length
+          ? `<ul>${why.map(w => `<li>${esc(w)}</li>`).join('')}</ul>`
+          : `<p>${esc(engName(k))} does not record per-trade reasons, so nothing here describes this trade on its own.</p>`}</div>
+        ${eng.hunts ? `<div class="why-sec"><h4><i class="ek ek-m">Rule</i> What ${esc(engName(k))} looks for</h4><p>${esc(eng.hunts)}</p><p class="why-n">Describes every trade this engine files — not a reason specific to ${esc(bareSym(r.symbol))}.</p></div>` : ''}
+        ${open && md.invalidate ? `<div class="why-sec"><h4><i class="ek ek-f">Exit</i> Invalidated by</h4><p>${esc(md.invalidate)}</p></div>` : ''}
+        <div class="why-sec"><h4><i class="ek ek-res">Record</i> ${esc(engName(k))} in this book</h4>${rec && rec.trades
+          ? `<p>${rec.trades} closed · ${rec.win_rate}% won · ${rec.expectancy_r > 0 ? '+' : ''}${rec.expectancy_r}R a trade${rec.ci ? ` · 95% interval ${fmtR(rec.ci[0])} to ${fmtR(rec.ci[1])}` : ''}.</p>`
+          : `<p>No closed trade since ${esc(LAUNCH)} — nothing to report, which is itself the answer.</p>`}
+          ${gateStrip(rec)}<p class="why-n">The book trusts an engine at 30 closed trades and t ≥ 2. ${(rec && rec.trades >= 30 && rec.t >= 2) ? `${esc(engName(k))} has cleared it.` : `${esc(engName(k))} has not.`}</p></div>
+        <div class="why-sec"><h4><i class="ek ek-m">Score</i> Engine score</h4><p>${scoreTxt}.</p></div>
+        ${parts ? `<div class="why-sec"><h4><i class="ek ek-v">Screen</i> How the name reads today</h4>${bars}
+          <p class="why-n">Move score ${ms == null ? 'not scored' : ms} — from the daily screen, not from the engine that filed this. Missing components are left out, never scored zero.</p></div>` : ''}
+        <p class="why-l"><a class="why-a" href="/engines">How ${esc(engName(k))} works →</a><a class="why-a" href="/methodology">How this is measured →</a></p>
+      </div></details>`;
+  };
+
   const screenRow = (sym) => {
     if (!SCREEN) return null;
     const k = bareSym(sym);
@@ -8743,6 +8824,10 @@
     const wins = all.filter(r => (r.badge || '').toLowerCase() === 'win').length;
     const losses = all.filter(r => (r.badge || '').toLowerCase() === 'loss').length;
     const opens = all.filter(isOpen);
+    /* The Why panel's context, computed once per load: each engine's record
+       over THIS page's population, and each engine's score scale. */
+    const WHYCTX = { rec: {}, scale: SCORE_SCALE(every) };
+    for (const k of new Set(all.map(r => r.signal_type))) WHYCTX.rec[k] = recordOf(all.filter(r => r.signal_type === k));
 
     /* Which names are open under more than one engine. Built from the open
        rows of THIS page's population, so the note can never point at a row the
@@ -8872,7 +8957,7 @@
           ${open ? `<a class="brief-link" href="/brief" data-brief="${esc(r.symbol)}">Full brief →</a>` : ''}
           ${symLinks(r.symbol, r.tv)}
         </div>
-        ${r.remarks ? `<div class="card-body">${esc(engineWords(String(r.remarks).slice(0, 180)))}</div>` : ''}
+        ${whyPanel(r, WHYCTX)}
         ${/* WHAT IS ABOVE AND BELOW THE ENTRY.
             * The row carried entry, stop, targets and R:R and stopped there,
             * so nothing on it said where the year's range or the moving

@@ -6219,3 +6219,48 @@ h1, .sec-lead { letter-spacing: var(--ls-tight); }
 .integ-m dt{color:var(--dim);min-width:74px}
 .integ-m dd{margin:0;color:var(--muted)}
 .integ-a{font-size:var(--t-3)}
+
+/* ── WHY THIS SIGNAL? ─────────────────────────────────────────────────────────
+ * One panel per card, closed until asked. Each layer carries a chip naming
+ * WHAT KIND of claim it is — measured on the bar, the engine's rule, the
+ * record, the screen's view — so a standing rule can never be read as a
+ * reason for this one trade. Chips differ in text first and tint second. */
+.why{margin-top:var(--s-3);border-top:1px solid var(--line)}
+.why summary{display:flex;align-items:baseline;gap:var(--s-2);flex-wrap:wrap;cursor:pointer;list-style:none;
+  padding:var(--s-3) 0;min-height:44px}
+.why summary::-webkit-details-marker{display:none}
+.why summary::before{content:'+';font:500 var(--t-5)/1 var(--mono);color:var(--accent);width:12px}
+.why[open] summary::before{content:'−'}
+.why-q{font-weight:650;font-size:var(--t-4);color:var(--text)}
+.why-s{font:400 var(--t-2)/1.3 var(--mono);color:var(--dim)}
+.why-b{padding:0 0 var(--s-3);display:flex;flex-direction:column;gap:var(--s-3)}
+.why-sec h4{margin:0 0 var(--s-1);font-size:var(--t-3);font-weight:600;color:var(--muted);display:flex;align-items:center;gap:var(--s-2)}
+.why-sec p{margin:0;font-size:var(--t-4);line-height:1.5;color:var(--text)}
+.why-sec ul{margin:0;padding-left:var(--s-4);font-size:var(--t-4);line-height:1.5}
+.why-n{color:var(--dim)!important;font-size:var(--t-3)!important;margin-top:var(--s-1)!important}
+.ek{font-style:normal;font:600 var(--t-1)/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 6px;border-radius:var(--r-1);border:1px solid var(--line2)}
+.ek-r{color:var(--up);border-color:currentColor}
+.ek-m{color:var(--accent);border-color:currentColor}
+.ek-f{color:var(--down);border-color:currentColor}
+.ek-res{color:var(--text)}
+.ek-v{color:var(--muted)}
+.why-f{display:grid;grid-template-columns:92px minmax(0,1fr) 88px;gap:var(--s-2);align-items:center;font-size:var(--t-3);margin:3px 0}
+.why-f b{font:500 var(--t-3)/1 var(--mono);text-align:right;color:var(--muted)}
+.why-fb{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.why-fb i{display:block;height:100%;background:var(--accent)}
+.why-fb.na{background:repeating-linear-gradient(135deg,var(--line) 0 3px,transparent 3px 6px)}
+.why-a{font-size:var(--t-3)}
+.why-l{display:flex;flex-wrap:wrap;gap:var(--s-1) var(--s-4);margin:0}
+/* The trust gate, drawn: how far the sample is from 30, and where t sits
+   against 2 — one glance instead of the sentence it replaces. */
+.gate{display:flex;flex-direction:column;gap:6px;margin-top:var(--s-2)}
+.gate-r{display:grid;grid-template-columns:56px minmax(0,1fr) 56px;gap:var(--s-2);align-items:center;font-size:var(--t-3)}
+.gate-k{color:var(--dim)}
+.gate-v{font:500 var(--t-3)/1 var(--mono);text-align:right}
+.gate-b{position:relative;height:8px;border-radius:4px;background:var(--line)}
+.gate-b > i{position:absolute;top:0;bottom:0;left:0;border-radius:4px;background:var(--accent)}
+.gate-t > i{width:3px;left:auto;top:-3px;bottom:-3px;transform:translateX(-50%);background:var(--up)}
+.gate-t > i.neg{background:var(--down)}
+.gate-b > em{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--text);transform:translateX(-50%)}
+.gate-b > em.z{background:var(--dim);width:1px}
