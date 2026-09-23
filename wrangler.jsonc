@@ -107,7 +107,10 @@
   // one is what makes it conflict.
   "routes": [
     { "pattern": "signal.askakshay.com", "custom_domain": true },
-    { "pattern": "gems.askakshay.com",   "custom_domain": true }
+    { "pattern": "gems.askakshay.com",   "custom_domain": true },
+    // The cockpit — same Worker, same feeds, a third arrangement. See the
+    // THREE PRODUCTS note in src/index.js.
+    { "pattern": "vision.askakshay.com", "custom_domain": true }
   ],
 
   // Declaring a route turns workers.dev OFF by default. Kept ON deliberately:

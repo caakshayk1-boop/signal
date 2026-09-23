@@ -27,7 +27,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 
-const SHELLS = ["public/index.html", "public/gems.html"];
+const SHELLS = ["public/index.html", "public/gems.html", "public/vision.html"];
 
 export function inlineHashes() {
   const out = new Set();

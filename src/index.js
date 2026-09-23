@@ -391,6 +391,25 @@ export default {
      * which is the worst combination, because it cannot be tested before it
      * ships. The header is what the client actually asked for, in both. */
     const host = (request.headers.get("host") || url.hostname || "").toLowerCase();
+    /* ── THREE PRODUCTS, ONE WORKER ───────────────────────────────────────
+     * vision.askakshay.com is the cockpit: the same ledger and feeds arranged
+     * for scanning, in one hash-routed shell (public/vision.html). Its routes
+     * are fragments, so the server has exactly one page to answer for. A PAGE
+     * path on the vision host — /signals, /stock/X, a link pasted across from
+     * signal.askakshay.com — is sent to that shell's root rather than served
+     * the other product's index under this product's name. Files and /api
+     * fall through untouched: they are shared, which is the point. */
+    if (host.startsWith("vision.")) {
+      const vp = url.pathname.replace(/\/+$/, "") || "/";
+      if (vp === "/") {
+        const v = new URL(request.url);
+        v.pathname = "/vision";     // extensionless, as for gems: /vision.html 307s here
+        return env.ASSETS.fetch(new Request(v.toString(), request));
+      }
+      if (!/\.[a-z0-9]+$/i.test(vp) && !vp.startsWith("/api/")) {
+        return Response.redirect(new URL("/", request.url).toString(), 302);
+      }
+    }
     if (host.startsWith("gems.") && url.pathname === "/") {
       const gems = new URL(request.url);
       // Extensionless: the assets binding 307s /gems.html -> /gems, and a
@@ -428,7 +447,11 @@ export default {
       "/discover", "/engines", "/funds",
       "/gems", "/heat", "/ideas", "/ipo", "/join", "/map", "/markets",
       "/methodology", "/news", "/privacy", "/radar", "/reads", "/screen",
-      "/signals", "/sources", "/terms", "/watch", "/buoy", "/research"]);
+      "/signals", "/sources", "/terms", "/watch", "/buoy", "/research",
+      /* The cockpit's shell, reachable on signal.askakshay.com/vision for a
+         check before the vision host resolves — and for the post-deploy suite,
+         which runs against SIGNAL_URL. */
+      "/vision"]);
     const p = url.pathname.replace(/\/+$/, "") || "/";
     const isPage = PAGES.has(p) || p.startsWith("/stock/");
     // A request for a real file (/signal.js, /screen.json, /fonts/...) has an
