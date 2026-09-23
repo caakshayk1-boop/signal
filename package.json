@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Indian markets in one screen — a live board and a trading signal brief, over a public ledger.",
+  "description": "Indian markets in one screen \u2014 a live board and a trading signal brief, over a public ledger.",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "node scripts/pull-feeds.mjs && node scripts/prerender.mjs && node scripts/csp-hashes.mjs && node scripts/stamp-build.mjs && node test/guard.mjs && node scripts/minify.mjs -- npx wrangler deploy",
@@ -13,7 +13,9 @@
     "set-domain": "node scripts/set-domain.mjs",
     "go-live": "bash scripts/go-live.sh",
     "stamp": "node scripts/stamp-build.mjs",
-    "pull": "node scripts/pull-feeds.mjs"
+    "pull": "node scripts/pull-feeds.mjs",
+    "vision:dev": "node scripts/vision-dev.mjs",
+    "verbatim": "node scripts/verbatim.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.15.7"

@@ -2450,6 +2450,63 @@ try {
   });
   ok("the active jump chip stays in view", gChip.found && gChip.visible, gChip);
   await gCtx.close();
+
+  /* ── VISION ──────────────────────────────────────────────────────────────
+   * The cockpit, served at /vision here; the Worker maps vision.askakshay.com/
+   * to the same shell. Checked against production like gems, because the
+   * failures worth catching — a CSP that blocks its boot script, a feed shape
+   * that changed under it — only exist on the deployed site. */
+  const vCtx = await newCtx({ viewport: { width: 1440, height: 900 } });
+  const v = await vCtx.newPage();
+  const vErr = [];
+  v.on("pageerror", (e) => vErr.push(e.message));
+  v.on("console", (m) => { if (m.type() === "error" && /Content Security Policy|Refused/.test(m.text())) vErr.push(m.text()); });
+  await v.goto(SITE + "/vision", { waitUntil: "domcontentloaded" });
+  await settled(v, SETTLE + 4000);
+  const vInfo = await v.evaluate(() => ({
+    theme: document.documentElement.getAttribute("data-theme"),
+    panels: [...document.querySelectorAll(".pn .ph h2")].map((h) => h.textContent.trim()),
+    radar: document.querySelectorAll("#oRadar .sig").length,
+    radarEmpty: !!document.querySelector("#oRadar .st"),
+    tiles: document.querySelectorAll("#oHeat .hm-t").length,
+    ticker: document.querySelectorAll("#tickIn .tk").length,
+    badges: [...document.querySelectorAll(".fb")].map((b) => b.textContent.trim()),
+    text: document.body.innerText,
+  }));
+  ok("vision boots with no page error or CSP refusal", vErr.length === 0, vErr.slice(0, 3));
+  ok("vision opens dark", vInfo.theme === "dark", vInfo.theme);
+  ok("vision paints its cockpit panels",
+     ["Market pulse", "Signal radar", "Market heatmap", "Top movers", "Market intelligence", "Watchlist"]
+       .every((t) => vInfo.panels.some((p) => p.toLowerCase() === t.toLowerCase())), vInfo.panels);
+  ok("the radar shows open signals, or says there are none", vInfo.radar > 0 || vInfo.radarEmpty, vInfo);
+  ok("the heatmap drew tiles", vInfo.tiles >= 50, vInfo.tiles);
+  ok("the ticker strip rendered", vInfo.ticker >= 6, vInfo.ticker);
+  ok("no freshness badge is stuck on 'loading'", !vInfo.badges.includes("loading"), vInfo.badges);
+  ok("vision prints no NaN, undefined or null", !/\bNaN\b|\bundefined\b|\bnull\b/.test(vInfo.text), (vInfo.text.match(/.{0,30}(NaN|undefined).{0,30}/) || [""])[0]);
+  /* Engines that do not score must not print a zero as though they rated it. */
+  ok("no ledger score renders as a bare 0", !(await v.$$eval("#oRadar .sig-sc", (els) => els.some((e) => e.textContent.trim() === "0"))));
+
+  for (const [hash, sel] of [["#/signals", "#sBody"], ["#/record", "#rBody"], ["#/screener", "#cBody"], ["#/heatmap", "#hMap"]]) {
+    await v.evaluate((h) => { location.hash = h; }, hash);
+    await settled(v, SETTLE + 3000);
+    const st = await v.evaluate((s2) => { const el = document.querySelector(s2); return el ? { sk: !!el.querySelector(".sk"), txt: el.innerText.slice(0, 80) } : null; }, sel);
+    ok(`vision ${hash} finished loading`, st && !st.sk, st);
+  }
+  await v.keyboard.press("Control+k");
+  await v.waitForTimeout(400);
+  ok("⌘K opens the search palette", await v.$("#layer .pal") !== null);
+  await v.keyboard.type("RELI");
+  await v.waitForTimeout(1500);
+  ok("...and finds a symbol", (await v.$$("#palL [data-i]")).length > 0);
+  await v.keyboard.press("Escape");
+
+  await v.setViewportSize({ width: 390, height: 844 });
+  await v.evaluate(() => { location.hash = "#/"; });
+  await settled(v, SETTLE + 2000);
+  const vScroll = await v.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  ok("vision does not scroll sideways on a phone", vScroll <= 0, vScroll);
+  ok("vision shows bottom tabs on a phone", await v.evaluate(() => getComputedStyle(document.getElementById("tabs")).display !== "none"));
+  await vCtx.close();
 } finally {
   await browser.close();
 }

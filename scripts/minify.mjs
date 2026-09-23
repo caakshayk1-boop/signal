@@ -60,6 +60,8 @@ const TARGETS = [
   ["public/heatcore.js", "js"],
   ["public/gems.js", "js"],
   ["public/brief_fundamentals.js", "js"],
+  ["public/vision.js", "js"],
+  ["public/vision.css", "css"],
 ];
 
 const kb = (n) => (n / 1024).toFixed(0).padStart(4);

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vision — your market cockpit</title>
+<meta name="description" content="Market state, the open signals and why they fired, a heatmap of the NSE screen and every name on it — one cockpit over the same public ledger as signal.askakshay.com.">
+<!-- noindex until the product has earned a canonical of its own. It carries
+     the same data as signal.askakshay.com, and two indexed pages saying the
+     same thing is a duplicate-content penalty on both. -->
+<meta name="robots" content="noindex,follow">
+<meta name="theme-color" content="#07090D">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="/icon.svg">
+<link rel="preload" href="/fonts/PlusJakarta-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/JetBrainsMono-500-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/vision.css">
+<script>
+/* Theme before first paint. DARK IS THE DEFAULT here — a cockpit is read on a
+   dark ground — and the key is vision's own, so choosing light on
+   signal.askakshay.com does not flip this product. */
+(function(){try{
+  var c=localStorage.getItem('vis:theme');
+  if(c!=='dark'&&c!=='light') c='dark';
+  document.documentElement.setAttribute('data-theme',c);
+}catch(e){}})();
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<aside class="dscl" role="note"><b>Research and market data, published for education.</b>
+  Not registered with SEBI as a Research Analyst or Investment Adviser. Nothing here is a recommendation to buy or sell.
+  <a href="https://signal.askakshay.com/disclaimer">Disclaimer</a></aside>
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#/" aria-label="Vision — overview"><i></i>VISION<em>.AKSHAY</em></a>
+    <nav class="nav" id="nav" aria-label="Primary"></nav>
+    <div class="top-r">
+      <button class="kbtn" id="kOpen" type="button" aria-label="Search symbols and pages">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span class="lbl">Search symbol, page…</span><kbd>⌘K</kbd></button>
+      <a class="ibtn" href="#/alerts" id="aBtn" aria-label="Alerts">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></a>
+      <button class="ibtn" id="thBtn" type="button" aria-label="Switch theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    </div>
+  </div>
+</header>
+<div class="tick" id="tick" role="region" aria-label="Live market ticker"><div class="tick-in" id="tickIn"></div></div>
+
+<div id="live" class="vh" role="status" aria-live="polite" aria-atomic="true"></div>
+<main id="main" tabindex="-1"></main>
+
+<nav class="tabs" id="tabs" aria-label="Sections"></nav>
+<div id="layer"></div>
+<noscript><p style="padding:24px">Vision needs JavaScript. The same data is readable without it on
+  <a href="https://signal.askakshay.com/">signal.askakshay.com</a>.</p></noscript>
+<script src="/engines.js"></script>
+<script src="/vision.js"></script>
+</body>
+</html>
