@@ -2507,6 +2507,36 @@ try {
     const st = await v.evaluate((s2) => { const el = document.querySelector(s2); return el ? { sk: !!el.querySelector(".sk"), txt: el.innerText.slice(0, 80) } : null; }, sel);
     ok(`vision ${hash} finished loading`, st && !st.sk, st);
   }
+  /* The heatmap card. A tile used to show a hover tooltip only, which on a
+     phone could not be closed. Click opens a dialog; Escape closes it. */
+  await v.evaluate(() => { location.hash = "#/heatmap"; });
+  await settled(v, SETTLE + 2000);
+  await v.click(".hm-t");
+  await v.waitForTimeout(500);
+  const vCard = await v.evaluate(() => { const d = document.querySelector("#layer .drw"); return d ? d.innerText : null; });
+  ok("a heatmap tile opens its card", !!vCard);
+  ok("...with the 50-day, 200-day and 52-week range", !!vCard && /50-day/.test(vCard) && /200-day/.test(vCard) && /52w high/.test(vCard) && /52w low/.test(vCard), (vCard || "").slice(0, 120));
+  await v.keyboard.press("Escape");
+  await v.waitForTimeout(300);
+  ok("...and Escape closes it", !(await v.$("#layer .drw")));
+  const vLabels = await v.evaluate(() => { let bad = 0; for (const t of document.querySelectorAll(".hm-t")) { const b = t.querySelector("b"); if (b && getComputedStyle(b).display !== "none" && b.getBoundingClientRect().right > t.getBoundingClientRect().right) bad++; } return bad; });
+  ok("no heatmap label is cut off", vLabels === 0, vLabels);
+  /* The header ran the nav under the search box from 821 to 1399 px. */
+  await v.setViewportSize({ width: 1180, height: 900 });
+  await v.waitForTimeout(300);
+  const vHdr = await v.evaluate(() => { const n = document.querySelector(".nav"), r = document.querySelector(".top-r");
+    if (!n || getComputedStyle(n).display === "none") return { ok: true };
+    return { ok: n.getBoundingClientRect().right <= r.getBoundingClientRect().left + 1 && n.scrollWidth <= n.clientWidth + 1 }; });
+  ok("the nav never runs under the header controls", vHdr.ok, vHdr);
+  await v.setViewportSize({ width: 1440, height: 900 });
+  /* The screener's presets and builder. */
+  await v.evaluate(() => { location.hash = "#/screener"; });
+  await settled(v, SETTLE + 2000);
+  await v.click('[data-pre="compound"]');
+  await v.waitForTimeout(400);
+  const vScr = await v.evaluate(() => ({ conds: document.querySelectorAll(".cond").length, n: (document.getElementById("cN") || {}).textContent || "" }));
+  ok("a screener preset loads its conditions", vScr.conds === 3 && /of/.test(vScr.n), vScr);
+
   await v.keyboard.press("Control+k");
   await v.waitForTimeout(400);
   ok("⌘K opens the search palette", await v.$("#layer .pal") !== null);

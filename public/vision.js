@@ -406,7 +406,7 @@
     const m = tickRows();
     const el = $('#tickIn');
     if (!S.ticker) { el.innerHTML = `<span class="tk tk-na">${FR['Live prices'] && !FR['Live prices'].ok ? 'Live prices unavailable — ' + esc(FR['Live prices'].error) : 'Loading live prices…'}</span>`; return; }
-    el.innerHTML = `<span class="tk mkt-t show-m" aria-hidden="true"></span>` + STRIP.map(([n, lab]) => {
+    el.innerHTML = `<span class="tk mkt-t" title="NSE session, IST"></span>` + STRIP.map(([n, lab]) => {
       const it = m[n];
       if (!it) return `<a class="tk" href="#/markets" title="${esc(n)}: not in this fetch"><b>${esc(lab)}</b><span class="tk-na">—</span></a>`;
       const prev = S.prevPx[n];
@@ -451,7 +451,7 @@
     el.innerHTML = `<i></i><span>NSE ${esc(m.t)}</span><em>${m.hhmm} IST</em>`;
     el.title = `National Stock Exchange · ${m.t} · ${m.hhmm} IST`;
     /* The top-bar chip is hidden on a phone; the ticker's first cell carries it. */
-    for (const t of $$('.mkt-t')) { t.className = `tk mkt-t show-m ${m.k}`; t.innerHTML = `<i></i><b>NSE</b><span>${esc(m.t.replace(' · ', ' '))}</span>`; }
+    for (const t of $$('.mkt-t')) { t.className = `tk mkt-t ${m.k}`; t.innerHTML = `<i></i><b>NSE</b><span>${esc(m.t)}</span><em class="mut">${m.hhmm} IST</em>`; }
   }
 
   /* ── DRAWER ─────────────────────────────────────────────────────────────
@@ -555,6 +555,7 @@
     return { name: name || 'overview', arg: rest.join('/'), params: new URLSearchParams(qi < 0 ? '' : raw.slice(qi + 1)) };
   };
   async function render() {
+    hideTip();
     const { name, arg, params } = route();
     const tok = ++navTok;
     closeLayer();
@@ -656,46 +657,122 @@
       <i style="background:${heatBg(0, sc)}" title="flat"></i>${cuts.slice().reverse().map((c) => `<i style="background:${heatBg(c + 0.01, sc)}" title="≥ +${c}%"></i>`).join('')}
       <span style="margin-left:6px">▼ −${cuts[0]}% … +${cuts[0]}% ▲</span></span>`; };
   /* rows: screen rows. opts: {size:'turnover'|'mcap', color:'r1d'|'r1w'|'r1m', n, height, group} */
+  /* READABLE BEFORE COMPLETE. The first version sized tiles by raw turnover
+     and drew 300 of them, so on a 1280px screen 212 of 300 symbols were
+     clipped and on a phone 250 had no label at all — a wall of colour you
+     could not read. Three changes, each stated on the page:
+       · area follows √turnover, which keeps the ORDER of importance but stops
+         five banks from taking half the map;
+       · the tile count is capped to what the container can label;
+       · a label is drawn only at a size that fits, never clipped mid-word. */
+  const HM_MIN_AREA = 7000;                    // px² per tile on a desktop — tuned so ≥ 80% carry a label
+  const HM_EXP = 0.5;                          // area ∝ √turnover — see the note above
+  /* MEASURED, NOT ESTIMATED. A characters-times-a-constant guess cut off
+     "SHADOWFA" and "APOLLOHOS" in the small size and left tiles that had
+     room for their name blank. The canvas measures the real glyphs in the
+     real face; results are cached per symbol and size. */
+  const MEASURE = { ctx: null, memo: {} };
+  const textW = (txt, px) => {
+    const k = px + '|' + txt; if (MEASURE.memo[k]) return MEASURE.memo[k];
+    try {
+      if (!MEASURE.ctx) MEASURE.ctx = document.createElement('canvas').getContext('2d');
+      MEASURE.ctx.font = `700 ${px}px Jakarta, ui-sans-serif, system-ui, sans-serif`;
+      return (MEASURE.memo[k] = MEASURE.ctx.measureText(txt).width);
+    } catch (e) { return (MEASURE.memo[k] = String(txt).length * px * 0.66); }
+  };
+  const fitLabel = (sym, w, h) => {
+    const room = w - 14;                                // 6px padding + 1px border each side
+    if (textW(sym, 12) <= room && h >= 34) return 'lg';  // symbol + move
+    if (textW(sym, 12) <= room && h >= 20) return 'md';  // symbol only
+    if (textW(sym, 10) <= room && h >= 17) return 'sm';  // smaller symbol
+    return 'xs';                                         // colour only; the card has it
+  };
   function treemap(host, rows, opts) {
     const W = host.clientWidth || 800, H = opts.height;
-    const sizeOf = (r) => opts.size === 'mcap' ? num(r.mcap_cr) : num(r.turnover_cr);
-    const pool = rows.filter((r) => (sizeOf(r) || 0) > 0).sort((a, b) => sizeOf(b) - sizeOf(a)).slice(0, opts.n);
+    const raw = (r) => opts.size === 'mcap' ? num(r.mcap_cr) : num(r.turnover_cr);
+    const sizeOf = (r) => { const v = raw(r); return v > 0 ? Math.pow(v, HM_EXP) : 0; };
+    /* Narrow containers need MORE area per tile, not less: a symbol needs
+       ~70 px of width whatever the screen, and a 358 px phone fits five. */
+    const cap = Math.max(12, Math.floor((W * H) / (W < 560 ? 9000 : W < 900 ? 8000 : HM_MIN_AREA)));
+    const n = Math.min(opts.n, cap);
+    const pool = rows.filter((r) => (raw(r) || 0) > 0).sort((a, b) => raw(b) - raw(a)).slice(0, n);
     let tiles = [], groups = [];
+    const BAND = 16;
     if (opts.group !== false) {
       const by = {};
       for (const r of pool) (by[r.sector || 'Unclassified'] = by[r.sector || 'Unclassified'] || []).push(r);
       groups = squarify(Object.entries(by).map(([k, rs]) => ({ k, rs, v: rs.reduce((s, r) => s + sizeOf(r), 0) })), 0, 0, W, H);
       for (const g of groups) {
-        const top = g.h > 40 && g.w > 60 ? 14 : 0;
-        tiles = tiles.concat(squarify(g.rs.map((r) => ({ r, v: sizeOf(r) })), g.x, g.y + top, g.w, g.h - top));
+        g.band = g.w > 56 && g.h > 48;
+        const top = g.band ? BAND : 0;
+        tiles = tiles.concat(squarify(g.rs.map((r) => ({ r, v: sizeOf(r) })), g.x + 1, g.y + top, g.w - 2, g.h - top - 1));
       }
     } else tiles = squarify(pool.map((r) => ({ r, v: sizeOf(r) })), 0, 0, W, H);
     const sc = HEAT_SCALE[opts.color] || 1;
     host.style.height = H + 'px';
-    host.innerHTML = groups.map((g) => `<div class="hm-g" style="left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px">${g.h > 40 && g.w > 60 ? `<em>${esc(g.k)}</em>` : ''}</div>`).join('')
-      + tiles.map((t) => { const r = t.r, v = r[opts.color], area = t.w * t.h;
-        const cls = area < 1400 || t.w < 44 ? (area < 500 || t.w < 26 ? 'xs' : 'sm') : '';
-        return `<a class="hm-t ${cls}" href="#/asset/${esc(r.sym)}" data-sym="${esc(r.sym)}" style="left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px;background:${heatBg(v, sc)}"
-          aria-label="${esc(r.sym)} ${v == null ? 'no move recorded' : signed(v)}"><b>${esc(r.sym)}</b><span>${v == null ? '—' : signed(v, 1)}</span></a>`; }).join('');
-    return pool.length;
+    host.innerHTML = groups.map((g) => `<div class="hm-g" style="left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px">${g.band ? `<em>${esc(g.k)}</em>` : ''}</div>`).join('')
+      + tiles.map((t) => { const r = t.r, v = r[opts.color], fit = fitLabel(r.sym, t.w, t.h);
+        return `<a class="hm-t f-${fit}" href="#/asset/${esc(r.sym)}" data-sym="${esc(r.sym)}" style="left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px;background:${heatBg(v, sc)}"
+          aria-label="${esc(r.sym)} ${v == null ? 'no move recorded' : signed(v)} — open card"><b>${esc(r.sym)}</b><span>${v == null ? '—' : signed(v, 1)}</span></a>`; }).join('');
+    return { shown: pool.length, asked: opts.n, capped: n < opts.n };
   }
-  /* One tooltip element, shared. Mouse follows; keyboard focus anchors it to the tile. */
+
+  /* ── THE STOCK CARD ─────────────────────────────────────────────────────
+     What a tile opens. It used to be a hover tooltip only — and on a phone a
+     tap fires the hover, shows the card, and nothing ever fires the matching
+     mouseleave, so the card stayed on screen with no way to close it. Now a
+     tap or click opens this card as a dialog (✕, backdrop or Esc closes it),
+     and the hover tooltip is kept for mouse pointers only. */
+  const lvlRow = (label, v, px) => {
+    const n = num(v); if (n == null || px == null) return `<div class="sc-l"><span>${label}</span><b class="na">—</b><em></em></div>`;
+    const d = (px - n) / n * 100;
+    return `<div class="sc-l"><span>${label}</span><b class="num">₹${fmt(n, n >= 1000 ? 0 : 1)}</b><em class="chip ${d >= 0 ? 'up' : 'dn'}">${d >= 0 ? 'above' : 'below'} ${Math.abs(d).toFixed(1)}%</em></div>`;
+  };
+  function stockCard(sym) {
+    const r = SCR && SCR[sym]; if (!r) { location.hash = '#/asset/' + sym; return; }
+    const mv = moveOf(r), lv = liveOf(sym), px = lv ? lv.price : num(r.price);
+    const hi = num(r.high52), lo = num(r.low52);
+    const pos = hi != null && lo != null && hi > lo && px != null ? clamp((px - lo) / (hi - lo) * 100, 0, 100) : null;
+    drawer(`${esc(r.sym)} ${star(r.sym)}`, `
+      <div class="sc-top"><div><div class="mut">${esc(r.name || '')}</div><div class="mut">${esc(r.sector || '')}${r.ind && r.ind !== r.sector ? ' · ' + esc(r.ind) : ''}</div></div>
+        <div style="text-align:right"><div class="big-px">${px != null ? '₹' + fmt(px, 2) : '—'}</div><div>${lv ? chg(lv.change_pct) + ' <span class="mut">live</span>' : chg(r.r1d) + ' <span class="mut">last close</span>'}</div></div></div>
+      <div class="kv" style="margin-top:0">${[['1D', r.r1d], ['1W', r.r1w], ['1M', r.r1m], ['3M', r.r3m], ['6M', r.r6m]].map(([k, v]) => `<div><em>${k}</em><b>${chg(v, 1)}</b></div>`).join('')}</div>
+      <div><h3>52-week range</h3>${pos != null ? `<div class="rng" role="img" aria-label="${pos.toFixed(0)}% of the way from the 52-week low to the high"><i style="left:${pos}%"></i></div>
+        <div class="rng-l"><span>Low ₹${fmt(lo, 1)}</span><span>${pos.toFixed(0)}% of range</span><span>High ₹${fmt(hi, 1)}</span></div>
+        <div class="sc-ls" style="margin-top:var(--s-2)">${lvlRow('52w high', hi, px)}${lvlRow('52w low', lo, px)}</div>`
+        : `<p class="note">No 52-week range on the screen for this name${r.rng_sessions ? ` — ${r.rng_sessions} sessions of history` : ''}.</p>`}</div>
+      <div><h3>Moving averages</h3><div class="sc-ls">${lvlRow('20-day', r.sma20, px)}${lvlRow('50-day', r.sma50, px)}${lvlRow('200-day', r.sma200, px)}</div></div>
+      <div><h3>How it reads</h3>${moveFactors(mv.parts)}<p class="note" style="margin-top:6px">Move score <b>${mv.score == null ? 'not scored' : mv.score}</b> · RSI ${r.rsi != null ? Math.round(r.rsi) : '—'} · turnover ${r.turnover_cr != null ? '₹' + fmt(r.turnover_cr, 0) + ' cr/day' : '—'}. Not a forecast.</p></div>
+      <div class="row wrap"><a class="btn pri" href="#/asset/${esc(r.sym)}">Open full page</a><a class="btn" href="#/alerts?sym=${esc(r.sym)}">Price alert</a>
+        <a class="btn" href="https://www.tradingview.com/chart/?symbol=NSE:${encodeURIComponent(r.sym)}" target="_blank" rel="noopener">Chart ↗</a></div>`,
+      { sub: `Close of ${esc(r.last_date || 'the last build')}${lv ? ' · live mark shown above' : ''}` });
+  }
+
+  /* Hover card: mouse pointers only. A touch screen gets the stock card on tap. */
+  const FINE = () => { try { return matchMedia('(hover:hover) and (pointer:fine)').matches; } catch (e) { return false; } };
+  const hideTip = () => { const t = $('#tip'); if (t) t.classList.remove('on'); };
   function wireTips(host) {
     let tip = $('#tip'); if (!tip) { tip = document.createElement('div'); tip.id = 'tip'; tip.className = 'tip'; tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip); }
     const show = (el, x, y) => {
+      if (!FINE()) return;
       const r = SCR && SCR[el.dataset.sym]; if (!r) return;
-      const mv = moveOf(r);
+      const mv = moveOf(r), px = num(r.price);
+      const rel = (v) => { const n = num(v); return n == null || px == null ? '—' : `₹${fmt(n, n >= 1000 ? 0 : 1)} <i class="${px >= n ? 'up' : 'dn'}">${px >= n ? '▲' : '▼'}</i>`; };
       tip.innerHTML = `<b>${esc(r.sym)}</b><span class="mut">${esc(r.name || '')}</span><dl>
-        <dt>Close</dt><dd>₹${fmt(r.price, 2) || '—'}</dd><dt>1D</dt><dd>${signed(r.r1d) || '—'}</dd><dt>1W</dt><dd>${signed(r.r1w) || '—'}</dd>
-        <dt>1M</dt><dd>${signed(r.r1m) || '—'}</dd><dt>Turnover</dt><dd>${r.turnover_cr != null ? '₹' + fmt(r.turnover_cr, 0) + ' cr' : '—'}</dd>
-        <dt>Move score</dt><dd>${mv.score == null ? 'not scored' : mv.score}</dd></dl>`;
-      const bx = Math.min(x + 14, innerWidth - 270), by = Math.min(y + 14, innerHeight - 200);
+        <dt>Close</dt><dd>₹${fmt(r.price, 2) || '—'}</dd><dt>1D · 1W · 1M</dt><dd>${[r.r1d, r.r1w, r.r1m].map((v) => signed(v, 1) || '—').join(' · ')}</dd>
+        <dt>50-day</dt><dd>${rel(r.sma50)}</dd><dt>200-day</dt><dd>${rel(r.sma200)}</dd>
+        <dt>52w high</dt><dd>${r.high52 != null ? '₹' + fmt(r.high52, 1) : '—'}</dd><dt>52w low</dt><dd>${r.low52 != null ? '₹' + fmt(r.low52, 1) : '—'}</dd>
+        <dt>Move score</dt><dd>${mv.score == null ? 'not scored' : mv.score}</dd></dl><span class="tip-h">Click for the card</span>`;
+      const bx = Math.min(x + 14, innerWidth - 280), by = Math.min(y + 14, innerHeight - 260);
       tip.style.left = bx + 'px'; tip.style.top = by + 'px'; tip.classList.add('on');
     };
-    host.addEventListener('mousemove', (e) => { const t = e.target.closest('.hm-t'); if (t) show(t, e.clientX, e.clientY); else tip.classList.remove('on'); });
-    host.addEventListener('mouseleave', () => tip.classList.remove('on'));
-    host.addEventListener('focusin', (e) => { const t = e.target.closest('.hm-t'); if (t) { const b = t.getBoundingClientRect(); show(t, b.left, b.bottom); } });
-    host.addEventListener('focusout', () => tip.classList.remove('on'));
+    host.addEventListener('mousemove', (e) => { const t = e.target.closest('.hm-t'); if (t) show(t, e.clientX, e.clientY); else hideTip(); });
+    host.addEventListener('mouseleave', hideTip);
+    host.addEventListener('click', (e) => {
+      const t = e.target.closest('.hm-t'); if (!t) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;   // new tab still works
+      e.preventDefault(); hideTip(); stockCard(t.dataset.sym);
+    });
   }
 
   /* ── OVERVIEW ─────────────────────────────────────────────────────────── */
@@ -712,8 +789,8 @@
           foot: 'Ranked by how strongly each name is moving — trend, momentum, volume and institutional holding — with liquidity and coverage as tie-breaks. Names under ₹5 cr a day are left out. A description of the move, not a call to trade.' })}
       </div>
       <div style="height:var(--s-4)"></div>
-      ${panel('Market heatmap', `<div class="hm" id="oHeat" style="height:${innerWidth < 760 ? 300 : 360}px"></div><div id="oSect" style="margin-top:var(--s-3)"></div>`,
-        { fb: 'Screen', more: '#/heatmap', moreText: 'Full heatmap', right: heatLegend('r1d') + ' ', foot: 'Top 150 names by turnover, grouped by sector. Size is turnover; colour is the last session\'s move. Click a tile for the name.' })}
+      ${panel('Market heatmap', `<div class="hm" id="oHeat" style="height:${innerWidth < 760 ? 340 : 380}px"></div><div id="oSect" style="margin-top:var(--s-3)"></div>`,
+        { fb: 'Screen', more: '#/heatmap', moreText: 'Full heatmap', right: heatLegend('r1d') + ' ', foot: 'The most-traded names, grouped by sector — as many as this width can label. Tile area follows √turnover; colour is the last session\'s move. Tap a tile for its card.' })}
       <div style="height:var(--s-4)"></div>
       <div class="grid g-2">
         ${panel('Top movers', skel(8), { bodyId: 'oMov', flush: true, fb: 'Live prices', more: '#/markets', moreText: 'Markets' })}
@@ -814,8 +891,11 @@
       S.pulse = p.ok ? p.data : S.pulse;
       const host = $('#oHeat'); if (!host) return;
       if (!r.ok) { host.innerHTML = failBox('The screen', r.error); return; }
-      const draw = () => treemap(host, Object.values(SCR), { size: 'turnover', color: 'r1d', n: 150, height: innerWidth < 760 ? 300 : 360 });
+      const draw = () => treemap(host, Object.values(SCR), { size: 'turnover', color: 'r1d', n: 120, height: innerWidth < 760 ? 340 : 380 });
       draw(); wireTips(host);
+      /* Labels are measured in the real face; if it arrives after the first
+         draw, measure again rather than keep fallback widths. */
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { MEASURE.memo = {}; if (document.contains(host)) draw(); });
       let w = host.clientWidth; new ResizeObserver(() => { if (Math.abs(host.clientWidth - w) > 8 && document.contains(host)) { w = host.clientWidth; draw(); } }).observe(host);
       const sd = p.ok ? (p.data.sectors_day || []) : [];
       const sb = $('#oSect');
@@ -866,13 +946,13 @@
     const px = lv ? lv.price : (r ? r.price : null);
     const mv = moveOf(r);
     $('#aHead').innerHTML = `<div class="pn"><div class="pb"><div class="ah">
-      <div style="min-width:0;flex:1"><span class="eb" style="display:block;font-size:var(--t-xs);font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)">${esc((r && r.sector) || 'Not on the screen')}${r && r.ind ? ' · ' + esc(r.ind) : ''}</span>
+      <div style="min-width:0;flex:1"><span class="eb" style="display:block;font-size:var(--t-xs);font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)">${esc((r && r.sector) || 'Not on the screen')}${r && r.ind && r.ind !== r.sector ? ' · ' + esc(r.ind) : ''}</span>
         <div class="row" style="gap:var(--s-2)"><h1>${esc(s)}</h1>${star(s)}</div><div class="nm">${esc((r && r.name) || '')}</div>
         <div class="row wrap" style="margin-top:var(--s-2)">
           ${r && r.risk ? `<span class="chip ${r.risk.level === 'HIGH' ? 'dn' : r.risk.level === 'MEDIUM' ? 'warn' : ''}">Risk ${esc(r.risk.level)}</span>` : ''}</div></div>
-      <div style="text-align:right"><div class="px">${px != null ? '₹' + fmt(px, 2) : '—'}</div>
+      <div class="ah-px"><div class="px">${px != null ? '₹' + fmt(px, 2) : '—'}</div>
         <div class="px-s">${lv ? chg(lv.change_pct) + ' <span class="mut">live</span>' : r ? chg(r.r1d) + ` <span class="mut">close of ${esc(r.last_date || r.price_date || 'the last build')}</span>` : ''}</div>
-        <div class="row" style="justify-content:flex-end;margin-top:var(--s-2);gap:6px">
+        <div class="row ah-act" style="margin-top:var(--s-2);gap:6px">
           <a class="btn sm" href="#/alerts?sym=${esc(s)}">Alert</a>
           <a class="btn sm" href="https://www.tradingview.com/chart/?symbol=NSE:${encodeURIComponent(s)}" target="_blank" rel="noopener">Chart ↗</a>
           <a class="btn sm" href="https://www.screener.in/company/${encodeURIComponent(s)}/consolidated/" target="_blank" rel="noopener">Filings ↗</a></div></div></div>
@@ -932,106 +1012,256 @@
 
   };
 
-  /* ── SCREENER ───────────────────────────────────────────────────────────
-     Every name on the screen, dense. Filters and sort persist per browser;
-     "Save view" keeps a named copy, "Export" writes exactly the rows shown. */
-  const SCOLS = [
-    ['sym', 'Symbol', (r) => r.sym, 'l'], ['sector', 'Sector', (r) => r.sector || '', 'l hide-m'],
-    ['price', 'Close', (r) => num(r.price)], ['r1d', '1D', (r) => num(r.r1d)], ['r1w', '1W', (r) => num(r.r1w)],
-    ['r1m', '1M', (r) => num(r.r1m)], ['r3m', '3M', (r) => num(r.r3m), 'hide-m'],
-    ['move', 'Move', (r) => moveOf(r).score, '', 'Move score: trend, momentum, volume, institutional. 0–100; not a forecast.'],
-    ['comp', 'Composite', (r) => num(r.comp), '', "The screen's weighted blend of quality, growth, valuation and technical"],
-    ['q', 'Q', (r) => num(r.q), 'hide-m', 'Quality'], ['g', 'G', (r) => num(r.g), 'hide-m', 'Growth'],
-    ['v', 'V', (r) => num(r.v), 'hide-m', 'Valuation'], ['tech', 'T', (r) => num(r.tech), 'hide-m', 'Technical'],
-    ['rsi', 'RSI', (r) => num(r.rsi), 'hide-m'], ['pe', 'PE', (r) => num(r.pe), 'hide-m'], ['roce', 'ROCE', (r) => num(r.roce), 'hide-m'],
-    ['turnover_cr', 'Turnover', (r) => num(r.turnover_cr)], ['from_high', 'Off high', (r) => num(r.from_high), 'hide-m'],
+  /* ── SCREENER (advanced) ────────────────────────────────────────────────
+     A condition builder over every field the screen publishes, plus fields
+     derived from them (distance from the 52-week low, from each average, the
+     position in the year's range). Rules combine with ALL or ANY. Ten presets
+     load distinct ideas into the builder — each is a starting point, not a
+     recommendation, and every one can be edited.
+
+     THE RULE THAT MATTERS: an unmeasured value never PASSES a numeric
+     condition. "PE ≤ 15" must not admit a company with no PE — that is
+     exactly the zero-fill the screen's own honesty rules forbid. */
+  const pctFrom = (a, b) => { const x = num(a), y = num(b); return x == null || y == null || !y ? null : (x - y) / y * 100; };
+  /* [key, label, group, getter, kind, format, hint]  kind: n = number, b = yes/no, c = category */
+  const SF = [
+    ['price', 'Close (₹)', 'Price', (r) => num(r.price), 'n', 'inr'],
+    ['r1d', '1-day %', 'Price', (r) => num(r.r1d), 'n', 'pct'], ['r1w', '1-week %', 'Price', (r) => num(r.r1w), 'n', 'pct'],
+    ['r1m', '1-month %', 'Price', (r) => num(r.r1m), 'n', 'pct'], ['r3m', '3-month %', 'Price', (r) => num(r.r3m), 'n', 'pct'],
+    ['r6m', '6-month %', 'Price', (r) => num(r.r6m), 'n', 'pct'],
+    ['from_high', '% from 52w high', 'Range', (r) => num(r.from_high), 'n', 'pct', 'Negative = below the high'],
+    ['from_low', '% above 52w low', 'Range', (r) => pctFrom(r.price, r.low52), 'n', 'pct'],
+    ['range_pos', 'Position in 52w range (0–100)', 'Range', (r) => { const h = num(r.high52), l = num(r.low52), p = num(r.price); return h != null && l != null && p != null && h > l ? (p - l) / (h - l) * 100 : null; }, 'n', 'n0'],
+    ['brk52w', 'At a 52-week high', 'Range', (r) => r.brk52w == null ? null : !!r.brk52w, 'b'],
+    ['above20', 'Above 20-day', 'Trend', (r) => r.sma20 && r.price ? r.price > r.sma20 : null, 'b'],
+    ['above50', 'Above 50-day', 'Trend', (r) => r.sma50 && r.price ? r.price > r.sma50 : null, 'b'],
+    ['above200', 'Above 200-day', 'Trend', (r) => r.sma200 && r.price ? r.price > r.sma200 : null, 'b'],
+    ['vs50', '% vs 50-day', 'Trend', (r) => pctFrom(r.price, r.sma50), 'n', 'pct'],
+    ['vs200', '% vs 200-day', 'Trend', (r) => pctFrom(r.price, r.sma200), 'n', 'pct'],
+    ['stack', 'Averages stacked (20 > 50 > 200)', 'Trend', (r) => r.stack == null ? null : !!r.stack, 'b'],
+    ['rsi', 'RSI (daily, 14)', 'Momentum', (r) => num(r.rsi), 'n', 'n0'],
+    ['atr_pct', 'Daily range, ATR %', 'Momentum', (r) => num(r.atr_pct), 'n', 'n1'],
+    ['move', 'Move score', 'Momentum', (r) => moveOf(r).score, 'n', 'n0', 'Trend, momentum, volume, institutional'],
+    ['tag', 'Setup tag', 'Momentum', (r) => (r.setup && r.setup.tags) || [], 'c', null, '', ['20D BREAKOUT', '50D BREAKOUT', '52W BREAKOUT', 'VOLUME', 'TREND INTACT', 'OVERSOLD']],
+    ['vol_spike', 'Volume vs average (×)', 'Volume', (r) => num(r.vol_spike), 'n', 'x'],
+    ['turnover_cr', 'Turnover (₹ cr/day)', 'Volume', (r) => num(r.turnover_cr), 'n', 'cr'],
+    ['mcap_cr', 'Market cap (₹ cr)', 'Size', (r) => num(r.mcap_cr) > 0 ? num(r.mcap_cr) : null, 'n', 'cr', 'Missing for some large names'],
+    ['roce', 'ROCE %', 'Quality', (r) => num(r.roce), 'n', 'n1'], ['roe', 'ROE %', 'Quality', (r) => num(r.roe), 'n', 'n1'],
+    ['de', 'Debt / equity', 'Quality', (r) => num(r.de), 'n', 'n2', 'Negative = negative equity'],
+    ['piotroski', 'Piotroski (0–9)', 'Quality', (r) => num(r.piotroski), 'n', 'n0'],
+    ['cfo_pat', 'Cash flow / profit', 'Quality', (r) => num(r.cfo_pat), 'n', 'n2'],
+    ['roce_trend', 'ROCE trend', 'Quality', (r) => r.roce_trend || null, 'c', null, '', ['rising', 'flat', 'peaked', 'falling']],
+    ['rev_cagr', 'Revenue CAGR %', 'Growth', (r) => num(r.rev_cagr), 'n', 'n1'], ['eps_cagr', 'EPS CAGR %', 'Growth', (r) => num(r.eps_cagr), 'n', 'n1'],
+    ['rev_yoy', 'Revenue YoY %', 'Growth', (r) => num(r.rev_yoy), 'n', 'n1'], ['eps_yoy', 'EPS YoY %', 'Growth', (r) => num(r.eps_yoy), 'n', 'n1'],
+    ['em_label', 'Earnings momentum', 'Growth', (r) => r.em_label || null, 'c', null, '', ['accelerating', 'stable', 'decelerating']],
+    ['pe', 'PE', 'Valuation', (r) => num(r.pe), 'n', 'n1'], ['pb', 'PB', 'Valuation', (r) => num(r.pb), 'n', 'n2'],
+    ['pe_pctile', 'PE vs its own history (pct)', 'Valuation', (r) => num(r.pe_pctile), 'n', 'n0', '0 = cheapest it has been'],
+    ['comp', 'Composite', 'Scores', (r) => num(r.comp), 'n', 'n0'], ['q', 'Quality score', 'Scores', (r) => num(r.q), 'n', 'n0'],
+    ['g', 'Growth score', 'Scores', (r) => num(r.g), 'n', 'n0'], ['v', 'Valuation score', 'Scores', (r) => num(r.v), 'n', 'n0'],
+    ['tech', 'Technical score', 'Scores', (r) => num(r.tech), 'n', 'n0'],
+    ['instis', 'Institutional holding %', 'Ownership', (r) => num(r.instis), 'n', 'n1'], ['insiders', 'Promoter holding %', 'Ownership', (r) => num(r.insiders), 'n', 'n1'],
+    ['risk', 'Risk level', 'Risk', (r) => (r.risk && r.risk.level) || null, 'c', null, '', ['LOW', 'MEDIUM', 'HIGH']],
+    ['sector', 'Sector', 'Identity', (r) => r.sector || null, 'c', null, '', null],
+    ['liquid', 'Liquid (screen\'s own flag)', 'Identity', (r) => r.liquid == null ? null : !!r.liquid, 'b'],
+    ['mine', 'On my watchlist', 'Identity', (r) => watching(r.sym), 'b'],
   ];
-  const SDEF = { q: '', sector: '', minComp: '', minTurn: '5', trend: '', mine: false, sort: 'turnover_cr', dir: -1 };
-  V.screener = async (el, arg, alive) => {
-    let f = Object.assign({}, SDEF, store.get('vis:scr', {}));
-    const saved = store.get('vis:scrSaved', null);
-    el.innerHTML = vhead('Screener', 'Every name on the NSE screen',
-      'Dense on purpose. Sort any column, filter, save the view, export what you see. Tap a name for its page.', fb('Screen'))
-      + `<div class="pn"><div class="ph" style="flex-wrap:wrap;gap:var(--s-2)">
-        <input class="inp" id="cQ" type="search" placeholder="Symbol or company" aria-label="Search" style="width:170px">
-        <select class="inp" id="cSec" aria-label="Sector"><option value="">All sectors</option></select>
-        <select class="inp" id="cTr" aria-label="Trend"><option value="">Any trend</option><option value="up">Above 50 & 200d</option><option value="dn">Below 50 & 200d</option><option value="high">Within 3% of 52w high</option></select>
-        <label class="note row" style="gap:4px">Composite ≥ <input class="inp" id="cMin" inputmode="numeric" style="width:52px" aria-label="Minimum composite"></label>
-        <label class="note row" style="gap:4px">Turnover ≥ ₹<input class="inp" id="cTurn" inputmode="numeric" style="width:52px" aria-label="Minimum turnover, crore"> cr</label>
-        <button class="btn sm" type="button" id="cSig" aria-pressed="false">★ Watchlist only</button>
-        <div class="ph-r"><button class="btn sm" type="button" id="cSave">Save view</button>${saved ? '<button class="btn sm" type="button" id="cLoad">Load saved</button>' : ''}
-          <button class="btn sm" type="button" id="cReset">Reset</button><button class="btn sm" type="button" id="cCsv">Export CSV</button></div></div>
-        <div class="pb flush" id="cBody">${skel(10)}</div><div class="pf" id="cFoot"></div></div>`;
+  const SFK = Object.fromEntries(SF.map((f) => [f[0], f]));
+  const OPS_N = [['>=', '≥'], ['<=', '≤'], ['between', 'between']];
+  /* Ten presets, each a different idea. Starting points, not recommendations. */
+  const SPRESETS = [
+    ['bottom', 'Bottom reversal', 'Off the floor, reclaiming the 50-day, still under the 200-day', [['from_low', '>=', 15], ['above50', 'is', true], ['above200', 'is', false]]],
+    ['highs', 'Near highs on volume', 'Within 3% of the 52-week high with volume behind it', [['from_high', '>=', -3], ['vol_spike', '>=', 1.5]]],
+    ['qdisc', 'Quality at a discount', 'High quality, cheap against its own history', [['q', '>=', 70], ['pe_pctile', '<=', 30]]],
+    ['leaders', 'Momentum leaders', 'Strong 3 months, above every average, RSI not stretched', [['r3m', '>=', 20], ['stack', 'is', true], ['rsi', 'between', [55, 75]]]],
+    ['oversold', 'Oversold quality', 'Good businesses the chart has sold down', [['rsi', '<=', 35], ['q', '>=', 60]]],
+    ['compound', 'Compounders', 'High returns on capital, growing, little debt', [['roce', '>=', 20], ['rev_cagr', '>=', 15], ['de', 'between', [0, 0.5]]]],
+    ['garp', 'Growth at a fair price', 'EPS compounding fast at a moderate PE', [['eps_cagr', '>=', 20], ['pe', 'between', [0, 25]]]],
+    ['surge', 'Volume surge today', 'Twice the usual volume on an up day', [['vol_spike', '>=', 2], ['r1d', '>=', 0.5]]],
+    ['steady', 'Low-risk uptrend', 'Screen\'s risk LOW, above the 200-day, calm daily range', [['risk', 'in', ['LOW']], ['above200', 'is', true], ['atr_pct', '<=', 2.5]]],
+    ['earn', 'Earnings accelerating', 'Earnings momentum accelerating with Piotroski ≥ 7', [['em_label', 'in', ['accelerating']], ['piotroski', '>=', 7]]],
+  ];
+  /* Visible columns. The key must be an SF key or 'sym'. */
+  const SCOL_DEF = ['sym', 'sector', 'price', 'r1d', 'r1m', 'from_low', 'vs50', 'vs200', 'rsi', 'move', 'comp', 'pe', 'roce', 'turnover_cr'];
+  const fmtCell = (f, v) => {
+    if (v == null || (Array.isArray(v) && !v.length)) return NA;
+    if (f[4] === 'b') return v ? '<span class="chip up">yes</span>' : '<span class="chip">no</span>';
+    if (f[4] === 'c') return Array.isArray(v) ? v.map((t) => `<span class="chip">${esc(t)}</span>`).join(' ') : `<span class="chip">${esc(v)}</span>`;
+    switch (f[5]) {
+      case 'pct': return chg(v, 1);
+      case 'inr': return inr(v, 2);
+      case 'cr': return cr(v);
+      case 'x': return `<span class="num">${Number(v).toFixed(2)}×</span>`;
+      case 'n0': return f[0] === 'move' || f[0] === 'comp' ? scoreCell(v, f[6] || f[1]) : `<span class="num">${Math.round(v)}</span>`;
+      case 'n2': return `<span class="num">${Number(v).toFixed(2)}</span>`;
+      default: return `<span class="num">${Number(v).toFixed(1)}</span>`;
+    }
+  };
+  const passes = (r, c) => {
+    const f = SFK[c.f]; if (!f) return true;
+    const v = f[3](r);
+    if (f[4] === 'b') return v != null && v === !!c.v;
+    if (f[4] === 'c') { const want = [].concat(c.v || []); if (!want.length) return true;
+      return Array.isArray(v) ? v.some((x) => want.includes(x)) : v != null && want.includes(v); }
+    if (v == null) return false;                                  // unmeasured never passes
+    if (c.op === '>=') return num(c.v) == null || v >= num(c.v);
+    if (c.op === '<=') return num(c.v) == null || v <= num(c.v);
+    if (c.op === 'between') { const [a, b] = [].concat(c.v); return (num(a) == null || v >= num(a)) && (num(b) == null || v <= num(b)); }
+    return true;
+  };
+  let COL_HANDLER = null, COL_WIRED = false;
+  const presetConds = (p) => p[3].map(([f, op, v]) => ({ f, op, v }));
+  const encodeScreen = (st) => { try { return btoa(unescape(encodeURIComponent(JSON.stringify({ c: st.conds, m: st.mode, s: st.sort, d: st.dir, k: st.cols })))); } catch (e) { return ''; } };
+  const decodeScreen = (t) => { try { const o = JSON.parse(decodeURIComponent(escape(atob(t)))); return { conds: o.c || [], mode: o.m || 'all', sort: o.s || 'turnover_cr', dir: o.d || -1, cols: o.k || SCOL_DEF.slice() }; } catch (e) { return null; } };
+
+  V.screener = async (el, arg, alive, params) => {
+    const fromUrl = params && params.get('s') ? decodeScreen(params.get('s')) : null;
+    let st = Object.assign({ conds: presetConds(SPRESETS[0]).slice(0, 0), mode: 'all', q: '', sort: 'turnover_cr', dir: -1, cols: SCOL_DEF.slice(), preset: '' },
+      store.get('vis:scr2', {}), fromUrl || {});
+    el.innerHTML = vhead('Screener', 'Build a screen',
+      'Any field the screen publishes, any number of conditions. Unmeasured values never pass a numeric rule and sort last. Presets are starting points, not recommendations.', fb('Screen'))
+      + `<div class="pn"><div class="pb" id="sbPre"></div></div><div style="height:var(--s-3)"></div>
+        <div class="pn"><div class="ph" style="flex-wrap:wrap;gap:var(--s-2)"><h2>Conditions</h2>
+          <div class="seg" role="group" aria-label="Combine">${[['all', 'Match ALL'], ['any', 'Match ANY']].map(([k, t]) => `<button type="button" data-mode="${k}" aria-pressed="${st.mode === k}">${t}</button>`).join('')}</div>
+          <div class="ph-r"><button class="btn sm" type="button" id="cAdd">+ Add condition</button><button class="btn sm" type="button" id="cClear">Clear</button></div></div>
+          <div class="pb" id="sbConds"></div></div>
+        <div style="height:var(--s-3)"></div>
+        <div class="pn"><div class="ph" style="flex-wrap:wrap;gap:var(--s-2)">
+          <input class="inp" id="cQ" type="search" placeholder="Symbol or company" aria-label="Search" style="width:170px">
+          <span class="n" id="cN"></span>
+          <div class="ph-r"><button class="btn sm" type="button" id="cCols">Columns</button><button class="btn sm" type="button" id="cSave">Save as…</button>
+            <select class="inp" id="cSaved" aria-label="Saved screens" style="height:26px;font-size:var(--t-xs)"></select>
+            <button class="btn sm" type="button" id="cShare">Copy link</button><button class="btn sm" type="button" id="cCsv">Export CSV</button></div></div>
+          <div class="pb flush" id="cBody">${skel(10)}</div><div class="pf" id="cFoot"></div></div>`;
     const [r0] = await Promise.all([F.screen(), F.insti()]);
     if (!alive()) return;
     if (!r0.ok) { $('#cBody').innerHTML = failBox('The screen', r0.error); return; }
     const all = Object.values(SCR);
-    $('#cSec').innerHTML += [...new Set(all.map((r) => r.sector).filter(Boolean))].sort().map((x) => `<option>${esc(x)}</option>`).join('');
+    SFK.sector[7] = [...new Set(all.map((r) => r.sector).filter(Boolean))].sort();
     let limit = 100, shown = [];
-    const sync = () => { $('#cQ').value = f.q; $('#cSec').value = f.sector; $('#cTr').value = f.trend; $('#cMin').value = f.minComp; $('#cTurn').value = f.minTurn; $('#cSig').setAttribute('aria-pressed', !!f.mine); };
+    const save = () => store.set('vis:scr2', { conds: st.conds, mode: st.mode, sort: st.sort, dir: st.dir, cols: st.cols, preset: st.preset });
+
+    const paintPresets = () => {
+      $('#sbPre').innerHTML = `<div class="presets">${SPRESETS.map((p) => `<button type="button" class="pre${st.preset === p[0] ? ' on' : ''}" data-pre="${p[0]}" title="${esc(p[2])}"><b>${esc(p[1])}</b><span>${esc(p[2])}</span></button>`).join('')}</div>`;
+    };
+    const fieldSelect = (cur) => {
+      const groups = [...new Set(SF.map((f) => f[2]))];
+      return `<select class="inp c-f" aria-label="Field">${groups.map((g) => `<optgroup label="${esc(g)}">${SF.filter((f) => f[2] === g).map((f) => `<option value="${f[0]}"${f[0] === cur ? ' selected' : ''}>${esc(f[1])}</option>`).join('')}</optgroup>`).join('')}</select>`;
+    };
+    const valueInput = (c, f) => {
+      if (f[4] === 'b') return `<select class="inp c-v" aria-label="Value"><option value="1"${c.v ? ' selected' : ''}>yes</option><option value="0"${!c.v ? ' selected' : ''}>no</option></select>`;
+      if (f[4] === 'c') { const want = [].concat(c.v || []);
+        return `<div class="c-chips">${(f[7] || []).map((o) => `<label class="chk"><input type="checkbox" class="c-o" value="${esc(o)}"${want.includes(o) ? ' checked' : ''}>${esc(o)}</label>`).join('')}</div>`; }
+      const ops = `<select class="inp c-op" aria-label="Operator">${OPS_N.map(([k, t]) => `<option value="${k}"${c.op === k ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
+      if (c.op === 'between') { const [a, b] = [].concat(c.v || [null, null]);
+        return ops + `<input class="inp c-a" inputmode="decimal" value="${a ?? ''}" aria-label="From" style="width:80px"><span class="mut">and</span><input class="inp c-b" inputmode="decimal" value="${b ?? ''}" aria-label="To" style="width:80px">`; }
+      return ops + `<input class="inp c-v" inputmode="decimal" value="${c.v ?? ''}" aria-label="Value" style="width:90px">`;
+    };
+    const paintConds = () => {
+      $('#sbConds').innerHTML = st.conds.length ? st.conds.map((c, i) => { const f = SFK[c.f] || SF[0];
+        return `<div class="cond" data-i="${i}">${fieldSelect(c.f)}${valueInput(c, f)}<button class="btn sm" type="button" data-rm="${i}" aria-label="Remove condition">✕</button>${f[6] ? `<span class="note">${esc(f[6])}</span>` : ''}</div>`; }).join('')
+        : '<p class="note" style="margin:0">No conditions — every name is shown. Pick a preset above or add a condition.</p>';
+    };
+    const readConds = () => {
+      st.conds = $$('.cond', el).map((row) => {
+        const f = SFK[$('.c-f', row).value] || SF[0], c = { f: f[0] };
+        if (f[4] === 'b') c.v = $('.c-v', row).value === '1';
+        else if (f[4] === 'c') c.v = $$('.c-o', row).filter((x) => x.checked).map((x) => x.value);
+        else { c.op = $('.c-op', row) ? $('.c-op', row).value : '>=';
+          c.v = c.op === 'between' ? [($('.c-a', row) || {}).value ?? '', ($('.c-b', row) || {}).value ?? ''].map((x) => x === '' ? null : x) : (($('.c-v', row) || {}).value || null); }
+        return c; });
+    };
+    const paintSaved = () => {
+      const sv = store.get('vis:screens', {});
+      $('#cSaved').innerHTML = `<option value="">Saved screens (${Object.keys(sv).length})</option>` + Object.keys(sv).sort().map((k) => `<option>${esc(k)}</option>`).join('')
+        + (Object.keys(sv).length ? '<option value="__del">Delete a saved screen…</option>' : '');
+    };
     const paint = () => {
-      store.set('vis:scr', f);
-      const Q = f.q.toUpperCase(), mc = num(f.minComp), mt = num(f.minTurn);
-      const col = SCOLS.find((c) => c[0] === f.sort) || SCOLS[16];
-      shown = all.filter((r) => (!Q || r.sym.includes(Q) || (r.name || '').toUpperCase().includes(Q))
-        && (!f.sector || r.sector === f.sector) && (mc == null || (num(r.comp) != null && r.comp >= mc))
-        && (mt == null || (num(r.turnover_cr) || 0) >= mt) && (!f.mine || watching(r.sym))
-        && (!f.trend || (f.trend === 'high' ? num(r.from_high) != null && r.from_high >= -3 : (trendWord(r) || {}).k === f.trend)))
-        .sort((a, b) => { const x = col[2](a), y = col[2](b);
-          if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;   // unknown sorts last, never as zero
-          return (x > y ? 1 : x < y ? -1 : 0) * f.dir; });
-      const cell = (c, r) => { const v = c[2](r);
-        if (c[0] === 'sym') return `<td>${star(r.sym)}</td><td><a class="sym" href="#/asset/${esc(r.sym)}">${esc(r.sym)}</a><span class="nm">${esc(r.name || '')}</span></td>`;
-        if (c[0] === 'sector') return `<td class="hide-m mut">${esc(v || '—')}</td>`;
-        const cls = `r${c[3] && c[3].includes('hide-m') ? ' hide-m' : ''}`;
-        if (['r1d', 'r1w', 'r1m', 'r3m', 'from_high'].includes(c[0])) return `<td class="${cls}">${chg(v, 1)}</td>`;
-        if (c[0] === 'price') return `<td class="${cls}">${inr(v, 2)}</td>`;
-        if (c[0] === 'turnover_cr') return `<td class="${cls}">${cr(v)}</td>`;
-        if (['move', 'comp'].includes(c[0])) return `<td class="${cls}">${scoreCell(v, c[4])}</td>`;
-        return `<td class="${cls}">${v == null ? NA : `<span class="num">${fmt(v, ['q', 'g', 'v', 'tech', 'rsi'].includes(c[0]) ? 0 : 1)}</span>`}</td>`; };
-      $('#cBody').innerHTML = shown.length ? `<div class="tw" style="max-height:72vh"><table class="tbl dense"><thead><tr><th scope="col"><span class="vh">Watch</span></th>${SCOLS.map((c) =>
-        `<th class="${c[3] && c[3].includes('l') ? '' : 'r'}${c[3] && c[3].includes('hide-m') ? ' hide-m' : ''}" scope="col"${f.sort === c[0] ? ` aria-sort="${f.dir > 0 ? 'ascending' : 'descending'}"` : ''}${c[4] ? ` title="${esc(c[4])}"` : ''}><button type="button" data-sort="${c[0]}">${c[1]}</button></th>`).join('')}</tr></thead>
-        <tbody>${shown.slice(0, limit).map((r) => `<tr>${SCOLS.map((c) => cell(c, r)).join('')}</tr>`).join('')}</tbody></table></div>
+      save();
+      const Q = st.q.toUpperCase();
+      const match = st.mode === 'any' && st.conds.length ? (r) => st.conds.some((c) => passes(r, c)) : (r) => st.conds.every((c) => passes(r, c));
+      const sf = st.sort === 'sym' ? ['sym', '', '', (r) => r.sym] : SFK[st.sort] || SFK.turnover_cr;
+      shown = all.filter((r) => (!Q || r.sym.includes(Q) || (r.name || '').toUpperCase().includes(Q)) && match(r))
+        .sort((a, b) => { let x = sf[3](a), y = sf[3](b); if (Array.isArray(x)) x = x.length; if (Array.isArray(y)) y = y.length;
+          if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+          return (x > y ? 1 : x < y ? -1 : 0) * st.dir; });
+      const cols = st.cols.filter((k) => k === 'sym' || SFK[k]);
+      const th = (k) => { const f = k === 'sym' ? null : SFK[k];
+        return `<th class="${k === 'sym' || (f && f[4] === 'c') ? '' : 'r'}" scope="col"${st.sort === k ? ` aria-sort="${st.dir > 0 ? 'ascending' : 'descending'}"` : ''}${f && f[6] ? ` title="${esc(f[6])}"` : ''}><button type="button" data-sort="${k}">${esc(k === 'sym' ? 'Symbol' : f[1])}</button></th>`; };
+      $('#cBody').innerHTML = shown.length ? `<div class="tw" style="max-height:72vh"><table class="tbl dense"><thead><tr><th scope="col"><span class="vh">Watch</span></th>${cols.map(th).join('')}</tr></thead>
+        <tbody>${shown.slice(0, limit).map((r) => `<tr><td>${star(r.sym)}</td>${cols.map((k) => k === 'sym'
+          ? `<td><button class="sym lnk" type="button" data-card="${esc(r.sym)}">${esc(r.sym)}</button><span class="nm">${esc(r.name || '')}</span></td>`
+          : `<td class="${SFK[k][4] === 'c' ? '' : 'r'}">${fmtCell(SFK[k], SFK[k][3](r))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
         ${shown.length > limit ? `<div class="st"><button class="btn" type="button" id="cMore">Show ${Math.min(100, shown.length - limit)} more of ${shown.length - limit}</button></div>` : ''}`
-        : empty('No name passes these filters', 'Loosen one, or Reset.');
-      $('#cFoot').innerHTML = `${shown.length.toLocaleString('en-IN')} of ${all.length.toLocaleString('en-IN')} names. Blank cells are unmeasured and sort last — never as zero. Scores describe the business and the chart; none is a forecast.`;
+        : empty('No name passes these conditions', 'Loosen one, switch to Match ANY, or clear them.');
+      $('#cN').textContent = `${shown.length.toLocaleString('en-IN')} of ${all.length.toLocaleString('en-IN')} names`;
+      $('#cFoot').innerHTML = `${st.conds.length ? `${st.conds.length} condition${st.conds.length > 1 ? 's' : ''}, ${st.mode === 'any' ? 'any' : 'all'} must hold. ` : ''}Unmeasured values never pass a numeric condition and sort last — never as zero. Tap a symbol for its card. Scores describe the business and the chart; none is a forecast.`;
       const m = $('#cMore'); if (m) m.onclick = () => { limit += 100; paint(); };
       paintStars();
     };
-    sync(); paint();
-    const on = (id, ev, fn) => { $(id).addEventListener(ev, fn); };
-    on('#cQ', 'input', (e) => { f.q = e.target.value.trim(); limit = 100; paint(); });
-    on('#cSec', 'change', (e) => { f.sector = e.target.value; paint(); });
-    on('#cTr', 'change', (e) => { f.trend = e.target.value; paint(); });
-    on('#cMin', 'input', (e) => { f.minComp = e.target.value.trim(); paint(); });
-    on('#cTurn', 'input', (e) => { f.minTurn = e.target.value.trim(); paint(); });
-    on('#cSig', 'click', () => { f.mine = !f.mine; sync(); paint(); });
-    on('#cReset', 'click', () => { f = Object.assign({}, SDEF); limit = 100; sync(); paint(); toast('Filters reset'); });
-    on('#cSave', 'click', () => { store.set('vis:scrSaved', f); toast('View saved in this browser'); });
-    const ld = $('#cLoad'); if (ld) ld.onclick = () => { f = Object.assign({}, SDEF, store.get('vis:scrSaved', {})); sync(); paint(); toast('Saved view loaded'); };
-    on('#cCsv', 'click', () => {
-      const head = ['symbol', 'name', 'sector', 'close', 'r1d', 'r1w', 'r1m', 'r3m', 'move_score', 'composite', 'quality', 'growth', 'valuation', 'technical', 'rsi', 'pe', 'roce', 'turnover_cr', 'from_high', 'screen_built_at'];
-      const q = (v) => v == null ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
-      const at = (FR.Screen || {}).at || '';
-      const csv = [head.join(',')].concat(shown.map((r) => [r.sym, r.name, r.sector, r.price, r.r1d, r.r1w, r.r1m, r.r3m, moveOf(r).score, r.comp, r.q, r.g, r.v, r.tech, r.rsi, r.pe, r.roce, r.turnover_cr, r.from_high, at].map(q).join(','))).join('\n');
-      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-      a.download = `vision-screen-${istToday()}.csv`; document.body.appendChild(a); a.click(); a.remove();
-      toast(`${shown.length} rows exported`);
+    paintPresets(); paintConds(); paintSaved(); paint();
+    $('#cQ').value = st.q || '';
+    $('#cQ').oninput = (e) => { st.q = e.target.value.trim(); limit = 100; paint(); };
+    el.addEventListener('change', (e) => {
+      if (e.target.closest('.cond')) {
+        const row = e.target.closest('.cond');
+        if (e.target.matches('.c-f')) { const f = SFK[e.target.value]; st.conds[+row.dataset.i] = { f: f[0], op: '>=', v: f[4] === 'b' ? true : f[4] === 'c' ? [] : null }; st.preset = ''; paintConds(); paintPresets(); paint(); return; }
+        if (e.target.matches('.c-op')) { readConds(); const c = st.conds[+row.dataset.i]; c.v = c.op === 'between' ? [null, null] : null; paintConds(); paint(); return; }
+        readConds(); st.preset = ''; paintPresets(); limit = 100; paint();
+      }
+      if (e.target.id === 'cSaved') {
+        const sv = store.get('vis:screens', {}), k = e.target.value;
+        if (k === '__del') { const d = prompt('Name of the saved screen to delete:'); if (d && sv[d]) { delete sv[d]; store.set('vis:screens', sv); toast(`Deleted “${d}”`); } paintSaved(); return; }
+        if (k && sv[k]) { Object.assign(st, sv[k]); st.preset = ''; paintPresets(); paintConds(); paint(); toast(`Loaded “${k}”`); }
+        e.target.value = '';
+      }
     });
-    el.addEventListener('click', (e) => { const b = e.target.closest('[data-sort]'); if (!b) return;
-      const k = b.dataset.sort; f.dir = f.sort === k ? -f.dir : (k === 'sym' || k === 'sector' ? 1 : -1); f.sort = k; paint(); });
+    el.addEventListener('input', (e) => { if (e.target.closest('.cond') && e.target.matches('input.inp')) { readConds(); st.preset = ''; limit = 100; paint(); } });
+    el.addEventListener('click', (e) => {
+      const pr = e.target.closest('[data-pre]'); if (pr) { const p = SPRESETS.find((x) => x[0] === pr.dataset.pre); st.conds = presetConds(p); st.mode = 'all'; st.preset = p[0];
+        $$('[data-mode]', el).forEach((b) => b.setAttribute('aria-pressed', b.dataset.mode === 'all')); paintPresets(); paintConds(); limit = 100; paint(); return; }
+      const md = e.target.closest('[data-mode]'); if (md) { st.mode = md.dataset.mode; $$('[data-mode]', el).forEach((b) => b.setAttribute('aria-pressed', b === md)); paint(); return; }
+      const rm = e.target.closest('[data-rm]'); if (rm) { readConds(); st.conds.splice(+rm.dataset.rm, 1); st.preset = ''; paintPresets(); paintConds(); paint(); return; }
+      if (e.target.closest('#cAdd')) { readConds(); st.conds.push({ f: 'r1m', op: '>=', v: null }); paintConds(); const last = $$('.cond', el).pop(); if (last) $('.c-f', last).focus(); return; }
+      if (e.target.closest('#cClear')) { st.conds = []; st.preset = ''; paintPresets(); paintConds(); paint(); return; }
+      const sb = e.target.closest('[data-sort]'); if (sb) { const k = sb.dataset.sort; st.dir = st.sort === k ? -st.dir : (k === 'sym' || k === 'sector' ? 1 : -1); st.sort = k; paint(); return; }
+      const cd = e.target.closest('[data-card]'); if (cd) { stockCard(cd.dataset.card); return; }
+      if (e.target.closest('#cSave')) { readConds(); const n = prompt('Name this screen:', st.preset ? (SPRESETS.find((p) => p[0] === st.preset) || [])[1] : ''); if (!n) return;
+        const sv = store.get('vis:screens', {}); sv[n.slice(0, 40)] = { conds: st.conds, mode: st.mode, sort: st.sort, dir: st.dir, cols: st.cols }; store.set('vis:screens', sv); paintSaved(); toast(`Saved “${n.slice(0, 40)}” in this browser`); return; }
+      if (e.target.closest('#cShare')) { const url = `${location.origin}${location.pathname}#/screener?s=${encodeScreen(st)}`;
+        (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => toast('Link copied — it carries the conditions and columns'), () => prompt('Copy this link:', url)); return; }
+      if (e.target.closest('#cCols')) { drawer('Columns', `<p class="note">Pick what the table shows. Symbol is always first.</p><div class="colpick">${[...new Set(SF.map((f) => f[2]))].map((g) => `<div><h3>${esc(g)}</h3>${SF.filter((f) => f[2] === g).map((f) => `<label class="chk"><input type="checkbox" data-col="${f[0]}"${st.cols.includes(f[0]) ? ' checked' : ''}>${esc(f[1])}</label>`).join('')}</div>`).join('')}</div>
+          <div class="row"><button class="btn pri" type="button" data-close>Done</button><button class="btn" type="button" data-colreset>Reset columns</button></div>`); return; }
+      if (e.target.closest('#cCsv')) {
+        const cols = st.cols.filter((k) => k !== 'sym' && SFK[k]);
+        const q = (v) => v == null ? '' : Array.isArray(v) ? v.join('|') : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
+        const at = (FR.Screen || {}).at || '';
+        const csv = [['symbol', 'name', ...cols, 'screen_built_at'].join(',')].concat(shown.map((r) => [r.sym, r.name, ...cols.map((k) => { const v = SFK[k][3](r); return typeof v === 'number' ? Math.round(v * 100) / 100 : v; }), at].map(q).join(','))).join('\n');
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        a.download = `vision-screen-${istToday()}.csv`; document.body.appendChild(a); a.click(); a.remove(); toast(`${shown.length} rows exported`);
+      }
+    });
+    /* Column picker lives in the drawer, outside this view's element. */
+    const onCol = (e) => {
+      const c = e.target.closest('[data-col]'); if (c) { const k = c.dataset.col; st.cols = c.checked ? [...st.cols.filter((x) => x !== k), k] : st.cols.filter((x) => x !== k); if (!st.cols.includes('sym')) st.cols.unshift('sym'); paint(); }
+      if (e.target.closest('[data-colreset]')) { st.cols = SCOL_DEF.slice(); $$('[data-col]').forEach((x) => { x.checked = st.cols.includes(x.dataset.col); }); paint(); }
+    };
+    /* One listener for the life of the page, pointed at the current view's
+       handler — attaching per render stacked a new pair on every visit. */
+    COL_HANDLER = onCol;
+    if (!COL_WIRED) { COL_WIRED = true; const L = $('#layer'); const fwd = (e) => COL_HANDLER && COL_HANDLER(e); L.addEventListener('change', fwd); L.addEventListener('click', fwd); }
+    return paint;
   };
 
   /* ── HEATMAP + BREADTH ──────────────────────────────────────────────────── */
   V.heatmap = async (el, arg, alive) => {
-    const o = Object.assign({ size: 'turnover', color: 'r1d', n: 300, group: true }, store.get('vis:hm', {}));
+    const o = Object.assign({ size: 'turnover', color: 'r1d', n: 150, group: true }, store.get('vis:hm2', {}));
     const segBtns = (key, opts) => `<div class="seg" role="group">${opts.map(([v, t]) => `<button type="button" data-k="${key}" data-val="${v}" aria-pressed="${String(o[key]) === String(v)}">${t}</button>`).join('')}</div>`;
     el.innerHTML = vhead('Heatmap', 'The market, by name',
-      'Size is importance, colour is the move. Hover for detail, click for the name. ◆ marks an open signal.', fb('Screen'))
+      'Size is importance, colour is the move. Tap or click any tile for its card — 50-day, 200-day and the 52-week range included.', fb('Screen'))
       + `<div class="pn"><div class="ph" style="flex-wrap:wrap;gap:var(--s-2)">
           ${segBtns('color', [['r1d', '1D'], ['r1w', '1W'], ['r1m', '1M']])}
           ${segBtns('size', [['turnover', 'Turnover'], ['mcap', 'Market cap']])}
-          ${segBtns('n', [[150, 'Top 150'], [300, 'Top 300'], [600, 'Top 600']])}
+          ${segBtns('n', [[60, 'Top 60'], [150, 'Top 150'], [300, 'Top 300']])}
           <div class="ph-r" id="hLeg"></div></div>
         <div class="pb"><div class="hm" id="hMap">${skel(0, 560)}</div></div><div class="pf" id="hFoot"></div></div>
       <div style="height:var(--s-4)"></div>
@@ -1041,17 +1271,19 @@
     const host = $('#hMap'), rows = Object.values(SCR);
     const draw = () => {
       $('#hLeg').innerHTML = heatLegend(o.color);
-      const n = treemap(host, rows, { size: o.size, color: o.color, n: +o.n, height: innerWidth < 760 ? 460 : 620, group: o.group });
+      const res = treemap(host, rows, { size: o.size, color: o.color, n: +o.n, height: innerWidth < 760 ? 520 : 640, group: o.group }), n = res.shown;
       const noCap = rows.filter((x) => !(num(x.mcap_cr) > 0));
-      $('#hFoot').innerHTML = `${n} names, grouped by sector, sized by ${o.size === 'mcap' ? 'market cap' : 'daily turnover'}.`
+      $('#hFoot').innerHTML = `${n} names, grouped by sector; tile area follows the square root of ${o.size === 'mcap' ? 'market cap' : 'daily turnover'}, so order is kept and mid-sized names stay readable.`
+        + (res.capped ? ` <b>Showing ${n} of the ${res.asked} asked for</b> — the most this screen width can label; widen the window or rotate the phone for more.` : '')
         + (o.size === 'mcap' ? ` <span class="warn">${noCap.length} names carry no market cap in the feed and are left out${noCap.length ? ` — including ${noCap.slice().sort((a, b) => (b.turnover_cr || 0) - (a.turnover_cr || 0)).slice(0, 4).map((x) => esc(x.sym)).join(', ')}` : ''}.</span>` : ' Turnover is the default because market cap is missing for some of the largest names.')
         + ` Colour steps are ${o.color === 'r1d' ? '1' : o.color === 'r1w' ? '2' : '4'}× the daily scale so a month is not all one shade.`;
     };
     draw(); wireTips(host);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { MEASURE.memo = {}; if (document.contains(host)) draw(); });
     let w = host.clientWidth; new ResizeObserver(() => { if (Math.abs(host.clientWidth - w) > 8 && document.contains(host)) { w = host.clientWidth; draw(); } }).observe(host);
     el.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (!b) return;
-      o[b.dataset.k] = b.dataset.k === 'n' ? +b.dataset.val : b.dataset.val; store.set('vis:hm', o);
-      $$(`[data-k="${b.dataset.k}"]`, el).forEach((x) => x.setAttribute('aria-pressed', x === b)); draw(); });
+      o[b.dataset.k] = b.dataset.k === 'n' ? +b.dataset.val : b.dataset.val;
+      $$(`[data-k="${b.dataset.k}"]`, el).forEach((x) => x.setAttribute('aria-pressed', x === b)); store.set('vis:hm2', o); draw(); });
 
     const b = r.data.breadth || {};
     const pc = (v) => v == null ? '—' : Number(v).toFixed(1) + '%';
@@ -1347,6 +1579,7 @@
   $('#kOpen').onclick = openPalette;
   $('#thBtn').onclick = toggleTheme;
   window.addEventListener('hashchange', render);
+  window.addEventListener('scroll', hideTip, { passive: true });
 
   /* Live while visible, idle while hidden: a background tab polling Yahoo
      every minute costs the reader battery and the site rate limit for prices
