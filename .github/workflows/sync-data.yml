@@ -44,6 +44,12 @@ on:
     - cron: "30 1 * * *"
     - cron: "40 6 * * *"
     - cron: "40 12 * * *"
+    # Vision's two setups are scanned upstream at 13:28 and 15:45 IST on
+    # trading days (vision_scan.yml, 07:58 and 10:15 UTC). These collect each
+    # run ~20 minutes later; without them a 4H breakout filed at 13:28 would
+    # sit unpublished until the evening sync, a whole candle later.
+    - cron: "20 8 * * 1-5"
+    - cron: "35 10 * * 1-5"
   workflow_dispatch:
   push:
     # ON MAIN ONLY. The branch filter was missing and the trigger fires on a
@@ -190,6 +196,30 @@ jobs:
             printf '  ok    %-12s %s\n' "$f" "$(du -h ".incoming/$f" | cut -f1)"
           else
             printf '  MISS  %-12s not fetched, not valid JS, or missing its export — keeping the copy in this repo\n' "$f"
+            rm -f ".incoming/$f"
+          fi
+
+      # ── VISION'S SIGNALS, FROM feeds/ NOT docs/ ──────────────────────────
+      #
+      # vision_scan.py writes feeds/vision_signals.json upstream — outside
+      # docs/ on purpose, because every docs/ commit there deploys the
+      # newspaper on Vercel, and this file changes twice a trading day. So it
+      # is not in FEEDS, which fetches docs/*.json, and is fetched here by its
+      # own path with the same rule: only valid JSON that says ok replaces
+      # the copy in this repo. Before the first upstream scan it 404s, and
+      # Vision's Signals page says "not published yet" rather than inventing.
+      - name: Fetch Vision's signals
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          f=vision_signals.json
+          if gh api "repos/$UPSTREAM/contents/feeds/$f" \
+               -H "Accept: application/vnd.github.raw" > ".incoming/$f" 2>/dev/null \
+             && python3 -c "import json,sys; d=json.load(open('.incoming/$f')); sys.exit(0 if d.get('ok') and 'history' in d else 1)" 2>/dev/null; then
+            printf '  ok    %-18s %s\n' "$f" "$(du -h ".incoming/$f" | cut -f1)"
+          else
+            printf '  MISS  %-18s not published upstream yet, or not a valid feed — keeping the copy in this repo\n' "$f"
             rm -f ".incoming/$f"
           fi
 

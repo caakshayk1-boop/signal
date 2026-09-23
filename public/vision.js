@@ -118,7 +118,7 @@
   const CADENCE_H = {
     'Live prices': 0.5, 'Ledger': 2, 'Screen': 72, 'Pulse': 72,
     'Barometer': 72, 'Regime': 72, 'Wire': 3, 'Flows': 72,
-    'Institutional': 24 * 120, 'Quotes': 0.5, 'Data health': 36,
+    'Institutional': 24 * 120, 'Quotes': 0.5, 'Data health': 36, 'Signals': 72,
   };
   const mark = (name, at, extra) => { FR[name] = Object.assign({ at, ok: true, t: Date.now() }, extra || {}); paintBadges(); };
   const markFail = (name, error) => { FR[name] = { ok: false, error, t: Date.now() }; paintBadges(); };
@@ -126,7 +126,7 @@
     const f = FR[name];
     if (!f) return { cls: '', txt: 'loading', title: `${name}: loading` };
     if (!f.ok) return { cls: 'failed', txt: 'failed', title: `${name}: ${f.error || 'did not load'}` };
-    if (f.na) return { cls: '', txt: 'nothing to price', title: `${name}: no symbol needed a quote` };
+    if (f.na) return { cls: '', txt: f.naTxt || 'nothing to price', title: `${name}: ${f.naTitle || 'no symbol needed a quote'}` };
     const t = Date.parse(f.at);
     if (!Number.isFinite(t)) return { cls: 'stale', txt: 'undated', title: `${name}: the feed carries no timestamp` };
     /* A feed stamped with a DATE only says which session it describes, not
@@ -284,7 +284,7 @@
 
   /* ── SHELL STATE ──────────────────────────────────────────────────────── */
   const S = {
-    ledger: null, ticker: null, pulse: null, wire: null,
+    ledger: null, ticker: null, pulse: null, wire: null, vsig: null,
     quotes: {}, prevPx: {},
     watch: store.get('vis:watch', []),
     alerts: store.get('vis:alerts', []),
@@ -359,7 +359,7 @@
      every route is a fragment — no route list to keep in step server-side. */
   const NAV = [
     ['overview', 'Overview', '#/'], ['markets', 'Markets', '#/markets'],
-    ['screener', 'Screener', '#/screener'], ['heatmap', 'Heatmap', '#/heatmap'], ['news', 'News', '#/news'],
+    ['screener', 'Screener', '#/screener'], ['setups', 'Signals', '#/setups'], ['heatmap', 'Heatmap', '#/heatmap'], ['news', 'News', '#/news'],
     ['watchlist', 'Watchlist', '#/watchlist'], ['alerts', 'Alerts', '#/alerts'],
   ];
   const ICON = {
@@ -387,7 +387,7 @@
   }
   const BLURB = {
     markets: 'Indices, FX, commodities, crypto, flows', screener: 'Every name on the NSE screen',
-    news: 'The wire, matched to names', alerts: 'Price alerts in this browser',
+    setups: 'Bottom reversal and 4H breakout, with levels', news: 'The wire, matched to names', alerts: 'Price alerts in this browser',
     overview: 'The market on one screen', heatmap: 'Every liquid name, by sector', watchlist: 'Names you follow',
   };
 
@@ -797,6 +797,9 @@
         ${panel('Market intelligence', skel(8), { bodyId: 'oNews', flush: true, fb: 'Wire', more: '#/news', moreText: 'All news' })}
       </div>
       <div style="height:var(--s-4)"></div>
+      ${panel('Signals on the last scan', skel(4), { bodyId: 'oSig', flush: true, fb: 'Signals', more: '#/setups', moreText: 'All signals',
+        foot: 'Bottom reversal (daily) and 4H breakout, each with the stop and three targets it was filed at. New rules, untested — graded in the open on the Signals page.' })}
+      <div style="height:var(--s-4)"></div>
       ${panel('Watchlist', skel(4), { bodyId: 'oWatch', flush: true, more: '#/watchlist', moreText: 'Manage', fb: 'Quotes' })}`;
     const h = $('[data-hero]', el); if (h) h.onclick = () => { store.set('vis:hero', false); h.closest('.hero').remove(); };
 
@@ -904,13 +907,26 @@
       if (!S.ticker) paintMovers();
     };
 
+    const paintSig = async () => {
+      const r = await F.vsig(); if (!alive()) return;
+      const box = $('#oSig'); if (!box) return;
+      if (!r.ok) { box.innerHTML = /not JSON|HTTP 404/.test(r.error || '') ? empty('Not published yet', 'The first scan runs at the next 4-hour close.') : failBox('The signals feed', r.error); return; }
+      const T = r.data.today || [];
+      box.innerHTML = T.length ? `<div class="tw"><table class="tbl dense"><thead><tr><th scope="col">Name</th><th scope="col">Setup</th><th class="r" scope="col">Entry</th><th class="r" scope="col">Stop</th>
+        <th class="r" scope="col">T1</th><th class="r hide-m" scope="col">T2</th><th class="r hide-m" scope="col">T3</th></tr></thead><tbody>
+        ${T.slice(0, 8).map((x) => `<tr><td><a class="sym" href="#/setups">${esc(x.sym)}</a></td><td><span class="chip ${x.engine === 'bottom' ? 'ghost' : ''}">${esc(VS_WORD[x.engine] || x.engine)}</span></td>
+          <td class="r">${inr(x.entry)}</td><td class="r dn">${inr(x.sl)}</td><td class="r">${inr(x.t1)}</td><td class="r hide-m">${inr(x.t2)}</td><td class="r hide-m">${inr(x.t3)}</td></tr>`).join('')}</tbody></table></div>
+        ${T.length > 8 ? `<div class="pb note" style="padding-top:var(--s-2)">${T.length - 8} more on the Signals page.</div>` : ''}`
+        : empty('Nothing qualified on the last scan', 'Neither rule was met on the last completed bar.');
+    };
+
     const paintWatch = async () => {
       const box = $('#oWatch'); if (!box) return;
       box.innerHTML = await watchTable({ compact: true });
       if (!alive()) return;
     };
 
-    await Promise.all([paintPulse(), paintLeaders(), paintNews(), paintHeat(), (async () => { await tickerP; paintMovers(); })()]);
+    await Promise.all([paintPulse(), paintLeaders(), paintNews(), paintHeat(), paintSig(), (async () => { await tickerP; paintMovers(); })()]);
     await refreshQuotes(); if (!alive()) return;
     await paintWatch();
     return async () => { paintMovers(); await paintWatch(); };
@@ -1506,6 +1522,142 @@
   /* ── DISCLAIMER ─────────────────────────────────────────────────────────
      Vision's own, so the legal line never depends on another product being
      up. The one-line version sits above every page; this is the full text. */
+  /* ── SIGNALS ────────────────────────────────────────────────────────────
+     Two rules, and only these two: a bottom reversal on daily bars and a
+     4-hour breakout on a solid bullish close. Both are computed upstream by
+     trading-dashboard's scanner.py over the same ~1,000 names the screen
+     covers, and published as /vision_signals.json. Nothing here computes a
+     signal, a level or a grade — the page reads them and says how old they are.
+
+     Each signal is FILED once with its levels fixed at the bar that fired it,
+     then graded on later bars. The rules are new and untested, so the page
+     prints counts and never a win rate or an expectancy: a rate over a handful
+     of trades is noise wearing a percent sign. */
+  const VS_NEED = 30;
+  const VS_WORD = { bottom: 'Bottom reversal', brk4h: '4H breakout' };
+  const VS_STATUS = {
+    open: ['Open', ''], t3: ['Reached T3', 'up'], expired: ['Expired', 'warn'], stopped: ['Stopped', 'dn'],
+    stopped_after_t1: ['Stopped after T1', 'warn'], stopped_after_t2: ['Stopped after T2', 'warn'],
+  };
+  F.vsig = async () => {
+    const r = await get('/vision_signals.json', 600000);
+    if (r.ok) { mark('Signals', r.data.generated_at); S.vsig = r.data; }
+    /* Absent before the first upstream scan: a state, not a failure — the
+       badge must not say "failed" beside a panel that says "not yet". */
+    else if (/not JSON|HTTP 404/.test(r.error || '')) { FR.Signals = { ok: true, na: true, naTxt: 'not yet published', naTitle: 'no scan has run yet', t: Date.now() }; paintBadges(); }
+    else markFail('Signals', r.error);
+    return r;
+  };
+  const vsFired = (s) => s.engine === 'brk4h' ? (s.candle || s.fired_at) : `close of ${dshort(s.fired_at)}`;
+  /* The ladder: stop, entry and three targets on one scale, with the live mark
+     on it when there is one. Positions are the prices themselves, not bands. */
+  const vsLadder = (s, px) => {
+    const lo = Math.min(s.sl, px == null ? s.sl : px), hi = Math.max(s.t3, px == null ? s.t3 : px), w = hi - lo;
+    if (!(w > 0)) return '';
+    const at = (v) => clamp((v - lo) / w * 100, 0, 100).toFixed(2);
+    return `<div class="vs-lad" role="img" aria-label="Stop ₹${fmt(s.sl, 2)}, entry ₹${fmt(s.entry, 2)}, targets ₹${fmt(s.t1, 2)}, ₹${fmt(s.t2, 2)}, ₹${fmt(s.t3, 2)}${px != null ? `, now ₹${fmt(px, 2)}` : ''}">
+      <i class="risk" style="left:${at(s.sl)}%;width:${(at(s.entry) - at(s.sl)).toFixed(2)}%"></i><i class="rew" style="left:${at(s.entry)}%;width:${(at(s.t3) - at(s.entry)).toFixed(2)}%"></i>
+      ${[['sl', s.sl], ['en', s.entry], ['t', s.t1], ['t', s.t2], ['t', s.t3]].map(([k, v]) => `<b class="${k}" style="left:${at(v)}%"></b>`).join('')}
+      ${px != null ? `<em style="left:${at(px)}%" title="Live ₹${fmt(px, 2)}"></em>` : ''}</div>`;
+  };
+  const vsLevels = (s) => {
+    const r = s.rr || [], pct = (v) => (v - s.entry) / s.entry * 100;
+    const cell = (k, v, sub, cls) => `<div class="${cls || ''}"><em>${k}</em><b class="num">₹${fmt(v, v >= 1000 ? 1 : 2)}</b><small>${sub}</small></div>`;
+    const risk = s.entry - s.sl;
+    return `<div class="vs-lv">${cell('Entry', s.entry, 'at the close')}${cell('Stop', s.sl, `−${Number(s.risk_pct).toFixed(1)}%`, 'dn')}
+      <div><em>Risk · 1R</em><b class="num">₹${fmt(risk, risk >= 100 ? 1 : 2)}</b><small>per share</small></div>
+      ${cell('T1', s.t1, `+${pct(s.t1).toFixed(1)}% · ${r[0] != null ? r[0].toFixed(1) + 'R' : '—'}`, 'up')}${cell('T2', s.t2, `+${pct(s.t2).toFixed(1)}% · ${r[1] != null ? r[1].toFixed(1) + 'R' : '—'}`, 'up')}
+      ${cell('T3', s.t3, `+${pct(s.t3).toFixed(1)}% · ${r[2] != null ? r[2].toFixed(1) + 'R' : '—'}`, 'up')}</div>`;
+  };
+  const vsState = (s, px) => {
+    const g = s.grade || { status: 'open', targets_hit: 0 };
+    const [w, k] = VS_STATUS[g.status] || [g.status, ''];
+    const hit = g.status === 'open' && g.targets_hit ? ` · T${g.targets_hit} reached` : '';
+    const live = px != null ? ` · now ${chg((px - s.entry) / s.entry * 100, 1)} from entry` : '';
+    return `<span class="chip ${k}">${esc(w)}${hit}</span>${g.ambiguous ? ' <span class="chip warn" title="One bar touched both the stop and a target. It is booked as the stop — the bar alone cannot say which came first.">ambiguous bar</span>' : ''}<span class="mut">${live}</span>`;
+  };
+  const vsCard = (s) => {
+    const lv = liveOf(s.sym), px = lv ? lv.price : null, g = s.grade || {};
+    return `<article class="vs-card" data-eng="${esc(s.engine)}">
+      <header><div class="vs-id"><div class="vs-sym"><a class="sym lnk" href="#/asset/${esc(s.sym)}" data-sym="${esc(s.sym)}">${esc(s.sym)}</a>${star(s.sym)}</div>
+        <div class="mut" title="${esc(s.name || '')}">${esc(s.name || '')}${s.sector ? ' · ' + esc(s.sector) : ''}</div></div>
+        <div class="vs-eng"><span class="chip ${s.engine === 'bottom' ? 'ghost' : ''}">${esc(VS_WORD[s.engine] || s.engine)}</span><small>${esc(vsFired(s))}</small></div></header>
+      ${vsLevels(s)}${vsLadder(s, px)}
+      <div class="vs-st">${vsState(s, px)}</div>
+      <details class="vs-why"><summary>Why this fired</summary><ul>${(s.why || []).map((w) => `<li>${esc(w)}</li>`).join('')}</ul>
+        <p class="note">Filed ${s.filed_at ? esc(new Date(s.filed_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })) + ' IST' : '—'}${g.bars ? ` · ${g.bars} ${s.engine === 'brk4h' ? '4H candles' : 'sessions'} since` : ''}. Levels are fixed at filing and do not move.</p></details>
+    </article>`;
+  };
+  const vsCounts = (c) => {
+    c = c || {}; const closed = (c.stopped || 0) + (c.expired || 0) + (c.t3 || 0);
+    return `<div class="kv" style="margin-top:var(--s-3)"><div><em>Filed</em><b>${c.filed || 0}</b></div><div><em>Open</em><b>${c.open || 0}</b></div>
+      <div><em>Reached T1+</em><b>${c.t1_or_better || 0}</b><small>open or closed</small></div><div><em>Stopped</em><b>${c.stopped || 0}</b></div>
+      <div><em>Expired</em><b>${c.expired || 0}</b></div><div><em>T3</em><b>${c.t3 || 0}</b></div></div>
+      <p class="note" style="margin:var(--s-2) 0 0">${closed} of the ${VS_NEED} closed trades needed before a win rate means anything${closed >= VS_NEED ? '' : ' — none is printed until then'}.</p>`;
+  };
+  V.setups = async (el, arg, alive) => {
+    const f = { eng: store.get('vis:vs-eng', '') };
+    el.innerHTML = vhead('Signals', 'Two setups, filed and graded',
+      'A bottom reversal on daily bars and a breakout on a 4-hour close, across the ~1,000 names on the screen. Each is filed once with its stop and three targets, then graded on the bars that follow. Research, not advice.', fb('Signals'))
+      + `<div id="vsBody">${skel(10)}</div>`;
+    const [r] = await Promise.all([F.vsig(), F.screen()]);
+    if (!alive()) return;
+    const B = $('#vsBody');
+    if (!r.ok) {
+      B.innerHTML = `<div class="pn">${/not JSON|HTTP 404/.test(r.error || '') ? empty('Not published yet',
+        'The first scan runs at the next 4-hour close — 13:28 or 15:45 IST on a trading day. Until it has run there is nothing to show, and nothing is shown in its place.')
+        : failBox('The signals feed', r.error)}</div>`;
+      return;
+    }
+    const D = r.data, hist = D.history || [], rules = D.rules || {};
+    const today = D.today || [], todayKey = new Set(today.map((s) => s.engine + '|' + s.sym));
+    const openOld = hist.filter((h) => (h.grade || {}).status === 'open' && !todayKey.has(h.engine + '|' + h.sym));
+    const closed = hist.filter((h) => h.grade && h.grade.status !== 'open');
+    Object.assign(S.quotes, await F.quotes([...today, ...openOld].map((s) => s.sym)));
+    if (!alive()) return;
+    const cov = D.coverage || {}, covTxt = ['daily', 'hourly'].map((k) => cov[k] ? `${k} bars for ${cov[k].got} of ${cov[k].asked}` : null).filter(Boolean).join(', ');
+    const ruleBox = (k) => { const x = rules[k]; if (!x) return '';
+      return panel(x.name, `<p class="note" style="margin:0 0 var(--s-2)"><b>${esc(x.timeframe)}</b> · horizon ${esc(x.horizon)}</p>
+        <ol class="vs-rule">${x.rule.map((t) => `<li>${esc(t)}</li>`).join('')}</ol><p class="note" style="margin:var(--s-2) 0 0">Gate: ${esc(x.gate)}</p>${vsCounts((D.counts || {})[k])}`,
+        { n: `${today.filter((s) => s.engine === k).length} now` }); };
+    const paint = () => {
+      const pick = (xs) => f.eng ? xs.filter((s) => s.engine === f.eng) : xs;
+      const T = pick(today), O = pick(openOld), C = pick(closed);
+      $('#vsNow').innerHTML = T.length ? `<div class="vs-grid">${T.map(vsCard).join('')}</div>`
+        : empty('Nothing qualifies on the last scan', `No name ${f.eng ? `met the ${esc(VS_WORD[f.eng])} rule` : 'met either rule'} on the last completed bar. That is a result — the rules are strict on purpose.`);
+      $('#vsNowN').textContent = T.length;
+      $('#vsOpen').innerHTML = O.length ? `<div class="vs-grid">${O.map(vsCard).join('')}</div>` : empty('None', 'Every open filing still qualifies, or there are none.');
+      $('#vsOpenN').textContent = O.length;
+      $('#vsClosed').innerHTML = C.length ? `<div class="tw"><table class="tbl dense"><thead><tr><th scope="col">Name</th><th scope="col">Setup</th><th scope="col" class="hide-m">Fired</th>
+        <th class="r" scope="col">Entry</th><th class="r" scope="col">Exit</th><th class="r" scope="col">Move</th><th scope="col">Result</th><th class="r hide-m" scope="col">Bars</th></tr></thead><tbody>
+        ${C.map((s) => { const g = s.grade, [w, k] = VS_STATUS[g.status] || [g.status, ''];
+          return `<tr><td><a class="sym lnk" href="#/asset/${esc(s.sym)}" data-sym="${esc(s.sym)}">${esc(s.sym)}</a></td><td>${esc(VS_WORD[s.engine] || s.engine)}</td><td class="hide-m">${esc(vsFired(s))}</td>
+            <td class="r">${inr(s.entry)}</td><td class="r">${inr(g.exit)}</td><td class="r">${chg((g.exit - s.entry) / s.entry * 100, 1)}</td>
+            <td><span class="chip ${k}">${esc(w)}</span>${g.ambiguous ? ' <span class="chip warn" title="Booked as the stop: one bar touched both.">ambiguous</span>' : ''}</td><td class="r hide-m num">${g.bars}</td></tr>`; }).join('')}</tbody></table></div>`
+        : empty('Nothing has closed yet', 'A filing closes at its stop, at T3, or at its horizon. The first ones will appear here, losses included.');
+      $('#vsClosedN').textContent = C.length;
+    };
+    B.innerHTML = `<div class="grid g-2">${ruleBox('bottom')}${ruleBox('brk4h')}</div>
+      <div class="pn vs-bar"><div class="ph" style="flex-wrap:wrap;gap:var(--s-2)"><div class="seg" role="group" aria-label="Setup">${[['', 'Both'], ['bottom', 'Bottom reversal'], ['brk4h', '4H breakout']].map(([k, t]) => `<button type="button" data-ve="${k}" aria-pressed="${f.eng === k}">${t}</button>`).join('')}</div>
+        <div class="ph-r"><span class="note">${esc(covTxt)}${D.universe ? ` · universe ${D.universe}` : ''}</span></div></div></div>
+      <section class="pn"><div class="ph"><h2>Qualifying on the last scan</h2><span class="n" id="vsNowN"></span><div class="ph-r">${fb('Quotes')}</div></div><div class="pb" id="vsNow"></div></section>
+      <div style="height:var(--s-4)"></div>
+      <section class="pn"><div class="ph"><h2>Still open, no longer qualifying</h2><span class="n" id="vsOpenN"></span></div><div class="pb" id="vsOpen"></div>
+        <div class="pf">A filing stays open until its stop, T3 or its horizon, whether or not the rule still holds today.</div></section>
+      <div style="height:var(--s-4)"></div>
+      <section class="pn"><div class="ph"><h2>Closed</h2><span class="n" id="vsClosedN"></span></div><div class="pb flush" id="vsClosed"></div></section>
+      <div style="height:var(--s-4)"></div>
+      ${panel('How the levels are set', `<p class="note" style="margin:0">${esc(D.levels || '')}</p>
+        <p class="note">Graded on completed bars after the one that fired. A bar that touches both the stop and a target is booked as the stop and marked <i>ambiguous</i> — assuming the favourable order is how a record flatters itself. The stop does not trail.</p>
+        <p class="note" style="margin-bottom:0"><b>${esc(D.note || '')}</b></p>`, {})}`;
+    paint();
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-ve]'); if (b) { f.eng = b.dataset.ve; store.set('vis:vs-eng', f.eng); $$('[data-ve]', el).forEach((x) => x.setAttribute('aria-pressed', x === b)); paint(); return; }
+      const a = e.target.closest('a.sym.lnk[data-sym]'); if (a && !(e.metaKey || e.ctrlKey || e.shiftKey) && SCR && SCR[a.dataset.sym]) { e.preventDefault(); stockCard(a.dataset.sym); }
+    });
+    return paint;
+  };
+
   V.disclaimer = async (el) => {
     el.innerHTML = vhead('Disclaimer', 'What this site is, and what it is not',
       'The short version: educational research and market data, not advice, and not registered.')
@@ -1547,7 +1699,8 @@
      every pending alert and every open signal the ticker's ledger map missed. */
   async function refreshQuotes() {
     const have = tickLedger();
-    const want = new Set([...S.watch.map((w) => w.s), ...S.alerts.filter((a) => !a.fired).map((a) => a.s),
+    const vs = S.vsig ? [...(S.vsig.today || []), ...(S.vsig.history || []).filter((h) => (h.grade || {}).status === 'open')].map((h) => h.sym) : [];
+    const want = new Set([...S.watch.map((w) => w.s), ...S.alerts.filter((a) => !a.fired).map((a) => a.s), ...vs,
     ].filter((s) => !have[s]));
     if (want.size) Object.assign(S.quotes, await F.quotes([...want]));
     /* Nothing to ask for is a state too: every name is already priced by the
