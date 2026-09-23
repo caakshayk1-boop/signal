@@ -1,7 +1,7 @@
 /* ── ONE ARITHMETIC, TWO PRODUCTS ─────────────────────────────────────────
  *
- * vision.js carries its own copy of the record statistics and the move score
- * rather than importing signal.js — that bundle is 500 KB and runs a whole
+ * vision.js carries its own copy of the move score rather than importing
+ * signal.js — that bundle is 500 KB and runs a whole
  * router on load. A copy is the right trade only if it cannot drift, so the
  * copy is not hand-kept: `node scripts/verbatim.mjs` writes it out of
  * signal.js, and test/guard.mjs extracts the same definitions from both files
@@ -9,14 +9,14 @@
  *
  * Comments and whitespace are ignored by the comparison; code is not. A fix
  * made in signal.js and not re-copied fails the build instead of quietly
- * giving the two sites different answers to "how has this book done".
+ * giving the two products different scores for the same name.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 
+/* The move score only. Vision carried the ledger's record statistics too
+   until signals were taken out of it (2026-09-23); they will return with the
+   rebuilt signal product, not as a copy. */
 export const CORE = [
-  "LAUNCH", "pubDay", "sinceLaunch", "withdrawn", "isScored",
-  "tStat", "lgamma", "betacf", "betai", "tPValue", "recordOf",
-  "ENGINES", "engineOk", "longOnly",
   /* `band` is declared five times in signal.js, in five scopes; the radar's is
      the one taking a range. A name alone would silently copy the first. */
   "band = (v, lo, hi)", "avg", "radarParts", "RADAR_W", "radarPriority", "radarRisk",

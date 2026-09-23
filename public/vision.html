@@ -4,10 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Vision — your market cockpit</title>
-<meta name="description" content="Market state, the open signals and why they fired, a heatmap of the NSE screen and every name on it — one cockpit over the same public ledger as signal.askakshay.com.">
-<!-- noindex until the product has earned a canonical of its own. It carries
-     the same data as signal.askakshay.com, and two indexed pages saying the
-     same thing is a duplicate-content penalty on both. -->
+<meta name="description" content="A market cockpit for Indian equities: market state, a heatmap of the NSE screen, what is moving and why, every name on the screen, the wire and your watchlist — every number with its age.">
+<!-- noindex until the product has earned a canonical of its own. -->
 <meta name="robots" content="noindex,follow">
 <meta name="theme-color" content="#07090D">
 <meta name="color-scheme" content="dark light">
@@ -17,8 +15,7 @@
 <link rel="stylesheet" href="/vision.css">
 <script>
 /* Theme before first paint. DARK IS THE DEFAULT here — a cockpit is read on a
-   dark ground — and the key is vision's own, so choosing light on
-   signal.askakshay.com does not flip this product. */
+   dark ground — under a storage key of this product's own. */
 (function(){try{
   var c=localStorage.getItem('vis:theme');
   if(c!=='dark'&&c!=='light') c='dark';
@@ -28,18 +25,20 @@
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<aside class="dscl" role="note"><b>Research and market data, published for education.</b>
+<aside class="dscl" role="note"><span class="dscl-full"><b>Research and market data, published for education.</b>
   Not registered with SEBI as a Research Analyst or Investment Adviser. Nothing here is a recommendation to buy or sell.
-  <a href="https://signal.askakshay.com/disclaimer">Disclaimer</a></aside>
+  <a href="#/disclaimer">Disclaimer</a></span>
+  <button class="dscl-m" type="button" data-dscl>⚠ Educational research · not SEBI RA/IA · not advice <span aria-hidden="true">›</span></button></aside>
 
 <header class="top">
   <div class="top-in">
     <a class="brand" href="#/" aria-label="Vision — overview"><i></i>VISION<em>.AKSHAY</em></a>
     <nav class="nav" id="nav" aria-label="Primary"></nav>
     <div class="top-r">
+      <span class="mkt" id="mkt" role="status" aria-live="off"></span>
       <button class="kbtn" id="kOpen" type="button" aria-label="Search symbols and pages">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <span class="lbl">Search symbol, page…</span><kbd>⌘K</kbd></button>
+        <span class="lbl">Search symbol, page…</span><span class="lbl-m">Search</span><kbd>⌘K</kbd></button>
       <a class="ibtn" href="#/alerts" id="aBtn" aria-label="Alerts">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></a>
       <button class="ibtn" id="thBtn" type="button" aria-label="Switch theme">
@@ -54,9 +53,7 @@
 
 <nav class="tabs" id="tabs" aria-label="Sections"></nav>
 <div id="layer"></div>
-<noscript><p style="padding:24px">Vision needs JavaScript. The same data is readable without it on
-  <a href="https://signal.askakshay.com/">signal.askakshay.com</a>.</p></noscript>
-<script src="/engines.js"></script>
+<noscript><p style="padding:24px">Vision needs JavaScript to fetch and draw live market data.</p></noscript>
 <script src="/vision.js"></script>
 </body>
 </html>

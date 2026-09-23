@@ -1829,10 +1829,20 @@ try {
     for (const t of tiles) { const k = step(t); if (k != null) dist[k]++; }
     const lum = (c) => { const m = c.match(/[\d.]+/g); if (!m) return null;
       const [r, g, b] = m.map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    /* A PROBE, NOT A SAMPLE. This read the alpha off a live tile of each
+       step, so on a calm session — VIX near 11 on 2026-09-23, no name moving
+       four of its own ranges — there was no ht-u4 tile to read and the check
+       failed on the market rather than on the ramp. The ramp is a property of
+       the stylesheet, so it is read from an element carrying each class,
+       placed where the tiles live so it inherits the same custom properties. */
     const alphaOf = (k) => {
-      const t = tiles.find(x => x.classList.contains("ht-u" + k));
-      if (!t) return null;
-      const m = getComputedStyle(t).backgroundImage.match(/rgba?\([^)]*?([\d.]+)\)/);
+      const host = (tiles[0] && tiles[0].parentElement) || document.body;
+      const p = document.createElement("div");
+      p.className = "ht ht-u" + k;
+      p.style.cssText = "position:absolute;visibility:hidden;width:1px;height:1px";
+      host.appendChild(p);
+      const m = getComputedStyle(p).backgroundImage.match(/rgba?\([^)]*?([\d.]+)\)/);
+      p.remove();
       return m ? Number(m[1]) : null;
     };
     return {
@@ -2466,8 +2476,9 @@ try {
   const vInfo = await v.evaluate(() => ({
     theme: document.documentElement.getAttribute("data-theme"),
     panels: [...document.querySelectorAll(".pn .ph h2")].map((h) => h.textContent.trim()),
-    radar: document.querySelectorAll("#oRadar .sig").length,
-    radarEmpty: !!document.querySelector("#oRadar .st"),
+    leaders: document.querySelectorAll("#oLead .lst li").length,
+    leadersEmpty: !!document.querySelector("#oLead .st"),
+    signalLinks: [...document.querySelectorAll("a[href]")].map((a) => a.href).filter((h) => /signal\.askakshay|gems\.askakshay/.test(h)),
     tiles: document.querySelectorAll("#oHeat .hm-t").length,
     ticker: document.querySelectorAll("#tickIn .tk").length,
     badges: [...document.querySelectorAll(".fb")].map((b) => b.textContent.trim()),
@@ -2476,17 +2487,16 @@ try {
   ok("vision boots with no page error or CSP refusal", vErr.length === 0, vErr.slice(0, 3));
   ok("vision opens dark", vInfo.theme === "dark", vInfo.theme);
   ok("vision paints its cockpit panels",
-     ["Market pulse", "Signal radar", "Market heatmap", "Top movers", "Market intelligence", "Watchlist"]
+     ["Market pulse", "Move leaders", "Market heatmap", "Top movers", "Market intelligence", "Watchlist"]
        .every((t) => vInfo.panels.some((p) => p.toLowerCase() === t.toLowerCase())), vInfo.panels);
-  ok("the radar shows open signals, or says there are none", vInfo.radar > 0 || vInfo.radarEmpty, vInfo);
+  ok("move leaders are ranked, or the panel says why not", vInfo.leaders > 0 || vInfo.leadersEmpty, vInfo.leaders);
+  ok("vision links to no signal site", vInfo.signalLinks.length === 0, vInfo.signalLinks);
   ok("the heatmap drew tiles", vInfo.tiles >= 50, vInfo.tiles);
   ok("the ticker strip rendered", vInfo.ticker >= 6, vInfo.ticker);
   ok("no freshness badge is stuck on 'loading'", !vInfo.badges.includes("loading"), vInfo.badges);
   ok("vision prints no NaN, undefined or null", !/\bNaN\b|\bundefined\b|\bnull\b/.test(vInfo.text), (vInfo.text.match(/.{0,30}(NaN|undefined).{0,30}/) || [""])[0]);
-  /* Engines that do not score must not print a zero as though they rated it. */
-  ok("no ledger score renders as a bare 0", !(await v.$$eval("#oRadar .sig-sc", (els) => els.some((e) => e.textContent.trim() === "0"))));
 
-  for (const [hash, sel] of [["#/signals", "#sBody"], ["#/record", "#rBody"], ["#/screener", "#cBody"], ["#/heatmap", "#hMap"]]) {
+  for (const [hash, sel] of [["#/screener", "#cBody"], ["#/heatmap", "#hMap"], ["#/markets", "#mBoards"], ["#/watchlist", "#wBody"]]) {
     await v.evaluate((h) => { location.hash = h; }, hash);
     await settled(v, SETTLE + 3000);
     const st = await v.evaluate((s2) => { const el = document.querySelector(s2); return el ? { sk: !!el.querySelector(".sk"), txt: el.innerText.slice(0, 80) } : null; }, sel);
