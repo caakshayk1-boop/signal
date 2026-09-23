@@ -513,3 +513,14 @@ select.inp{padding-right:var(--s-5)}
 .mini i.na{background:repeating-linear-gradient(135deg,var(--panel-3) 0 2px,transparent 2px 4px)}
 .prose h3{margin:var(--s-5) 0 var(--s-2);font-size:var(--t-lg)}
 .prose p{margin:0;color:var(--ink-2);max-width:72ch;line-height:1.6}
+
+/* ── RESERVED HEIGHTS ─────────────────────────────────────────────────────────
+ * Measured at 4× CPU / slow 4G: the Pulse and Move-leaders bodies grew from
+ * their skeletons to their content after first paint and pushed every panel
+ * below them down — CLS 0.159 on a phone, 0.088 on a desktop. Each body now
+ * reserves roughly its settled height, so a late feed fills space instead of
+ * moving the page. Heights are the measured ones, rounded down, so a short
+ * state (an error, an empty list) is not left in a large gap. */
+#oPulse{min-height:500px} #oLead{min-height:420px}
+@media (max-width:1080px){ #oPulse{min-height:620px} }
+@media (max-width:760px){ #oMov,#oNews{min-height:560px} }

@@ -15,12 +15,15 @@
  *   node scripts/vision-dev.mjs [port]            everything the snapshot has
  *   VDEV_FAIL=ticker,wire node scripts/vision-dev.mjs   force failures
  *   VDEV_SLOW=1500 node scripts/vision-dev.mjs    add latency to every /api
+ *   VDEV_SITE=signal node scripts/vision-dev.mjs  serve signal.askakshay.com's
+ *                                                 shell instead, for audits
  */
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "public");
 const PORT = Number(process.argv[2] || 8799);
@@ -31,6 +34,7 @@ const SLOW = Number(process.env.VDEV_SLOW || 0);
    so the record page can be exercised locally. Off by default: the snapshot
    genuinely carries no R, and the page must be seen refusing that too. */
 const GRADE = !!process.env.VDEV_GRADE;
+const SITE = process.env.VDEV_SITE === "signal" ? "signal" : "vision";
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css",
   ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png",
   ".woff2": "font/woff2", ".webmanifest": "application/manifest+json", ".txt": "text/plain" };
@@ -122,9 +126,15 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { "content-type": "application/json" });
     return res.end(JSON.stringify(API[key](u.searchParams)));
   }
-  if (p === "/" || p === "/vision") p = "/vision.html";
+  if (SITE === "vision" && (p === "/" || p === "/vision")) p = "/vision.html";
+  /* The signal site routes by PATH: anything that is not a file is its shell. */
+  if (SITE === "signal" && !/\.[a-z0-9]+$/i.test(p)) p = p === "/vision" ? "/vision.html" : "/index.html";
   const f = join(ROOT, p);
   if (!f.startsWith(ROOT) || !existsSync(f)) { res.writeHead(404); return res.end("not found"); }
-  res.writeHead(200, { "content-type": TYPES[extname(f)] || "application/octet-stream", "cache-control": "no-store" });
-  res.end(await readFile(f));
+  /* Gzipped like the edge does, or every load-time number measured through
+     this harness is several times worse than production's. */
+  const body = await readFile(f), ct = TYPES[extname(f)] || "application/octet-stream";
+  const gz = /gzip/.test(req.headers["accept-encoding"] || "") && /text|javascript|json|svg|css/.test(ct);
+  res.writeHead(200, { "content-type": ct, "cache-control": "no-store", ...(gz ? { "content-encoding": "gzip" } : {}) });
+  res.end(gz ? gzipSync(body) : body);
 }).listen(PORT, () => console.log(`vision dev → http://127.0.0.1:${PORT}/  (fail: ${[...FAIL].join(",") || "none"})`));

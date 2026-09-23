@@ -1112,13 +1112,68 @@
         before it trusts an engine.` : ''}`;
   };
   const fmtR = v => `${v > 0 ? '+' : ''}${Number(v).toFixed(2)}R`;
+
+  /* ── SIGNAL INTEGRITY ─────────────────────────────────────────────────
+   * The arithmetic of the book, as an instrument rather than a sentence:
+   * every signal in the book in exactly one bucket, the buckets summing to
+   * the total in plain sight, and the population, cutoff and as-of beside
+   * them. It was a sentence ("50 published = 15 + 35 + 0 + 0"), which a
+   * reader has to parse to audit — and which printed `undefined` four times
+   * the one week the book had nothing closed.
+   *
+   * The sum is ASSERTED here, not left to the reader: if the buckets ever
+   * fail to add up the block says so in red rather than rounding it away. */
+  const integrityBlock = (LR) => {
+    const b = LR.bucket || { closed: 0, open: 0, withdrawn: 0, expired: 0, other: 0 };
+    const cells = [['Closed', b.closed, 'graded to an R multiple'], ['Open', b.open, 'not yet resolved'],
+                   ['Expired', b.expired, 'never filled'], ...(b.other ? [['Other', b.other, 'no recognised state']] : [])];
+    const sum = cells.reduce((a, c) => a + (Number(c[1]) || 0), 0);
+    const ok = sum === LR.published;
+    const at = LR.asOf ? new Date(LR.asOf) : null;
+    const when = at && Number.isFinite(at.getTime())
+      ? at.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) + ' IST'
+      : null;
+    return `<div class="integ" role="group" aria-label="Signal integrity">
+      <div class="integ-h"><b>Signal integrity</b><span>${LR.live === false ? 'build-time snapshot' : 'live ledger'}</span></div>
+      <div class="integ-r">
+        <div class="integ-c tot"><b>${LR.published}</b><em>in the book</em></div>
+        <i class="integ-eq" aria-hidden="true">=</i>
+        ${cells.map(([k, v, t], n) => `${n ? '<i class="integ-eq" aria-hidden="true">+</i>' : ''}<div class="integ-c${v ? '' : ' z'}" title="${esc(t)}"><b>${v}</b><em>${esc(k)}</em></div>`).join('')}
+      </div>
+      ${ok ? '' : `<p class="integ-bad">These do not sum to ${LR.published} (they sum to ${sum}). That is a defect in this page, not rounding — the ledger itself is the authority.</p>`}
+      <dl class="integ-m">
+        <div><dt>Population</dt><dd>Long signals from live engines, rupee-quoted</dd></div>
+        <div><dt>Cutoff</dt><dd>Published on or after ${esc(LAUNCH)}</dd></div>
+        ${LR.withdrawnN != null ? `<div><dt>Withdrawn</dt><dd>${LR.withdrawnN} pulled before entry — outside the book, listed on the ledger</dd></div>` : ''}
+        <div><dt>As of</dt><dd>${when ? esc(when) : LR.asOfDay ? `snapshot, newest row filed ${esc(LR.asOfDay)}` : 'the ledger carried no timestamp'}</dd></div>
+      </dl>
+      <a class="integ-a" href="/methodology">How this is calculated →</a></div>`;
+  };
   const fmtP = v => v == null ? '—'
     : v < 0.001 ? '&lt;0.001'
     : Number(v).toFixed(3);
 
   const recordOf = rows => {
     const closed = rows.filter(isScored);
-    if (!closed.length) return { trades: 0, wins: 0, losses: 0, win_rate: null,
+    /* THE BUCKETS COME FIRST, BECAUSE AN EMPTY BOOK STILL HAS THEM.
+     * They were counted after the early return below, so a book with nothing
+     * closed returned no `bucket` at all — and the front page's reconciliation
+     * line, reading `LR.bucket || {}`, printed "47 published = undefined closed
+     * and graded + undefined still open + undefined withdrawn before entry +
+     * undefined expired unfilled" on every day before the first close. The
+     * zero-closed case is exactly the day a new reader most needs the
+     * arithmetic, and it was the one day it could not be shown. */
+    const bucket = { closed: 0, open: 0, withdrawn: 0, expired: 0, other: 0 };
+    for (const r of rows) {
+      const st = String(r.status || '').toUpperCase();
+      const bd = String(r.badge || '').toLowerCase();
+      if (isScored(r)) bucket.closed += 1;
+      else if (withdrawn(r)) bucket.withdrawn += 1;
+      else if (st === 'EXPIRED') bucket.expired += 1;
+      else if (st === 'OPEN' || bd === 'open') bucket.open += 1;
+      else bucket.other += 1;
+    }
+    if (!closed.length) return { bucket, trades: 0, wins: 0, losses: 0, win_rate: null,
                                  expectancy_r: null, t: null, p: null,
                                  ci: null, significant: false };
     const wins = closed.filter(r => Number(r.r_multiple) > 0).length;
@@ -1156,16 +1211,6 @@
      * Zero-count buckets are PRINTED, not omitted. A withdrawn count of zero
      * is information; a missing withdrawn row is the thing that looks like
      * filtering. */
-    const bucket = { closed: 0, open: 0, withdrawn: 0, expired: 0, other: 0 };
-    for (const r of rows) {
-      const st = String(r.status || '').toUpperCase();
-      const bd = String(r.badge || '').toLowerCase();
-      if (isScored(r)) bucket.closed += 1;
-      else if (withdrawn(r)) bucket.withdrawn += 1;
-      else if (st === 'EXPIRED') bucket.expired += 1;
-      else if (st === 'OPEN' || bd === 'open') bucket.open += 1;
-      else bucket.other += 1;
-    }
     return { bucket, trades: n, wins, losses: n - wins,
              win_rate: Math.round(wins / n * 1000) / 10,
              expectancy_r: Math.round(mean * 1000) / 1000,
@@ -2581,7 +2626,7 @@
     return `<div class="breadth">
       <div class="breadth-n">
         <span><b class="up">${b.up}</b> <span style="color:var(--dim)">up</span></span>
-        <span style="color:var(--dim);font:400 11px/1 var(--mono)">${b.counted} names screened${
+        <span style="color:var(--dim);font:400 11px/1 var(--mono)">${b.counted} names · past week${
           Math.max(0, b.counted - b.up - b.down) > 0
             ? ` · ${Math.max(0, b.counted - b.up - b.down)} unchanged` : ''}</span>
         <span><b class="dn">${b.down}</b> <span style="color:var(--dim)">down</span></span>
@@ -2591,7 +2636,7 @@
            name that did not move — 11 of 989 the day this was written. The
            split bar carries all three, so the widths add to the universe and
            a reader can check the arithmetic on the page. */''}
-      ${splitBar(b.up, b.down, b.counted)}
+      ${splitBar(b.up, b.down, b.counted, 'over the past week')}
       <div class="breadth-sub">Median name ${pct(b.median)} on the week ·
         <b style="color:var(--muted)" class="cnum">${b.above_200dma}</b> hold their 200-day ·
         <b style="color:var(--muted)" class="cnum">${b.at_52w_high}</b> at a 52-week high</div>
@@ -2756,7 +2801,21 @@
     const lrRows = sgx.ok ? (sgx.rows || []).filter(r => sinceLaunch(r) && !withdrawn(r)) : [];
     const LR = recordOf(lrRows);
     LR.published = lrRows.length;
-    LR.open = lrRows.filter(r => (r.badge || '').toLowerCase() === 'open').length;
+    /* From the same bucket the reconciliation line prints. This counted
+       badge === 'open' while the bucket counts status OPEN too, so the tile
+       and the sum under it could name two different open counts. */
+    LR.open = LR.bucket.open;
+    /* Withdrawn setups are removed from lrRows above, so the bucket's
+       `withdrawn` is zero by construction — a count nobody measured, printed
+       as "0 withdrawn". They are counted here, from the same since-launch
+       rows, and reported as what they are: filed, pulled before entry, and
+       outside the book. */
+    LR.withdrawnN = sgx.ok ? (sgx.rows || []).filter(r => sinceLaunch(r) && withdrawn(r)).length : null;
+    /* The live ledger stamps itself; the snapshot does not, so its as-of is
+       the date of its newest row — a date, not a time, and labelled as such. */
+    LR.asOf = sgx.ok ? (sgx.at || null) : null;
+    LR.asOfDay = sgx.ok && !sgx.at ? ((sgx.rows || []).map(r => pubDay(r)).sort().pop() || null) : null;
+    LR.live = sgx.ok ? !!sgx.live : null;
     /* CACHED IS SYNCHRONOUS. It reads the in-memory micro-cache and returns
      * the wrapper itself — {ok, ready, data, error} — not a promise. This line
      * called .then on it, which is undefined, so the Today route threw on
@@ -2914,7 +2973,7 @@
             return `<h1>Every signal, graded.<br>The record starts here.</h1>
               <p class="hero-sub"><b>${LR.published}</b> published since ${esc(LAUNCH)},
                 <b>${LR.trades}</b> closed so far${LR.wins === 0 && LR.trades
-                  ? ` — <b class="dn">${LR.trades === 1 ? 'a loss' : 'both losses'}</b>` : ''}.
+                  ? ` — <b class="dn">${LR.trades === 1 ? 'a loss' : LR.trades === 2 ? 'both losses' : `all ${LR.trades} losses`}</b>` : ''}.
                 That is too few to mean anything in either direction, and it is shown rather
                 than withheld until it flatters. Everything below is research, not a
                 recommendation.</p>`;
@@ -3222,23 +3281,7 @@
              asserted in the sentence rather than left for the reader to do,
              because the reader doing it and finding a gap is how this was
              found in the first place. */''}
-        ${LR.published ? (() => {
-          const b = LR.bucket || {};
-          const parts = [
-            [b.closed, 'closed and graded'],
-            [b.open, 'still open'],
-            [b.withdrawn, 'withdrawn before entry'],
-            [b.expired, 'expired unfilled'],
-            [b.other, 'unclassified'],
-          ].filter(x => x[1] !== 'unclassified' || x[0] > 0);
-          const sum = parts.reduce((a, x) => a + (x[0] || 0), 0);
-          return `<p class="sec-note recon"><b>${LR.published}</b> published
-            = ${parts.map(([n, label]) =>
-                `<b class="${n ? '' : 'z'}">${n}</b> ${label}`).join(' + ')}.
-            ${sum === LR.published ? '' :
-              `<b class="dn">These do not sum to ${LR.published} — that is a defect in this
-               page, not a rounding difference.</b>`}</p>`;
-        })() : ''}
+        ${LR.published ? integrityBlock(LR) : ''}
         <p class="sec-note">${!LR.published
           ? ``
           : !LR.trades
@@ -3310,15 +3353,30 @@
      * no extra request. */
     {
       const hv = heroVix ? Number(heroVix.price_raw != null ? heroVix.price_raw : heroVix.price) : null;
-      const HB = barometer(heroNifty, pu.breadth || {}, hv);
+      /* THE PUBLISHED SCORE, AS ON /markets. This called barometer() in the
+       * browser, fed pulse.breadth — a ONE-WEEK count — into a component it
+       * labels "Advancing today", and led the front page with the result. On
+       * 2026-09-23 that printed 52/100 while barometer.json, the score gems and
+       * vision print and the one with a published history, said 44. One site,
+       * two answers to "where does the market stand", and the louder one was
+       * the unpublished one. The browser formula stays as the fallback for a
+       * day the file does not answer, exactly as /markets uses it. */
+      const bj = await get('/barometer.json').catch(() => ({ ok: false }));
+      const BPt = bj && bj.ok && bj.data && bj.data.ok && bj.data.today ? bj.data.today : null;
+      const HB = BPt ? { score: BPt.score, band: BPt.band,
+                         acc: BPt.stage ? { stage: { t: BPt.stage.t, say: '' } } : null, published: true }
+                     : barometer(heroNifty, pu.breadth || {}, hv);
       if (HB) {
         out += sec('Where the market stands', `
           <div class="baro">
             <div class="baro-s ${esc(HB.band.c)}">${ringGauge(HB.score, HB.band.t, HB.band.c, 118)}</div>
             <div class="baro-p">
-              ${splitBar((pu.breadth || {}).up, (pu.breadth || {}).down, (pu.breadth || {}).counted)}
+              ${splitBar((pu.breadth || {}).up, (pu.breadth || {}).down, (pu.breadth || {}).counted, 'over the past week')}
               ${HB.acc ? `<p class="hint" style="margin-top:12px"><b>${esc(HB.acc.stage.t)}.</b>
-                ${esc(HB.acc.stage.say)}</p>` : ''}
+                ${esc(HB.acc.stage.say || '')}</p>` : ''}
+              <p class="hint" style="margin-top:8px">${HB.published
+                ? `The score is the <a href="/markets">published barometer</a>; the bar is the week's breadth across the screen.`
+                : `The published barometer did not answer, so this score is computed here from the week's breadth — not the same inputs.`}</p>
             </div>
           </div>`,
           `${HB.score}/100`, null, { lead: true });
@@ -8928,7 +8986,8 @@
           const openN = opens.length;
           if (!openN && !closed.length) return '';
           return `<div style="margin-top:14px">${
-            splitBar(wins, losses, wins + losses + openN)}</div>
+            splitBar(wins, losses, wins + losses + openN, '',
+              { u: 'won', f: 'still open', d: 'lost', us: 'won', ds: 'lost', ua: 'won', da: 'lost' })}</div>
             <p class="hint"><b>${wins}</b> won and <b>${losses}</b> lost of what has
               closed, with <b>${openN}</b> still open. The grey is the part of the
               book that has not answered yet.</p>`;
@@ -9106,7 +9165,14 @@
 
   /* Advancers / unchanged / decliners as one bar. The widths are real
      percentages written inline; `grow` only animates from zero-basis. */
-  const splitBar = (up, down, total) => {
+  /* `win` names the window the counts cover. pulse.breadth is ONE-WEEK
+     returns, and "427 advancing" with no window reads as today. */
+  /* `words` renames the three buckets. The ledger's book-shape bar passed
+     wins, open and losses through this and printed "1 advancing · 35
+     unchanged · 14 declining" under a record of trades. */
+  const splitBar = (up, down, total, win, words) => {
+    const W = Object.assign({ u: 'advancing', f: 'unchanged', d: 'declining', us: 'up', ds: 'down',
+                              ua: 'advanced', da: 'declined' }, words || {});
     const u = Number(up) || 0, d = Number(down) || 0, t = Number(total) || 0;
     if (!t) return '';
     const flat = Math.max(0, t - u - d);
@@ -9114,8 +9180,8 @@
     const seg = (n, cls, txt) => n <= 0 ? '' :
       `<i class="${cls}" style="flex:0 0 ${pc(n).toFixed(1)}%">${pc(n) > 11 ? esc(txt) : ''}</i>`;
     return `<div class="splitb" role="img"
-        aria-label="${u} advanced, ${flat} unchanged, ${d} declined of ${t}">
-        ${seg(u, 'sb-u', u + ' up')}${seg(flat, 'sb-f', flat)}${seg(d, 'sb-d', d + ' down')}
+        aria-label="${u} ${W.ua}, ${flat} ${W.f}, ${d} ${W.da} of ${t}${win ? ' ' + esc(win) : ''}">
+        ${seg(u, 'sb-u', u + ' ' + W.us)}${seg(flat, 'sb-f', flat)}${seg(d, 'sb-d', d + ' ' + W.ds)}
       </div>
       ${/* ── THE THIRD BUCKET IS NAMED, NOT LEFT AS A GAP ───────────────────
            * The BAR always carried the unchanged slice; the LABELS under it
@@ -9124,9 +9190,9 @@
            * do not add up. An external audit did notice, and it is the kind of
            * gap that reads as filtering rather than as an omission. Seven
            * names went nowhere; the page says so. */''}
-      <div class="splitl"><span>${u} advancing</span>${
-        flat > 0 ? `<span class="sb-fl">${flat} unchanged</span>` : ''
-      }<span>${d} declining</span></div>`;
+      <div class="splitl"><span>${u} ${W.u}</span>${
+        flat > 0 ? `<span class="sb-fl">${flat} ${W.f}${win ? ' · ' + esc(win) : ''}</span>` : (win ? `<span class="sb-fl">${esc(win)}</span>` : '')
+      }<span>${d} ${W.d}</span></div>`;
   };
 
   /* A labelled 0-100 meter. */
@@ -9234,8 +9300,10 @@
 
     const up = n(breadth.up);
     if (up != null) {
-      add('participation', 'Advancing today', up / counted * 100,
-          `${up} of ${counted} advanced`);
+      /* Every caller passes pulse.breadth, whose `up` is r1w > 0 — the WEEK.
+         It was labelled "Advancing today". */
+      add('participation', 'Advancing over the week', up / counted * 100,
+          `${up} of ${counted} rose over the past week`);
     }
 
     /* VIX INVERTED, AND BANDED RATHER THAN SCALED. 11 and 13 are the same
@@ -12145,7 +12213,8 @@
     btn.className = 'fresh ' + (fresh === dated.length ? 'all'
                                : fresh >= dated.length * 0.6 ? 'most' : 'few');
     document.getElementById('freshTxt').textContent =
-      fresh === dated.length ? `${fresh}/${dated.length} current` : `${ageWord(worst)}`;
+      /* "8/8 current" was a fraction with no noun; say what the eight are. */
+      fresh === dated.length ? `${fresh} of ${dated.length} feeds current` : `${ageWord(worst)}`;
     btn.setAttribute('aria-label',
       `Data freshness: oldest feed is ${ageWord(worst)}. Open the detail.`);
 
@@ -16786,29 +16855,68 @@
     try { localStorage.setItem('sig:theme', next); } catch (e) { /* private mode */ }
   });
 
-  /* ── live clock, in MYT ────────────────────────────────────────────────
-   * The header carried the EDITION date, which is the day the paper was
-   * built — correct, and read as "the site is a day stale" every morning
-   * between midnight MYT and the 6 AM build. A running clock says the page
-   * is alive; the edition date moves to where it belongs, beside the data
-   * that actually carries it. */
+  /* ── THE MARKET'S CLOCK, IN IST ───────────────────────────────────────
+   * This was a per-second clock in MYT. Two faults in one widget: MYT is the
+   * author's timezone, not the NSE reader's, and a clock repainting every
+   * second is battery and layout work for no information — no trader reads
+   * the seconds. What a trader reads is where the session stands: "Open ·
+   * 1h 32m to close", "Closed · opens Mon 09:15". So that is what it says, in
+   * IST, repainted once a minute. The date stays, because the page's edition
+   * question ("is this today's?") is answered beside it.
+   *
+   * Hours are NSE's (pre-open 09:00, trading 09:15–15:30, Mon–Fri). Holidays
+   * come from NSE_HOLIDAYS, which the calendar fills when /api/calendar
+   * answers; before it does, a holiday reads as a weekday and says so only
+   * once the calendar arrives — the chip never claims a holiday it has not
+   * been told about. */
   const clockEl = document.getElementById('edition');
+  /* The edition date and the clock shared this element and overwrote each
+     other: the edition fetch wrote the build date, and the per-second tick
+     replaced it within a second — so the one fact that answers "is this
+     today's paper?" was on screen for under a second. Both live here now. */
+  let EDITION_DAY = null;
   function tickClock() {
     if (!clockEl) return;
-    const t = new Date().toLocaleTimeString('en-GB', {
-      timeZone: 'Asia/Kuala_Lumpur', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const d = new Date().toLocaleDateString('en-GB', {
-      timeZone: 'Asia/Kuala_Lumpur', day: '2-digit', month: 'short' });
-    clockEl.innerHTML = `<span class="clk-d">${d}</span><span class="clk-t">${t}</span><span class="clk-z">MYT</span>`;
+    const now = new Date(Date.now() + 330 * 60000);             // IST, read via the UTC getters
+    const ymd = now.toISOString().slice(0, 10), dow = now.getUTCDay();
+    const min = now.getUTCHours() * 60 + now.getUTCMinutes();
+    const hol = (typeof NSE_HOLIDAYS === 'object' && NSE_HOLIDAYS) ? NSE_HOLIDAYS[ymd] : null;
+    const tradingDay = dow >= 1 && dow <= 5 && !hol;
+    const dur = (m) => m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+    let state, cls;
+    if (tradingDay && min >= 555 && min < 930) { state = `Open · ${dur(930 - min)} to close`; cls = 'open'; }
+    else if (tradingDay && min >= 540 && min < 555) { state = `Pre-open · ${dur(555 - min)}`; cls = 'pre'; }
+    else if (tradingDay && min < 540) { state = `Opens in ${dur(555 - min)}`; cls = 'shut'; }
+    else {
+      let add = 1, nd;
+      for (; add < 10; add++) {
+        nd = new Date(now.getTime() + add * 86400000);
+        const w = nd.getUTCDay(), k = nd.toISOString().slice(0, 10);
+        if (w >= 1 && w <= 5 && !((typeof NSE_HOLIDAYS === 'object' && NSE_HOLIDAYS) && NSE_HOLIDAYS[k])) break;
+      }
+      const day = add === 1 ? 'tomorrow' : nd.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
+      state = `${hol ? 'Holiday' : 'Closed'} · opens ${day} 09:15`; cls = 'shut';
+    }
+    const edDay = EDITION_DAY ? new Date(EDITION_DAY + 'T00:00:00Z') : null;
+    const d = edDay && Number.isFinite(edDay.getTime())
+      ? `Edition ${edDay.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}${EDITION_DAY === ymd ? '' : ' · not today'}`
+      : now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' });
+    const t = now.toISOString().slice(11, 16);
+    clockEl.className = (clockEl.className.replace(/\bmkt-\w+\b/g, '') + ' mkt-' + cls).trim();
+    clockEl.title = `NSE · ${state}${hol ? ' (' + hol + ')' : ''} · ${t} IST`;
+    clockEl.innerHTML = `<span class="clk-d">${d}</span><span class="clk-s">NSE ${esc(state)}</span><span class="clk-t">${t}</span><span class="clk-z">IST</span>`;
   }
   tickClock();
-  setInterval(tickClock, 1000);
+  /* On the minute, not every second. The first tick lands on the next
+     minute boundary so the displayed time is never up to 59 s stale. */
+  setTimeout(() => { tickClock(); setInterval(tickClock, 60000); }, 60000 - (Date.now() % 60000) + 50);
 
   /* ── edition stamp and data health ─────────────────────────────────────── */
   paintFreshness();
   get('/edition.json').then(r => {
     if (r.ok && r.data && r.data.build_date) {
-      document.getElementById('edition').textContent = r.data.build_date;
+      EDITION_DAY = String(r.data.build_date).slice(0, 10);
+      tickClock();
     }
   });
 

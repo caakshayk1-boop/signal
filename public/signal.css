@@ -910,6 +910,11 @@ main,.foot{position:relative;z-index:1}
 .clk-d{color:var(--dim)}
 .clk-t{color:var(--live);font-weight:500;letter-spacing:var(--ls-wide)}
 .clk-z{font-size:var(--t-1);color:var(--dim);letter-spacing:var(--ls-wider)}
+/* The session, not the seconds. */
+.clk-s{color:var(--text);font-weight:600}
+.mkt-open .clk-s::before{content:'●';color:var(--up);margin-right:5px}
+.mkt-pre .clk-s::before{content:'●';color:var(--warn);margin-right:5px}
+@media(max-width:560px){ .clk-d,.clk-z{display:none} }
 .brand-dot{background:var(--live);box-shadow:0 0 0 3px color-mix(in srgb,var(--live) 18%,transparent);
   animation:pip 2.6s ease-in-out infinite}
 @keyframes pip{0%,100%{opacity:1}50%{opacity:.45}}
@@ -2128,7 +2133,11 @@ body::before{display:none}
 
 .cmdk kbd{font:500 var(--t-1)/1 var(--mono);border:1px solid var(--line2);border-radius:var(--r-1);
   padding:3px 4px;color:var(--dim)}
-@media(max-width:900px){.cmdk .cmdk-l{display:none} .cmdk{padding:0 8px}}
+/* A PHONE HAS NO COMMAND KEY. This hid the word and kept the shortcut, so a
+   390px screen showed a lone "⌘K" — a laptop hint on the one device that
+   cannot use it. The word stays; the shortcut goes. */
+.cmdk .cmdk-l{white-space:nowrap}
+@media(max-width:900px){.cmdk kbd{display:none} .cmdk{padding:0 10px}}
 @media(max-width:700px){.fresh span{display:none} .fresh{padding:0 8px} .bar-where{display:none}}
 
 /* The CTA says what it is and how long it takes, per §6 — two lines, because
@@ -2287,6 +2296,14 @@ body::before{display:none}
   display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
 .dscl b{font-weight:650}
 .dscl span{color:var(--muted)}
+.dscl-m{display:none}
+.dscl-m summary{cursor:pointer;list-style:none;padding:6px 16px;font-size:var(--t-2);color:var(--muted);min-height:32px;display:flex;align-items:center}
+.dscl-m summary::-webkit-details-marker{display:none}
+.dscl-m summary::after{content:'›';margin-left:6px;transition:transform var(--t-press,160ms)}
+.dscl-m[open] summary::after{transform:rotate(90deg)}
+.dscl .dscl-m p{padding:0 16px 10px}
+/* `.dscl p` sets display, so the hide needs the same specificity plus one. */
+@media(max-width:760px){ .dscl p.dscl-w{display:none} .dscl .dscl-m{display:block} }
 .dscl a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;
   white-space:nowrap}
 @media (hover:hover) and (pointer:fine){.dscl a:hover{text-decoration-thickness:2px}}
@@ -4254,6 +4271,15 @@ html:has(dialog[open]){overflow:hidden}
 .tkr-i.is-shut .tkr-p,.tkr-i.is-shut .tkr-c,.tkr-i.is-shut .tkr-n{opacity:.5}
 /* NO MOTION WHEN NONE IS WANTED. It becomes an ordinary scrollable row, which
  * is the same information without the movement. */
+/* NOTHING TO HOVER, NOTHING TO PAUSE. On a touch screen the only way to
+ * stop the strip was reduced-motion, so it scrolled past faster than a price
+ * could be read. On touch it is a still, swipeable row from the start. */
+@media (hover:none){
+  .tkr-t{animation:none}
+  .tkr-row{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .tkr-row::-webkit-scrollbar{display:none}
+  .tkr-h[aria-hidden="true"]{display:none}
+}
 @media (prefers-reduced-motion:reduce){
   .tkr-t{animation:none}
   .tkr-row{overflow-x:auto;scrollbar-width:none}
@@ -6170,3 +6196,26 @@ h1, .sec-lead { letter-spacing: var(--ls-tight); }
   border:1px solid var(--line);font-size:var(--t-4);line-height:1.5;
   color:var(--muted)}
 .baro-cov b{color:var(--text);font-variant-numeric:tabular-nums}
+
+/* ── SIGNAL INTEGRITY ─────────────────────────────────────────────────────────
+ * The book's arithmetic as an instrument: total = buckets, in one row, with
+ * population, cutoff and as-of beneath. Numbers in the mono face so the
+ * columns align; a zero bucket is dimmed, never hidden — a hidden zero reads
+ * as filtering. */
+.integ{margin-top:var(--s-4);border:1px solid var(--line);border-radius:var(--r-2);padding:var(--s-3) var(--s-4)}
+.integ-h{display:flex;align-items:baseline;gap:var(--s-2);margin-bottom:var(--s-2)}
+.integ-h b{font-size:var(--t-3);letter-spacing:var(--ls-wide);text-transform:uppercase}
+.integ-h span{font-size:var(--t-2);color:var(--dim)}
+.integ-r{display:flex;align-items:center;flex-wrap:wrap;gap:var(--s-1) var(--s-2)}
+.integ-c{display:flex;flex-direction:column;min-width:52px}
+.integ-c b{font:500 var(--t-8)/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.integ-c em{font-style:normal;font-size:var(--t-2);color:var(--muted)}
+.integ-c.tot b{color:var(--accent)}
+.integ-c.z b{color:var(--dim)}
+.integ-eq{font-style:normal;color:var(--dim);font:400 var(--t-6)/1 var(--mono)}
+.integ-bad{margin:var(--s-2) 0 0;color:var(--down);font-size:var(--t-4)}
+.integ-m{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:var(--s-1) var(--s-4);margin:var(--s-3) 0 var(--s-2)}
+.integ-m div{display:flex;gap:var(--s-2);font-size:var(--t-3)}
+.integ-m dt{color:var(--dim);min-width:74px}
+.integ-m dd{margin:0;color:var(--muted)}
+.integ-a{font-size:var(--t-3)}
