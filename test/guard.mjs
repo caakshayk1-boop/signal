@@ -2025,31 +2025,30 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      /class="rd-parts" title="[^"]*composite score/.test(JS));
 }
 
-/* ── VISION: ONE ARITHMETIC, AND NOTHING ADDED TO IT ─────────────────────────
- * vision.askakshay.com carries a COPY of the record statistics and the move
- * score so it need not load a 500 KB bundle. A copy is only acceptable if it
- * cannot drift: two sites answering "how has this book done" with different
- * numbers is the failure this repo has already had once (8 engines on one
- * page, 9 on another). So every copied definition is extracted from both
- * files and compared token for token, comments aside. */
+/* ── VISION: ONE MOVE SCORE, AND NO SIGNALS ─────────────────────────────────
+ * vision.askakshay.com carries a COPY of the move score so it need not load a
+ * 500 KB bundle. A copy is only acceptable if it cannot drift — one name with
+ * two scores on two products is the failure this repo has already had once
+ * (8 engines on one page, 9 on another). So every copied definition is
+ * extracted from both files and compared token for token, comments aside.
+ *
+ * Since 2026-09-23 Vision carries no trading signals: no ledger, no per-signal
+ * reason, no record, no link to the signal site. Those are being rebuilt as
+ * their own product. The checks below keep them from creeping back in through
+ * a copy-paste. */
 {
   const { CORE, extract, norm } = await import("../scripts/verbatim.mjs");
   const VJS = readFileSync("public/vision.js", "utf8");
   const VCSS = readFileSync("public/vision.css", "utf8");
   const VHTML = readFileSync("public/vision.html", "utf8");
   const drift = CORE.filter((n) => { const a = extract(JS, n), b = extract(VJS, n); return !a || !b || norm(a) !== norm(b); });
-  ok("vision.js carries signal.js's record and move-score code verbatim", drift.length === 0,
-     drift.length ? `${drift.join(", ")} — run \`node scripts/verbatim.mjs\`` : "");
-  /* The check has to be able to fail. One token changed in a copy of recordOf
-     must be caught, or the comparison is decoration. */
-  const tampered = VJS.replace("const wins = closed.filter(r => Number(r.r_multiple) > 0).length;",
-                               "const wins = closed.filter(r => Number(r.r_multiple) >= 0).length;");
+  ok("vision.js carries signal.js's move-score code verbatim", drift.length === 0,
+     drift.length ? `${drift.join(", ")} — run \`npm run verbatim\`` : "");
+  /* The check has to be able to fail. */
+  const tampered = VJS.replace("if (live.length < 2) return null;", "if (live.length < 1) return null;");
   ok("...and the comparison catches a one-character change",
-     tampered !== VJS && norm(extract(tampered, "recordOf")) !== norm(extract(JS, "recordOf")));
+     tampered !== VJS && norm(extract(tampered, "radarScore")) !== norm(extract(JS, "radarScore")));
 
-  /* Every colour token the dark theme defines, the light theme redefines —
-     a token missing from one theme silently inherits the other's value, and
-     dark ink on a light ground is unreadable, not merely off-brand. */
   const toks = (sel) => new Set([...((VCSS.match(new RegExp(sel + "\\{([\\s\\S]*?)\\n\\}")) || ["", ""])[1]
     .matchAll(/(--[a-z0-9-]+):/g))].map((m) => m[1]));
   const dark = toks(':root,:root\\[data-theme="dark"\\]'), light = toks(':root\\[data-theme="light"\\]');
@@ -2059,26 +2058,23 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("vision.css paints an explicit body background", /body\{[^}]*background:var\(--bg\)/.test(VCSS));
   ok("vision.css removes motion under prefers-reduced-motion", /prefers-reduced-motion:reduce/.test(VCSS));
 
-  /* CSP is connect-src 'self'. A fetch to another origin would load and then
-     be blocked at runtime with a green build. */
   const offOrigin = [...VJS.matchAll(/(?:fetch|get)\(\s*['"`](https?:)?\/\/[^'"`]+/g)].map((m) => m[0]);
   ok("vision.js fetches only its own origin", offOrigin.length === 0, offOrigin);
-  ok("vision.html loads the one shared engine registry, not a copy", /<script src="\/engines\.js"><\/script>/.test(VHTML));
   ok("vision.html keeps the SEBI disclaimer", /Not registered with SEBI/.test(VHTML));
+  ok("...and links it to its own full disclaimer, not another site's", /href="#\/disclaimer"/.test(VHTML) && /V\.disclaimer = /.test(VJS));
 
-  /* LEDGE, BREACH and KEEL file score = 0 as a placeholder and VECTOR files a
-     statistic near 3. Printed raw, those read "rated 0" and "rated 3 of 100".
-     The ledger's score may only reach the page through engScoreCell /
-     engScoreText, which read the engine's scale from the ledger first. */
-  const raw = [...VJS.matchAll(/scoreCell\((?:r|s|x2|o|op\[0\])\.score/g)].map((m) => m[0]);
-  ok("vision never prints a ledger score without its engine's scale", raw.length === 0, raw);
-  ok("...and an engine that files only zeros reads as unscored", /SCALE\[e\] = !real\.length \? 'none'/.test(VJS));
+  /* No trace of the signal product. */
+  const all = VJS + VCSS + VHTML;
+  ok("vision names no signal site", !/signal\.askakshay\.com|gems\.askakshay\.com/.test(all),
+     (all.match(/.{0,40}signal\.askakshay\.com.{0,20}/) || [""])[0]);
+  ok("vision reads no ledger", !/\/api\/signals\?(limit|symbol)|alerts\.json|\/api\/stats/.test(VJS));
+  ok("vision loads no engine registry", !/engines\.js|ENGINE_BOOK/.test(all));
+  ok("vision has no signal or record route", !/V\.(signals|record) = |['"]#\/(signals|record)['"]/.test(VJS));
 
-  /* The snapshot fallback has no r_multiple. A record computed from it reads
-     "0 closed" over a book with closed trades. */
-  ok("vision refuses to compute the record from an ungraded snapshot", /if \(!L\.graded\)/.test(VJS));
   /* FII + DII net: flows.js adds a missing side as zero. */
   ok("vision sums FII and DII only when both sides answered", /const both = f && f\.fii && f\.dii/.test(VJS));
+  /* A per-second clock is battery and layout work for no information. */
+  ok("vision's market clock repaints per minute, not per second", /setInterval\(paintMarket, 60000\)/.test(VJS) && !/setInterval\([^,]+, 1000\)/.test(VJS));
   ok("the Worker routes the vision host to its shell", /host\.startsWith\("vision\."\)/.test(IDX));
 }
 

@@ -582,25 +582,25 @@ A design document that is not executable is a document that was true once.
 
 ## 16. Vision — the cockpit (vision.askakshay.com)
 
-A third arrangement of the same book, built for scanning: MARKET → SIGNAL →
-ASSET → REASON → CHART → ACTION. Same Worker, same feeds, same ledger.
+A market cockpit over the NSE screen, the live board and the wire, built for
+scanning: MARKET → MOVE → ASSET → REASON → CHART → ACTION. Same Worker and
+feeds as the signal site, and **no trading signals**: the ledger, the
+per-signal reason and the record were taken out on 2026-09-23 to be rebuilt as
+their own product. Guard checks keep them (and any link to the signal site)
+from creeping back.
 
 - **Files.** `public/vision.html` (shell + inline theme boot, hashed into the
-  CSP), `public/vision.css` (its own token set — dark primary, light designed
+  CSP), `public/vision.css` (its own tokens — dark primary, light designed
   separately), `public/vision.js` (hash-routed; one file). The Worker maps the
   vision host's `/` to the shell and redirects any other page path to it.
-- **One arithmetic.** The record statistics and the move score are copied out
-  of `signal.js` by `scripts/verbatim.mjs`; `test/guard.mjs` compares every
-  copied definition token for token and fails on drift. After changing any of
-  them in `signal.js`, run `npm run verbatim`.
-- **Engine scores have scales.** LEDGE, BREACH and KEEL file `score = 0` as a
-  placeholder; VECTOR files a statistic near 3. Vision reads each engine's
-  scale from the ledger and prints *unscored* or *own scale* rather than a
-  number that reads as a rating.
-- **Refusals.** The record is not computed from the `alerts.json` snapshot
-  (it carries no `r_multiple`); FII + DII is not summed unless both answered;
-  news carries no sentiment; there is no portfolio, because there is no
-  holdings backend.
+- **One move score.** The radar's move score is copied out of `signal.js` by
+  `scripts/verbatim.mjs`; `test/guard.mjs` compares every copied definition
+  token for token. After changing any of them in `signal.js`, run
+  `npm run verbatim`.
+- **Time.** IST, relative to the NSE session ("Open · 1h 32m to close"),
+  repainted per minute. No per-second clock.
+- **Refusals.** FII + DII is not summed unless both answered; news carries no
+  sentiment; no portfolio, because there is no holdings backend; price alerts
+  say plainly that they fire only while a tab is open.
 - **Local.** `npm run vision:dev` serves `public/` with `/api/*` answered from
-  committed files only (`VDEV_FAIL=ticker,wire` forces failures;
-  `VDEV_GRADE=1` grades the snapshot from its own fields).
+  committed files only (`VDEV_FAIL=ticker,wire` forces failures).
