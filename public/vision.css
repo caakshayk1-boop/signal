@@ -559,6 +559,11 @@ select.inp{padding-right:var(--s-5)}
   .top-r{margin-left:auto}
 }
 
+/* Eight nav items since Signals joined: between 1100 and 1279 px the search
+   box gives up its label and shortcut hint (the icon still opens it) rather
+   than the nav running under it. */
+@media (min-width:1100px) and (max-width:1279px){ .kbtn{min-width:0} .kbtn .lbl,.kbtn kbd{display:none} }
+
 /* Asset header: price block right-aligned on a wide screen, below the name on
    a phone — side by side at 390px it squeezed the name into three lines. */
 .ah-px{text-align:right}
@@ -590,3 +595,35 @@ select.inp{padding-right:var(--s-5)}
   .presets{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin:0 calc(-1 * var(--s-4));padding:0 var(--s-4)}
   .presets::-webkit-scrollbar{display:none}
   .pre{flex:0 0 72%;scroll-snap-align:start} }
+
+/* ── Signals: two setups, each a card with its filed levels ──────────────── */
+.vs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--s-3)}
+.vs-card{border:1px solid var(--line-2);border-radius:var(--r-2);padding:var(--s-3);display:flex;flex-direction:column;gap:var(--s-3);min-width:0;background:var(--panel)}
+.vs-card header{display:flex;justify-content:space-between;gap:var(--s-2);align-items:flex-start}
+.vs-id{min-width:0;flex:1}
+.vs-sym{display:flex;align-items:center;gap:6px}
+.vs-card header .mut{font-size:var(--t-xs);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vs-card .sym{font-size:var(--t-md)}
+.vs-eng{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:3px;text-align:right}
+.vs-eng small{font-size:var(--t-xs);color:var(--ink-3)}
+.vs-lv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border-radius:var(--r-1);overflow:hidden}
+.vs-lv>div{background:var(--panel-2);padding:6px 7px;min-width:0}
+.vs-lv em{display:block;font-style:normal;font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
+.vs-lv b{display:block;font:500 var(--t-sm)/1.35 var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vs-lv small{display:block;font-size:10px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vs-lv .dn b{color:var(--dn)} .vs-lv .up b{color:var(--up)}
+.vs-lad{position:relative;height:14px;margin:2px 4px}
+.vs-lad i{position:absolute;top:5px;height:4px;border-radius:2px}
+.vs-lad i.risk{background:rgba(var(--dn-rgb),.45)} .vs-lad i.rew{background:rgba(var(--up-rgb),.35)}
+.vs-lad b{position:absolute;top:1px;width:2px;height:12px;margin-left:-1px;background:var(--ink-3);border-radius:1px}
+.vs-lad b.sl{background:var(--dn)} .vs-lad b.en{background:var(--ink);width:3px} .vs-lad b.t{background:var(--up)}
+.vs-lad em{position:absolute;top:2px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--accent);border:2px solid var(--panel)}
+.vs-st{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:var(--t-sm)}
+.vs-why summary{cursor:pointer;font-size:var(--t-sm);color:var(--ink-2)}
+.vs-why ul{margin:var(--s-2) 0 0;padding-left:18px;font-size:var(--t-sm);color:var(--ink-2);line-height:1.5}
+.vs-why .note{margin:var(--s-2) 0 0}
+.vs-rule{margin:0;padding-left:18px;font-size:var(--t-sm);color:var(--ink-2);line-height:1.55}
+.vs-bar{margin:var(--s-4) 0}
+@media (max-width:760px){
+  .vs-grid{grid-template-columns:minmax(0,1fr)}
+}

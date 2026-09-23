@@ -2507,6 +2507,19 @@ try {
     const st = await v.evaluate((s2) => { const el = document.querySelector(s2); return el ? { sk: !!el.querySelector(".sk"), txt: el.innerText.slice(0, 80) } : null; }, sel);
     ok(`vision ${hash} finished loading`, st && !st.sk, st);
   }
+  /* The two setups. Before the first upstream scan the feed 404s and the page
+     must say so in words; after it, every card carries a stop and three
+     targets. Never a skeleton left spinning, never a NaN in a level. */
+  await v.evaluate(() => { location.hash = "#/setups"; });
+  await settled(v, SETTLE + 3000);
+  const vSig = await v.evaluate(() => { const b = document.getElementById("vsBody"); if (!b) return null;
+    const cards = [...b.querySelectorAll(".vs-card")];
+    return { sk: !!b.querySelector(".sk"), cards: cards.length, pending: /Not published yet/.test(b.innerText),
+      failed: !!b.querySelector(".st.err"), levels: cards.every((c) => /Stop/i.test(c.innerText) && /T1/.test(c.innerText) && /T3/.test(c.innerText)),
+      bad: /\bNaN\b|\bundefined\b|\bnull\b/.test(b.innerText), rules: b.querySelectorAll(".vs-rule").length }; });
+  ok("vision #/setups finished loading", vSig && !vSig.sk, vSig);
+  ok("...shows the setups or says they are not published yet", vSig && (vSig.pending || (vSig.rules === 2 && !vSig.failed)), vSig);
+  ok("...every signal carries its stop and three targets", vSig && vSig.levels && !vSig.bad, vSig);
   /* The heatmap card. A tile used to show a hover tooltip only, which on a
      phone could not be closed. Click opens a dialog; Escape closes it. */
   await v.evaluate(() => { location.hash = "#/heatmap"; });
@@ -2522,12 +2535,14 @@ try {
   const vLabels = await v.evaluate(() => { let bad = 0; for (const t of document.querySelectorAll(".hm-t")) { const b = t.querySelector("b"); if (b && getComputedStyle(b).display !== "none" && b.getBoundingClientRect().right > t.getBoundingClientRect().right) bad++; } return bad; });
   ok("no heatmap label is cut off", vLabels === 0, vLabels);
   /* The header ran the nav under the search box from 821 to 1399 px. */
-  await v.setViewportSize({ width: 1180, height: 900 });
-  await v.waitForTimeout(300);
-  const vHdr = await v.evaluate(() => { const n = document.querySelector(".nav"), r = document.querySelector(".top-r");
-    if (!n || getComputedStyle(n).display === "none") return { ok: true };
-    return { ok: n.getBoundingClientRect().right <= r.getBoundingClientRect().left + 1 && n.scrollWidth <= n.clientWidth + 1 }; });
-  ok("the nav never runs under the header controls", vHdr.ok, vHdr);
+  for (const W of [1100, 1180, 1280]) {
+    await v.setViewportSize({ width: W, height: 900 });
+    await v.waitForTimeout(300);
+    const vHdr = await v.evaluate(() => { const n = document.querySelector(".nav"), r = document.querySelector(".top-r");
+      if (!n || getComputedStyle(n).display === "none") return { ok: true };
+      return { ok: n.getBoundingClientRect().right <= r.getBoundingClientRect().left + 1 && n.scrollWidth <= n.clientWidth + 1 }; });
+    ok(`the nav never runs under the header controls at ${W}px`, vHdr.ok, vHdr);
+  }
   await v.setViewportSize({ width: 1440, height: 900 });
   /* The screener's presets and builder. */
   await v.evaluate(() => { location.hash = "#/screener"; });

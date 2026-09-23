@@ -2123,6 +2123,18 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("vision reads no ledger", !/\/api\/signals\?(limit|symbol)|alerts\.json|\/api\/stats/.test(VJS));
   ok("vision loads no engine registry", !/engines\.js|ENGINE_BOOK/.test(all));
   ok("vision has no signal or record route", !/V\.(signals|record) = |['"]#\/(signals|record)['"]/.test(VJS));
+  /* Vision's Signals page shows two setups computed upstream (scanner.py's
+     vision_bottom_reversal and vision_4h_breakout) and nothing else: it is not
+     the ledger, so it must not be routed as #/signals, and it must read ONE
+     feed that both mirrors actually carry — a feed fetched but never synced
+     does not fail, it freezes. */
+  const SYNC_V = readFileSync(".github/workflows/sync-data.yml", "utf8");
+  const PULL_V = readFileSync("scripts/pull-feeds.mjs", "utf8");
+  ok("vision's setups read the one signals feed", /V\.setups = /.test(VJS) && /get\('\/vision_signals\.json'/.test(VJS));
+  ok("the signals feed is mirrored by the scheduled sync and the deploy",
+     /contents\/feeds\/\$f"/.test(SYNC_V) && /f=vision_signals\.json/.test(SYNC_V) && /feeds\/vision_signals\.json/.test(PULL_V));
+  ok("vision's setups print no win rate or expectancy",
+     !/win rate[^'"`]*\$\{|expectancy[^'"`]*\$\{/i.test((VJS.match(/V\.setups = [\s\S]*?\n  \};/) || [""])[0]));
 
   /* FII + DII net: flows.js adds a missing side as zero. */
   ok("vision sums FII and DII only when both sides answered", /const both = f && f\.fii && f\.dii/.test(VJS));

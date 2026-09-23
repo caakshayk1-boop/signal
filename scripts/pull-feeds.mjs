@@ -103,4 +103,26 @@ for (const f of FEEDS) {
     console.log(`  keep  ${f} — ${String(e.message || e)} (committed copy left in place)`);
   }
 }
+/* Vision's signals live in feeds/, not docs/, upstream — see sync-data.yml's
+   "Fetch Vision's signals" step for why. Same rule: only a valid feed that
+   says ok replaces the committed copy, and a 404 before the first scan is a
+   state, not a failure. */
+const EXTRA = [["vision_signals", "https://raw.githubusercontent.com/caakshayk1-boop/trading-dashboard/main/feeds/vision_signals.json"]];
+for (const [f, url] of EXTRA) {
+  const path = `public/${f}.json`;
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const text = await r.text(), d = JSON.parse(text);
+    if (!d || !d.ok || !Array.isArray(d.history)) throw new Error("not a valid signals feed");
+    let before = null;
+    try { before = readFileSync(path, "utf8"); } catch { /* first pull */ }
+    if (before === text) { kept++; console.log(`  same  ${f}`); continue; }
+    writeFileSync(path, text); changed++;
+    console.log(`  NEW   ${f}  ${String(d.generated_at || "").slice(0, 19)}`);
+  } catch (e) {
+    failed++;
+    console.log(`  keep  ${f} — ${String(e.message || e)} (committed copy, if any, left in place)`);
+  }
+}
 console.log(`feeds: ${changed} updated, ${kept} unchanged, ${failed} unreachable`);

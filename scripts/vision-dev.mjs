@@ -17,6 +17,13 @@
  *   VDEV_SLOW=1500 node scripts/vision-dev.mjs    add latency to every /api
  *   VDEV_SITE=signal node scripts/vision-dev.mjs  serve signal.askakshay.com's
  *                                                 shell instead, for audits
+ *   VDEV_VSIG=/path/feed.json node scripts/vision-dev.mjs
+ *                                                 serve that file as
+ *                                                 /vision_signals.json. Without
+ *                                                 it the route 404s, which is
+ *                                                 the page's "not published yet"
+ *                                                 state — the one production
+ *                                                 shows until the first scan.
  */
 import http from "node:http";
 import { readFile } from "node:fs/promises";
@@ -34,6 +41,7 @@ const SLOW = Number(process.env.VDEV_SLOW || 0);
    so the record page can be exercised locally. Off by default: the snapshot
    genuinely carries no R, and the page must be seen refusing that too. */
 const GRADE = !!process.env.VDEV_GRADE;
+const VSIG = process.env.VDEV_VSIG || "";
 const SITE = process.env.VDEV_SITE === "signal" ? "signal" : "vision";
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css",
   ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png",
@@ -125,6 +133,10 @@ http.createServer(async (req, res) => {
     }
     res.writeHead(200, { "content-type": "application/json" });
     return res.end(JSON.stringify(API[key](u.searchParams)));
+  }
+  if (p === "/vision_signals.json" && VSIG) {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    return res.end(readFileSync(VSIG));
   }
   if (SITE === "vision" && (p === "/" || p === "/vision")) p = "/vision.html";
   /* The signal site routes by PATH: anything that is not a file is its shell. */
