@@ -1,0 +1,54 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Signal component gallery</title>
+<link rel="stylesheet" href="/signal.css"><link rel="stylesheet" href="/heat.css">
+<style>
+  body{padding:0}
+  .gal-h{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);
+    padding:12px var(--gut);display:flex;gap:12px;align-items:center;
+    font:600 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-widest);text-transform:uppercase;color:var(--dim)}
+  .gal-w{max-width:900px;margin:0 auto;padding:24px var(--gut) 80px}
+  .gal-l{font:600 var(--t-2)/1 var(--mono);letter-spacing:var(--ls-widest);
+    text-transform:uppercase;color:var(--dim);margin:32px 0 12px}
+</style></head><body>
+<div class="gal-h"><span>Component gallery</span><span id="th"></span></div>
+<main id="main" class="gal-w"></main>
+<script>
+  const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const price = v => v==null?'\u2014':'\u20b9'+Number(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const pct = v => { const n=Number(v); if(!isFinite(n)) return '\u2014';
+    const r=Number(n.toFixed(2)); return (r>0?'+':'')+(r===0?'0.00':r.toFixed(2))+'%'; };
+  const dir = v => Number(v)>0?'up':Number(v)<0?'dn':'';
+  const ppFmt = v => (Number(v)>0?'+':'')+Number(v).toFixed(2)+' pp';
+  const strengthWord = s => s>=85?'Strong':s>=70?'Firm':s>=50?'Mixed':'Weak';
+  const instiOf = sym => ({quality:'complete', signal:'accumulation', fii_pp:0.79, dii_pp:12.04});
+  const VERDICT_LOOK = { BUY:['up','Buy'], WAIT:['wn','Wait for entry'], AVOID:['dn','Avoid'] };
+</script>
+<script src="/.gallery/parts.js"></script>
+<script>
+(function(){
+
+  // ── fixtures taken from the operator's own screenshots, 22 Sep ────────────
+  const ROWS = [
+    { nd:{score:92, parts:{trend:100,momentum:87,volume:100,institutional:81},
+        r:{sym:'ACMESOLAR', name:'ACME Solar Holdings Ltd.', price:458.65, r1d:0.12,
+           vd:{c:'BUY'}, rsi:67, rsi_m:71, r1m:9.5, r3m:23.9,
+           low52:195.70, high52:440.70, from_high:-1.2, ahimsa:true,
+           lad:{entry:435.25, stop:412.25, target:472.05}}}, i:5 },
+    { nd:{score:89, parts:{trend:100,momentum:88,volume:69,institutional:93},
+        r:{sym:'LENSKART', name:'Lenskart Solutions Ltd.', price:691.45, r1d:1.11,
+           vd:{c:'BUY'}, rsi:74, rsi_m:null, r1m:8.0, r3m:37.7,
+           rng_lo:502.10, rng_hi:731.00, rng_from_hi:-5.4, rng_sessions:96, ahimsa:true}}, i:2 },
+    { nd:{score:88, parts:{trend:100,momentum:100,volume:100,institutional:40},
+        r:{sym:'YATHARTH', name:'Yatharth Hospital & Trauma Care Services Ltd.', price:1129.10,
+           r1d:0.34, vd:{c:'WAIT'}, rsi:62, rsi_m:58, r1m:4.2, r3m:12.1,
+           low52:380.00, high52:1180.00, from_high:-4.3, ahimsa:null}}, i:6 },
+  ];
+  const main = document.getElementById('main');
+  let html = '<p class="gal-l">Radar row · three real rows from the 22 Sep screenshots</p>';
+  for (const {nd,i} of ROWS) { try { html += radarRow(nd, i); } catch(e){ html += '<pre>'+e+'</pre>'; } }
+  main.innerHTML = html;
+  document.getElementById('th').textContent =
+    (document.documentElement.getAttribute('data-theme')||'light') + ' · ' + innerWidth + 'px';
+})();
+</script></body></html>
