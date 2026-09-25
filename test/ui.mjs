@@ -2520,6 +2520,15 @@ try {
   ok("vision #/setups finished loading", vSig && !vSig.sk, vSig);
   ok("...shows the setups or says they are not published yet", vSig && (vSig.pending || (vSig.rules === 2 && !vSig.failed)), vSig);
   ok("...every signal carries its stop and three targets", vSig && vSig.levels && !vSig.bad, vSig);
+  /* Today: the morning read. Against production it must finish, carry its six
+     sections, end, and count breadth from live quotes. */
+  await v.evaluate(() => { location.hash = "#/today"; });
+  await settled(v, SETTLE + 3000);
+  const vDay = await v.evaluate(() => { const b = document.getElementById("tBody"); if (!b) return null;
+    return { sk: !!b.querySelector(".sk"), secs: b.querySelectorAll("section h2").length, end: !!b.querySelector(".end"),
+      breadth: /Of the \d+ names quoted/.test(b.innerText), bad: /\bNaN\b|\bundefined\b|\bnull\b/.test(b.innerText) }; });
+  ok("vision's Today brief finishes, with its six sections, and ends", !!vDay && !vDay.sk && vDay.secs === 6 && vDay.end && !vDay.bad, vDay);
+  ok("...and counts breadth from live quotes", !!vDay && vDay.breadth, vDay);
   /* The heatmap card. A tile used to show a hover tooltip only, which on a
      phone could not be closed. Click opens a dialog; Escape closes it. */
   await v.evaluate(() => { location.hash = "#/heatmap"; });

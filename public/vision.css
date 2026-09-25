@@ -631,3 +631,20 @@ select.inp{padding-right:var(--s-5)}
 @media (max-width:760px){
   .vs-grid{grid-template-columns:minmax(0,1fr)}
 }
+
+/* ── TODAY — a column to read, not panels to scan ───────────────────────── */
+.brief{max-width:720px;font-size:var(--t-lg);line-height:1.6;color:var(--ink)}
+.brief section{padding:var(--s-4) 0;border-top:1px solid var(--line)}
+.brief section:first-child{border-top:0;padding-top:0}
+.brief h2{font-size:var(--t-2xs);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:0 0 var(--s-2)}
+.brief p{margin:0 0 var(--s-2)}
+.brief ul{margin:0 0 var(--s-2);padding-left:1.1em}
+.brief li{margin:2px 0}
+.brief .k{font-size:var(--t-sm);color:var(--ink-3);margin:var(--s-2) 0 2px}
+.brief a{color:var(--accent)}
+.brief a.sym{color:var(--ink);font-weight:700;text-decoration:none}
+.brief .src{font-size:var(--t-xs);color:var(--ink-3);margin-top:var(--s-2)}
+.brief .end{border-top:1px solid var(--line);padding-top:var(--s-4);color:var(--ink-2)}
+.sc-news{margin:0 0 4px;padding-left:1.1em;font-size:var(--t-sm);line-height:1.45}
+.sc-news li{margin:3px 0}
+.sc-news a{color:var(--ink)}

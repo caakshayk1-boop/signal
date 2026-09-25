@@ -2166,6 +2166,17 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      /F\.heat = async/.test(VJS) && /get\(`\/api\/heat\?part=/.test(VJS) && !/heatQuotes[\s\S]{0,200}F\.quotes/.test(VJS)
      && /HEAT_PART = 200/.test(HEATJS) && 200 / 20 <= 40 && /caches\.default/.test(HEATJS) && /quoteSpark/.test(HEATJS)
      && !/retryMissing/.test(HEATJS) && /url\.pathname === "\/api\/heat"\) return heat\(/.test(IDX));
+  /* Vision is the product, and it runs TWO engines: bottom reversal and the
+     4H breakout. A third arriving by copy-paste is the drift this pins. */
+  const VSW = (VJS.match(/const VS_WORD = \{([^}]*)\}/) || [])[1] || "";
+  ok("vision runs exactly two engines: bottom reversal and 4H breakout",
+     (VSW.match(/\b\w+:/g) || []).map((x) => x.slice(0, -1)).sort().join(",") === "bottom,brk4h", VSW);
+  /* Today is the morning read folded in from gems: a column that ends, built
+     from the same live quotes as the cockpit rather than a second model. */
+  const TODAY = (VJS.match(/V\.today = [\s\S]*?\n  \};/) || [""])[0];
+  ok("vision's Today brief reads the live feeds and ends",
+     /\['today', 'Today', '#\/today'\]/.test(VJS) && /await F\.heat\(\)/.test(TODAY) && /class="end">That is the day/.test(TODAY)
+     && /no headline names it/.test(TODAY) && !/(?<!never a )win rate[^'"`]*\$\{/i.test(TODAY));
   ok("vision's setups print no win rate or expectancy",
      !/win rate[^'"`]*\$\{|expectancy[^'"`]*\$\{/i.test((VJS.match(/V\.setups = [\s\S]*?\n  \};/) || [""])[0]));
 
