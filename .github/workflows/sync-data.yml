@@ -78,7 +78,7 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Fetched from the upstream repo, not from news.askakshay.com. The repo
       # is the source of truth and is reachable even when the site is not.

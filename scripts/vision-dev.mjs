@@ -20,10 +20,10 @@
  *   VDEV_VSIG=/path/feed.json node scripts/vision-dev.mjs
  *                                                 serve that file as
  *                                                 /vision_signals.json. Without
- *                                                 it the route 404s, which is
- *                                                 the page's "not published yet"
- *                                                 state — the one production
- *                                                 shows until the first scan.
+ *                                                 it, public/'s synced copy.
+ *   VDEV_VSIG=none node scripts/vision-dev.mjs    404 the feed exactly as the
+ *                                                 Worker does, for the page's
+ *                                                 "not published yet" state.
  */
 import http from "node:http";
 import { readFile } from "node:fs/promises";
@@ -47,6 +47,11 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", "
   ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png",
   ".woff2": "font/woff2", ".webmanifest": "application/manifest+json", ".txt": "text/plain" };
 
+/* A missing feed answers the way the Worker answers it (src/index.js): 404,
+   JSON, "no such file". A plain-text 404 here once let the page pass locally
+   on a body production never sends. */
+const noFile = (res, p) => { res.writeHead(404, { "content-type": "application/json" });
+  return res.end(JSON.stringify({ ok: false, error: `no such file: ${p}` })); };
 const j = (f) => JSON.parse(readFileSync(join(ROOT, f), "utf8"));
 
 /* The ledger: alerts.json is generate.py's snapshot of all_signals, in the
@@ -134,6 +139,7 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { "content-type": "application/json" });
     return res.end(JSON.stringify(API[key](u.searchParams)));
   }
+  if (p === "/vision_signals.json" && VSIG === "none") return noFile(res, p);
   if (p === "/vision_signals.json" && VSIG) {
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     return res.end(readFileSync(VSIG));
@@ -142,7 +148,10 @@ http.createServer(async (req, res) => {
   /* The signal site routes by PATH: anything that is not a file is its shell. */
   if (SITE === "signal" && !/\.[a-z0-9]+$/i.test(p)) p = p === "/vision" ? "/vision.html" : "/index.html";
   const f = join(ROOT, p);
-  if (!f.startsWith(ROOT) || !existsSync(f)) { res.writeHead(404); return res.end("not found"); }
+  if (!f.startsWith(ROOT) || !existsSync(f)) {
+    if (/\.json$/i.test(p)) return noFile(res, p);
+    res.writeHead(404); return res.end("not found");
+  }
   /* Gzipped like the edge does, or every load-time number measured through
      this harness is several times worse than production's. */
   const body = await readFile(f), ct = TYPES[extname(f)] || "application/octet-stream";

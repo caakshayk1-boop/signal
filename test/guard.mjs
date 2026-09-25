@@ -2133,6 +2133,19 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("vision's setups read the one signals feed", /V\.setups = /.test(VJS) && /get\('\/vision_signals\.json'/.test(VJS));
   ok("the signals feed is mirrored by the scheduled sync and the deploy",
      /contents\/feeds\/\$f"/.test(SYNC_V) && /f=vision_signals\.json/.test(SYNC_V) && /feeds\/vision_signals\.json/.test(PULL_V));
+  /* Deploy 220: the Worker 404s a missing feed with "no such file: …" and the
+     page matched the error TEXT for "HTTP 404", so the pre-scan state read
+     "failed". Executed against what the Worker and get() actually produce. */
+  const absSrc = (VJS.match(/const absent = (\(r\) => [^\n]+);/) || [])[1];
+  const absent = absSrc ? new Function(`return ${absSrc}`)() : null;
+  const workerMiss = /error: `no such file: \$\{p\}` \},\s*\{ status: 404 \}/.test(IDX);
+  ok("a feed the Worker 404s reads as not published, not failed",
+     !!absent && workerMiss && /status: r\.status, error: \(data && data\.error\)/.test(VJS)
+     && absent({ ok: false, status: 404, error: "no such file: /vision_signals.json" })
+     && absent({ ok: false, status: 200, error: "/vision_signals.json is not JSON (HTTP 200)" })
+     && !absent({ ok: false, status: 502, error: "/vision_signals.json is not JSON (HTTP 502)" })
+     && !absent({ ok: false, error: "timed out after 15s" }) && !absent({ ok: true, data: {} })
+     && !/not JSON\|HTTP 404/.test(VJS), absSrc);
   ok("vision's setups print no win rate or expectancy",
      !/win rate[^'"`]*\$\{|expectancy[^'"`]*\$\{/i.test((VJS.match(/V\.setups = [\s\S]*?\n  \};/) || [""])[0]));
 
