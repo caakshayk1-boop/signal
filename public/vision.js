@@ -96,8 +96,12 @@
         let data;
         /* A feed the assets binding does not have comes back as HTML with a
            200. Parsing it is how a missing feed announces itself. */
-        try { data = JSON.parse(txt); } catch (e) { return { ok: false, error: `${url} is not JSON (HTTP ${r.status})` }; }
-        if (!r.ok) return { ok: false, error: (data && data.error) || `HTTP ${r.status}`, data };
+        try { data = JSON.parse(txt); } catch (e) { return { ok: false, status: r.status, error: `${url} is not JSON (HTTP ${r.status})` }; }
+        /* The status travels with the result. The Worker answers a missing
+           feed with a 404 whose body says "no such file: …", so reading the
+           error TEXT for "404" missed it and the page said "failed" where it
+           meant "not published yet" (deploy 220). */
+        if (!r.ok) return { ok: false, status: r.status, error: (data && data.error) || `HTTP ${r.status}`, data };
         if (data && data.ok === false) return { ok: false, error: data.error || 'feed reported a failure', data };
         return { ok: true, data };
       } catch (e) {
@@ -109,6 +113,8 @@
     CACHE.set(url, { v, t: Date.now() });
     return v;
   }
+  /* Absent, not broken: a 404, or the SPA shell standing in for a missing file. */
+  const absent = (r) => !r.ok && (r.status === 404 || /not JSON \(HTTP 200\)/.test(r.error || ''));
 
   /* ── FRESHNESS ──────────────────────────────────────────────────────────
      One registry. A badge is drawn from the feed's OWN timestamp and a stated
@@ -910,7 +916,7 @@
     const paintSig = async () => {
       const r = await F.vsig(); if (!alive()) return;
       const box = $('#oSig'); if (!box) return;
-      if (!r.ok) { box.innerHTML = /not JSON|HTTP 404/.test(r.error || '') ? empty('Not published yet', 'The first scan runs at the next 4-hour close.') : failBox('The signals feed', r.error); return; }
+      if (!r.ok) { box.innerHTML = absent(r) ? empty('Not published yet', 'The first scan runs at the next 4-hour close.') : failBox('The signals feed', r.error); return; }
       const T = r.data.today || [];
       box.innerHTML = T.length ? `<div class="tw"><table class="tbl dense"><thead><tr><th scope="col">Name</th><th scope="col">Setup</th><th class="r" scope="col">Entry</th><th class="r" scope="col">Stop</th>
         <th class="r" scope="col">T1</th><th class="r hide-m" scope="col">T2</th><th class="r hide-m" scope="col">T3</th></tr></thead><tbody>
@@ -1544,7 +1550,7 @@
     if (r.ok) { mark('Signals', r.data.generated_at); S.vsig = r.data; }
     /* Absent before the first upstream scan: a state, not a failure — the
        badge must not say "failed" beside a panel that says "not yet". */
-    else if (/not JSON|HTTP 404/.test(r.error || '')) { FR.Signals = { ok: true, na: true, naTxt: 'not yet published', naTitle: 'no scan has run yet', t: Date.now() }; paintBadges(); }
+    else if (absent(r)) { FR.Signals = { ok: true, na: true, naTxt: 'not yet published', naTitle: 'no scan has run yet', t: Date.now() }; paintBadges(); }
     else markFail('Signals', r.error);
     return r;
   };
@@ -1604,7 +1610,7 @@
     if (!alive()) return;
     const B = $('#vsBody');
     if (!r.ok) {
-      B.innerHTML = `<div class="pn">${/not JSON|HTTP 404/.test(r.error || '') ? empty('Not published yet',
+      B.innerHTML = `<div class="pn">${absent(r) ? empty('Not published yet',
         'The first scan runs at the next 4-hour close — 13:28 or 15:45 IST on a trading day. Until it has run there is nothing to show, and nothing is shown in its place.')
         : failBox('The signals feed', r.error)}</div>`;
       return;

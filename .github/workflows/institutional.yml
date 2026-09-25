@@ -53,9 +53,9 @@ jobs:
     # this is the backstop if a single request hangs past its timeout.
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with: { node-version: "22" }
 
       # The calculator has no network in it, so its tests are the cheapest
