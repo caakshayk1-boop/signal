@@ -608,13 +608,20 @@
   const heatSize = (r, size) => size === 'mcap' ? num(r.mcap_cr) : num(r.turnover_cr);
   const heatPool = (n, size) => Object.values(SCR || {}).filter((r) => (heatSize(r, size) || 0) > 0)
     .sort((a, b) => heatSize(b, size) - heatSize(a, size)).slice(0, n);
-  /* Quotes for every name the map can show, bar those the ticker already
-     prices. F.quotes chunks by 40 and get() caches 45 s, so a redraw inside
-     the same minute costs nothing. */
-  async function heatQuotes(n, size) {
-    const have = tickLedger(), want = heatPool(n, size).map((r) => r.sym).filter((x) => !have[x]);
-    if (want.length) Object.assign(S.quotes, await F.quotes(want));
-  }
+  /* Heatmap quotes come from /api/heat, not ?px=: the whole screen in shards
+     of 200 by turnover, each edge-cached 60 s and shared by every viewer, so
+     1,000 live tiles cost Yahoo the same ~50 calls a minute however many tabs
+     are open. Shard 0 alone covers the overview strip. */
+  const HEAT_PART = 200;
+  F.heat = async (want) => {
+    const first = await get('/api/heat?part=0', 55000);
+    const total = (first.data && first.data.parts) || 5, k = want == null ? total : Math.min(want, total);
+    const rs = [first, ...await Promise.all(Array.from({ length: Math.max(0, k - 1) }, (_, i) => get(`/api/heat?part=${i + 1}`, 55000)))];
+    let at = null, bad = null;
+    for (const r of rs) { if (r.ok && r.data.quotes) { Object.assign(S.quotes, r.data.quotes); if (!at || r.data.at < at) at = r.data.at; } else bad = bad || r.error; }
+    if (at) mark('Quotes', at, bad ? { note: `a shard did not answer: ${bad}` } : null); else if (bad) markFail('Quotes', bad);
+  };
+  const heatQuotes = (n, size) => F.heat(size === 'turnover' ? Math.ceil(n / HEAT_PART) : null);
   const liveAt = () => { const t = (FR.Quotes || {}).at || (S.ticker || {}).fetched_at; return t ? new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) + ' IST' : null; };
   const trendWord = (r) => {
     if (!r || !r.price || !r.sma50 || !r.sma200) return null;
@@ -694,7 +701,12 @@
          five banks from taking half the map;
        · every name asked for is drawn, colour-only where its name will not fit;
        · a label is drawn only at a size that fits, never clipped mid-word. */
-  const HM_MIN_AREA = 1200;                    // px² per tile — a ~35 px tap target; below it the phone caps the count
+  /* The map grows taller rather than drop names: height is set so the
+     average tile keeps HM_AREA px², and no tile's weight falls below HM_FLOOR
+     of the mean, so the smallest of 1,000 names is still a tappable square. */
+  const HM_AREA = { phone: 3000, wide: 3400 };
+  const HM_FLOOR = 0.3;
+  const heatHeight = (n, W, base) => Math.max(base, Math.ceil(n * (W < 560 ? HM_AREA.phone : HM_AREA.wide) / Math.max(W, 1)));
   const HM_EXP = 0.5;                          // area ∝ √turnover — see the note above
   /* MEASURED, NOT ESTIMATED. A characters-times-a-constant guess cut off
      "SHADOWFA" and "APOLLOHOS" in the small size and left tiles that had
@@ -713,25 +725,30 @@
     const room = w - 14;                                // 6px padding + 1px border each side
     if (textW(sym, 12) <= room && h >= 34) return 'lg';  // symbol + move
     if (textW(sym, 12) <= room && h >= 20) return 'md';  // symbol only
+    if (textW(sym, 10) <= room && h >= 32) return 'sv';  // smaller symbol + move
     if (textW(sym, 10) <= room && h >= 17) return 'sm';  // smaller symbol
+    if (textW(sym, 8) <= w - 8 && h >= 12) return 'ti';  // 8px symbol, 3px padding
     return 'xs';                                         // colour only; the card has it
   };
   function treemap(host, rows, opts) {
     const W = host.clientWidth || 800, H = opts.height;
     const raw = (r) => heatSize(r, opts.size);
-    const sizeOf = (r) => { const v = raw(r); return v > 0 ? Math.pow(v, HM_EXP) : 0; };
-    /* EVERY NAME ASKED FOR. The count used to be capped to what could carry a
-       label (~110 on a desktop), so "Top 300" drew a third of the market. Now
-       every tile is drawn; one too small for its name is colour only and its
-       card is a tap away. The one floor left is a tap target, HM_MIN_AREA. */
-    const cap = Math.max(12, Math.floor((W * H) / HM_MIN_AREA));
-    const n = Math.min(opts.n, cap);
-    const pool = rows.filter((r) => (raw(r) || 0) > 0).sort((a, b) => raw(b) - raw(a)).slice(0, n);
+    /* EVERY NAME ASKED FOR, NO CAP. The count was once capped to what could
+       carry a label, then to a tap target, and either way "Top 150" and
+       "Top 300" drew the same ~149 tiles on a phone. The caller sizes the
+       height to the count instead (heatHeight). */
+    const pool = rows.filter((r) => (raw(r) || 0) > 0).sort((a, b) => raw(b) - raw(a)).slice(0, opts.n);
+    /* A phone flattens the size range further (turnover^0.3, floor 0.5 of the
+       mean): at 358 px, square-root sizing left most names too small to name. */
+    const ex = W < 560 ? 0.3 : HM_EXP, fl = W < 560 ? 0.5 : HM_FLOOR;
+    const mean = pool.reduce((m, r) => m + Math.pow(raw(r), ex), 0) / (pool.length || 1);
+    const sizeOf = (r) => { const v = raw(r); return v > 0 ? Math.max(Math.pow(v, ex), fl * mean) : 0; };
+    const gKey = (r) => (opts.groupBy === 'ind' ? r.ind : r.sector) || 'Unclassified';
     let tiles = [], groups = [];
     const BAND = 16;
     if (opts.group !== false) {
       const by = {};
-      for (const r of pool) (by[r.sector || 'Unclassified'] = by[r.sector || 'Unclassified'] || []).push(r);
+      for (const r of pool) (by[gKey(r)] = by[gKey(r)] || []).push(r);
       groups = squarify(Object.entries(by).map(([k, rs]) => ({ k, rs, v: rs.reduce((s, r) => s + sizeOf(r), 0) })), 0, 0, W, H);
       for (const g of groups) {
         g.band = g.w > 56 && g.h > 48;
@@ -741,11 +758,17 @@
     } else tiles = squarify(pool.map((r) => ({ r, v: sizeOf(r) })), 0, 0, W, H);
     const sc = HEAT_SCALE[opts.color] || 1;
     host.style.height = H + 'px';
-    host.innerHTML = groups.map((g) => `<div class="hm-g" style="left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px">${g.band ? `<em>${esc(g.k)}</em>` : ''}</div>`).join('')
-      + tiles.map((t) => { const r = t.r, v = r[opts.color], fit = fitLabel(r.sym, t.w, t.h);
+    host.innerHTML = groups.map((g) => `<div class="hm-g" style="left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px">${g.band ? `<em${opts.groupBy === 'ind' ? '' : ` data-sec="${esc(g.k)}" title="Show only ${esc(g.k)}"`}>${esc(g.k)}</em>` : ''}</div>`).join('')
+      + tiles.map((t) => { const r = t.r, v = r[opts.color];
+        let fit = fitLabel(r.sym, t.w, t.h), txt = r.sym;
+        /* Last resort before colour-only: the symbol shortened with an
+           ellipsis, measured to fit at 8px. The full symbol is on aria-label
+           and on the card. Four letters or nothing — "BA…" names no one. */
+        if (fit === 'xs' && t.h >= 12) for (let k = r.sym.length - 1; k >= 4; k--) {
+          if (textW(r.sym.slice(0, k) + '…', 8) <= t.w - 8) { fit = 'ti'; txt = r.sym.slice(0, k) + '…'; break; } }
         return `<a class="hm-t f-${fit}" href="#/asset/${esc(r.sym)}" data-sym="${esc(r.sym)}" style="left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px;background:${heatBg(v, sc)}"
-          aria-label="${esc(r.sym)} ${v == null ? 'no move recorded' : signed(v)} — open card"><b>${esc(r.sym)}</b><span>${v == null ? '—' : signed(v, 1)}</span></a>`; }).join('');
-    return { shown: pool.length, asked: opts.n, capped: n < opts.n, live: pool.filter((r) => r.live).length };
+          aria-label="${esc(r.sym)} ${v == null ? 'no move recorded' : signed(v)} — open card"><b>${esc(txt)}</b><span>${v == null ? '—' : signed(v, 1)}</span></a>`; }).join('');
+    return { shown: pool.length, asked: opts.n, live: pool.filter((r) => r.live).length };
   }
 
   /* ── THE STOCK CARD ─────────────────────────────────────────────────────
@@ -821,7 +844,7 @@
       </div>
       <div style="height:var(--s-4)"></div>
       ${panel('Market heatmap', `<div class="hm" id="oHeat" style="height:${innerWidth < 760 ? 340 : 380}px"></div><div id="oSect" style="margin-top:var(--s-3)"></div>`,
-        { fb: 'Screen', more: '#/heatmap', moreText: 'Full heatmap', right: heatLegend('r1d') + ' ', foot: 'The 120 most-traded names, grouped by sector. Tile area follows √turnover; colour is the live move on the previous close, refreshed every minute (the screen\'s last close for any name not yet quoted). Tap a tile for its card.' })}
+        { fb: 'Screen', more: '#/heatmap', moreText: 'Full heatmap', right: heatLegend('r1d') + ' ', foot: 'The most-traded names (120; 60 on a phone), grouped by sector. Tile area follows √turnover; colour is the live move on the previous close, refreshed every minute (the screen\'s last close for any name not yet quoted). Tap a tile for its card.' })}
       <div style="height:var(--s-4)"></div>
       <div class="grid g-2">
         ${panel('Top movers', skel(8), { bodyId: 'oMov', flush: true, fb: 'Live prices', more: '#/markets', moreText: 'Markets' })}
@@ -927,7 +950,7 @@
       S.pulse = p.ok ? p.data : S.pulse;
       const host = $('#oHeat'); if (!host) return;
       if (!r.ok) { host.innerHTML = failBox('The screen', r.error); return; }
-      const draw = () => { if (document.contains(host)) treemap(host, Object.values(SCR).map(liveRow), { size: 'turnover', color: 'r1d', n: 120, height: innerWidth < 760 ? 340 : 380 }); };
+      const draw = () => { if (document.contains(host)) { const n = innerWidth < 760 ? 60 : 120; treemap(host, Object.values(SCR).map(liveRow), { size: 'turnover', color: 'r1d', n, height: heatHeight(n, host.clientWidth, innerWidth < 760 ? 340 : 380) }); } };
       heatDraw = draw;
       draw(); wireTips(host);
       /* Labels are measured in the real face; if it arrives after the first
@@ -1304,32 +1327,47 @@
 
   /* ── HEATMAP + BREADTH ──────────────────────────────────────────────────── */
   V.heatmap = async (el, arg, alive) => {
-    const o = Object.assign({ size: 'turnover', color: 'r1d', n: 150, group: true }, store.get('vis:hm2', {}));
+    /* vis:hm3, not hm2: the old key held 60/150/300, and the map now opens on
+       every name unless the reader narrows it. */
+    const o = Object.assign({ size: 'turnover', color: 'r1d', n: 1000, sec: '', group: true }, store.get('vis:hm3', {}));
+    if (![100, 300, 500, 1000].includes(+o.n)) o.n = 1000;
     const segBtns = (key, opts) => `<div class="seg" role="group">${opts.map(([v, t]) => `<button type="button" data-k="${key}" data-val="${v}" aria-pressed="${String(o[key]) === String(v)}">${t}</button>`).join('')}</div>`;
     el.innerHTML = vhead('Heatmap', 'The market, by name',
       'Size is importance, colour is the move. Tap or click any tile for its card — 50-day, 200-day and the 52-week range included.', fb('Screen'))
       + `<div class="pn"><div class="ph" style="flex-wrap:wrap;gap:var(--s-2)">
           ${segBtns('color', [['r1d', '1D'], ['r1w', '1W'], ['r1m', '1M']])}
           ${segBtns('size', [['turnover', 'Turnover'], ['mcap', 'Market cap']])}
-          ${segBtns('n', [[60, 'Top 60'], [150, 'Top 150'], [300, 'Top 300']])}
+          ${segBtns('n', [[100, 'Top 100'], [300, 'Top 300'], [500, 'Top 500'], [1000, 'All']])}
+          <select id="hSecSel" class="inp" aria-label="Sector" style="max-width:220px"><option value="">All sectors</option></select>
           <div class="ph-r" id="hLeg"></div></div>
         <div class="pb"><div class="hm" id="hMap">${skel(0, 560)}</div></div><div class="pf" id="hFoot"></div></div>
       <div style="height:var(--s-4)"></div>
       <div class="grid g-2">${panel('Breadth', skel(6), { bodyId: 'hBr', fb: 'Screen' })}${panel('Sectors today', skel(8), { bodyId: 'hSec', flush: true, fb: 'Pulse' })}</div>`;
     const [r, p] = await Promise.all([F.screen(), F.pulse()]); if (!alive()) return;
     if (!r.ok) { $('#hMap').innerHTML = failBox('The screen', r.error); return; }
-    const host = $('#hMap'), rows = Object.values(SCR);
+    const host = $('#hMap'), all = Object.values(SCR);
+    const secs = Object.entries(all.reduce((m, x) => { const k = x.sector || 'Unclassified'; m[k] = (m[k] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]);
+    const sel = $('#hSecSel');
+    sel.innerHTML = `<option value="">All sectors · ${all.length}</option>` + secs.map(([k, c]) => `<option value="${esc(k)}">${esc(k)} · ${c}</option>`).join('');
+    if (o.sec && !secs.some(([k]) => k === o.sec)) o.sec = '';
+    sel.value = o.sec;
+    /* One sector is drawn by industry, so zooming in adds structure, not just size. */
+    const rowsNow = () => o.sec ? all.filter((x) => (x.sector || 'Unclassified') === o.sec) : all;
+    let rows = rowsNow();
     const closeOn = rows.reduce((m, x) => (x.last_date && x.last_date > m ? x.last_date : m), '') || 'its build';
     const draw = () => {
       if (!document.contains(host)) return;
       $('#hLeg').innerHTML = heatLegend(o.color);
-      const res = treemap(host, rows.map(liveRow), { size: o.size, color: o.color, n: +o.n, height: innerWidth < 760 ? 520 : 640, group: o.group }), n = res.shown;
+      rows = rowsNow();
+      const nEff = Math.min(+o.n, rows.filter((x) => (heatSize(x, o.size) || 0) > 0).length);
+      host.dataset.pool = nEff;
+      const res = treemap(host, rows.map(liveRow), { size: o.size, color: o.color, n: +o.n, height: heatHeight(nEff, host.clientWidth, innerWidth < 760 ? 520 : 640), group: o.group, groupBy: o.sec ? 'ind' : 'sector' }), n = res.shown;
       const noCap = rows.filter((x) => !(num(x.mcap_cr) > 0)), at = liveAt();
       $('#hFoot').innerHTML = (res.live ? `<b class="up">Live</b> — ${res.live} of ${n} tiles on a quote${at ? ` of ${at}` : ''}, refreshed every minute while this tab is open${res.live < n ? '; the rest show the screen\'s close of ' + esc(closeOn) : ''}. `
           : `<b class="warn">Not live yet</b> — colours are the screen's close of ${esc(closeOn)} until quotes arrive. `)
         + (o.color === 'r1d' ? '1D is the move on the previous close. ' : `${o.color === 'r1w' ? '1W' : '1M'} runs from the screen's base close to the live price. `)
-        + `${n} names, grouped by sector; tile area follows the square root of ${o.size === 'mcap' ? 'market cap' : 'daily turnover'}, so order is kept and mid-sized names stay readable. Names too small to label are colour only — tap for the card.`
-        + (res.capped ? ` <b>Showing ${n} of the ${res.asked} asked for</b> — the most this screen fits as tappable tiles; widen the window or rotate the phone for more.` : '')
+        + `${n} names${o.sec ? ` in ${esc(o.sec)}, grouped by industry` : ', grouped by sector — tap a sector name to zoom into it'}; tile area follows the square root of ${o.size === 'mcap' ? 'market cap' : 'daily turnover'}, so order is kept and mid-sized names stay readable. Names too small to label are colour only — tap for the card.`
+        + ' The map grows taller with the count, so every name keeps a tappable tile.'
         + (o.size === 'mcap' ? ` <span class="warn">${noCap.length} names carry no market cap in the feed and are left out${noCap.length ? ` — including ${noCap.slice().sort((a, b) => (b.turnover_cr || 0) - (a.turnover_cr || 0)).slice(0, 4).map((x) => esc(x.sym)).join(', ')}` : ''}.</span>` : ' Turnover is the default because market cap is missing for some of the largest names.')
         + ` Colour steps are ${o.color === 'r1d' ? '1' : o.color === 'r1w' ? '2' : '4'}× the daily scale so a month is not all one shade.`;
     };
@@ -1337,16 +1375,20 @@
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { MEASURE.memo = {}; draw(); });
     let w = host.clientWidth; new ResizeObserver(() => { if (Math.abs(host.clientWidth - w) > 8 && document.contains(host)) { w = host.clientWidth; draw(); } }).observe(host);
     const live = async () => { await heatQuotes(+o.n, o.size); if (!alive()) return; draw(); paintSide(); };
-    el.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (!b) return;
+    const setSec = (v) => { o.sec = v; sel.value = v; store.set('vis:hm3', o); draw(); paintSide(); };
+    sel.addEventListener('change', () => setSec(sel.value));
+    el.addEventListener('click', (e) => {
+      const sg = e.target.closest('[data-sec]'); if (sg) { e.preventDefault(); setSec(sg.dataset.sec); return; }
+      const b = e.target.closest('[data-k]'); if (!b) return;
       o[b.dataset.k] = b.dataset.k === 'n' ? +b.dataset.val : b.dataset.val;
-      $$(`[data-k="${b.dataset.k}"]`, el).forEach((x) => x.setAttribute('aria-pressed', x === b)); store.set('vis:hm2', o); draw(); live(); });
+      $$(`[data-k="${b.dataset.k}"]`, el).forEach((x) => x.setAttribute('aria-pressed', x === b)); store.set('vis:hm3', o); draw(); live(); });
 
     /* Advancing, declining and the sector medians are counted from the live
        tiles once enough names are quoted; until then, and for the
        moving-average shares that need a full close series, the screen's build. */
     const paintSide = () => {
       if (!document.contains(host)) return;
-      const L = heatPool(+o.n, o.size).map(liveRow).filter((x) => x.live && x.r1d != null), isLive = L.length >= 50;
+      const L = heatPool(1000, o.size).map(liveRow).filter((x) => x.live && x.r1d != null), isLive = L.length >= 50;
       const b = Object.assign({}, r.data.breadth || {}), at = liveAt();
       if (isLive) { b.advancing = L.filter((x) => x.r1d > 0).length; b.declining = L.filter((x) => x.r1d < 0).length; }
       const pc = (v) => v == null ? '—' : Number(v).toFixed(1) + '%';

@@ -343,12 +343,16 @@ select.inp{padding-right:var(--s-5)}
 /* A label is drawn at a size that fits or not at all — never clipped. */
 .hm-t.f-md span{display:none}
 .hm-t.f-sm b{font-size:var(--t-2xs)} .hm-t.f-sm span{display:none}
+.hm-t.f-sv b{font-size:var(--t-2xs)} .hm-t.f-sv span{font-size:9px}
+.hm-t.f-ti{padding:2px 3px} .hm-t.f-ti b{font-size:8px;line-height:1.1} .hm-t.f-ti span{display:none}
 .hm-t.f-xs b,.hm-t.f-xs span{display:none}
 .hm-t{text-shadow:0 1px 1px rgba(0,0,0,.35)}
 :root[data-theme="light"] .hm-t{text-shadow:none}
 .hm-g{position:absolute;pointer-events:none;border:1px solid var(--bg);z-index:2}
 .hm-g em{position:absolute;left:4px;right:4px;top:2px;font-style:normal;font-size:var(--t-2xs);font-weight:700;letter-spacing:.08em;
   text-transform:uppercase;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:13px}
+.hm-g em[data-sec]{pointer-events:auto;cursor:zoom-in}
+.hm-g em[data-sec]:hover{color:var(--ink)}
 .hm-leg{display:flex;align-items:center;gap:2px;font:500 var(--t-xs)/1 var(--f-mono);color:var(--ink-3)}
 .hm-leg i{width:22px;height:10px;border-radius:2px}
 .tip{position:fixed;z-index:80;pointer-events:none;background:var(--panel-3);border:1px solid var(--line-2);

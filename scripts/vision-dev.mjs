@@ -118,7 +118,18 @@ function wire() {
   return { ok: true, at: new Date().toISOString(), sources: 1, failed: [], stories };
 }
 
+/* /api/heat: the Worker's shards (200 by turnover), priced at the screen's
+   own close — the same committed stand-in ?px= uses here. */
+function heat(q) {
+  const rows = (j("screen-lite.json").rows || []).filter((r) => r && r.sym)
+    .sort((a, b) => (b.turnover_cr || 0) - (a.turnover_cr || 0) || String(a.sym).localeCompare(String(b.sym)));
+  const part = Number(q.get("part") || 0), parts = Math.ceil(rows.length / 200), quotes = {};
+  for (const r of rows.slice(part * 200, part * 200 + 200)) if (Number.isFinite(r.price)) quotes[r.sym] = { price: r.price, change_pct: r.r1d ?? null };
+  return { ok: true, at: new Date().toISOString(), part, parts, got: Object.keys(quotes).length, quotes };
+}
+
 const API = {
+  "/api/heat": heat,
   "/api/signals": signals,
   "/api/ticker": ticker,
   "/api/wire": wire,

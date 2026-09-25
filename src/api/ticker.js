@@ -332,6 +332,17 @@ export async function quoteAll(defs, priority = []) {
 // +1.60%, and MSFT +25%. One day in, one day's change out.
 const RANGE = "range=1d&interval=1d";
 
+/* Spark only, no per-symbol retry: the heatmap's 1,000 names are fetched in
+   shards of 200 by /api/heat, and a shard must stay inside the free plan's
+   50-subrequest budget. 10 spark calls fit; retryMissing's 48 would not. */
+export async function quoteSpark(symbols) {
+  const uniq = [...new Set(symbols)], chunks = [];
+  for (let i = 0; i < uniq.length; i += CHUNK) chunks.push(uniq.slice(i, i + CHUNK));
+  const out = new Map();
+  for (const r of await Promise.all(chunks.map(spark))) for (const [k, v] of r) out.set(k, v);
+  return out;
+}
+
 async function spark(symbols) {
   const out = new Map();
   try {

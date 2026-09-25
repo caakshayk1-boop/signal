@@ -2540,8 +2540,10 @@ try {
      stopped answering is exactly what this should fail on. */
   const vHeat = await v.evaluate(() => { const on = document.querySelector('[data-k="n"][aria-pressed="true"]');
     const m = (document.getElementById("hFoot") || {}).innerText || "", lm = m.match(/Live — (\d+) of (\d+) tiles/);
-    return { asked: on ? +on.dataset.val : null, tiles: document.querySelectorAll("#hMap .hm-t").length, live: lm ? +lm[1] : 0, foot: m.slice(0, 90) }; });
-  ok("the heatmap draws every name asked for", vHeat.tiles === vHeat.asked, vHeat);
+    const hm = document.getElementById("hMap");
+    return { asked: on ? +on.dataset.val : null, pool: hm ? +hm.dataset.pool : null, tiles: document.querySelectorAll("#hMap .hm-t").length, live: lm ? +lm[1] : 0, foot: m.slice(0, 90) }; });
+  /* pool = min(asked, names that have a size): "All" is every name on the screen. */
+  ok("the heatmap draws every name asked for", vHeat.pool > 0 && vHeat.tiles === vHeat.pool && (vHeat.asked < 1000 || vHeat.pool >= 900), vHeat);
   ok("...and colours at least 80% of them from a live quote", vHeat.tiles > 0 && vHeat.live >= 0.8 * vHeat.tiles, vHeat);
   /* The header ran the nav under the search box from 821 to 1399 px. */
   for (const W of [1100, 1180, 1280]) {
