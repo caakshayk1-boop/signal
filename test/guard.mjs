@@ -2146,6 +2146,17 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      && !absent({ ok: false, status: 502, error: "/vision_signals.json is not JSON (HTTP 502)" })
      && !absent({ ok: false, error: "timed out after 15s" }) && !absent({ ok: true, data: {} })
      && !/not JSON\|HTTP 404/.test(VJS), absSrc);
+  /* The heatmap was coloured from the screen build and never redrawn, so it
+     showed a session days old and did not move. Both maps draw live rows and
+     their views hand the minute beat a function that re-quotes and redraws. */
+  const HEATV = (VJS.match(/V\.heatmap = [\s\S]*?\n  \};/) || [""])[0];
+  ok("the heatmap is live: live rows, re-quoted on the minute beat",
+     /treemap\(host, rows\.map\(liveRow\)/.test(HEATV) && /await heatQuotes\(\+o\.n, o\.size\)/.test(HEATV) && /\n    return live;\n  \};$/.test(HEATV)
+     && /treemap\(host, Object\.values\(SCR\)\.map\(liveRow\)/.test(VJS) && /await liveHeat\(\); await paintWatch\(\)/.test(VJS));
+  /* "Top 300" drew ~110 because the count was capped to what could carry a
+     label. Only a tap-target floor may cap it now. */
+  ok("the heatmap draws every name asked for, bar a tap-target floor",
+     /const cap = Math\.max\(12, Math\.floor\(\(W \* H\) \/ HM_MIN_AREA\)\)/.test(VJS) && /const HM_MIN_AREA = (\d+)/.test(VJS) && +VJS.match(/const HM_MIN_AREA = (\d+)/)[1] <= 1500);
   ok("vision's setups print no win rate or expectancy",
      !/win rate[^'"`]*\$\{|expectancy[^'"`]*\$\{/i.test((VJS.match(/V\.setups = [\s\S]*?\n  \};/) || [""])[0]));
 
