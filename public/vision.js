@@ -207,6 +207,9 @@
     mark('Wire', ed.ok ? ed.data.built_at : null, { snap: true, cad: 36, note: `build-time snapshot; live wire unavailable: ${r.error || 'empty'}` });
     return { ok: true, stories: (s.data || []).map((x) => cleanStory(Object.assign({ scope: null, at: null }, x))), live: false, failed: [] };
   };
+  /* Every successful wire read is kept on S, so a card opened anywhere can
+     name the headlines for its stock without waiting on a fetch. */
+  { const wire0 = F.wire; F.wire = async () => { const W = await wire0(); if (W.ok) S.wire = W; return W; }; }
   /* Live marks for arbitrary NSE symbols, 40 a request, chunked not truncated. */
   F.quotes = async (syms) => {
     const list = [...new Set((syms || []).map(bare).filter(Boolean))];
@@ -364,18 +367,21 @@
      Hash routes. The Worker maps the vision host's "/" to this one shell, so
      every route is a fragment — no route list to keep in step server-side. */
   const NAV = [
-    ['overview', 'Overview', '#/'], ['markets', 'Markets', '#/markets'],
+    ['today', 'Today', '#/today'], ['overview', 'Overview', '#/'], ['markets', 'Markets', '#/markets'],
     ['screener', 'Screener', '#/screener'], ['setups', 'Signals', '#/setups'], ['heatmap', 'Heatmap', '#/heatmap'], ['news', 'News', '#/news'],
     ['watchlist', 'Watchlist', '#/watchlist'], ['alerts', 'Alerts', '#/alerts'],
   ];
   const ICON = {
+    today: '<path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/>',
     overview: '<path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z"/>',
     screener: '<path d="M4 6h16M4 12h16M4 18h10"/>',
     heatmap: '<path d="M4 4h9v9H4zM15 4h5v5h-5zM15 11h5v9h-5zM4 15h9v5H4z"/>',
     watchlist: '<path d="m12 2.8 2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.3l-5.6 2.9 1.1-6.3L2.9 9.5l6.3-.9z"/>',
     more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   };
-  const TABS = ['overview', 'screener', 'heatmap', 'watchlist'];
+  /* Today leads the phone tabs: it is the morning read, and the screener is
+     one tap away under More. */
+  const TABS = ['today', 'overview', 'heatmap', 'watchlist'];
   const svgI = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
 
   function paintNav(cur) {
@@ -394,7 +400,7 @@
   const BLURB = {
     markets: 'Indices, FX, commodities, crypto, flows', screener: 'Every name on the NSE screen',
     setups: 'Bottom reversal and 4H breakout, with levels', news: 'The wire, matched to names', alerts: 'Price alerts in this browser',
-    overview: 'The market on one screen', heatmap: 'Every liquid name, by sector', watchlist: 'Names you follow',
+    today: 'The day in two minutes — it ends', overview: 'The market on one screen', heatmap: 'Every liquid name, by sector', watchlist: 'Names you follow',
   };
 
   /* ── TICKER ─────────────────────────────────────────────────────────────
@@ -603,7 +609,9 @@
     const lv = r && liveOf(r.sym), c = r && num(r.price);
     if (!lv || !(lv.price > 0)) return r;
     const re = (m) => { const v = num(m); return v == null || !(c > 0) ? null : ((1 + v / 100) * lv.price / c - 1) * 100; };
-    return Object.assign({}, r, { price: lv.price, r1d: lv.change_pct, r1w: re(r.r1w), r1m: re(r.r1m), live: true });
+    const hi = num(r.high52);
+    return Object.assign({}, r, { price: lv.price, r1d: lv.change_pct, r1w: re(r.r1w), r1m: re(r.r1m),
+      from_high: hi > 0 ? (lv.price / hi - 1) * 100 : r.from_high, live: true });
   };
   const heatSize = (r, size) => size === 'mcap' ? num(r.mcap_cr) : num(r.turnover_cr);
   const heatPool = (n, size) => Object.values(SCR || {}).filter((r) => (heatSize(r, size) || 0) > 0)
@@ -613,12 +621,13 @@
      1,000 live tiles cost Yahoo the same ~50 calls a minute however many tabs
      are open. Shard 0 alone covers the overview strip. */
   const HEAT_PART = 200;
+  const HEAT_SYMS = new Set();   // names the shards priced; ?px= is only asked for the rest
   F.heat = async (want) => {
     const first = await get('/api/heat?part=0', 55000);
     const total = (first.data && first.data.parts) || 5, k = want == null ? total : Math.min(want, total);
     const rs = [first, ...await Promise.all(Array.from({ length: Math.max(0, k - 1) }, (_, i) => get(`/api/heat?part=${i + 1}`, 55000)))];
     let at = null, bad = null;
-    for (const r of rs) { if (r.ok && r.data.quotes) { Object.assign(S.quotes, r.data.quotes); if (!at || r.data.at < at) at = r.data.at; } else bad = bad || r.error; }
+    for (const r of rs) { if (r.ok && r.data.quotes) { Object.assign(S.quotes, r.data.quotes); for (const k in r.data.quotes) HEAT_SYMS.add(k); if (!at || r.data.at < at) at = r.data.at; } else bad = bad || r.error; }
     if (at) mark('Quotes', at, bad ? { note: `a shard did not answer: ${bad}` } : null); else if (bad) markFail('Quotes', bad);
   };
   const heatQuotes = (n, size) => F.heat(size === 'turnover' ? Math.ceil(n / HEAT_PART) : null);
@@ -796,6 +805,10 @@
         <div class="sc-ls" style="margin-top:var(--s-2)">${lvlRow('52w high', hi, px)}${lvlRow('52w low', lo, px)}</div>`
         : `<p class="note">No 52-week range on the screen for this name${r.rng_sessions ? ` — ${r.rng_sessions} sessions of history` : ''}.</p>`}</div>
       <div><h3>Moving averages</h3><div class="sc-ls">${lvlRow('20-day', r.sma20, px)}${lvlRow('50-day', r.sma50, px)}${lvlRow('200-day', r.sma200, px)}</div></div>
+      ${(() => { const nh = S.wire ? newsIndex(S.wire.stories)(sym).slice(0, 3) : null;
+        return `<div><h3>In the news</h3>${nh == null ? '<p class="note">The wire has not loaded yet.</p>' : nh.length
+          ? `<ul class="sc-news">${nh.map((h) => `<li><a href="${esc(h.link)}" target="_blank" rel="noopener">${esc(h.title)}</a> <span class="mut">${esc(h.source)}</span></li>`).join('')}</ul><p class="note">Headlines that name it — a text match, not a judgement that they explain the move.</p>`
+          : '<p class="note">No headline on the wire names it.</p>'}</div>`; })()}
       <div><h3>How it reads</h3>${moveFactors(mv.parts)}<p class="note" style="margin-top:6px">Move score <b>${mv.score == null ? 'not scored' : mv.score}</b> · RSI ${r.rsi != null ? Math.round(r.rsi) : '—'} · turnover ${r.turnover_cr != null ? '₹' + fmt(r.turnover_cr, 0) + ' cr/day' : '—'}. Not a forecast.</p></div>
       <div class="row wrap"><a class="btn pri" href="#/asset/${esc(r.sym)}">Open full page</a><a class="btn" href="#/alerts?sym=${esc(r.sym)}">Price alert</a>
         <a class="btn" href="https://www.tradingview.com/chart/?symbol=NSE:${encodeURIComponent(r.sym)}" target="_blank" rel="noopener">Chart ↗</a></div>`,
@@ -830,6 +843,65 @@
   }
 
   /* ── OVERVIEW ─────────────────────────────────────────────────────────── */
+  /* ── TODAY — the day in two minutes, and it ends ──────────────────────────
+     The gems digest, folded into the cockpit: the crux written
+     out as sentences from the live feeds, each section saying where its
+     numbers came from and how old they are, and a last line that says the
+     page is over. It computes nothing new — every figure is one the other
+     views already show — so the brief cannot disagree with the cockpit. */
+  V.today = async (el, arg, alive) => {
+    const day = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
+    el.innerHTML = vhead('Today', day, 'The market, what moved and why, the two setups and your names — written from the live feeds. Two minutes, and it ends.', fb('Quotes'))
+      + `<article class="brief" id="tBody">${skel(12)}</article>`;
+    const [sr, b, , W] = await Promise.all([F.screen(), F.baro(), tickerP, F.wire(), F.vsig()]);
+    if (!alive()) return;
+    await F.heat(); if (!alive()) return;
+    const paint = () => {
+      const box = $('#tBody'); if (!box) return;
+      const m = marketState(), tr = tickRows(), at = liveAt();
+      const hit = W.ok ? newsIndex(W.stories) : null;
+      const why = (sym) => { const h = hit ? hit(sym) : []; return h.length ? ` — <a href="${esc(h[0].link)}" target="_blank" rel="noopener">${esc(h[0].title)}</a> <span class="mut">(${esc(h[0].source)})</span>` : ' — <span class="mut">no headline names it</span>'; };
+      const L = SCR ? heatPool(1000, 'turnover').map(liveRow).filter((x) => x.live && x.r1d != null) : [];
+      const up = L.filter((x) => x.r1d > 0).length, dn = L.filter((x) => x.r1d < 0).length;
+      const sec = {}; for (const x of L) (sec[x.sector || 'Unclassified'] = sec[x.sector || 'Unclassified'] || []).push(x.r1d);
+      const med = (a) => { const v = a.slice().sort((p, q) => p - q), k = v.length >> 1; return v.length % 2 ? v[k] : (v[k - 1] + v[k]) / 2; };
+      const secs = Object.entries(sec).filter(([, v]) => v.length >= 5).map(([k, v]) => [k, med(v), v.length]).sort((p, q) => q[1] - p[1]);
+      const liquid = L.filter((x) => (x.turnover_cr || 0) >= 25);
+      const top = liquid.slice().sort((p, q) => q.r1d - p.r1d).slice(0, 5), bot = liquid.slice().sort((p, q) => p.r1d - q.r1d).slice(0, 5);
+      const nifty = tr['Nifty 50'], bank = tr['Bank Nifty'], vix = tr['India VIX'], bt = b.ok ? (b.data.today || {}) : null;
+      const V0 = S.vsig, vtoday = V0 ? V0.today || [] : [];
+      const li = (x) => `<li><a class="sym" href="#/asset/${esc(x.sym)}">${esc(x.sym)}</a> ${chg(x.r1d)}${why(x.sym)}</li>`;
+      const mine = S.watch.map((w) => ({ s: w.s, l: liveOf(w.s) })).filter((w) => w.l && w.l.change_pct != null).sort((p, q) => Math.abs(q.l.change_pct) - Math.abs(p.l.change_pct));
+      const named = W.ok ? W.stories.filter((st) => { const t = ' ' + String(st.title || '').toUpperCase().replace(/[^A-Z0-9&]+/g, ' ') + ' '; return L.some((x) => x.sym.length >= 4 && t.includes(' ' + x.sym + ' ')); }).slice(0, 4) : [];
+      const src = (t) => `<p class="note src">${t}</p>`;
+      box.innerHTML = `
+        <section><h2>The market</h2><p>NSE: <b>${esc(m.t)}</b> (${m.hhmm} IST).
+          ${nifty ? `Nifty 50 is at <b>${esc(nifty.price)}</b>, ${chg(nifty.change_pct)} on the day` : 'The live index board did not answer'}${bank ? `; Bank Nifty ${chg(bank.change_pct)}` : ''}${vix ? `; India VIX ${esc(vix.price)} (${chg(vix.change_pct)})` : ''}.
+          ${L.length >= 50 ? `Of the ${L.length} names quoted, <b class="up">${up} rose</b> and <b class="dn">${dn} fell</b>.` : 'Too few names are quoted yet to count breadth.'}
+          ${bt && bt.score != null ? `The barometer reads <b>${bt.score}/100 — ${esc((bt.band && bt.band.t) || '')}</b>.` : ''}</p>
+          ${src(`Live board and ${L.length} live quotes${at ? `, ${at}` : ''}; barometer from its daily build.`)}</section>
+        <section><h2>Where it moved</h2>${secs.length >= 2 ? `<p>Strongest: ${secs.slice(0, 2).map(([k, v, n]) => `<b>${esc(k)}</b> ${chg(v)} <span class="mut">(median of ${n})</span>`).join(', ')}.
+          Weakest: ${secs.slice(-2).reverse().map(([k, v, n]) => `<b>${esc(k)}</b> ${chg(v)} <span class="mut">(median of ${n})</span>`).join(', ')}.</p>` : '<p class="mut">Sector medians need more live quotes.</p>'}
+          ${src('Median live 1D move of each sector\'s quoted names; sectors with fewer than five are left out.')}</section>
+        <section><h2>What moved, and why</h2>${liquid.length ? `<p class="k">Up most</p><ul>${top.map(li).join('')}</ul><p class="k">Down most</p><ul>${bot.map(li).join('')}</ul>` : '<p class="mut">No live quotes yet.</p>'}
+          ${src('Names trading at least ₹25 cr a day. "Why" is the latest headline that names the stock — a text match, not a judgement that it caused the move.')}</section>
+        <section><h2>The two setups</h2>${!V0 ? '<p class="mut">The signals feed is not published yet.</p>' : vtoday.length
+          ? `<p><b>${vtoday.length}</b> filed on the last scan — ${['bottom', 'brk4h'].map((k) => `${vtoday.filter((x) => x.engine === k).length} ${k === 'bottom' ? 'bottom reversal' : '4H breakout'}`).join(', ')}.</p>
+            <ul>${vtoday.slice(0, 5).map((x) => { const l = liveOf(x.sym), d = l ? (l.price - x.entry) / x.entry * 100 : null;
+              return `<li><a class="sym" href="#/asset/${esc(x.sym)}">${esc(x.sym)}</a> ${esc(VS_WORD[x.engine] || x.engine)} · entry ${inr(x.entry)}, stop ${inr(x.sl)}, T1 ${inr(x.t1)}${d != null ? ` · now ${chg(d, 1)} from entry` : ''}</li>`; }).join('')}</ul>
+            <p><a href="#/setups">Every filing, open and closed →</a></p>` : '<p>Nothing filed on the last scan.</p>'}
+          ${src(`Two rules only, untested — counts, never a win rate, until ${VS_NEED} have closed.${V0 && V0.generated_at ? ` Scan of ${esc(new Date(V0.generated_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }))} IST.` : ''}`)}</section>
+        <section><h2>Your names</h2>${!S.watch.length ? '<p class="mut">Your watchlist is empty — star a name anywhere and it is reported here.</p>'
+          : mine.length ? `<ul>${mine.slice(0, 5).map((w) => `<li><a class="sym" href="#/asset/${esc(w.s)}">${esc(w.s)}</a> ${chg(w.l.change_pct)}${why(w.s)}</li>`).join('')}</ul>` : '<p class="mut">No live quote for your names yet.</p>'}</section>
+        <section><h2>Worth reading</h2>${named.length ? `<ul>${named.map((st) => `<li><a href="${esc(st.link)}" target="_blank" rel="noopener">${esc(st.title)}</a> <span class="mut">${esc(st.source)}</span></li>`).join('')}</ul>`
+          : `<p class="mut">${W.ok ? 'No headline on the wire names a stock on the screen.' : 'The wire did not answer.'}</p>`}
+          ${src(W.ok ? (W.live ? 'The live wire, headlines that name a stock on the screen.' : 'The wire\'s last build — live wire unavailable.') : '')}</section>
+        <p class="end">That is the day. <a href="#/">Open the cockpit</a> or <a href="#/heatmap">the full heatmap</a> for the rest.</p>`;
+    };
+    paint();
+    return async () => { await F.heat(); if (alive()) paint(); };
+  };
+
   V.overview = async (el, arg, alive) => {
     setTitle('');
     const hero = store.get('vis:hero', true);
@@ -1098,7 +1170,7 @@
   const pctFrom = (a, b) => { const x = num(a), y = num(b); return x == null || y == null || !y ? null : (x - y) / y * 100; };
   /* [key, label, group, getter, kind, format, hint]  kind: n = number, b = yes/no, c = category */
   const SF = [
-    ['price', 'Close (₹)', 'Price', (r) => num(r.price), 'n', 'inr'],
+    ['price', 'Price (₹)', 'Price', (r) => num(r.price), 'n', 'inr', 'Live where quoted, else the screen\'s close'],
     ['r1d', '1-day %', 'Price', (r) => num(r.r1d), 'n', 'pct'], ['r1w', '1-week %', 'Price', (r) => num(r.r1w), 'n', 'pct'],
     ['r1m', '1-month %', 'Price', (r) => num(r.r1m), 'n', 'pct'], ['r3m', '3-month %', 'Price', (r) => num(r.r3m), 'n', 'pct'],
     ['r6m', '6-month %', 'Price', (r) => num(r.r6m), 'n', 'pct'],
@@ -1208,7 +1280,11 @@
     const [r0] = await Promise.all([F.screen(), F.insti()]);
     if (!alive()) return;
     if (!r0.ok) { $('#cBody').innerHTML = failBox('The screen', r0.error); return; }
-    const all = Object.values(SCR);
+    /* Live rows: price, 1D, 1W, 1M, distance from the 52-week high and every
+       field derived from price (range position, vs 50/200-day) move with the
+       quote; the rest are the screen's build. Re-read on every minute beat. */
+    const all0 = Object.values(SCR);
+    let all = all0.map(liveRow);
     SFK.sector[7] = [...new Set(all.map((r) => r.sector).filter(Boolean))].sort();
     let limit = 100, shown = [];
     const save = () => store.set('vis:scr2', { conds: st.conds, mode: st.mode, sort: st.sort, dir: st.dir, cols: st.cols, preset: st.preset });
@@ -1267,7 +1343,8 @@
         ${shown.length > limit ? `<div class="st"><button class="btn" type="button" id="cMore">Show ${Math.min(100, shown.length - limit)} more of ${shown.length - limit}</button></div>` : ''}`
         : empty('No name passes these conditions', 'Loosen one, switch to Match ANY, or clear them.');
       $('#cN').textContent = `${shown.length.toLocaleString('en-IN')} of ${all.length.toLocaleString('en-IN')} names`;
-      $('#cFoot').innerHTML = `${st.conds.length ? `${st.conds.length} condition${st.conds.length > 1 ? 's' : ''}, ${st.mode === 'any' ? 'any' : 'all'} must hold. ` : ''}Unmeasured values never pass a numeric condition and sort last — never as zero. Tap a symbol for its card. Scores describe the business and the chart; none is a forecast.`;
+      const nl = all.filter((x) => x.live).length, at = liveAt();
+      $('#cFoot').innerHTML = `${nl ? `<b class="up">Live</b> — price, 1D/1W/1M and price-derived fields for ${nl} of ${all.length} names${at ? `, ${at}` : ''}; fundamentals and averages from the screen's build. ` : 'Prices are the screen\'s close until quotes arrive. '}${st.conds.length ? `${st.conds.length} condition${st.conds.length > 1 ? 's' : ''}, ${st.mode === 'any' ? 'any' : 'all'} must hold. ` : ''}Unmeasured values never pass a numeric condition and sort last — never as zero. Tap a symbol for its card. Scores describe the business and the chart; none is a forecast.`;
       const m = $('#cMore'); if (m) m.onclick = () => { limit += 100; paint(); };
       paintStars();
     };
@@ -1322,7 +1399,9 @@
        handler — attaching per render stacked a new pair on every visit. */
     COL_HANDLER = onCol;
     if (!COL_WIRED) { COL_WIRED = true; const L = $('#layer'); const fwd = (e) => COL_HANDLER && COL_HANDLER(e); L.addEventListener('change', fwd); L.addEventListener('click', fwd); }
-    return paint;
+    const live = async () => { await F.heat(); if (!alive()) return; all = all0.map(liveRow); paint(); };
+    live();
+    return live;
   };
 
   /* ── HEATMAP + BREADTH ──────────────────────────────────────────────────── */
@@ -1344,6 +1423,7 @@
       <div style="height:var(--s-4)"></div>
       <div class="grid g-2">${panel('Breadth', skel(6), { bodyId: 'hBr', fb: 'Screen' })}${panel('Sectors today', skel(8), { bodyId: 'hSec', flush: true, fb: 'Pulse' })}</div>`;
     const [r, p] = await Promise.all([F.screen(), F.pulse()]); if (!alive()) return;
+    F.wire();   /* for the card's "In the news"; not awaited — the map does not wait on it */
     if (!r.ok) { $('#hMap').innerHTML = failBox('The screen', r.error); return; }
     const host = $('#hMap'), all = Object.values(SCR);
     const secs = Object.entries(all.reduce((m, x) => { const k = x.sector || 'Unclassified'; m[k] = (m[k] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]);
@@ -1710,7 +1790,8 @@
     const today = D.today || [], todayKey = new Set(today.map((s) => s.engine + '|' + s.sym));
     const openOld = hist.filter((h) => (h.grade || {}).status === 'open' && !todayKey.has(h.engine + '|' + h.sym));
     const closed = hist.filter((h) => h.grade && h.grade.status !== 'open');
-    Object.assign(S.quotes, await F.quotes([...today, ...openOld].map((s) => s.sym)));
+    await F.heat();
+    Object.assign(S.quotes, await F.quotes([...today, ...openOld].map((s) => s.sym).filter((x) => !HEAT_SYMS.has(x))));
     if (!alive()) return;
     const cov = D.coverage || {}, covTxt = ['daily', 'hourly'].map((k) => cov[k] ? `${k} bars for ${cov[k].got} of ${cov[k].asked}` : null).filter(Boolean).join(', ');
     const ruleBox = (k) => { const x = rules[k]; if (!x) return '';
@@ -1798,7 +1879,7 @@
     const have = tickLedger();
     const vs = S.vsig ? [...(S.vsig.today || []), ...(S.vsig.history || []).filter((h) => (h.grade || {}).status === 'open')].map((h) => h.sym) : [];
     const want = new Set([...S.watch.map((w) => w.s), ...S.alerts.filter((a) => !a.fired).map((a) => a.s), ...vs,
-    ].filter((s) => !have[s]));
+    ].filter((s) => !have[s] && !HEAT_SYMS.has(s)));
     if (want.size) Object.assign(S.quotes, await F.quotes([...want]));
     /* Nothing to ask for is a state too: every name is already priced by the
        ticker (or there are none). Left unmarked, the badge would read
@@ -1839,6 +1920,7 @@
     if (document.visibilityState !== 'visible') return;
     beat++;
     await refreshTicker();
+    await F.heat();       // every screen name, from the shared edge cache
     await refreshQuotes();
     if (cur && cur.live) { try { await cur.live(); } catch (e) { /* the next beat retries */ } }
     paintBadges();
