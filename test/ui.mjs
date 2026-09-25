@@ -2534,6 +2534,15 @@ try {
   ok("...and Escape closes it", !(await v.$("#layer .drw")));
   const vLabels = await v.evaluate(() => { let bad = 0; for (const t of document.querySelectorAll(".hm-t")) { const b = t.querySelector("b"); if (b && getComputedStyle(b).display !== "none" && b.getBoundingClientRect().right > t.getBoundingClientRect().right) bad++; } return bad; });
   ok("no heatmap label is cut off", vLabels === 0, vLabels);
+  /* LIVE, AND FULL. The map was coloured from the screen build and never
+     redrawn, and "Top 150" drew ~110. Against production: every name asked
+     for is a tile, and most of them carry a live quote — a quote feed that has
+     stopped answering is exactly what this should fail on. */
+  const vHeat = await v.evaluate(() => { const on = document.querySelector('[data-k="n"][aria-pressed="true"]');
+    const m = (document.getElementById("hFoot") || {}).innerText || "", lm = m.match(/Live — (\d+) of (\d+) tiles/);
+    return { asked: on ? +on.dataset.val : null, tiles: document.querySelectorAll("#hMap .hm-t").length, live: lm ? +lm[1] : 0, foot: m.slice(0, 90) }; });
+  ok("the heatmap draws every name asked for", vHeat.tiles === vHeat.asked, vHeat);
+  ok("...and colours at least 80% of them from a live quote", vHeat.tiles > 0 && vHeat.live >= 0.8 * vHeat.tiles, vHeat);
   /* The header ran the nav under the search box from 821 to 1399 px. */
   for (const W of [1100, 1180, 1280]) {
     await v.setViewportSize({ width: W, height: 900 });

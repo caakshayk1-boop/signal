@@ -593,6 +593,29 @@
     const s = bare(sym), q = S.quotes[s] || tickLedger()[s];
     return q && Number.isFinite(q.price) ? { price: q.price, change_pct: num(q.change_pct) } : null;
   };
+  /* LIVE TILES. The screen is a batch build: its 1D is the move of the session
+     it was built from, days old by the time anyone reads it, and a heatmap
+     coloured from it never changes. A row takes the live quote where there is
+     one — 1D is the live change on the previous close; 1W and 1M keep the
+     build's base close (close ÷ (1 + move)) and run from it to the live price.
+     A name with no quote keeps the build's figures and is not marked live. */
+  const liveRow = (r) => {
+    const lv = r && liveOf(r.sym), c = r && num(r.price);
+    if (!lv || !(lv.price > 0)) return r;
+    const re = (m) => { const v = num(m); return v == null || !(c > 0) ? null : ((1 + v / 100) * lv.price / c - 1) * 100; };
+    return Object.assign({}, r, { price: lv.price, r1d: lv.change_pct, r1w: re(r.r1w), r1m: re(r.r1m), live: true });
+  };
+  const heatSize = (r, size) => size === 'mcap' ? num(r.mcap_cr) : num(r.turnover_cr);
+  const heatPool = (n, size) => Object.values(SCR || {}).filter((r) => (heatSize(r, size) || 0) > 0)
+    .sort((a, b) => heatSize(b, size) - heatSize(a, size)).slice(0, n);
+  /* Quotes for every name the map can show, bar those the ticker already
+     prices. F.quotes chunks by 40 and get() caches 45 s, so a redraw inside
+     the same minute costs nothing. */
+  async function heatQuotes(n, size) {
+    const have = tickLedger(), want = heatPool(n, size).map((r) => r.sym).filter((x) => !have[x]);
+    if (want.length) Object.assign(S.quotes, await F.quotes(want));
+  }
+  const liveAt = () => { const t = (FR.Quotes || {}).at || (S.ticker || {}).fetched_at; return t ? new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) + ' IST' : null; };
   const trendWord = (r) => {
     if (!r || !r.price || !r.sma50 || !r.sma200) return null;
     const a50 = r.price > r.sma50, a200 = r.price > r.sma200;
@@ -669,9 +692,9 @@
      could not read. Three changes, each stated on the page:
        · area follows √turnover, which keeps the ORDER of importance but stops
          five banks from taking half the map;
-       · the tile count is capped to what the container can label;
+       · every name asked for is drawn, colour-only where its name will not fit;
        · a label is drawn only at a size that fits, never clipped mid-word. */
-  const HM_MIN_AREA = 7000;                    // px² per tile on a desktop — tuned so ≥ 80% carry a label
+  const HM_MIN_AREA = 1200;                    // px² per tile — a ~35 px tap target; below it the phone caps the count
   const HM_EXP = 0.5;                          // area ∝ √turnover — see the note above
   /* MEASURED, NOT ESTIMATED. A characters-times-a-constant guess cut off
      "SHADOWFA" and "APOLLOHOS" in the small size and left tiles that had
@@ -695,11 +718,13 @@
   };
   function treemap(host, rows, opts) {
     const W = host.clientWidth || 800, H = opts.height;
-    const raw = (r) => opts.size === 'mcap' ? num(r.mcap_cr) : num(r.turnover_cr);
+    const raw = (r) => heatSize(r, opts.size);
     const sizeOf = (r) => { const v = raw(r); return v > 0 ? Math.pow(v, HM_EXP) : 0; };
-    /* Narrow containers need MORE area per tile, not less: a symbol needs
-       ~70 px of width whatever the screen, and a 358 px phone fits five. */
-    const cap = Math.max(12, Math.floor((W * H) / (W < 560 ? 9000 : W < 900 ? 8000 : HM_MIN_AREA)));
+    /* EVERY NAME ASKED FOR. The count used to be capped to what could carry a
+       label (~110 on a desktop), so "Top 300" drew a third of the market. Now
+       every tile is drawn; one too small for its name is colour only and its
+       card is a tap away. The one floor left is a tap target, HM_MIN_AREA. */
+    const cap = Math.max(12, Math.floor((W * H) / HM_MIN_AREA));
     const n = Math.min(opts.n, cap);
     const pool = rows.filter((r) => (raw(r) || 0) > 0).sort((a, b) => raw(b) - raw(a)).slice(0, n);
     let tiles = [], groups = [];
@@ -720,7 +745,7 @@
       + tiles.map((t) => { const r = t.r, v = r[opts.color], fit = fitLabel(r.sym, t.w, t.h);
         return `<a class="hm-t f-${fit}" href="#/asset/${esc(r.sym)}" data-sym="${esc(r.sym)}" style="left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px;background:${heatBg(v, sc)}"
           aria-label="${esc(r.sym)} ${v == null ? 'no move recorded' : signed(v)} — open card"><b>${esc(r.sym)}</b><span>${v == null ? '—' : signed(v, 1)}</span></a>`; }).join('');
-    return { shown: pool.length, asked: opts.n, capped: n < opts.n };
+    return { shown: pool.length, asked: opts.n, capped: n < opts.n, live: pool.filter((r) => r.live).length };
   }
 
   /* ── THE STOCK CARD ─────────────────────────────────────────────────────
@@ -742,7 +767,7 @@
     drawer(`${esc(r.sym)} ${star(r.sym)}`, `
       <div class="sc-top"><div><div class="mut">${esc(r.name || '')}</div><div class="mut">${esc(r.sector || '')}${r.ind && r.ind !== r.sector ? ' · ' + esc(r.ind) : ''}</div></div>
         <div style="text-align:right"><div class="big-px">${px != null ? '₹' + fmt(px, 2) : '—'}</div><div>${lv ? chg(lv.change_pct) + ' <span class="mut">live</span>' : chg(r.r1d) + ' <span class="mut">last close</span>'}</div></div></div>
-      <div class="kv" style="margin-top:0">${[['1D', r.r1d], ['1W', r.r1w], ['1M', r.r1m], ['3M', r.r3m], ['6M', r.r6m]].map(([k, v]) => `<div><em>${k}</em><b>${chg(v, 1)}</b></div>`).join('')}</div>
+      <div class="kv" style="margin-top:0">${(() => { const L = liveRow(r); return [['1D', L.r1d], ['1W', L.r1w], ['1M', L.r1m], ['3M', r.r3m], ['6M', r.r6m]]; })().map(([k, v]) => `<div><em>${k}</em><b>${chg(v, 1)}</b></div>`).join('')}</div>
       <div><h3>52-week range</h3>${pos != null ? `<div class="rng" role="img" aria-label="${pos.toFixed(0)}% of the way from the 52-week low to the high"><i style="left:${pos}%"></i></div>
         <div class="rng-l"><span>Low ₹${fmt(lo, 1)}</span><span>${pos.toFixed(0)}% of range</span><span>High ₹${fmt(hi, 1)}</span></div>
         <div class="sc-ls" style="margin-top:var(--s-2)">${lvlRow('52w high', hi, px)}${lvlRow('52w low', lo, px)}</div>`
@@ -761,11 +786,11 @@
     let tip = $('#tip'); if (!tip) { tip = document.createElement('div'); tip.id = 'tip'; tip.className = 'tip'; tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip); }
     const show = (el, x, y) => {
       if (!FINE()) return;
-      const r = SCR && SCR[el.dataset.sym]; if (!r) return;
-      const mv = moveOf(r), px = num(r.price);
+      const r0 = SCR && SCR[el.dataset.sym]; if (!r0) return;
+      const r = liveRow(r0), mv = moveOf(r0), px = num(r.price);
       const rel = (v) => { const n = num(v); return n == null || px == null ? '—' : `₹${fmt(n, n >= 1000 ? 0 : 1)} <i class="${px >= n ? 'up' : 'dn'}">${px >= n ? '▲' : '▼'}</i>`; };
       tip.innerHTML = `<b>${esc(r.sym)}</b><span class="mut">${esc(r.name || '')}</span><dl>
-        <dt>Close</dt><dd>₹${fmt(r.price, 2) || '—'}</dd><dt>1D · 1W · 1M</dt><dd>${[r.r1d, r.r1w, r.r1m].map((v) => signed(v, 1) || '—').join(' · ')}</dd>
+        <dt>${r.live ? 'Live' : 'Close'}</dt><dd>₹${fmt(r.price, 2) || '—'}</dd><dt>1D · 1W · 1M</dt><dd>${[r.r1d, r.r1w, r.r1m].map((v) => signed(v, 1) || '—').join(' · ')}</dd>
         <dt>50-day</dt><dd>${rel(r.sma50)}</dd><dt>200-day</dt><dd>${rel(r.sma200)}</dd>
         <dt>52w high</dt><dd>${r.high52 != null ? '₹' + fmt(r.high52, 1) : '—'}</dd><dt>52w low</dt><dd>${r.low52 != null ? '₹' + fmt(r.low52, 1) : '—'}</dd>
         <dt>Move score</dt><dd>${mv.score == null ? 'not scored' : mv.score}</dd></dl><span class="tip-h">Click for the card</span>`;
@@ -796,7 +821,7 @@
       </div>
       <div style="height:var(--s-4)"></div>
       ${panel('Market heatmap', `<div class="hm" id="oHeat" style="height:${innerWidth < 760 ? 340 : 380}px"></div><div id="oSect" style="margin-top:var(--s-3)"></div>`,
-        { fb: 'Screen', more: '#/heatmap', moreText: 'Full heatmap', right: heatLegend('r1d') + ' ', foot: 'The most-traded names, grouped by sector — as many as this width can label. Tile area follows √turnover; colour is the last session\'s move. Tap a tile for its card.' })}
+        { fb: 'Screen', more: '#/heatmap', moreText: 'Full heatmap', right: heatLegend('r1d') + ' ', foot: 'The 120 most-traded names, grouped by sector. Tile area follows √turnover; colour is the live move on the previous close, refreshed every minute (the screen\'s last close for any name not yet quoted). Tap a tile for its card.' })}
       <div style="height:var(--s-4)"></div>
       <div class="grid g-2">
         ${panel('Top movers', skel(8), { bodyId: 'oMov', flush: true, fb: 'Live prices', more: '#/markets', moreText: 'Markets' })}
@@ -895,12 +920,15 @@
           ${tg.map((x) => `<span class="tag" title="Name match, algorithmic">★ ${esc(x)} · watchlist</span>`).join('')}</div></a>`; }).join('');
     };
 
+    let heatDraw = null;
+    const liveHeat = async () => { await heatQuotes(120, 'turnover'); if (alive() && heatDraw) heatDraw(); };
     const paintHeat = async () => {
       const [r, p] = await Promise.all([F.screen(), F.pulse()]); if (!alive()) return;
       S.pulse = p.ok ? p.data : S.pulse;
       const host = $('#oHeat'); if (!host) return;
       if (!r.ok) { host.innerHTML = failBox('The screen', r.error); return; }
-      const draw = () => treemap(host, Object.values(SCR), { size: 'turnover', color: 'r1d', n: 120, height: innerWidth < 760 ? 340 : 380 });
+      const draw = () => { if (document.contains(host)) treemap(host, Object.values(SCR).map(liveRow), { size: 'turnover', color: 'r1d', n: 120, height: innerWidth < 760 ? 340 : 380 }); };
+      heatDraw = draw;
       draw(); wireTips(host);
       /* Labels are measured in the real face; if it arrives after the first
          draw, measure again rather than keep fallback widths. */
@@ -933,9 +961,9 @@
     };
 
     await Promise.all([paintPulse(), paintLeaders(), paintNews(), paintHeat(), paintSig(), (async () => { await tickerP; paintMovers(); })()]);
-    await refreshQuotes(); if (!alive()) return;
+    await Promise.all([refreshQuotes(), liveHeat()]); if (!alive()) return;
     await paintWatch();
-    return async () => { paintMovers(); await paintWatch(); };
+    return async () => { paintMovers(); await liveHeat(); await paintWatch(); };
   };
 
   /* ── ASSET ──────────────────────────────────────────────────────────────
@@ -1291,35 +1319,56 @@
     const [r, p] = await Promise.all([F.screen(), F.pulse()]); if (!alive()) return;
     if (!r.ok) { $('#hMap').innerHTML = failBox('The screen', r.error); return; }
     const host = $('#hMap'), rows = Object.values(SCR);
+    const closeOn = rows.reduce((m, x) => (x.last_date && x.last_date > m ? x.last_date : m), '') || 'its build';
     const draw = () => {
+      if (!document.contains(host)) return;
       $('#hLeg').innerHTML = heatLegend(o.color);
-      const res = treemap(host, rows, { size: o.size, color: o.color, n: +o.n, height: innerWidth < 760 ? 520 : 640, group: o.group }), n = res.shown;
-      const noCap = rows.filter((x) => !(num(x.mcap_cr) > 0));
-      $('#hFoot').innerHTML = `${n} names, grouped by sector; tile area follows the square root of ${o.size === 'mcap' ? 'market cap' : 'daily turnover'}, so order is kept and mid-sized names stay readable.`
-        + (res.capped ? ` <b>Showing ${n} of the ${res.asked} asked for</b> — the most this screen width can label; widen the window or rotate the phone for more.` : '')
+      const res = treemap(host, rows.map(liveRow), { size: o.size, color: o.color, n: +o.n, height: innerWidth < 760 ? 520 : 640, group: o.group }), n = res.shown;
+      const noCap = rows.filter((x) => !(num(x.mcap_cr) > 0)), at = liveAt();
+      $('#hFoot').innerHTML = (res.live ? `<b class="up">Live</b> — ${res.live} of ${n} tiles on a quote${at ? ` of ${at}` : ''}, refreshed every minute while this tab is open${res.live < n ? '; the rest show the screen\'s close of ' + esc(closeOn) : ''}. `
+          : `<b class="warn">Not live yet</b> — colours are the screen's close of ${esc(closeOn)} until quotes arrive. `)
+        + (o.color === 'r1d' ? '1D is the move on the previous close. ' : `${o.color === 'r1w' ? '1W' : '1M'} runs from the screen's base close to the live price. `)
+        + `${n} names, grouped by sector; tile area follows the square root of ${o.size === 'mcap' ? 'market cap' : 'daily turnover'}, so order is kept and mid-sized names stay readable. Names too small to label are colour only — tap for the card.`
+        + (res.capped ? ` <b>Showing ${n} of the ${res.asked} asked for</b> — the most this screen fits as tappable tiles; widen the window or rotate the phone for more.` : '')
         + (o.size === 'mcap' ? ` <span class="warn">${noCap.length} names carry no market cap in the feed and are left out${noCap.length ? ` — including ${noCap.slice().sort((a, b) => (b.turnover_cr || 0) - (a.turnover_cr || 0)).slice(0, 4).map((x) => esc(x.sym)).join(', ')}` : ''}.</span>` : ' Turnover is the default because market cap is missing for some of the largest names.')
         + ` Colour steps are ${o.color === 'r1d' ? '1' : o.color === 'r1w' ? '2' : '4'}× the daily scale so a month is not all one shade.`;
     };
     draw(); wireTips(host);
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { MEASURE.memo = {}; if (document.contains(host)) draw(); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { MEASURE.memo = {}; draw(); });
     let w = host.clientWidth; new ResizeObserver(() => { if (Math.abs(host.clientWidth - w) > 8 && document.contains(host)) { w = host.clientWidth; draw(); } }).observe(host);
+    const live = async () => { await heatQuotes(+o.n, o.size); if (!alive()) return; draw(); paintSide(); };
     el.addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (!b) return;
       o[b.dataset.k] = b.dataset.k === 'n' ? +b.dataset.val : b.dataset.val;
-      $$(`[data-k="${b.dataset.k}"]`, el).forEach((x) => x.setAttribute('aria-pressed', x === b)); store.set('vis:hm2', o); draw(); });
+      $$(`[data-k="${b.dataset.k}"]`, el).forEach((x) => x.setAttribute('aria-pressed', x === b)); store.set('vis:hm2', o); draw(); live(); });
 
-    const b = r.data.breadth || {};
-    const pc = (v) => v == null ? '—' : Number(v).toFixed(1) + '%';
-    const bar = (v, label) => `<div style="margin-bottom:var(--s-3)"><div class="row"><span class="note">${label}</span><span class="sp"></span><b class="num">${pc(v)}</b></div>
-      <div class="brd" role="img" aria-label="${label} ${pc(v)}"><i class="a" style="flex:${num(v) || 0}"></i><i class="u" style="flex:${100 - (num(v) || 0)}"></i></div></div>`;
-    $('#hBr').innerHTML = `${bar(b.above20, 'Above the 20-day average')}${bar(b.above50, 'Above the 50-day average')}${bar(b.above200, 'Above the 200-day average')}
-      <div class="kv"><div><em>Advancing</em><b class="up">${b.advancing ?? '—'}</b></div><div><em>Declining</em><b class="dn">${b.declining ?? '—'}</b></div>
-        <div><em>Median 1M</em><b>${b.median_1m != null ? signed(b.median_1m, 1) : '—'}</b></div><div><em>At 52w high</em><b>${b.at_52w_high ?? '—'}</b></div></div>
-      <p class="note" style="margin-top:var(--s-3)">Across ${b.counted ? b.counted.toLocaleString('en-IN') : '—'} names on the screen, at its build. The barometer on Overview is the one headline; these are its raw inputs.</p>`;
-    const sd = p.ok ? p.data.sectors_day || [] : [];
-    $('#hSec').innerHTML = sd.length ? `<div class="tw"><table class="tbl dense"><thead><tr><th scope="col">Sector</th><th class="r" scope="col">Median</th><th scope="col">Rose</th></tr></thead><tbody>${sd.map((s) =>
-      `<tr><td>${esc(s.name)}</td><td class="r">${chg(s.median)}</td><td><div class="row"><div class="brd" style="width:90px;margin:0"><i class="a" style="flex:${s.up}"></i><i class="d" style="flex:${s.n - s.up}"></i></div><span class="num mut">${s.up}/${s.n}</span></div></td></tr>`).join('')}</tbody></table></div>
-      <div class="pf">The ${p.data.day_universe || ''} largest names, last session. Sectors with too few names are left out rather than shown on two data points.</div>`
-      : p.ok ? empty('No sector table in this build', '') : failBox('The pulse', p.error);
+    /* Advancing, declining and the sector medians are counted from the live
+       tiles once enough names are quoted; until then, and for the
+       moving-average shares that need a full close series, the screen's build. */
+    const paintSide = () => {
+      if (!document.contains(host)) return;
+      const L = heatPool(+o.n, o.size).map(liveRow).filter((x) => x.live && x.r1d != null), isLive = L.length >= 50;
+      const b = Object.assign({}, r.data.breadth || {}), at = liveAt();
+      if (isLive) { b.advancing = L.filter((x) => x.r1d > 0).length; b.declining = L.filter((x) => x.r1d < 0).length; }
+      const pc = (v) => v == null ? '—' : Number(v).toFixed(1) + '%';
+      const bar = (v, label) => `<div style="margin-bottom:var(--s-3)"><div class="row"><span class="note">${label}</span><span class="sp"></span><b class="num">${pc(v)}</b></div>
+        <div class="brd" role="img" aria-label="${label} ${pc(v)}"><i class="a" style="flex:${num(v) || 0}"></i><i class="u" style="flex:${100 - (num(v) || 0)}"></i></div></div>`;
+      $('#hBr').innerHTML = `${bar(b.above20, 'Above the 20-day average')}${bar(b.above50, 'Above the 50-day average')}${bar(b.above200, 'Above the 200-day average')}
+        <div class="kv"><div><em>Advancing</em><b class="up">${b.advancing ?? '—'}</b></div><div><em>Declining</em><b class="dn">${b.declining ?? '—'}</b></div>
+          <div><em>Median 1M</em><b>${b.median_1m != null ? signed(b.median_1m, 1) : '—'}</b></div><div><em>At 52w high</em><b>${b.at_52w_high ?? '—'}</b></div></div>
+        <p class="note" style="margin-top:var(--s-3)">${isLive ? `Advancing and declining: <b class="up">live</b>, across the ${L.length} quoted names on the map${at ? ` at ${at}` : ''}. ` : ''}Moving-average shares${isLive ? '' : ', advancing and declining'} across ${b.counted ? b.counted.toLocaleString('en-IN') : '—'} names on the screen, at its close of ${esc(closeOn)}. The barometer on Overview is the one headline; these are its raw inputs.</p>`;
+      const by = {};
+      for (const x of L) (by[x.sector || 'Unclassified'] = by[x.sector || 'Unclassified'] || []).push(x.r1d);
+      const med = (a) => { const v = a.slice().sort((m, n) => m - n), k = v.length >> 1; return v.length % 2 ? v[k] : (v[k - 1] + v[k]) / 2; };
+      const sd = isLive ? Object.entries(by).filter(([, v]) => v.length >= 3).map(([name, v]) => ({ name, median: med(v), up: v.filter((x) => x > 0).length, n: v.length })).sort((m, n) => n.median - m.median)
+        : p.ok ? p.data.sectors_day || [] : [];
+      $('#hSec').innerHTML = sd.length ? `<div class="tw"><table class="tbl dense"><thead><tr><th scope="col">Sector</th><th class="r" scope="col">Median</th><th scope="col">Rose</th></tr></thead><tbody>${sd.map((s) =>
+        `<tr><td>${esc(s.name)}</td><td class="r">${chg(s.median)}</td><td><div class="row"><div class="brd" style="width:90px;margin:0"><i class="a" style="flex:${s.up}"></i><i class="d" style="flex:${s.n - s.up}"></i></div><span class="num mut">${s.up}/${s.n}</span></div></td></tr>`).join('')}</tbody></table></div>
+        <div class="pf">${isLive ? `<b class="up">Live</b> — the ${L.length} quoted names on the map${at ? `, ${at}` : ''}` : `The ${p.ok ? p.data.day_universe || '' : ''} largest names, last session`}. Sectors with too few names are left out rather than shown on two data points.</div>`
+        : p.ok ? empty('No sector table in this build', '') : failBox('The pulse', p.error);
+    };
+    paintSide();
+    live();
+    return live;
   };
 
   /* ── MARKETS ────────────────────────────────────────────────────────────── */
