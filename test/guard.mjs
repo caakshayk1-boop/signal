@@ -2153,10 +2153,19 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("the heatmap is live: live rows, re-quoted on the minute beat",
      /treemap\(host, rows\.map\(liveRow\)/.test(HEATV) && /await heatQuotes\(\+o\.n, o\.size\)/.test(HEATV) && /\n    return live;\n  \};$/.test(HEATV)
      && /treemap\(host, Object\.values\(SCR\)\.map\(liveRow\)/.test(VJS) && /await liveHeat\(\); await paintWatch\(\)/.test(VJS));
-  /* "Top 300" drew ~110 because the count was capped to what could carry a
-     label. Only a tap-target floor may cap it now. */
-  ok("the heatmap draws every name asked for, bar a tap-target floor",
-     /const cap = Math\.max\(12, Math\.floor\(\(W \* H\) \/ HM_MIN_AREA\)\)/.test(VJS) && /const HM_MIN_AREA = (\d+)/.test(VJS) && +VJS.match(/const HM_MIN_AREA = (\d+)/)[1] <= 1500);
+  /* "Top 150" and "Top 300" drew the same ~149 tiles on a phone: the count was
+     capped to fit the box. Now nothing caps it; the map grows taller. */
+  ok("the heatmap draws every name asked for: no count cap, height grows",
+     !/const cap = /.test(VJS) && /\.slice\(0, opts\.n\)/.test(VJS) && /heatHeight\(nEff, host\.clientWidth/.test(HEATV)
+     && /\[1000, 'All'\]/.test(HEATV));
+  /* 1,000 live tiles through ?px= would be 50 Yahoo calls a minute PER TAB.
+     The heatmap reads /api/heat: shards of 200, edge-cached, shared by all —
+     and each shard must stay inside the free plan's 50 subrequests. */
+  const HEATJS = readFileSync("src/api/heat.js", "utf8");
+  ok("heatmap quotes are sharded, edge-cached and inside the subrequest budget",
+     /F\.heat = async/.test(VJS) && /get\(`\/api\/heat\?part=/.test(VJS) && !/heatQuotes[\s\S]{0,200}F\.quotes/.test(VJS)
+     && /HEAT_PART = 200/.test(HEATJS) && 200 / 20 <= 40 && /caches\.default/.test(HEATJS) && /quoteSpark/.test(HEATJS)
+     && !/retryMissing/.test(HEATJS) && /url\.pathname === "\/api\/heat"\) return heat\(/.test(IDX));
   ok("vision's setups print no win rate or expectancy",
      !/win rate[^'"`]*\$\{|expectancy[^'"`]*\$\{/i.test((VJS.match(/V\.setups = [\s\S]*?\n  \};/) || [""])[0]));
 

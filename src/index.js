@@ -34,6 +34,7 @@ import { runWatchdog } from "./watchdog.js";
 import subscribe from "./api/subscribe.js";
 import telegramWebhook from "./bot/webhook.js";
 import clientError from "./api/clienterror.js";
+import heat from "./api/heat.js";
 
 const ROUTES = {
   "/api/ticker": ticker,
@@ -332,6 +333,10 @@ export default {
     if (url.pathname === "/api/telegram/webhook") {
       return telegramWebhook(request, env);
     }
+
+    // Native, not in ROUTES: it needs env.ASSETS and the edge cache, and it
+    // talks only to Yahoo, so the no-Turso dev proxy has nothing to add.
+    if (url.pathname === "/api/heat") return heat(request, env, ctx);
 
     const handler = ROUTES[url.pathname];
     if (handler) {
