@@ -1249,7 +1249,11 @@ try {
              dropdowns: document.querySelectorAll(".tabs details").length,
              minTap: Math.min(...tabs.map(t => Math.round(t.getBoundingClientRect().height))) };
   });
-  ok("the bar has six destinations", shell.count === 6, shell);
+  /* FIVE since the 2026-10 redesign — one per reader goal (Today, Brief,
+     Screen, Ledger, Markets). Watchlist and the tool index moved to the
+     header's utilities and the More sheet; see guard.mjs, "the bar has five
+     slots". */
+  ok("the bar has five destinations", shell.count === 5, shell);
   ok("none of them is a dropdown", shell.dropdowns === 0, shell);
   ok("every destination has an icon", shell.icons === shell.count, shell);
   ok("the brief has an entry of its own", shell.labels.includes("Brief"), shell.labels);

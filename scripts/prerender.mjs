@@ -172,11 +172,10 @@ const state = up != null && counted
 const block = `${OPEN}
 <section class="pre">
   <p class="pre-k">Signal · ${date}</p>
-  <h1 class="pre-h">${rec && rec.trades
-    ? (rec.wins === 0
-        ? `Every signal, graded. All ${rec.trades} that closed, lost.`
-        : `Every signal, graded. Including the ${rec.losses} that lost.`)
-    : `Every signal, graded. The record is public.`}</h1>
+  <!-- The same permanent headline the app's masthead paints, so the snapshot
+       and the live page never disagree about what this site is. The record,
+       which changes, is the line under it. -->
+  <h1 class="pre-h">Every NSE name, screened before the open. Every call, graded in public.</h1>
   <p class="pre-s">${rec && rec.trades
     ? `<b>${rec.published}</b> published since ${LAUNCH}, <b>${rec.trades}</b> closed, averaging
        <b>${rec.expectancy_r > 0 ? "+" : ""}${rec.expectancy_r}R</b>.

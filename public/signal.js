@@ -4561,7 +4561,7 @@
   });
 
   R['/markets'] = async () => {
-    paint(head('Markets', 'Live prices, and how the wider market did underneath them.', 'The board') +
+    paint(head('Markets', 'The indices, sectors, currencies and commodities that set the tone — and how the wider screen did underneath them.', 'The board') +
       sec('Breadth', `<div class="sk" style="height:104px"></div>`) +
       sec('Sector heat', `<div class="sk" style="height:120px"></div>`) +
       sec('The board', `<div class="board">${skel('sk-row', 8)}</div>`), true);
@@ -6500,8 +6500,8 @@
     };
 
     const shell = body => head('Screen',
-      'Every name on the screen, searchable. Tap any row for the full card.',
-      'The full universe') + body;
+      'Every NSE name on the screen, scored on quality, growth, value and trend. Search, filter, or open any row for its full card.',
+      'Every name, ranked') + body;
     if (!SCREEN) paint(shell(`<div class="note">Loading the full universe — about 260 KB, once per session.</div>` +
       `<div class="sk" style="height:320px"></div>`));
 
@@ -8724,11 +8724,14 @@
 
 
   R['/signals'] = async () => {
-    const intro = 'Every call this site has made, with the price it was made at. Each one is scored when it closes — the losses too. That is the point.';
-    paint(head('Signals', intro, 'The public ledger') + skel('sk-card', 4), true);
+    /* Titled LEDGER, as the navigation names it. The page was "Signals" under
+       a tab labelled "Ledger", so the reader clicked one word and landed on
+       another. */
+    const intro = 'Every signal this site has published, at the price it was published at, graded when it closes. The losses stay in — that is the point of publishing them.';
+    paint(head('Ledger', intro, 'The public record') + skel('sk-card', 4), true);
     const [a, engRes] = await Promise.all([ledger(), get('/engines.json'), loadResearchN()]);
     const ENG_TABLE = (engRes && engRes.ok && engRes.data && engRes.data.ok) ? engRes.data : null;
-    const base = head('Signals', intro, 'The public ledger')
+    const base = head('Ledger', intro, 'The public record')
       + (a.live ? '' : `<div class="note"><b>Showing this morning's snapshot, not the live ledger.</b>
           The live signal feed did not answer${a.error ? ` — ${esc(a.error)}` : ''}, so this page is
           reading the copy written at the last build. Anything the scanner has published since is
@@ -9739,15 +9742,17 @@
   R['/join'] = async () => {
     paint(`<div class="join">
       <div class="join-l">
-        <h1>Get it before the open.</h1>
-        <p class="join-sub">One email each morning: what moved, the sector heat, the books
-          open today and the names the engine put up — with the levels it put them up at.</p>
+        <h1>Join the morning list.</h1>
+        <p class="join-sub">The daily email is <b>not being sent yet</b>. Leave your address and
+          you will get the first one when it starts: what moved, the sector heat, the books open
+          that day and the names the engine put up — with the levels it put them up at.
+          Until then, <a href="/brief">today’s brief</a> is here every morning.</p>
         <ul class="join-ul">
           <li><b>Free.</b> No card, no trial that expires into a charge.</li>
             <li><b>The record is public.</b> Every signal is scored when it closes — losers
             included, which is the point of publishing it.</li>
-          <li><b>One email a day.</b> Unsubscribe in one click, and the list is a table
-            we own rather than a mailing vendor's.</li>
+          <li><b>One email a day, once it starts.</b> Unsubscribe in one click, and the list
+            is a table we own rather than a mailing vendor's.</li>
         </ul>
       </div>
       <div class="join-r">
@@ -9760,8 +9765,8 @@
             <label for="joinW">Website</label>
             <input id="joinW" name="website" type="text" tabindex="-1" autocomplete="off">
           </div>
-          <button type="submit" class="btn-primary" id="joinB">Get the morning brief</button>
-          <p class="join-note" id="joinM">We send one email a day. Nothing else, ever.</p>
+          <button type="submit" class="btn-primary" id="joinB">Join the list</button>
+          <p class="join-note" id="joinM">Nothing is sent until the daily email starts. Then one a day, nothing else.</p>
         </form>
       </div>
     </div>`);
@@ -9791,19 +9796,22 @@
         });
         const j = await r.json().catch(() => ({}));
         if (r.ok && j.ok !== false) {
-          f.innerHTML = `<div class="join-ok"><b>You are on the list.</b>
-            The next brief goes out before tomorrow's open. If it does not arrive,
-            check the spam folder once and mark it "not spam" — that is the only
-            thing that keeps it landing.</div>`;
+          /* THE RECEIPT SAYS WHAT HAPPENS NEXT, AND NOTHING THAT WILL NOT.
+             It promised "the next brief goes out before tomorrow's open"; no
+             job sends it yet (the list is exported, not mailed), so a reader
+             was told to watch for an email that was never coming. */
+          f.innerHTML = `<div class="join-ok" role="status"><b>You are on the list.</b>
+            Nothing will be sent until the daily email starts; the first one will say so.
+            Until then, <a href="/brief">today's brief</a> is on this site every morning.</div>`;
         } else {
           msg.className = 'join-note bad';
           msg.textContent = j.error || 'That did not go through. Try again in a moment.';
-          btn.disabled = false; btn.textContent = 'Get the morning brief';
+          btn.disabled = false; btn.textContent = 'Join the list';
         }
       } catch (e) {
         msg.className = 'join-note bad';
         msg.textContent = 'No connection. Your address was not sent — try again.';
-        btn.disabled = false; btn.textContent = 'Get the morning brief';
+        btn.disabled = false; btn.textContent = 'Join the list';
       }
     });
   };
@@ -15174,7 +15182,7 @@
      * DISCOVER and the sentence above them was not, so the page contradicted
      * itself in the space of one screen. A number typed beside a list is a
      * claim that the list will never grow, and this one already had. */
-    paint(head('Discover', `${DISCOVER.length} ways into the same ${universeN()} names. Each answers a different question.`,
+    paint(head('All tools', `${DISCOVER.length} ways into the same ${universeN()} names. Each answers a different question.`,
                'Discover') +
       `<div class="disc">${DISCOVER.map(([href, name, sub, why]) => `
         <a class="disc-c" href="${esc(href)}">
@@ -16060,7 +16068,7 @@
                      'The feed behind every figure on this site, and how fresh each one is.'],
     '/terms':       ['Terms', 'Terms of use for signal.askakshay.com.'],
     '/privacy':     ['Privacy', 'What this site stores, and what it does not.'],
-    '/join':        ['The brief — every morning', 'One setup a day, in full, by email.'],
+    '/join':        ['The morning list', 'Join the list for the daily email. It is not being sent yet; the brief is on the site every morning.'],
     '/research':    ['The research floor — three engines, and the record that rejects them',
                      'BUOY, ANCHOR and BEDROCK: unproven engines published with their own measured null results beside every name.'],
     '/buoy':        ['BUOY — the 200-period average, reclaimed on the 4-hour',
@@ -16151,8 +16159,8 @@
   /* The route's own name, shown beside the brand. Empty on Today, because a
    * breadcrumb reading "Today" while you are looking at Today is noise. */
   const WHERE = { '/': '', '/markets': 'Markets', '/ideas': 'Ideas', '/ipo': 'IPO',
-                  '/screen': 'Screen', '/signals': 'Signals', '/brief': 'Brief', '/watch': 'Watchlist',
-                  '/engines': 'The floor', '/radar': 'Radar', '/discover': 'Discover', '/buoy': 'BUOY', '/research': 'Research',
+                  '/screen': 'Screen', '/signals': 'Ledger', '/brief': 'Brief', '/watch': 'Watchlist',
+                  '/engines': 'The floor', '/radar': 'Radar', '/discover': 'All tools', '/buoy': 'BUOY', '/research': 'Research',
                   '/map': 'The map', '/reads': 'Weekly reads', '/heat': 'Heatmap',
                   '/join': 'The brief', '/methodology': 'Methodology',
                   '/sources': 'Data sources', '/terms': 'Terms', '/privacy': 'Privacy' };

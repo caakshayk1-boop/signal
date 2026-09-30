@@ -49,10 +49,10 @@
      a preload means the headline paints in the system serif and then reflows,
      and CLS is a promise not to move what someone is reading. 22 KB, latin. -->
 <link rel="preload" href="/fonts/PlusJakarta-var-latin.woff2" as="font" type="font/woff2" crossorigin>
-<!-- 2026-10: the display serif sets every route title and the masthead, so it
-     is preloaded like the other two — a title that paints in Georgia and then
-     reflows is a shift in the largest line on the page. 22 KB, latin. -->
-<link rel="preload" href="/fonts/Newsreader-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<!-- The display serif (Newsreader) is deliberately NOT preloaded. Measured
+     2026-10-01 at 390px, 4x CPU, 1.6 Mbps: preloading it cost 92 ms of LCP on
+     the front page and removed no layout shift (CLS 0.001 either way) — the
+     headline swaps inside its own box. -->
 <link rel="stylesheet" href="/signal.css">
 <!-- The heatmap tiles, shared with gems.askakshay.com so one ramp serves both. -->
 <link rel="stylesheet" href="/heat.css">
@@ -103,7 +103,7 @@
     <!-- THE CHILD PRODUCT, NAMED AS FAMILY. Signal says what deserves
          attention; Vision is where one company is understood. Quiet on
          purpose: a sibling, not a sixth destination. -->
-    <a class="to-vision-bar" href="https://vision.askakshay.com/" title="Vision — research one company in depth">
+    <a class="to-vision-bar" href="https://vision.askakshay.com/" title="Vision — research one company in depth" aria-label="Vision, research one company in depth">
       <svg class="vis-mark" viewBox="0 0 20 20" aria-hidden="true"><rect x=".75" y=".75" width="18.5" height="18.5" rx="4.5"/><path d="M4 14.5h12M10.5 5v9.5"/></svg><span>Vision</span><span class="ext" aria-hidden="true">↗</span></a>
   </div>
   <!-- The section the reader is in. Shown on a phone, where the navigation is

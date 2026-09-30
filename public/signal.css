@@ -6662,3 +6662,26 @@ main{max-width:calc(var(--maxw) + var(--gut) * 2)}
 
 .fam-band-l{min-width:0}
 .foot-fam .foot-vis{margin-bottom:var(--s-1)}
+/* On a phone the company page's "Open in Vision" line is longer than the
+   column; it wraps rather than pushing the page 2px sideways. */
+@media(max-width:560px){.to-vision{white-space:normal}}
+/* The pre-rendered snapshot wears the masthead's type, so the swap to the live
+   page changes the numbers and nothing else. */
+.pre{max-width:calc(var(--maxw) + var(--gut) * 2);margin:0 auto;padding:var(--s-6) var(--gut) var(--s-4)}
+.pre-k{font:500 var(--t-3)/1.3 var(--ui);letter-spacing:0;text-transform:none;color:var(--accent)}
+.pre-h{font:400 clamp(var(--t-11),5vw,var(--t-14))/1.04 var(--disp);letter-spacing:-.022em;max-width:17ch}
+.pre-s{max-width:60ch}
+/* The tool list is twice as long as the other three groups together, so it
+   takes the first column whole and the rest stack beside it. */
+@media(min-width:641px){.more-g:first-child{grid-row:1 / span 3}}
+@media(max-width:640px){.more-dlg{width:100vw;max-width:100vw;left:0;right:0}}
+.join h1{font:400 clamp(var(--t-11),4.2vw,var(--t-13))/1.06 var(--disp);letter-spacing:-.018em}
+/* The pre-rendered snapshot is shorter than the live page, so the footer and
+   the freshness line sat inside the first screen and jumped when the app
+   painted — most of the measured CLS on the front page. <main> reserves a full
+   screen, so nothing below it is on screen to move. */
+main{min-height:calc(100vh - var(--barh))}
+/* A price is ink; its change carries the colour. Nifty's level turned red on
+   a down day while Sensex's did not — two answers to one question in one
+   table. Only the FII/DII net figures, which ARE signed amounts, are tinted. */
+.hero-t .hero-reg .v:not(.up):not(.dn),.hero-t .hero-q .v:not(.up):not(.dn){color:var(--text)}

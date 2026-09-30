@@ -16,6 +16,49 @@ an open item with its measured size, not quietly omitted.
 
 ---
 
+## 2026-10 — the redesign, and what it supersedes
+
+**The brief did not change: an honest desk, not a brokerage.** What changed is how
+the page says it. This section is the current rule wherever it disagrees with a
+later section; the later sections stay as the record of why things were decided.
+
+**Identity.** An independent research desk, set like a publication and operated
+like a tool. Paper neutrals (`--bg` #F8F7F4, panels `--surface` #FFFFFF, fills
+`--raised`), ink text (`--text`, `--muted`, `--dim`), hairlines (`--line`,
+`--line2`), and **one accent, cobalt `--accent`**, which marks where you are, what
+you can press next, and the tick. It is never a gain, a loss or a warning, so it
+cannot be misread as a price moving. `--up`, `--down` and `--warn` keep that job
+alone. Every text token measures ≥ 4.5:1 on all three grounds in both themes
+(docs/REDESIGN_2026-10.md). Light is the default and follows the system; dark is
+redesigned, not inverted.
+
+**Three voices, one job each.** `--disp` (Newsreader) sets route titles, the
+masthead and a section's lead sentence: the lines that state what a page is.
+`--ui` (Plus Jakarta) sets everything a reader operates or scans. `--mono`
+(JetBrains Mono) sets figures that must line up. Labels are sentence case, not
+tracked capitals.
+
+**The tick.** The one motif: a hairline with a short accent stroke at its start,
+the mark a grader makes against a scale. It heads every section (`.sec-h`) and
+marks the active destination. It always sits on a line that divides something.
+
+**Geometry.** Radii `--r-1`…`--r-6` are 4–16px; panels use `--r-4`. Elevation
+`--e-1`…`--e-4` is for things that float (menus, sheets, dialogs, popovers). A
+data panel is drawn by its hairline and casts nothing. Spacing stays on `--s-1`…
+`--s-9`. Content width is `--maxw`.
+
+**Structure.** One header row: family (Signal + Vision), five destinations
+(Today, Brief, Screen, Ledger, Markets), utilities (freshness, search, watchlist,
+More), and one filled button, today's brief. Under 1024px the same `<nav>` docks
+to the bottom as a five-cell tab bar. Everything else is in the More sheet, a
+native `<dialog>` filled from `DISCOVER`. Vision uses the same tokens, the same
+anatomy and the same display face; its header reads **Signal / Vision**.
+
+**Motion.** A route change cross-fades; controls acknowledge a press. Sections
+do not fade in on scroll: data is on the page or it is not.
+
+---
+
 ## 0. The one-sentence brief
 
 **An honest desk, not a brokerage.**

@@ -1752,12 +1752,14 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
     ok(`${t} resolves to the interface face, not the serif`,
        !!m && !/Newsreader/.test(m[1]), m && m[1]);
   }
-  /* AND NOW IT IS PRELOADED, for the reason the other two faces are: every
-     route's h1 is set in it, so without a preload the title paints in Georgia
-     and reflows when the face arrives — a shift in the largest line on the
-     page. */
-  ok("the serif is preloaded — every route's title is set in it",
-     /rel="preload" href="\/fonts\/Newsreader-400-latin\.woff2"/.test(HTML));
+  /* AND IT IS STILL NOT PRELOADED, though every route's title now uses it.
+     Measured on 2026-10-01 (390px, 4x CPU, 1.6 Mbps, median of three): the
+     preload cost the front page 92 ms of LCP and removed no layout shift —
+     CLS 0.001 with and without, because the headline swaps inside its own
+     box. A preload is the highest-priority fetch a page can make; it has to
+     buy something. */
+  ok("the serif is not preloaded — measured slower, no CLS benefit",
+     !/rel="preload"[^>]*Newsreader/.test(HTML));
 }
 
 /* ── A PAGE MAY NOT DENY A CAPABILITY IT RENDERS ────────────────────────────
@@ -2138,10 +2140,13 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
 
   const toks = (sel) => new Set([...((VCSS.match(new RegExp(sel + "\\{([\\s\\S]*?)\\n\\}")) || ["", ""])[1]
     .matchAll(/(--[a-z0-9-]+):/g))].map((m) => m[1]));
-  const dark = toks(':root,:root\\[data-theme="dark"\\]'), light = toks(':root\\[data-theme="light"\\]');
-  const missing = [...dark].filter((t) => !light.has(t));
+  /* 2026-10: LIGHT IS THE DEFAULT (:root), dark the override, as on Signal.
+     The rule is unchanged in substance — neither theme may inherit a colour
+     designed for the other — only the direction of the default flipped. */
+  const light = toks(':root,:root\\[data-theme="light"\\]'), dark = toks('\\n:root\\[data-theme="dark"\\]');
+  const missing = [...light].filter((t) => !dark.has(t));
   ok("vision.css: both themes define their colour tokens", dark.size >= 15 && light.size >= 15, { dark: dark.size, light: light.size });
-  ok("...and light redefines every one dark sets", missing.length === 0, missing);
+  ok("...and dark redefines every one light sets", missing.length === 0, missing);
   ok("vision.css paints an explicit body background", /body\{[^}]*background:var\(--bg\)/.test(VCSS));
   ok("vision.css removes motion under prefers-reduced-motion", /prefers-reduced-motion:reduce/.test(VCSS));
 

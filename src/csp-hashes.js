@@ -4,8 +4,8 @@
  * Regenerate with `node scripts/csp-hashes.mjs`; test/guard.mjs fails the
  * build if this file and the HTML disagree. */
 export const INLINE_SCRIPT_HASHES = [
+  "sha256-0Gqpw2nD1t882W1cnxc4zr9T0ebnzLPz/jBDfOcpwpA=",
   "sha256-2rD94fNFgdL/uSOx8uH+lGPnKd6nM7EpJf0fWO2sKxc=",
-  "sha256-Jz9ocWxkIXEmToRdlZMooEUhfHYQfJ+00to2ozXedbE=",
   "sha256-X83CC0BX3Vy99+K20P3I5gzaaha/UyBisIgC/Zx062c=",
   "sha256-ly02Vl/T4fFdeXcuub6QTwxx4UYUUhQ7GAKPo6lvyJo="
 ];

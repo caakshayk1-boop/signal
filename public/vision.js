@@ -383,12 +383,17 @@
      compare it, the two setups, the screen, the map, the day. The rest are
      one tap away under More; nothing was removed. */
   const NAV = [
-    ['home', 'Companies', '#/'], ['compare', 'Compare', '#/compare'], ['setups', 'Signals', '#/setups'],
+    ['home', 'Companies', '#/'], ['compare', 'Compare', '#/compare'], ['setups', 'Setups', '#/setups'],
     ['screener', 'Screener', '#/screener'], ['heatmap', 'Heatmap', '#/heatmap'], ['today', 'Today', '#/today'],
     ['cockpit', 'Cockpit', '#/cockpit'], ['markets', 'Markets', '#/markets'], ['news', 'News', '#/news'],
     ['watchlist', 'Watchlist', '#/watchlist'], ['alerts', 'Alerts', '#/alerts'],
   ];
-  const PRIMARY = ['home', 'compare', 'setups', 'screener', 'heatmap', 'today'];
+  /* FIVE DESTINATIONS, as on Signal: the company search, compare, the two
+     graded setups, the screener and the heatmap. Today, the cockpit, markets,
+     news, the watchlist and alerts are one tap away under More. "Setups", not
+     "Signals": the parent product is called Signal, and a tab with nearly its
+     name that means something else is how a reader gets lost between them. */
+  const PRIMARY = ['home', 'compare', 'setups', 'screener', 'heatmap'];
   const ICON = {
     home: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
     setups: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
@@ -949,7 +954,7 @@
         <div id="hRecent" class="row wrap hrec"></div></section>
       <div class="grid g-2">${panel('What changed across the screen', skel(6), { bodyId: 'hChg', fb: 'Screen' })}${panel('Unusual today', skel(5), { bodyId: 'hUnu', fb: 'Screen' })}</div>
       <div style="height:var(--s-4)"></div>
-      <div class="grid g-2">${panel('Signals on the last scan', skel(4), { bodyId: 'hSig', flush: true, fb: 'Signals', more: '#/setups', moreText: 'All signals' })}${panel('Most-traded companies', skel(6), { bodyId: 'hTop', fb: 'Screen' })}</div>`;
+      <div class="grid g-2">${panel('Setups on the last scan', skel(4), { bodyId: 'hSig', flush: true, fb: 'Signals', more: '#/setups', moreText: 'All setups' })}${panel('Most-traded companies', skel(6), { bodyId: 'hTop', fb: 'Screen' })}</div>`;
     const inp = $('#hQ'), L = $('#hL');
     let hits = [], sel = 0;
     const paintL = () => { const Q = inp.value.trim().toUpperCase(); hits = findCo(inp.value); sel = clamp(sel, 0, Math.max(0, hits.length - 1));
@@ -1113,7 +1118,7 @@
         ${panel('Market intelligence', skel(8), { bodyId: 'oNews', flush: true, fb: 'Wire', more: '#/news', moreText: 'All news' })}
       </div>
       <div style="height:var(--s-4)"></div>
-      ${panel('Signals on the last scan', skel(4), { bodyId: 'oSig', flush: true, fb: 'Signals', more: '#/setups', moreText: 'All signals',
+      ${panel('Setups on the last scan', skel(4), { bodyId: 'oSig', flush: true, fb: 'Signals', more: '#/setups', moreText: 'All setups',
         foot: 'Bottom reversal (daily) and 4H breakout, each with the stop and three targets it was filed at. New rules, untested — graded in the open on the Signals page.' })}
       <div style="height:var(--s-4)"></div>
       ${panel('Watchlist', skel(4), { bodyId: 'oWatch', flush: true, more: '#/watchlist', moreText: 'Manage', fb: 'Quotes' })}`;
@@ -2048,7 +2053,7 @@
   };
   V.setups = async (el, arg, alive) => {
     const f = { eng: store.get('vis:vs-eng', '') };
-    el.innerHTML = vhead('Signals', 'Two setups, filed and graded',
+    el.innerHTML = vhead('Setups', 'Two rules, filed and graded',
       'A bottom reversal on daily bars and a breakout on a 4-hour close, across the ~1,000 names on the screen. Each is filed once with its stop and three targets, then graded on the bars that follow. Research, not advice.', fb('Signals'))
       + `<div id="vsBody">${skel(10)}</div>`;
     const [r] = await Promise.all([F.vsig(), F.screen()]);
