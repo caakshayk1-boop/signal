@@ -2186,6 +2186,14 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      && /:root,:root\[data-theme="dark"\]\{ --viz-1:/.test(VCSS) && /:root\[data-theme="light"\]\{ --viz-1:/.test(VCSS));
   ok("the privacy page names the analytics the host runs, not 'no analytics script'",
      /Cloudflare Web Analytics/.test(JS) && !/There is no analytics script/.test(JS));
+  {
+    /* The front page's heavy feeds start with the route, not after its first
+       wave — after meant a guaranteed second full repaint (measured 6.8s to a
+       complete page against 5.6s), and a count that changed under the reader. */
+    const home = JS.slice(JS.indexOf("R['/'] = async"), JS.indexOf("R['/'] = async") + 20000);
+    const start = home.indexOf("if (!heavyTried) {"), wave = home.indexOf("await Promise.all(");
+    ok("the front page requests its heavy feeds before awaiting the first wave", start > 0 && wave > 0 && start < wave, { start, wave });
+  }
   ok("the ledger offers a Closed filter", /\['closed', `Closed \$\{closedN\}`\]/.test(JS) && /sigFilter === 'closed'/.test(JS));
   ok("vision reads no ledger", !/\/api\/signals\?(limit|symbol)|alerts\.json|\/api\/stats/.test(VJS));
   ok("vision loads no engine registry", !/engines\.js|ENGINE_BOOK/.test(all));

@@ -2735,6 +2735,22 @@
      * to the wire. Anything that changes between the passes is flagged by the
      * usual change-flash rather than swapping silently. */
     const n2 = { ok: false, data: null };   // filled below; the hero reads its length
+    /* ── THE HEAVY FEEDS START NOW; THE PAGE STILL DOES NOT WAIT FOR THEM ──
+     *
+     * They were requested only AFTER the first wave below resolved, which
+     * guaranteed a second full repaint of this route two to four seconds
+     * later — measured locally (390px, 4x CPU, 1.6 Mbps): real content at
+     * 1.4s from the pre-render, the page at 5.7s, then the whole DOM rebuilt
+     * again at 8.2s for the screen's counts. Started here and not awaited,
+     * the screen usually lands while the first wave is still in flight, so
+     * the route paints once. The first render still waits only on the small
+     * feeds; when the screen is late the one retry below repaints, as before. */
+    if (!heavyTried) {
+      heavyTried = true;
+      Promise.all([get('/api/calendar'), getScreen(false).then(g => noteLadder(g.r))]).then(() => {
+        if (routeOf() === '/' && homeLacked) { homeLacked = false; R['/'](); }
+      });
+    }
     /* /api/stats joins the first wave deliberately. The record is now the
      * front page's lead claim, and a lead claim that arrives in a second pass
      * is one the reader has already scrolled past. It is a Turso aggregate of
@@ -2870,12 +2886,10 @@
      *
      * heavyTried is cleared by render() on every route change, so navigating
      * away and back does try again — the guard stops a loop, not a retry. */
-    if (!heavyTried && (!cl.ready || !sr.ready)) {
-      heavyTried = true;
-      Promise.all([get('/api/calendar'), getScreen(false).then(g => noteLadder(g.r))]).then(() => {
-        if (routeOf() === '/') R['/']();
-      });
-    }
+    /* The heavy fetch started at the top of the route; this render only
+       records whether it went out without them, so the fetch's own
+       completion knows to repaint once. */
+    homeLacked = !cl.ready || !sr.ready;
     /* ── THE HERO ────────────────────────────────────────────────────────
      * The first viewport has to answer four things: what this is, what state
      * the market is in, what to do next, and how long that takes. It replaces
@@ -4415,6 +4429,8 @@
    * again to show what is on screen is a request for nothing. */
   let TODAY5 = null;
   let heavyTried = false;
+  /* True when the front page rendered before its heavy feeds arrived. */
+  let homeLacked = false;
   /* Same shape as heavyTried: one retry per visit, never a loop on failure. */
   let regimeTried = false;
   /* ── THE SCREEN ROWS, HELD ONCE SEEN ──────────────────────────────────────
@@ -16282,6 +16298,7 @@
     // A new route reads a different set of feeds; the probe must follow it.
     routeUrls = new Set();
     heavyTried = false;      // a fresh visit may retry the deferred feeds
+    homeLacked = false;
     const run = async () => {
       try { await R[path](); } catch (err) {
         paint(fail('This section', err && err.message ? err.message : 'unexpected error'));

@@ -47,9 +47,21 @@ Pages (27): `/ /markets /discover /watch /signals /brief /ideas /screen /heat /m
   the signals are correct but late. **Fixed:** `vision_scan.yml` is now a watchdog entry
   (`src/watchdog_schedule.js`), dispatched 12 minutes after a missed slot; the two follow-up
   syncs moved to 08:40 / 10:55 UTC and are watchdog slots too, pinned equal by the guard.
-- **Performance.** `/about` measured LCP 3.5 s, CLS 0.05 under throttling (unminified dev build).
-  The bottleneck identified in AUDIT-PHASE0 (the home page waits on ten feeds; one 148 KB-gz bundle
-  for every route) is unchanged. No budget is claimed.
+- **Performance — re-measured with the production (minified) bundle, 30 Sep.** Local harness,
+  390 px, 4× CPU, 1.6 Mbps / 150 ms. The earlier 3.5 s for `/about` was the unminified dev build.
+
+  | Page | Real content | Page complete (LCP) | CLS |
+  |---|---|---|---|
+  | `/about` | 0.95 s | 2.1 s | 0.004 |
+  | `/` before | 0.95 s (pre-render) | 6.7–6.8 s, after two full repaints | 0.005 |
+  | `/` after | 0.96 s (pre-render) | 5.4–5.8 s, one repaint | 0.004 |
+
+  The home page's heavy feeds (the 230 KB screen, the calendar) were requested only after its
+  first wave of eleven — a guaranteed second full repaint, during which a count changed under the
+  reader (989 → 984 names). They now start with the route and are not awaited. The first full
+  paint is ~1.3 s later (bandwidth is shared), the complete page ~1.2 s sooner. The home page is
+  still over 2.5 s complete under this throttle; the remaining cost is the eleven-feed first wave,
+  whose live half (`/api/markets`, `/flows`, `/wire`, `/ticker`) the harness cannot reproduce.
 - **Analytics.** Only Cloudflare Web Analytics' page-view beacon exists. The review's event list
   (search, filter, Vision opened…) needs Workers Analytics Engine; not added.
 
@@ -59,6 +71,6 @@ Done in this pass: edge-written heads and bodies for every route (§2), sitemap 
 table, "Today", Closed filter, Vision links in the bar, on every stock row, on the stock page and
 in ⌘K.
 
-Next, in order: (1) split the home page's hero from its ten-feed
-`Promise.all` (AUDIT-PHASE0 #10) and set a JS budget after measuring; (2) Workers Analytics
+Next, in order: (1) paint the home page's hero from its static feeds and let the live APIs
+fill in after (AUDIT-PHASE0 #10), then set a JS budget; (2) Workers Analytics
 Engine for the events, cookie-free.
