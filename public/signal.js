@@ -2944,210 +2944,95 @@
         : ['NEUTRAL', '', 'The screen is split.'])
       : null;
 
+    /* ── THE MASTHEAD, OCTOBER 2026 ────────────────────────────────────────
+     *
+     * It opened on a 64px slogan that filled half the first screen and then
+     * changed with the record — "Every signal, graded. The record starts
+     * here." on one day, "India's market, screened every session." on
+     * another. A headline that changes with the data is not a headline, it is
+     * a status line set too large.
+     *
+     * Now the headline says, once and permanently, what this is: every NSE
+     * name screened before the open, every call graded in public. The line
+     * under it is the part that changes, and it is the record — published,
+     * closed, what it averaged — in the second sentence a first-time reader
+     * meets, not below the fold. The losses stay above the fold by the same
+     * rule as before: a record you have to scroll to find is a curated record.
+     *
+     * The first button is still the record (test/ui.mjs pins that decision),
+     * the second is today's brief with its reading time, and the screen is a
+     * text link. To the right, the four readings a reader checks before
+     * anything else, as one ruled table rather than four floating cards. */
+    const heroSub = (() => {
+      if (!LR.published) {
+        return sgx.ok
+          ? `The ledger restarted on <b>${esc(LAUNCH)}</b> when the stop rules changed, and nothing has been published since. Earlier signals stay on <a href="https://news.askakshay.com">news.askakshay.com</a>.`
+          : `The ledger is not answering this minute — <a href="/signals">open the record</a> rather than take this page's word for it.`;
+      }
+      if (!LR.trades) {
+        return `<b>${LR.published}</b> signals published since ${esc(LAUNCH)}, none closed yet. Nothing to report is reported as nothing, not as a clean slate.`;
+      }
+      if (LR.trades < 5) {
+        return `<b>${LR.published}</b> published since ${esc(LAUNCH)}, <b>${LR.trades}</b> closed${LR.wins === 0
+          ? ` — <b class="dn">${LR.trades === 1 ? 'a loss' : LR.trades === 2 ? 'both losses' : `all ${LR.trades} losses`}</b>` : ''}.
+          Too few to mean anything either way, and shown rather than withheld until it flatters.`;
+      }
+      const neg = LR.expectancy_r < 0;
+      return `Since ${esc(LAUNCH)}: <b>${LR.published}</b> published, <b>${LR.trades}</b> closed,
+        <b class="dn">${LR.losses}</b> lost, averaging
+        <b class="${neg ? 'dn' : 'up'}">${LR.expectancy_r > 0 ? '+' : ''}${LR.expectancy_r}R</b> a trade. ${verdictOf(LR, true)}`;
+    })();
+    const inr = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + '₹' + Math.abs(Math.round(v)).toLocaleString('en-IN') + ' cr';
+    const vixBand = (() => {
+      if (!heroVix) return '';
+      const v = lvl(heroVix.price_raw != null ? heroVix.price_raw : heroVix.price);
+      return v == null ? '' : v < 12 ? 'calm' : v < 16 ? 'normal range' : v < 22 ? 'jumpy' : 'stressed';
+    })();
     let out = `<section class="hero">
       <div class="hero-l">
-        <span class="eyebrow">The morning edition · ${esc((t.ok && t.data.date_str) || '')}</span>
-        ${/* A CLAIM, THEN THE EVIDENCE FOR IT.
-            * "Numbers first. Noise last." is a mood. It tells a first-time
-            * reader nothing about what this is or why they would come back
-            * tomorrow. The headline now states what the site does; the line
-            * under it is the only honest proof — today's actual counts, from
-            * the feeds this page has already loaded. If the screen is empty
-            * the sentence says so rather than making the claim anyway. */''}
-        ${/* THE HEADLINE USED TO SELL THE SIGNALS. THE LEDGER REFUTES THEM.
-            *
-            * It read "Indian markets, decoded in 60 seconds", under which the
-            * subhead promised "one setup written up in full — with the stop,
-            * the target and the reason it would be wrong". Every word of that
-            * was true about the process and silent about the outcome, while
-            * this site's own published record showed 62 losses in 71 closed
-            * trades at an expectancy of −0.556R.
-            *
-            * A page cannot lead with a claim its own measurement contradicts
-            * and still call itself measured. So the lead is now the record —
-            * including, and especially, when the record is bad. That is the
-            * only version of this page that is honest on a losing month, and
-            * a page that is only honest on good months is not honest.
-            *
-            * The numbers are read live from /api/stats, never typed here. If
-            * the edge turns positive this headline reports that instead, by
-            * the same mechanism and with no edit. */''}
-        ${(() => {
-          if (!LR.published) {
-            /* EMPTY BECAUSE IT RESTARTED IS NOT EMPTY BECAUSE IT BROKE.
-             * This branch said "the ledger is not reachable this minute",
-             * which was true only of a failed fetch. On the day the cutoff
-             * moves it is reached by a page whose ledger answered perfectly
-             * and had nothing on or after LAUNCH yet — and telling a reader
-             * the site is broken when it is working is its own kind of lie. */
-            const reachable = sgx.ok;
-            return `<h1>Every signal, graded.<br>The record starts ${esc(LAUNCH)}.</h1>
-              <p class="hero-sub">${reachable
-                ? `Nothing published yet. The stop rules changed today, so the count starts here.
-                   Earlier signals stay on
-                   <a href="https://news.askakshay.com">news.askakshay.com</a>.`
-                : `The ledger is not answering this minute —
-                   <a href="/signals">open the record</a> rather than take this page's word.`}
-              </p>`;
-          }
-          /* BELOW FIVE, THE HEADLINE STATES THE COUNT AND NOT A VERDICT.
-           *
-           * This page already holds that line elsewhere: rCurve() returns null
-           * under five closed trades, and #/signals says in as many words that
-           * "a curve needs five before its shape means anything". A headline
-           * reading "All 2 that closed, lost" would break that rule in the
-           * loudest type on the site — technically true, and a verdict drawn
-           * from two data points, which is the same error as claiming an edge
-           * from two winners. Being wrong in the pessimistic direction is
-           * still being wrong. */
-          if (LR.trades && LR.trades < 5) {
-            return `<h1>Every signal, graded.<br>The record starts here.</h1>
-              <p class="hero-sub"><b>${LR.published}</b> published since ${esc(LAUNCH)},
-                <b>${LR.trades}</b> closed so far${LR.wins === 0 && LR.trades
-                  ? ` — <b class="dn">${LR.trades === 1 ? 'a loss' : LR.trades === 2 ? 'both losses' : `all ${LR.trades} losses`}</b>` : ''}.
-                That is too few to mean anything in either direction, and it is shown rather
-                than withheld until it flatters. Everything below is research, not a
-                recommendation.</p>`;
-          }
-          if (!LR.trades) {
-            return `<h1>Every signal, graded.<br>The record starts here.</h1>
-              <p class="hero-sub"><b>${LR.published}</b> signals published since
-                ${esc(LAUNCH)}, none closed yet. Nothing to report is reported as nothing,
-                not as a clean slate. Everything below is research until it settles.</p>`;
-          }
-          const neg = LR.expectancy_r < 0;
-          const allLost = LR.wins === 0;
-          const thin = LR.trades < 30;
-          /* ── WHAT THE PAGE IS, THEN WHAT IT HAS COST ────────────────────
-           *
-           * The headline was "Every signal, graded. Including the 12 that
-           * lost." — the record, in the largest type on the site, before the
-           * page had said what the site IS. An external audit's finding, and
-           * it is right about a first-time reader: the honesty is the whole
-           * argument and it is an argument ABOUT something, so the something
-           * has to come first or the loss disclosure is the opening line of a
-           * page whose subject is still unknown.
-           *
-           * WHAT THE AUDIT ASKED FOR AND DID NOT GET. It wanted the honesty
-           * block moved BELOW the value proposition and the disclaimer. Half
-           * of that is taken: the H1 now names the product. The other half is
-           * refused — the losses stay above the fold, in the subhead, in the
-           * second sentence, and on the secondary button. A record that a
-           * reader has to scroll to find is a curated record, and there is no
-           * version of this page worth shipping where the number moves down
-           * because it is bad. It reads worse this way. It is the only way
-           * that is true.
-           *
-           * The H1 is a claim the page can support in the next sentence —
-           * every name screened, every signal graded — and not a promise
-           * about returns, which is the sentence this site exists to not
-           * write. */
-          return `<h1>India's market, screened every session.<br>
-              <span class="h1-sub">${allLost
-                ? `Every signal graded — all <b class="dn">${LR.trades}</b> that closed, lost.`
-                : `Every signal graded, including the <b class="dn">${LR.losses}</b> that lost.`}</span></h1>
-            <p class="hero-sub">
-              <b>${universeN()}</b> NSE names re-screened before every open — breadth, sector
-              heat, the IPO books open now, the wire, and a public ledger of every signal
-              this site has published.
-              Since ${esc(LAUNCH)}: <b>${LR.published}</b> published,
-              <b>${LR.trades}</b> closed, averaging
-              <b class="${neg ? 'dn' : 'up'}">${LR.expectancy_r > 0 ? '+' : ''}${LR.expectancy_r}R</b>${
-                allLost ? '' : ` at a <b>${LR.win_rate}%</b> win rate`}.
-              ${verdictOf(LR, true)}
-            </p>`;
-        })()}
-        ${/* ── THE RECORD STAYS THE PRIMARY ACTION ────────────────────────
-             * The audit asks for "See this morning's screen" as the primary
-             * call and the ledger as the secondary. Half taken, half refused,
-             * and the refusal is the considered half.
-             *
-             * Its real finding was that no value proposition existed above the
-             * fold — the page opened with a loss disclosure before it had said
-             * what the site was. The H1 fixes that. The CTA order is a
-             * different question, and test/ui.mjs pins the answer: "the hero
-             * leads with the measured record". That is a deliberate decision
-             * somebody already made, and it is right for the same reason the
-             * audit gives two sections earlier — the record is "your single
-             * most differentiating asset". Every screener has a screen. What
-             * this site has that they do not is a graded ledger with the
-             * losses in it.
-             *
-             * So: the headline names the product, and the first thing it asks
-             * you to do is check its record. The screen is the second button,
-             * not a demoted one. */''}
+        <span class="eyebrow">${esc((t.ok && t.data.date_str) || 'Today')} · Independent research on NSE equities</span>
+        <h1>Every NSE name, screened before the open. Every call, graded in public.</h1>
+        <p class="hero-sub">${heroSub}</p>
         <div class="hero-cta">
-          <a class="btn-hero" href="/signals">The record
-            <em>every trade, graded — including the losses</em></a>
-          <a class="btn-hero btn-hero-2" href="/screen">This morning's screen
-            <em>every NSE name, ranked and explained</em></a>
-          <a class="btn-ghost" href="/brief">Today’s brief · ${CURVE_MIN} →</a>
+          <a class="btn-hero" href="/signals">See the record
+            <em>every signal, graded — losses included</em></a>
+          <a class="btn-hero btn-hero-2" href="/brief">Today’s brief
+            <em>one setup, in full · ${CURVE_MIN}</em></a>
+          <a class="btn-ghost" href="/screen">Or browse the ${universeN()}-name screen →</a>
         </div>
       </div>
-      <div class="hero-r">
-        ${/* NIFTY, SENSEX, FLOWS — the three readings, in that order.
-            * The lead slot used to hold a "Market state" badge reading RISK-ON
-            * or NEUTRAL, which is a restatement of the breadth number printed
-            * a few centimetres below it and not a fact about the market that
-            * the market itself reports. The index is. */''}
-        ${heroNifty ? `<div class="hero-reg ${dir(heroNifty.change_pct)}">
-          <span class="k">Nifty 50</span>
-          <span class="v">${esc(heroNifty.price ?? '—')}</span>
-          <span class="s"><b class="${dir(heroNifty.change_pct)}">${pct(heroNifty.change_pct)}</b> today${
-            Number.isFinite(adv) && Number.isFinite(counted) && counted
-              ? ` · ${adv} of ${counted} screened names advancing` : ''}</span>
-        </div>` : ''}
-        ${/* THE SAME DIRECTION CLASS AS NIFTY ABOVE.
-            * .hero-reg carried `dn` and tinted its value; .hero-q did not, so
-            * on a day both indices fell, Nifty's ₹23,635 was red and Sensex's
-            * ₹75,578 was plain black beside it — two different answers to
-            * "which way is the market" in one block. */''}
-        ${heroSensex ? `<div class="hero-q ${dir(heroSensex.change_pct)}">
-          <span class="k">Sensex</span>
-          <span class="v">${esc(heroSensex.price ?? '—')}</span>
-          <span class="c ${dir(heroSensex.change_pct)}">${pct(heroSensex.change_pct)}</span>
-        </div>` : ''}
-        ${/* A NUMBER NOBODY CAN READ IS NOT INFORMATION.
-            * "India VIX 13.17" tells a reader who already knows the bands
-            * exactly what they already knew, and everyone else nothing. The
-            * band is stated in words beside it, and the direction is the
-            * OPPOSITE of the index colour on purpose: rising volatility is
-            * not a rising market, and colouring it green on a +7% day would
-            * be the single most misleading thing on this page. */''}
-        ${heroVix ? (() => {
-          const v = lvl(heroVix.price_raw != null ? heroVix.price_raw : heroVix.price);
-          const band = v == null ? ''
-            : v < 12 ? 'calm — very little movement expected'
-            : v < 16 ? 'normal — the usual range'
-            : v < 22 ? 'jumpy — bigger daily swings expected'
-            : 'stressed — people are paying up for protection';
-          return `<div class="hero-q hero-vix">
-            <span class="k">India VIX</span>
-            <span class="v">${esc(heroVix.price ?? '—')}</span>
-            <span class="c ${heroVix.change_pct > 0 ? 'dn' : heroVix.change_pct < 0 ? 'up' : ''}"
-              title="Rising volatility is not a rising market — this reads inverse to the index">${
-              pct(heroVix.change_pct)}</span>
-            <span class="fl-n">${esc(band)}</span>
-          </div>`;
-        })() : ''}
-        <div class="hero-q hero-fl">
-          <span class="k">FII &amp; DII${flow && flow.date ? ` · ${esc(flow.date)}` : ''}</span>
-          ${flow ? `<span class="fl-r">
-              <b>FII</b>
-              <i class="${dir(flow.fii && flow.fii.net)}">${flow.fii && flow.fii.net != null
-                ? (flow.fii.net > 0 ? '+' : '') + '₹' + Math.round(flow.fii.net).toLocaleString('en-IN') + ' cr'
-                : 'Not published'}</i>
-            </span>
-            <span class="fl-r">
-              <b>DII</b>
-              <i class="${dir(flow.dii && flow.dii.net)}">${flow.dii && flow.dii.net != null
-                ? (flow.dii.net > 0 ? '+' : '') + '₹' + Math.round(flow.dii.net).toLocaleString('en-IN') + ' cr'
-                : 'Not published'}</i>
-            </span>
-            <span class="fl-n">Net cash-market buying, last published session.</span>`
-          : `<span class="fl-n">Not published — NSE did not answer.</span>`}
-        </div>
-      </div>
+      <aside class="hero-r" aria-label="Before the open">
+        <h2 class="hero-rh">Before the open</h2>
+        <dl class="hero-t">
+          ${heroNifty ? `<div class="hero-reg ${dir(heroNifty.change_pct)}"><dt>Nifty 50</dt>
+            <dd><span class="v">${esc(heroNifty.price ?? '—')}</span><span class="c ${dir(heroNifty.change_pct)}">${pct(heroNifty.change_pct)}</span></dd></div>` : ''}
+          ${heroSensex ? `<div class="hero-q ${dir(heroSensex.change_pct)}"><dt>Sensex</dt>
+            <dd><span class="v">${esc(heroSensex.price ?? '—')}</span><span class="c ${dir(heroSensex.change_pct)}">${pct(heroSensex.change_pct)}</span></dd></div>` : ''}
+          ${/* Rising volatility is not a rising market, so VIX reads inverse to
+              * the index colour, and its band is stated in words. */''}
+          ${heroVix ? `<div class="hero-q hero-vix"><dt>India VIX${vixBand ? ` <small>${esc(vixBand)}</small>` : ''}</dt>
+            <dd><span class="v">${esc(heroVix.price ?? '—')}</span><span class="c ${heroVix.change_pct > 0 ? 'dn' : heroVix.change_pct < 0 ? 'up' : ''}"
+              title="Rising volatility is not a rising market — this reads inverse to the index">${pct(heroVix.change_pct)}</span></dd></div>` : ''}
+          <div class="hero-q hero-fl"><dt>FII · DII net${flow && flow.date ? ` <small>${esc(flow.date)}</small>` : ''}</dt>
+            <dd>${flow
+              ? `<span class="v ${dir(flow.fii && flow.fii.net)}">${flow.fii && flow.fii.net != null ? inr(flow.fii.net) : 'Not published'}</span>
+                 <span class="v ${dir(flow.dii && flow.dii.net)}">${flow.dii && flow.dii.net != null ? inr(flow.dii.net) : 'Not published'}</span>`
+              : `<span class="fl-n">Not published — NSE did not answer.</span>`}</dd></div>
+          ${Number.isFinite(adv) && Number.isFinite(counted) && counted ? `<div class="hero-q"><dt>Screen breadth <small>past week</small></dt>
+            <dd><span class="v">${adv} of ${counted}</span><span class="c">advancing</span></dd></div>` : ''}
+        </dl>
+      </aside>
+    </section>
+    <section class="howto" aria-label="What Signal does">
+      <a class="howto-i" href="/screen"><span class="howto-k">01 · Screen</span>
+        <b>Every name, ranked and explained</b>
+        <span>${universeN()} NSE companies re-scored on quality, growth, value and trend before each open.</span></a>
+      <a class="howto-i" href="/brief"><span class="howto-k">02 · Brief</span>
+        <b>One setup, written up in full</b>
+        <span>Entry, stop, targets and the reason it would be wrong — readable in ${CURVE_MIN}.</span></a>
+      <a class="howto-i" href="/signals"><span class="howto-k">03 · Ledger</span>
+        <b>Every call, graded when it closes</b>
+        <span>${LR.published ? `${LR.published} published since ${esc(LAUNCH)}. ` : ''}Wins and losses in R, with the arithmetic shown.</span></a>
     </section>`;
     if (!t.ok && !p.ok) { paint(out + fail('Today', t.error || p.error)); return; }
 
@@ -3747,6 +3632,31 @@
     // exactly the case fillIpoLive() is for, so give it somewhere to render.
     if (!ipoOpen.length) out += '<div id="ipoExtraHome"></div>';
     out += wireSec;
+    /* ── THE SIBLING, IN ITS PLACE ────────────────────────────────────────
+     * Signal says which names deserve attention today; Vision is where one of
+     * them is understood — financials, ownership, events. It is offered after
+     * the day's content and before the reference, as the next step for a
+     * reader who has found a name, never as a competing front door. The three
+     * names are today's most-traded on the screen, read from the rows this
+     * page already holds; with no rows, the band still links Vision's search. */
+    {
+      const top = (FRONT_SCREEN || []).filter(r => r && r.sym && Number.isFinite(Number(r.turnover_cr)))
+        .sort((a, b) => b.turnover_cr - a.turnover_cr).slice(0, 3);
+      out += `<section class="fam-band" aria-labelledby="famH">
+        <div class="fam-band-l">
+          <span class="eyebrow">Also from this desk</span>
+          <h2 id="famH">Found a name? Understand the company in Vision.</h2>
+          <p>Financials, ownership by quarter, results dates and what changed since the last build,
+             for every company on this screen. Every figure carries its source and its age.</p>
+        </div>
+        <div class="fam-band-r">
+          ${top.map(r => `<a class="fam-co" href="${esc(visionUrl(r.sym))}">
+            <b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span></a>`).join('')}
+          <a class="fam-go" href="${VISION_URL}/">Open Vision ↗</a>
+          ${top.length ? `<p class="hint">Today's three most-traded names on the screen.</p>` : ''}
+        </div>
+      </section>`;
+    }
     /* The reference, after the day it qualifies. */
     out += recordSec;
     paint(out);
@@ -16281,8 +16191,8 @@
      * nowhere. The group also names the page it is holding, so "Discover"
      * reads "Discover · Screen" and the collapsed bar still answers "where am
      * I" without being opened. */
-    document.querySelectorAll('.tabs a').forEach(a =>
-      a.dataset.route === path ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+    document.querySelectorAll('.tabs a, .bar-right a.icon-btn[href]').forEach(a =>
+      (a.dataset.route || a.getAttribute('href')) === path ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
     document.querySelectorAll('.tabs .tabg').forEach(g => {
       const inside = g.querySelector(`a[data-route="${path}"]`);
       g.classList.toggle('is-here', !!inside);
@@ -17017,10 +16927,49 @@
     });
   }
 
+  /* ── MORE: EVERY TOOL AND THE SETTINGS, IN ONE SHEET ──────────────────
+   * The bar holds five destinations and nothing else. Everything a reader
+   * reaches less often — the ten research tools, the watchlist, how the
+   * numbers are made, the sibling products, theme and density — is one tap
+   * away here. It is filled from DISCOVER, the same table /discover renders,
+   * so the sheet and the page cannot list different tools.
+   *
+   * A native modal <dialog>: showModal() moves focus in and holds it, Escape
+   * closes it, and the browser returns focus to the button. Clicking the
+   * backdrop closes it too, because a sheet that only a small X dismisses is
+   * a sheet that traps a thumb. Following a link closes it before the route
+   * paints, so the page asked for is never under a sheet. */
+  (() => {
+    const btn = document.getElementById('moreBtn');
+    const dlg = document.getElementById('moreDlg');
+    const body = document.getElementById('moreBody');
+    if (!btn || !dlg || !body || typeof dlg.showModal !== 'function') return;
+    const PRIMARY = new Set(['/', '/brief', '/screen', '/signals', '/markets']);
+    const groups = [
+      ['Research tools', DISCOVER.filter(([h]) => !PRIMARY.has(h)).map(([h, n, sub]) => [h, n, sub])],
+      ['Your desk', [['/watch', 'Watchlist', 'The names you starred, marked to the latest price'],
+                     ['/discover', 'All tools', 'Every way into the screen, with what each is for']]],
+      ['How the record is made', [['/methodology', 'Methodology', 'How every number here is made'],
+                     ['/sources', 'Data sources', 'Where each figure comes from, and how fresh'],
+                     ['/engines', 'The engines', 'What fires each one, and what it has done'],
+                     ['/about', 'About', 'Who builds this, and why the losses are published']]],
+      ['Also from this desk', [[VISION_URL + '/', 'Vision ↗', 'Research one company in depth'],
+                     ['https://news.askakshay.com/', 'The newspaper ↗', 'The long-form daily read']]],
+    ];
+    body.innerHTML = groups.map(([g, items]) => `<section class="more-g"><h3>${esc(g)}</h3>
+      <div class="more-l">${items.map(([h, n, sub]) => `<a href="${esc(h)}"${/^https?:/.test(h) ? ' rel="noopener"' : ''}>
+        <b>${esc(n)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</a>`).join('')}</div></section>`).join('');
+    btn.addEventListener('click', () => { dlg.showModal(); btn.setAttribute('aria-expanded', 'true'); });
+    dlg.addEventListener('close', () => btn.setAttribute('aria-expanded', 'false'));
+    dlg.addEventListener('click', (e) => {
+      if (e.target === dlg || e.target.closest('[data-close]') || e.target.closest('a[href]')) dlg.close();
+    });
+  })();
+
   document.getElementById('themeBtn').addEventListener('click', () => {
     const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
-    document.querySelector('meta[name="theme-color"]').setAttribute('content', next === 'dark' ? '#0B0F14' : '#FFFFFF');
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', next === 'dark' ? '#0F1012' : '#F8F7F4');
     try { localStorage.setItem('sig:theme', next); } catch (e) { /* private mode */ }
   });
 

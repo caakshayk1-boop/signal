@@ -28,7 +28,7 @@
 <meta name="twitter:title" content="Signal — Indian markets, every morning">
 <meta name="twitter:description" content="Sector heat, IPO books open now, ranked ideas and a public ledger.">
 <meta name="twitter:image" content="https://signal.askakshay.com/og.png">
-<meta name="theme-color" content="#FFFFFF">
+<meta name="theme-color" content="#F8F7F4">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="/icon.svg">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -49,6 +49,10 @@
      a preload means the headline paints in the system serif and then reflows,
      and CLS is a promise not to move what someone is reading. 22 KB, latin. -->
 <link rel="preload" href="/fonts/PlusJakarta-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<!-- 2026-10: the display serif sets every route title and the masthead, so it
+     is preloaded like the other two — a title that paints in Georgia and then
+     reflows is a shift in the largest line on the page. 22 KB, latin. -->
+<link rel="preload" href="/fonts/Newsreader-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/signal.css">
 <!-- The heatmap tiles, shared with gems.askakshay.com so one ramp serves both. -->
 <link rel="stylesheet" href="/heat.css">
@@ -82,151 +86,130 @@
 <div class="scrollprog" id="scrollprog" role="progressbar" aria-label="Page scrolled"
      aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
 
+<!-- ── THE SHELL, OCTOBER 2026 ─────────────────────────────────────────────
+     One row. The brand and its sibling on the left, the five destinations in
+     the middle, utilities on the right, and exactly one filled button — the
+     brief. What used to crowd this bar moved to where it belongs: the edition
+     and the session clock to the ticker, theme and density to the More sheet.
+     On a phone the same <nav> docks to the bottom of the screen, so there is
+     one navigation in the DOM, not two to keep in step. -->
 <header class="bar" role="banner">
  <div class="bar-in">
-  <a class="brand" href="/">
-    <span class="brand-dot" aria-hidden="true"></span>
-    <span class="brand-name">SIGNAL</span>
-  </a>
-  <!-- The section the reader is in, beside the brand. Filled by the router,
-       empty on the front page — a breadcrumb that says "Today" while you are
-       looking at Today is noise. -->
+  <div class="fam">
+    <a class="brand" href="/" aria-label="Signal — today">
+      <svg class="brand-mark" viewBox="0 0 20 20" aria-hidden="true"><rect width="20" height="20" rx="5"/><path d="M4 14.5h12M10.5 5v9.5M5.5 12.5v2M15 12.5v2"/></svg>
+      <span class="brand-name">Signal</span>
+    </a>
+    <!-- THE CHILD PRODUCT, NAMED AS FAMILY. Signal says what deserves
+         attention; Vision is where one company is understood. Quiet on
+         purpose: a sibling, not a sixth destination. -->
+    <a class="to-vision-bar" href="https://vision.askakshay.com/" title="Vision — research one company in depth">
+      <svg class="vis-mark" viewBox="0 0 20 20" aria-hidden="true"><rect x=".75" y=".75" width="18.5" height="18.5" rx="4.5"/><path d="M4 14.5h12M10.5 5v9.5"/></svg><span>Vision</span><span class="ext" aria-hidden="true">↗</span></a>
+  </div>
+  <!-- The section the reader is in. Shown on a phone, where the navigation is
+       at the bottom of the screen; on a desktop the active tab says it.
+       Empty on Today — a breadcrumb reading "Today" on Today is noise. -->
   <span class="bar-where" id="barWhere" aria-hidden="true"></span>
+
+<nav class="tabs" id="tabs" aria-label="Primary">
+  <!-- FIVE DESTINATIONS, ONE PER READER GOAL. Today: what happened and what
+       deserves attention. Brief: the one setup, in full. Screen: every name,
+       ranked and explained. Ledger: every signal, graded. Markets: the board.
+       Watchlist, the tool index, search and settings are UTILITIES — they sit
+       to the right of this, never in it. -->
+  <a href="/" data-route="/">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/></svg>
+    <span>Today</span></a>
+  <a href="/brief" data-route="/brief">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 3.5h13v17h-13z"/><path d="M8.5 8h7"/><path d="M8.5 12h7"/><path d="M8.5 16h4"/></svg>
+    <span>Brief</span></a>
+  <a href="/screen" data-route="/screen">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
+    <span>Screen</span></a>
+  <a href="/signals" data-route="/signals">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"/><path d="M7 19V9"/><path d="M12 19V5"/><path d="M17 19v-7"/></svg>
+    <span>Ledger</span></a>
+  <a href="/markets" data-route="/markets">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-6 4 4 4-7 5 5"/></svg>
+    <span>Markets</span></a>
+</nav>
+
   <div class="bar-right">
-    <span class="stat-live" id="edition" aria-live="polite">—</span>
-    <!-- Freshness lives in the header because it qualifies every number on
-         every page. It is a button: the detail is a click, not a hover, so it
-         is reachable on a phone and by a keyboard. -->
+    <!-- Freshness qualifies every number on every page, so it stays in the
+         bar — a dot and a count, the detail one click away. -->
     <button type="button" class="fresh" id="freshBtn" hidden
             aria-label="Data freshness">
       <i aria-hidden="true"></i><span id="freshTxt">—</span>
     </button>
-    <!-- THE CHILD PRODUCT, NAMED IN THE BAR. Signal says what deserves
-         attention; Vision is where one company is understood. -->
-    <a class="to-vision-bar" href="https://vision.askakshay.com/" title="Vision — company research">Vision <span aria-hidden="true">↗</span></a>
     <button type="button" class="cmdk" id="cmdkBtn" aria-label="Search and commands">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
       <span class="cmdk-l">Search</span><kbd>⌘K</kbd>
+    </button>
+    <a class="icon-btn" href="/watch" aria-label="Watchlist" title="Watchlist">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.8l2.5 5.1 5.6.8-4 3.9 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4-3.9 5.6-.8z"/></svg>
+    </a>
+    <button type="button" class="icon-btn" id="moreBtn" aria-label="More: every tool and settings"
+            aria-haspopup="dialog" aria-controls="moreDlg" title="More">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
     </button>
     <a class="btn-cta" href="/brief">
       <span class="cta-l">Today’s brief</span>
       <span class="cta-s" id="ctaSub">60 seconds</span>
     </a>
-    <button type="button" class="icon-btn" id="densBtn" aria-label="Row density"
-            aria-pressed="false" title="Row density">
-      <span class="dens-i" aria-hidden="true"><i></i><i></i><i></i></span>
-    </button>
-    <button type="button" class="icon-btn" id="themeBtn" aria-label="Switch theme">
-      <span aria-hidden="true">◐</span>
-    </button>
   </div>
  </div>
 </header>
 
-<!-- THE TICKER, AND WHY IT DOES NOT SCROLL BY ITSELF.
-     A marquee is the obvious build and the wrong one here. It moves the number
-     away from the eye that is reading it; it is motion nobody asked for; and
-     driven by requestAnimationFrame it FREEZES in a background tab — a trap
-     this repo has already hit once (see the note in signal.js). Worst of all
-     it flatters: a price gliding past looks live whether or not it is, on a
-     site whose entire argument is that it tells you when to stop trusting it.
-     So this strip holds still, scrolls when you push it, and says which
-     markets are shut. -->
-<div class="tkr" id="tkr" role="region" aria-label="Market ticker" hidden>
-  <div class="tkr-row" id="tkrRow" tabindex="0"></div>
-</div>
-
-
-<!-- FOUR DECISIONS, NOT NINE.
-     Nine tabs is not a navigation, it is a list of every page — and it read as
-     nine equally-weighted choices when only two of them are the daily path.
-     TODAY is what happened. BRIEF is the one setup, in full. DISCOVER is where
-     you go looking; TRACK is what you already follow. The five pages under
-     Discover and the two under Track are unchanged and one click away; what
-     changed is that the bar no longer asks you to rank them.
-
-     The groups are <details>, so they open without JavaScript and close on
-     Escape for free. Each summary is a real button to the assistive tree. -->
-<!-- ── FIVE FLAT DESTINATIONS ──────────────────────────────────────────────
-     Two of the four tabs were <details> dropdowns, so reaching the ledger was
-     tap Track, tap Signals — two taps and a menu, for the page the whole site
-     is built to be judged on. A tab bar whose items open menus is a menu bar,
-     and on a phone it competes with the thumb it is placed under.
-
-     Five destinations, every one a single tap, no nested disclosure. The
-     pages that were inside those menus are not hidden: Discover is now a real
-     page that lists them with what each is for, and More is a sheet for the
-     reference material. Icons are drawn, not emoji — an emoji set renders
-     differently on every platform and cannot take the current-tab colour. -->
 <!-- ── THE DISCLAIMER IS ABOVE THE FOLD, NOT IN THE FOOTER ──────────────────
-     An external audit's first blocker: this site publishes ranked, security-
-     specific NSE candidates and carried no registration statement anywhere a
-     reader would see before acting. The footer said "Not investment advice",
-     which is the right sentence in the wrong place — nobody scrolls past a
-     ranked list to find out whether they should have.
-
-     It is static HTML in the shell rather than rendered by the app, so it is
-     present on the FIRST PAINT, on every route, before any JavaScript runs,
-     and in the crawler's copy. A disclosure that depends on a bundle loading
-     is a disclosure that is missing exactly when the bundle fails. -->
+     This site publishes ranked, security-specific NSE candidates, so the
+     registration statement is in the FIRST PAINT of every route, in static
+     HTML, before any JavaScript runs, and in the crawler's copy. One line at
+     every width: the summary IS the statement, and the full wording is one
+     click away in <details>, which opens without JavaScript. -->
 <aside class="dscl" role="note">
-  <p class="dscl-w"><b>Research and market data, published for education.</b>
-     <span>Not registered with SEBI as a Research Analyst or Investment Adviser.
-     Nothing here is a recommendation to buy or sell any security, and nothing
-     here is personalised to you.</span>
-     <a href="/disclaimer">Full disclaimer</a> · <a href="/disclosures">Disclosures</a></p>
-  <!-- ONE LINE ON A PHONE, THE SAME WORDS ONE TAP AWAY. The paragraph above
-       took a third of a 390px first screen before a single number. <details>
-       needs no JavaScript, so the disclosure is still in the first paint and
-       in the crawler's copy — the reason this block is static HTML at all. -->
   <details class="dscl-m">
-    <summary>⚠ Educational research · not SEBI RA/IA · not advice</summary>
-    <p><span>Not registered with SEBI as a Research Analyst or Investment Adviser.
-       Nothing here is a recommendation to buy or sell any security, and nothing
-       here is personalised to you.</span>
+    <summary><b>Education only.</b> Not SEBI-registered research or advice. <span class="dscl-more">Read the disclaimer</span></summary>
+    <p><span>Research and market data, published for education. Not registered with SEBI
+       as a Research Analyst or Investment Adviser. Nothing here is a recommendation to buy
+       or sell any security, and nothing here is personalised to you.</span>
        <a href="/disclaimer">Full disclaimer</a> · <a href="/disclosures">Disclosures</a></p>
   </details>
 </aside>
 
-<nav class="tabs" id="tabs" aria-label="Sections">
-  <a href="/" data-route="/">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/></svg>
-    <span>Today</span></a>
-  <!-- MARKETS REPLACES "SIGNALS" IN SLOT 2, AND "LEDGER" REPLACES "MORE".
-       /markets existed and was reachable from NO tab — the one destination that
-       answers "what is happening?" was behind a search or a link on Home.
-       "More" was a junk drawer in a five-slot bar: its label tells a reader
-       nothing, and everything in it that a phone needs day to day (theme,
-       density, search, freshness) is already in the header. What remained —
-       methodology, sources, legal, the floor — is provenance, and provenance
-       belongs with the record it qualifies, so it now sits at the foot of the
-       Ledger. Five slots, five answers: what is happening, where do I look,
-       what am I holding, what happened. -->
-  <a href="/markets" data-route="/markets">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-6 4 4 4-7 5 5"/></svg>
-    <span>Markets</span></a>
-  <a href="/discover" data-route="/discover">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M15 9l-2 5-5 2 2-5z"/></svg>
-    <span>Discover</span></a>
-  <a href="/watch" data-route="/watch">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.8l2.5 5.1 5.6.8-4 3.9 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4-3.9 5.6-.8z"/></svg>
-    <span>Watch</span></a>
-  <a href="/signals" data-route="/signals">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"/><path d="M7 19V9"/><path d="M12 19V5"/><path d="M17 19v-7"/></svg>
-    <span>Ledger</span></a>
-  <!-- BRIEF IS A SIXTH SLOT BECAUSE ON A PHONE IT HAD NO SLOT AT ALL.
-       /brief is the longest, most-worked page on this site and the only route
-       to it from a phone was the header CTA — which signal.css hides under
-       560px — or a "Full brief" link inside an expanded ledger card, below the
-       fold, two taps in. A destination reachable only from inside another
-       destination is not navigation.
+<!-- THE TICKER, AND WHY IT DOES NOT SCROLL BY ITSELF. A marquee moves the
+     number away from the eye reading it, freezes in a background tab, and
+     flatters: a price gliding past looks live whether or not it is. This strip
+     holds still, scrolls when you push it, and says which markets are shut.
+     The edition and session clock sit at its left edge, where "is this
+     today's?" is asked. -->
+<div class="tkr" id="tkr" role="region" aria-label="Market ticker" hidden>
+  <span class="stat-live" id="edition" aria-live="polite">—</span>
+  <div class="tkr-row" id="tkrRow" tabindex="0"></div>
+</div>
 
-       The bar is grid-auto-flow:column at minmax(0,1fr), so a sixth cell costs
-       no layout change: 65px each on a 390px phone, and the type already steps
-       down under 400px. -->
-  <a href="/brief" data-route="/brief">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 3.5h13v17h-13z"/><path d="M8.5 8h7"/><path d="M8.5 12h7"/><path d="M8.5 16h4"/></svg>
-    <span>Brief</span></a>
-</nav>
+<!-- ── MORE: EVERY TOOL, AND THE SETTINGS ──────────────────────────────────
+     A native modal <dialog>: focus moves in and is held there, Escape closes
+     it, and focus returns to the button — no focus-trap code to get wrong.
+     Filled from the same DISCOVER table that renders /discover, so the two
+     can never list different tools. -->
+<dialog class="more-dlg" id="moreDlg" aria-labelledby="moreT">
+  <div class="more-dlg-h">
+    <h2 id="moreT">Everything on Signal</h2>
+    <button type="button" class="icon-btn" data-close aria-label="Close">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div class="more-dlg-b" id="moreBody"></div>
+  <div class="more-dlg-f">
+    <button type="button" class="set-btn" id="themeBtn" aria-label="Switch theme">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <span>Dark / light</span></button>
+    <button type="button" class="set-btn" id="densBtn" aria-label="Row density"
+            aria-pressed="false" title="Row density">
+      <span class="dens-i" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span>Compact rows</span></button>
+  </div>
+</dialog>
 
 <!-- A new edition arrived and the page has already swapped to it. This is a
      receipt, not a prompt: there is no "reload" to press, because nothing is
@@ -291,18 +274,49 @@
      the router after each paint — see freshBar() in signal.js. -->
 <div id="freshBar" class="freshbar" role="status" aria-live="polite"></div>
 
+<!-- ── THE FOOTER IS A MAP, NOT A LINK DUMP ────────────────────────────────
+     Four columns a reader can scan: the five destinations, the tools, how the
+     record is made, and the family. The author and the disclaimer close it,
+     because a signed page is the only credential this site claims. -->
 <footer class="foot">
-  <p>Built by <b>Akshay Kothari</b> · CA · FP&amp;A · Data from NSE, Yahoo Finance and company filings.</p>
-  <p class="foot-link">
-    <a href="https://www.linkedin.com/in/akkothari" rel="me noopener" target="_blank">LinkedIn</a> ·
-    <a href="https://askakshay.com/" rel="me noopener" target="_blank">askakshay.com</a> ·
-    <a href="mailto:ca.akshayk1@gmail.com">Email</a>
-  </p>
-  <p><a href="/methodology">Methodology</a> · <a href="/sources">Data sources</a> ·
-     <a href="/about">About</a> · <a href="/disclaimer">Disclaimer</a> ·
-     <a href="/disclosures">Disclosures</a> ·
+  <div class="foot-in">
+    <div class="foot-brand">
+      <a class="brand" href="/" aria-label="Signal — today">
+        <svg class="brand-mark" viewBox="0 0 20 20" aria-hidden="true"><rect width="20" height="20" rx="5"/><path d="M4 14.5h12M10.5 5v9.5M5.5 12.5v2M15 12.5v2"/></svg>
+        <span class="brand-name">Signal</span></a>
+      <p>An independent research desk for Indian equities. Every NSE name screened before
+         the open; every signal graded in public, the losses included.</p>
+      <p class="foot-by">Built by <b>Akshay Kothari</b>, CA · FP&amp;A.
+        <a href="https://www.linkedin.com/in/akkothari" rel="me noopener" target="_blank">LinkedIn</a> ·
+        <a href="https://askakshay.com/" rel="me noopener" target="_blank">askakshay.com</a> ·
+        <a href="mailto:ca.akshayk1@gmail.com">Email</a></p>
+    </div>
+    <nav class="foot-col" aria-label="Signal">
+      <h2>Signal</h2>
+      <a href="/">Today</a><a href="/brief">Today’s brief</a><a href="/screen">Screen</a>
+      <a href="/signals">Ledger</a><a href="/markets">Markets</a><a href="/watch">Watchlist</a>
+    </nav>
+    <nav class="foot-col" aria-label="Tools">
+      <h2>Tools</h2>
+      <a href="/ideas">Ideas</a><a href="/ipo">IPOs</a><a href="/heat">Heatmap</a>
+      <a href="/reads">Weekly reads</a><a href="/research">Research floor</a><a href="/discover">All tools</a>
+    </nav>
+    <nav class="foot-col" aria-label="Trust">
+      <h2>How it is made</h2>
+      <a href="/methodology">Methodology</a><a href="/sources">Data sources</a>
+      <a href="/engines">The engines</a><a href="/about">About</a>
+      <a href="/disclosures">Disclosures</a><a href="/disclaimer">Disclaimer</a>
+    </nav>
+    <div class="foot-col foot-fam">
+      <h2>Also from this desk</h2>
+      <a class="foot-vis" href="https://vision.askakshay.com/">
+        <b>Vision ↗</b><span>Research one company in depth: financials, ownership, events.</span></a>
+      <a href="https://news.askakshay.com/" rel="noopener">The newspaper ↗</a>
+    </div>
+  </div>
+  <p class="foot-legal">Data from NSE, Yahoo Finance and company filings. A public ledger:
+     wins <i>and</i> losses. Education only, not investment advice.
      <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
-  <p>A public ledger — wins <i>and</i> losses. Not investment advice.</p>
 </footer>
 
 <script type="application/ld+json">

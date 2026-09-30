@@ -683,7 +683,12 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
 {
   const nav = [...HTML.matchAll(/<a href="(\/[a-z/]*)" data-route="([^"]+)">[\s\S]*?<span>([^<]+)<\/span>/g)]
     .map((m) => ({ href: m[1], route: m[2], label: m[3] }));
-  ok("the bar has six slots", nav.length === 6, nav.map((n) => n.label));
+  /* FIVE, FROM 2026-10. The redesign made each slot one READER GOAL — Today,
+     Brief, Screen, Ledger, Markets — and moved the personal utility (Watch)
+     and the tool index (Discover) out of the bar into the header's utilities
+     and the More sheet. Both are still one tap away; neither is a peer of the
+     ledger. Exact, not a floor, for the reason above. */
+  ok("the bar has five slots", nav.length === 5, nav.map((n) => n.label));
   ok("href and data-route agree on every tab",
      nav.every((n) => n.href === n.route), nav.filter((n) => n.href !== n.route));
 
@@ -702,7 +707,16 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   // What "More" held that lives nowhere else must still be reachable.
   ok("the provenance links moved to the Ledger rather than being dropped",
      /const provenance = \(\) => sec\(/.test(JS) && /provenance\(\);/.test(JS));
-  ok("nothing still binds the removed #moreBtn", !/getElementById\('moreBtn'\)/.test(JS));
+  /* #moreBtn CAME BACK AS A DIFFERENT THING. The old one was a sixth SLOT
+     labelled "More" — a junk drawer in the navigation. The new one is a
+     utility in the header, beside search, that opens a <dialog> of every tool
+     and the settings. What must hold is the distinction: it is never inside
+     the bar, and the sheet lists tools from DISCOVER, the same table
+     /discover renders, so the two cannot drift. */
+  ok("#moreBtn is a header utility, never a slot in the bar",
+     !/id="moreBtn"/.test((HTML.match(/<nav class="tabs"[\s\S]*?<\/nav>/) || [""])[0])
+     && /class="bar-right"[\s\S]*?id="moreBtn"/.test(HTML));
+  ok("the More sheet is filled from DISCOVER", /DISCOVER\.filter\(\(\[h\]\) => !PRIMARY\.has\(h\)\)/.test(JS));
 }
 
 /* ── EVERY EXPLANATION MUST BE REACHABLE, AND THE BIG NUMBERS MUST HAVE ONE ──
@@ -1722,23 +1736,28 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
 {
   const body = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
   const refs = [...body.matchAll(/Newsreader/g)];
-  /* Three, exactly: the @font-face family, the woff2 it points at, and
-     --b-serif. Nothing else may name it. */
-  ok("Newsreader is named exactly three times — its family, its file, its one token",
-     refs.length === 3, refs.length);
-  ok("...and the second is --b-serif", /--b-serif:'Newsreader'/.test(body));
-  /* THE SITE-WIDE TOKENS MUST NOT POINT AT IT. --serif, --disp and --ui are
-     the three every other rule reaches through. */
-  for (const t of ["--serif", "--disp", "--ui"]) {
+  /* 2026-10: THE SERIF IS THE DISPLAY VOICE, AND IT HAS EXACTLY TWO DOORS.
+     The redesign promoted the brief's headline face to every route title and
+     the masthead, through --disp. What this still guards is the thing that
+     went wrong the first time — the face spreading into body and interface
+     text one rule at a time. Four names, exactly: the @font-face family, its
+     file, --b-serif and --disp. --ui and --serif, which carry every label,
+     paragraph and control, must never reach it. */
+  ok("Newsreader is named exactly four times — family, file, --b-serif, --disp",
+     refs.length === 4, refs.length);
+  ok("...and two of them are --b-serif and --disp",
+     /--b-serif:'Newsreader'/.test(body) && /--disp:'Newsreader'/.test(body));
+  for (const t of ["--serif", "--ui"]) {
     const m = body.match(new RegExp(`${t}:([^;]+);`));
     ok(`${t} resolves to the interface face, not the serif`,
        !!m && !/Newsreader/.test(m[1]), m && m[1]);
   }
-  /* AND IT IS NOT PRELOADED. A preload is the highest-priority fetch a page can
-     make; spending one on a face used by a single route would cost every other
-     route the bandwidth. */
-  ok("the serif is not preloaded — one route uses it",
-     !/rel="preload"[^>]*Newsreader/.test(HTML));
+  /* AND NOW IT IS PRELOADED, for the reason the other two faces are: every
+     route's h1 is set in it, so without a preload the title paints in Georgia
+     and reflows when the face arrives — a shift in the largest line on the
+     page. */
+  ok("the serif is preloaded — every route's title is set in it",
+     /rel="preload" href="\/fonts\/Newsreader-400-latin\.woff2"/.test(HTML));
 }
 
 /* ── A PAGE MAY NOT DENY A CAPABILITY IT RENDERS ────────────────────────────
