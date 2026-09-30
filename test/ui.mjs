@@ -2498,7 +2498,11 @@ try {
     text: document.body.innerText,
   }));
   ok("vision boots with no page error or CSP refusal", vErr.length === 0, vErr.slice(0, 3));
-  ok("vision opens dark", vInfo.theme === "dark", vInfo.theme);
+  /* Since the 2026-10 redesign Vision follows the reader's system theme, as
+     Signal does, instead of opening dark. This context asks for light, so a
+     page that ignored the system (or whose theme script a CSP refused) reads
+     "dark" from the stale default or nothing at all. */
+  ok("vision follows the system theme, as Signal does", vInfo.theme === "light", vInfo.theme);
   ok("vision paints its cockpit panels",
      ["Market pulse", "Move leaders", "Market heatmap", "Top movers", "Market intelligence", "Watchlist"]
        .every((t) => vInfo.panels.some((p) => p.toLowerCase() === t.toLowerCase())), vInfo.panels);
