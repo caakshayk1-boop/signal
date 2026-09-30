@@ -34,6 +34,15 @@
   };
 
   const num = (v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+  /* LENDERS ARE READ DIFFERENTLY — the screen's own rule, word for word
+     (stock_screen.py::_is_financial). A bank or NBFC borrows to lend: debt/
+     equity of 4 is its business model, operating cash flow swings with the
+     loan book, and EBIT margin and ROCE have no meaning. The screen already
+     leaves all four out of its scores and risk grade; this layer printed them
+     anyway, so EDELWEISS read "Risk LOW" beside a red "heavily geared" and a
+     green 7.64× cash conversion. guard.mjs holds the three copies of this
+     rule (Python, here, signal.js) to the same four words. */
+  const isFinancial = (r) => /financial|bank|insurance|real estate/.test(`${(r && r.sector) || ''} ${(r && r.ind) || ''}`.toLowerCase());
   const f1 = (v) => (Math.round(v * 10) / 10).toFixed(1);
   const pct = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${f1(Math.abs(v))}%`;
   const pp = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${f1(Math.abs(v))} pp`;
@@ -56,12 +65,18 @@
     if (ry != null) add('Revenue', `${pct(ry)} YoY`, rc != null ? `${pct(rc)} a year over ${r.fy_count || 'several'} years` : 'no multi-year rate', ry >= 0 ? 'up' : 'dn', SRC.fin(r));
     const roce = num(r.roce), rm = num(r.roce_med);
     if (roce != null) add('ROCE', `${f1(roce)}%`, rm != null ? `median ${f1(rm)}%${r.roce_trend ? ' · ' + r.roce_trend : ''}` : '', '', SRC.fin(r));
-    const md = num(r.margin_delta), em = num(r.ebit_margin);
-    if (md != null || em != null) add('EBIT margin', em != null ? `${f1(em)}%` : '—', md != null ? `${pp(md)} on the prior year` : '', md == null ? '' : md >= 0 ? 'up' : 'dn', SRC.fin(r));
-    const de = num(r.de);
-    if (de != null) add('Debt / equity', de < 0 ? 'Negative equity' : de.toFixed(2), de < 0 ? 'insolvency, not a clean balance sheet' : de < 0.3 ? 'lightly geared' : de > 1.5 ? 'heavily geared' : '', de < 0 || de > 1.5 ? 'dn' : '', SRC.fin(r));
-    const cp = num(r.cfo_pat);
-    if (cp != null) add('Cash conversion', `${cp.toFixed(2)}×`, 'operating cash flow ÷ profit, multi-year median', cp < 0.6 ? 'dn' : cp >= 1 ? 'up' : '', SRC.fin(r));
+    const fin = isFinancial(r), de = num(r.de);
+    if (fin) {
+      const roe = num(r.roe), rm = num(r.roe_med);
+      if (roe != null) add('ROE', `${f1(roe)}%`, rm != null ? `median ${f1(rm)}% · how a lender is judged` : 'how a lender is judged', '', SRC.fin(r));
+      if (de != null) add('Debt / equity', de < 0 ? 'Negative equity' : de.toFixed(2), de < 0 ? 'insolvency, not a clean balance sheet' : 'a lender borrows to lend — not a risk measure here', de < 0 ? 'dn' : '', SRC.fin(r));
+    } else {
+      const md = num(r.margin_delta), em = num(r.ebit_margin);
+      if (md != null || em != null) add('EBIT margin', em != null ? `${f1(em)}%` : '—', md != null ? `${pp(md)} on the prior year` : '', md == null ? '' : md >= 0 ? 'up' : 'dn', SRC.fin(r));
+      if (de != null) add('Debt / equity', de < 0 ? 'Negative equity' : de.toFixed(2), de < 0 ? 'insolvency, not a clean balance sheet' : de < 0.3 ? 'lightly geared' : de > 1.5 ? 'heavily geared' : '', de < 0 || de > 1.5 ? 'dn' : '', SRC.fin(r));
+      const cp = num(r.cfo_pat);
+      if (cp != null) add('Cash conversion', `${cp.toFixed(2)}×`, 'operating cash flow ÷ profit, multi-year median', cp < 0.6 ? 'dn' : cp >= 1 ? 'up' : '', SRC.fin(r));
+    }
     const r1m = num(r.r1m), med = num(c.median_1m);
     if (r1m != null) add('Price, 1 month', pct(r1m), med != null ? `screen median ${pct(med)} → ${pp(r1m - med)} relative` : '', r1m >= 0 ? 'up' : 'dn', SRC.px(r));
     const pe = num(r.pe), pp_ = num(r.pe_pctile);
@@ -85,16 +100,17 @@
       if (d >= T.growthPP) put('improved', 'Revenue growth accelerated', `${pct(ry)} last year against ${pct(rc)} a year over ${r.fy_count || 'several'} years`, SRC.fin(r));
       else if (d <= -T.growthPP) put('weakened', 'Revenue growth slowed', `${pct(ry)} last year against ${pct(rc)} a year over ${r.fy_count || 'several'} years`, SRC.fin(r));
     }
+    const fin = isFinancial(r);
     const ey = num(r.ebitda_yoy), ec = num(r.ebitda_cagr);
-    if (ey != null && ec != null) {
+    if (!fin && ey != null && ec != null) {
       const d = ey - ec;
       if (d >= T.growthPP) put('improved', 'Operating profit growth accelerated', `EBITDA ${pct(ey)} last year against ${pct(ec)} a year`, SRC.fin(r));
       else if (d <= -T.growthPP) put('weakened', 'Operating profit growth slowed', `EBITDA ${pct(ey)} last year against ${pct(ec)} a year`, SRC.fin(r));
     }
     const md = num(r.margin_delta);
-    if (md != null && Math.abs(md) >= T.marginPP) put(md > 0 ? 'improved' : 'weakened', md > 0 ? 'Margins widened' : 'Margins narrowed', `EBIT margin ${pp(md)} on the prior fiscal year`, SRC.fin(r));
+    if (!fin && md != null && Math.abs(md) >= T.marginPP) put(md > 0 ? 'improved' : 'weakened', md > 0 ? 'Margins widened' : 'Margins narrowed', `EBIT margin ${pp(md)} on the prior fiscal year`, SRC.fin(r));
     const roce = num(r.roce), rm = num(r.roce_med);
-    if (roce != null && rm != null && Math.abs(roce - rm) >= T.rocePP) put(roce > rm ? 'improved' : 'weakened', roce > rm ? 'Returns on capital above their own norm' : 'Returns on capital below their own norm', `ROCE ${f1(roce)}% against a ${f1(rm)}% multi-year median`, SRC.fin(r));
+    if (!fin && roce != null && rm != null && Math.abs(roce - rm) >= T.rocePP) put(roce > rm ? 'improved' : 'weakened', roce > rm ? 'Returns on capital above their own norm' : 'Returns on capital below their own norm', `ROCE ${f1(roce)}% against a ${f1(rm)}% multi-year median`, SRC.fin(r));
 
     if (x && x.quality === 'complete') {
       const th = num(c.threshold_pp) || 0.5, ip = num(x.insti_pp);
@@ -111,12 +127,12 @@
 
     const de = num(r.de);
     if (de != null && de < 0) put('watch', 'Negative equity', 'Debt/equity below zero means liabilities exceed assets', SRC.fin(r));
-    else if (de != null && de > 1.5) put('watch', 'High leverage', `Debt/equity ${de.toFixed(2)}`, SRC.fin(r));
+    else if (!fin && de != null && de > 1.5) put('watch', 'High leverage', `Debt/equity ${de.toFixed(2)}`, SRC.fin(r));
     const pe = num(r.pe_pctile);
     if (pe != null && pe >= T.peHi) put('watch', 'Valued near the top of its own range', `PE in the ${Math.round(pe)}th percentile of its history`, SRC.fin(r));
     else if (pe != null && pe <= T.peLo) put('watch', 'Valued near the bottom of its own range', `PE in the ${Math.round(pe)}th percentile of its history`, SRC.fin(r));
     const cp = num(r.cfo_pat);
-    if (cp != null && cp < 0.6) put('watch', 'Profit is not turning into cash', `Operating cash flow ${cp.toFixed(2)}× profit (multi-year median)`, SRC.fin(r));
+    if (!fin && cp != null && cp < 0.6) put('watch', 'Profit is not turning into cash', `Operating cash flow ${cp.toFixed(2)}× profit (multi-year median)`, SRC.fin(r));
     if (r.shares_changed) put('watch', 'Share count moved structurally', 'EPS growth is withheld: a split, bonus or issue makes it incomparable', SRC.fin(r));
 
     const vs = num(r.vol_spike);
@@ -141,8 +157,9 @@
   ];
   function differences(rows) {
     const out = [];
+    const LENDER_NA = new Set(['roce', 'ebit_margin', 'de', 'cfo_pat']);
     for (const [k, word, unit, gap] of CMP) {
-      const m = rows.map((r) => [r.sym, num(r[k])]).filter(([, v]) => v != null);
+      const m = rows.filter((r) => !(LENDER_NA.has(k) && isFinancial(r))).map((r) => [r.sym, num(r[k])]).filter(([, v]) => v != null);
       if (m.length < 2) continue;
       m.sort((a, b) => b[1] - a[1]);
       const [hi, lo] = [m[0], m[m.length - 1]];
@@ -167,5 +184,5 @@
     'Volume spike': 'Today\'s volume ÷ its recent average. 2× means twice the usual shares changed hands.',
   };
 
-  root.VisionInsight = { T, matters, changes, differences, GLOSSARY, SRC };
+  root.VisionInsight = { T, matters, changes, differences, GLOSSARY, SRC, isFinancial };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

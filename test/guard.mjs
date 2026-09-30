@@ -2180,6 +2180,32 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
     ok("insight: every claim carries a basis and a source", [...c.improved, ...c.watch].every((i) => i.basis && i.src));
     ok("insight: no recommendation language", !/\b(buy|sell|accumulate|target price|should)\b/i.test(readFileSync("public/insight.js", "utf8").replace(/\/\*[\s\S]*?\*\//g, "")));
   }
+  {
+    /* LENDERS: the screen's own rule (stock_screen.py::_is_financial). It takes
+       leverage, cash conversion, margins and ROCE out of a lender's scores and
+       risk grade; the pages judged them anyway, so EDELWEISS read "Risk LOW"
+       beside a red "heavily geared" and a green 7.64x cash conversion. Every
+       copy must be the Python's four words, no more, no fewer. */
+    const I = globalThis.VisionInsight;
+    const RULE = "financial|bank|insurance|real estate";
+    const rules = (src) => [...src.matchAll(/\/((?:[a-z ]+\|){3}[a-z ]+)\/\.test\(/g)].map((m) => m[1]);
+    for (const [f, src] of [["public/insight.js", readFileSync("public/insight.js", "utf8")], ["public/signal.js", JS], ["public/vision.js", VJS]]) {
+      const rs = rules(src);
+      ok(`${f} reads lenders with the screen's four words`, rs.length > 0 && rs.every((x) => x === RULE), rs);
+    }
+    const edel = { sym: "EDELWEISS", sector: "Financial Services", ind: "Financial Services", de: 4.02, cfo_pat: 7.64, roe: 11.8, roe_med: 8.9, margin_delta: 5, roce: 3, roce_med: 9 };
+    const mt = I.matters(edel, null, {}), ch = I.changes(edel, null, {});
+    ok("insight: a lender's D/E is not called geared or coloured as a risk",
+       mt.some((t) => /Debt/.test(t.k || t.label || JSON.stringify(t))) && !JSON.stringify(mt).match(/heavily geared|lightly geared/) && !ch.watch.some((i) => /High leverage/.test(i.t)));
+    ok("insight: a lender's cash conversion and ROCE are not judged", !JSON.stringify(mt).match(/Cash conversion|EBIT margin/) && !JSON.stringify(ch).match(/Returns on capital|Margins|not turning into cash/));
+    ok("insight: a lender with negative equity is still named", I.changes({ ...edel, de: -1 }, null, {}).watch.some((i) => /Negative equity/.test(i.t)));
+    const ind = { sym: "X", sector: "Industrials", de: 2.4, cfo_pat: 0.4 };
+    ok("insight: an industrial is still judged on leverage and cash", I.changes(ind, null, {}).watch.some((i) => /High leverage/.test(i.t)) && I.changes(ind, null, {}).watch.some((i) => /not turning into cash/.test(i.t)));
+    /* A LEVEL IS NOT A CHANGE: yoy() prints "+" and a direction colour. */
+    ok("signal's stock card prints level ratios as levels, not signed changes", !/yoy\('(Cash conversion|Free cash|ROCE|Debt \/ equity)/.test(JS));
+    /* The company header's range label reads the same price as its marker. */
+    ok("vision's range label is computed from the displayed price", /fh = px > 0 && hi52 > 0 \? \(px \/ hi52 - 1\) \* 100/.test(VJS) && !/r\.from_high != null \? signed\(r\.from_high, 1\) \+ ' from the high'/.test(VJS));
+  }
   ok("vision has a company-search home and a compare view", /V\.home = /.test(VJS) && /V\.compare = /.test(VJS));
   ok("vision's company page charts ownership by quarter, in colours set for both themes",
      /function ownChart\(series, width\)/.test(VJS) && /ownChart\(x\.series/.test(VJS)

@@ -894,6 +894,11 @@
      Vision setup. insight.js turns it into "what matters" and "what changed"
      — the same file the Worker runs to write the page's HTML. */
   const INS = () => window.VisionInsight || null;
+  /* The screen's lender rule (stock_screen.py::_is_financial), via insight.js
+     where it is written once for the browser and the Worker. The fallback is
+     the same four words, for a page on which insight.js did not arrive. */
+  const isLender = (r) => INS() ? INS().isFinancial(r) : /financial|bank|insurance|real estate/.test(`${(r && r.sector) || ''} ${(r && r.ind) || ''}`.toLowerCase());
+  const LENDER_NA = '<span class="mut" title="Not meaningful for a lender: it borrows to lend">n/a · lender</span>';
   F.co = (sym) => get(`/c/${keyOf(sym)}.json`, 600000);
   F.site = () => get('/c/_site.json', 600000);
   /* Peers: same industry, else same sector, nearest in market value. */
@@ -995,9 +1000,9 @@
     ['Market value', (d) => d.r.mcap_cr, (v) => v == null ? NA : v >= 100000 ? `₹${fmt(v / 100000, 2)} lakh cr` : `₹${fmt(v, 0)} cr`],
     ['1 month', (d) => d.r.r1m, (v) => chg(v, 1)], ['3 months', (d) => d.r.r3m, (v) => chg(v, 1)], ['1 year', (d) => d.r.r1y, (v) => chg(v, 1)],
     ['Revenue, multi-year', (d) => d.r.rev_cagr, (v) => v == null ? NA : signed(v, 1)], ['Revenue, last year', (d) => d.r.rev_yoy, (v) => v == null ? NA : signed(v, 1)],
-    ['EBIT margin', (d) => d.r.ebit_margin, (v) => v == null ? NA : fmt(v, 1) + '%'], ['ROCE', (d) => d.r.roce, (v) => v == null ? NA : fmt(v, 1) + '%', 'ROCE'],
-    ['ROE', (d) => d.r.roe, (v) => v == null ? NA : fmt(v, 1) + '%'], ['Debt / equity', (d) => d.r.de, (v) => v == null ? NA : v < 0 ? '<span class="dn">Negative equity</span>' : fmt(v, 2)],
-    ['Cash conversion', (d) => d.r.cfo_pat, (v) => v == null ? NA : fmt(v, 2) + '×', 'Cash conversion'], ['PE', (d) => d.r.pe, (v) => v == null ? NA : fmt(v, 1)],
+    ['EBIT margin', (d) => d.r.ebit_margin, (v) => v == null ? NA : fmt(v, 1) + '%', null, true], ['ROCE', (d) => d.r.roce, (v) => v == null ? NA : fmt(v, 1) + '%', 'ROCE', true],
+    ['ROE', (d) => d.r.roe, (v) => v == null ? NA : fmt(v, 1) + '%'], ['Debt / equity', (d) => d.r.de, (v) => v == null ? NA : v < 0 ? '<span class="dn">Negative equity</span>' : fmt(v, 2), null, true],
+    ['Cash conversion', (d) => d.r.cfo_pat, (v) => v == null ? NA : fmt(v, 2) + '×', 'Cash conversion', true], ['PE', (d) => d.r.pe, (v) => v == null ? NA : fmt(v, 1)],
     ['PE percentile', (d) => d.r.pe_pctile, (v) => v == null ? NA : Math.round(v) + 'th', 'PE percentile'],
     ['FII + DII, q/q', (d) => d.x && d.x.quality === 'complete' ? d.x.insti_pp : null, (v) => v == null ? NA : signed(v, 2, ' pp')],
     ['Quality score', (d) => d.r.q, (v) => v == null ? NA : Math.round(v)], ['Growth score', (d) => d.r.g, (v) => v == null ? NA : Math.round(v)],
@@ -1021,7 +1026,7 @@
       const rs = await Promise.all(syms.map((x) => F.co(x))); if (!alive()) return;
       const ds = rs.map((r, i) => r.ok ? r.data : { r: Object.assign({ sym: syms[i] }, SCR[syms[i]] || {}), x: null });
       $('#cmpBody').innerHTML = `<div class="tw cmp-w"><table class="tbl cmp"><thead><tr><th scope="col">Measure</th>${ds.map((d) => `<th scope="col"><a class="sym" href="#/asset/${esc(d.r.sym)}">${esc(d.r.sym)}</a><small>${esc(d.r.name || '')}</small></th>`).join('')}</tr></thead>
-        <tbody>${CMP_ROWS.map(([k, g, f, dk]) => `<tr><th scope="row">${esc(k)} ${dk ? defn(dk) : ''}</th>${ds.map((d) => `<td class="num">${f(num(g(d)) != null ? num(g(d)) : g(d))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+        <tbody>${CMP_ROWS.map(([k, g, f, dk, lna]) => `<tr><th scope="row">${esc(k)} ${dk ? defn(dk) : ''}</th>${ds.map((d) => `<td class="num">${lna && isLender(d.r) && !(k === 'Debt / equity' && num(g(d)) < 0) ? LENDER_NA : f(num(g(d)) != null ? num(g(d)) : g(d))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
       const dif = INS() ? INS().differences(ds.map((d) => d.r)) : [];
       $('#cmpFoot').innerHTML = (dif.length ? `<b>Key differences</b><ul class="plain">${dif.map((x) => `<li>${esc(x.t)}</li>`).join('')}</ul>` : '<b>Key differences</b> — none large enough to state.')
         + `<p class="note src">Company filings via the stock screen; shareholding from exchange filings; prices at the screen's last close. Descriptive — no row is scored better or worse.</p>`;
@@ -1334,6 +1339,13 @@
     }
     const px = lv ? lv.price : (r ? r.price : null);
     const mv = moveOf(r);
+    /* The range label reads the SAME price as the marker beside it. It printed
+       the build's from_high while the marker sat at the live price, so
+       EDELWEISS read "-7.2% from the high" at ₹142.73 against a ₹146 high —
+       that was the 28 Sep close (₹135.45); live it was -2.2%. Above the build's
+       52-week high the live price IS the new high, and says so. */
+    const hi52 = num(r && r.high52), fh = px > 0 && hi52 > 0 ? (px / hi52 - 1) * 100 : num(r && r.from_high);
+    const fhTxt = fh == null ? '' : fh >= 0 ? 'above the 52w high — a new high' : signed(fh, 1) + ' from the high';
     $('#aHead').innerHTML = `<div class="pn"><div class="pb"><div class="ah">
       <div style="min-width:0;flex:1"><span class="eb" style="display:block;font-size:var(--t-xs);font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)">${esc((r && r.sector) || 'Not on the screen')}${r && r.ind && r.ind !== r.sector ? ' · ' + esc(r.ind) : ''}</span>
         <div class="row" style="gap:var(--s-2)"><h1>${esc(s)}</h1>${star(s)}</div><div class="nm">${esc((r && r.name) || '')}</div>
@@ -1349,7 +1361,7 @@
           <a class="btn sm" href="https://www.tradingview.com/chart/?symbol=NSE:${encodeURIComponent(s)}" target="_blank" rel="noopener">Chart ↗</a>
           <a class="btn sm" href="https://www.screener.in/company/${encodeURIComponent(s)}/consolidated/" target="_blank" rel="noopener">Filings ↗</a></div></div></div>
       ${r && r.high52 && r.low52 && r.high52 > r.low52 ? `<div style="margin-top:var(--s-4)"><div class="rng" role="img" aria-label="52-week range ${fmt(r.low52)} to ${fmt(r.high52)}"><i style="left:${clamp((px - r.low52) / (r.high52 - r.low52) * 100, 0, 100)}%"></i></div>
-        <div class="rng-l"><span>52w low ₹${fmt(r.low52, 1)}</span><span>${r.from_high != null ? signed(r.from_high, 1) + ' from the high' : ''}</span><span>52w high ₹${fmt(r.high52, 1)}</span></div></div>`
+        <div class="rng-l"><span>52w low ₹${fmt(r.low52, 1)}</span><span>${fhTxt}${fhTxt && !lv ? ' · at close' : ''}</span><span>52w high ₹${fmt(r.high52, 1)}</span></div></div>`
       : r && r.rng_lo != null && r.rng_hi != null ? `<p class="note" style="margin-top:var(--s-3)">No 52-week range yet — ${r.rng_sessions || 'too few'} sessions of history. Its ${r.rng_sessions}-session range is ₹${fmt(r.rng_lo, 1)} – ₹${fmt(r.rng_hi, 1)}.</p>` : ''}
       </div></div>`;
 
@@ -1390,11 +1402,11 @@
         ${lv2.filter((l) => l[1] <= px).map((l) => `<div><span class="num">${l[0]}</span><em>${esc(l[2])}</em><span class="num">₹${fmt(l[1], 1)} <span class="mut">${signed((l[1] - px) / px * 100, 1)}</span></span></div>`).join('')}</div>
       ${r.atr_pct != null ? `<p class="note" style="margin-top:var(--s-2)">A typical day moves it <b>${Number(r.atr_pct).toFixed(1)}%</b>; a level closer than that is noise, not a test.</p>` : ''}` : empty('No levels', 'Not on the screen.');
 
-    const de = num(r && r.de);
+    const de = num(r && r.de), lender = !!(r && isLender(r));
     $('#aFun').innerHTML = r ? `<div class="kv" style="margin-top:0">
-      <div><em>ROCE</em><b>${r.roce != null ? fmt(r.roce, 1) + '%' : '—'}</b><small>${r.roce_med != null ? 'median ' + fmt(r.roce_med, 1) + '%' : ''}</small></div>
-      <div><em>ROE</em><b>${r.roe != null ? fmt(r.roe, 1) + '%' : '—'}</b></div>
-      <div><em>Debt / equity</em><b class="${de != null && de < 0 ? 'dn' : ''}">${de == null ? '—' : de < 0 ? 'Negative equity' : fmt(de, 2)}</b><small>${de != null && de < 0 ? 'insolvency, not a clean balance sheet' : ''}</small></div>
+      <div><em>ROCE</em><b>${lender ? 'n/a' : r.roce != null ? fmt(r.roce, 1) + '%' : '—'}</b><small>${lender ? 'not meaningful for a lender' : r.roce_med != null ? 'median ' + fmt(r.roce_med, 1) + '%' : ''}</small></div>
+      <div><em>ROE</em><b>${r.roe != null ? fmt(r.roe, 1) + '%' : '—'}</b><small>${lender ? (r.roe_med != null ? 'median ' + fmt(r.roe_med, 1) + '% · ' : '') + 'how a lender is judged' : ''}</small></div>
+      <div><em>Debt / equity</em><b class="${de != null && de < 0 ? 'dn' : ''}">${de == null ? '—' : de < 0 ? 'Negative equity' : fmt(de, 2)}</b><small>${de != null && de < 0 ? 'insolvency, not a clean balance sheet' : lender && de != null ? 'a lender borrows to lend — not a risk measure here' : ''}</small></div>
       <div><em>PE</em><b>${r.pe != null ? fmt(r.pe, 1) : '—'}</b><small>${r.pe_pctile != null ? `${Math.round(r.pe_pctile)}th pct of its own history` : ''}</small></div>
       <div><em>Revenue CAGR</em><b>${r.rev_cagr != null ? signed(r.rev_cagr, 1) : '—'}</b></div>
       <div><em>EPS CAGR</em><b>${r.eps_cagr != null ? signed(r.eps_cagr, 1) : '—'}</b><small>${r.eps_cagr == null ? 'withheld or not reported' : ''}</small></div>
