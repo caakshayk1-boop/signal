@@ -2181,6 +2181,11 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
     ok("insight: no recommendation language", !/\b(buy|sell|accumulate|target price|should)\b/i.test(readFileSync("public/insight.js", "utf8").replace(/\/\*[\s\S]*?\*\//g, "")));
   }
   ok("vision has a company-search home and a compare view", /V\.home = /.test(VJS) && /V\.compare = /.test(VJS));
+  ok("vision's company page charts ownership by quarter, in colours set for both themes",
+     /function ownChart\(series, width\)/.test(VJS) && /ownChart\(x\.series/.test(VJS)
+     && /:root,:root\[data-theme="dark"\]\{ --viz-1:/.test(VCSS) && /:root\[data-theme="light"\]\{ --viz-1:/.test(VCSS));
+  ok("the privacy page names the analytics the host runs, not 'no analytics script'",
+     /Cloudflare Web Analytics/.test(JS) && !/There is no analytics script/.test(JS));
   {
     /* The front page's heavy feeds start with the route, not after its first
        wave — after meant a guaranteed second full repaint (measured 6.8s to a

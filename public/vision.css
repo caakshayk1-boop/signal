@@ -753,3 +753,24 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 #hRecent{min-height:30px}
 #hChg,#hUnu{min-height:330px}
 @media (max-width:760px){ #hChg{min-height:560px} #hUnu{min-height:250px} }
+
+/* ── Ownership over quarters ───────────────────────────────────────────────
+   Series colours: dataviz reference slots 1–2, validated per theme surface. */
+:root,:root[data-theme="dark"]{ --viz-1:#3987e5; --viz-2:#d95926 }
+:root[data-theme="light"]{ --viz-1:#2a78d6; --viz-2:#eb6834 }
+.own{margin-top:var(--s-3)}
+.own-leg{display:flex;flex-wrap:wrap;gap:var(--s-3);font-size:var(--t-xs);color:var(--ink-2);margin-bottom:4px}
+.own-leg i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.own-c{position:relative}
+.own-svg{width:100%;height:auto;display:block;overflow:visible}
+.own-g{stroke:var(--line-2);stroke-width:1}
+.own-t{fill:var(--ink-3);font:10px var(--f-mono)}
+.own-e{fill:var(--ink);font:600 10px var(--f-mono)}
+.own-l{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.own-m{stroke:var(--panel);stroke-width:2}
+.own-x{stroke:var(--ink-3);stroke-width:1;stroke-dasharray:2 3}
+.own-h{fill:transparent;cursor:crosshair}
+.own-tip{position:absolute;top:-4px;padding:4px 8px;border-radius:var(--r-1);background:var(--panel-3);border:1px solid var(--line-2);
+  font-size:var(--t-xs);color:var(--ink);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s}
+.own-tip.on{opacity:1}
+.own-tbl{margin-top:var(--s-2)} .own-tbl summary{cursor:pointer;font-size:var(--t-xs);color:var(--ink-3)}
