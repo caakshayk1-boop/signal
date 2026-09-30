@@ -2318,6 +2318,9 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
 ok("the count-up clamps its progress at zero and one",
    /const k = Math\.max\(0, Math\.min\(1, \(now - t0\) \/ dur\)\);/.test(JS));
 
+ok("the count-up never leaves a partial figure — skipped when hidden, forced final after",
+   /if \(document\.hidden\) return;/.test(JS) && /setTimeout\(\(\) => \{ el\.textContent = finalText;/.test(JS));
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

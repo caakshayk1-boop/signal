@@ -9186,10 +9186,18 @@
     const target = Number(m[0].replace(/,/g, ''));
     if (!Number.isFinite(target) || Math.abs(target) < 1) return;
     el.dataset.ran = '1';
+    /* A HIDDEN PAGE GETS THE NUMBER, NOT THE ANIMATION. requestAnimationFrame
+       does not run in a background tab or a headless crawler, so the first
+       frame's "0" was the figure such a reader was left with — measured on the
+       live page after the negative-progress fix: "Published 0". */
+    if (document.hidden) return;
     const dp = (m[0].split('.')[1] || '').length;
     const dur = 620;
     const t0 = performance.now();
     el.classList.add('is-run');
+    /* And a hard stop: whatever the frame clock does, the exact text is back
+       shortly after the animation should have ended. */
+    setTimeout(() => { el.textContent = finalText; el.classList.remove('is-run'); }, dur + 150);
     const step = (now) => {
       /* CLAMPED AT BOTH ENDS. A rAF timestamp is the START of the frame, which
          can be earlier than performance.now() read when the animation was
