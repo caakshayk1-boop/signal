@@ -442,6 +442,16 @@
     return (r > 0 ? '+' : '') + (r === 0 ? '0.00' : r.toFixed(2)) + '%';
   };
   const dir = v => Number(v) > 0 ? 'up' : Number(v) < 0 ? 'dn' : '';
+  /* LENDERS ARE READ DIFFERENTLY — the screen's rule, word for word
+     (stock_screen.py::_is_financial). A bank or NBFC borrows to lend, so debt/
+     equity of 4 is its business model and operating cash flow swings with its
+     loan book; the screen leaves leverage, cash conversion, interest cover,
+     margins and ROCE out of its scores and risk grade for these names. This
+     page used to judge them anyway ("leveraged", "not all arriving as cash")
+     beside a Risk LOW the screen had graded correctly. guard.mjs holds this
+     copy, insight.js's and the Python to the same four words. */
+  const isLender = r => /financial|bank|insurance|real estate/.test(`${(r && r.sector) || ''} ${(r && r.ind) || ''}`.toLowerCase());
+  const LENDER_NOTE = 'a lender borrows to lend — not judged here';
   /* ── "OFF ITS HIGH" MUST NOT BE A POSITIVE NUMBER ────────────────────────
    * from_high is measured against the 52-week high as of the last complete
    * bar, so a stock printing a new high today comes back POSITIVE — and the
@@ -7731,10 +7741,12 @@
         : '';
       P.push(`<p><b>Growth.</b> ${rc != null ? `Revenue has compounded at ${N(rc)}% a year` : ''}${
         rc != null && ec != null ? ', and earnings at ' + N(ec) + '%' : ec != null ? `Earnings have compounded at ${N(ec)}%` : ''}.${gap}${
-        cfp != null ? ` Cash from operations covers ${N(cfp, 2)}x of reported profit${
+        isLender(r) ? (de != null && de < 0 ? ' Debt to equity is below zero — negative equity, which is insolvency.'
+          : ' It is a lender, so cash conversion and debt to equity are not read as quality here: it borrows to lend, and its operating cash flow moves with the loan book. Return on equity is the measure that applies.')
+        : `${cfp != null ? ` Cash from operations covers ${N(cfp, 2)}x of reported profit${
           cfp >= 0.8 ? ' — the profit is arriving as cash' : ', so a meaningful part of the profit is not cash yet'}.` : ''}${
         de != null ? ` Debt to equity is ${N(de, 2)}${
-          de <= 0.1 ? ' — effectively debt-free' : de >= 1.5 ? ', which is leveraged; earnings swing harder in both directions' : ''}.` : ''}</p>`);
+          de < 0 ? ' — negative equity, which is insolvency' : de <= 0.1 ? ' — effectively debt-free' : de >= 1.5 ? ', which is leveraged; earnings swing harder in both directions' : ''}.` : ''}`}</p>`);
     }
 
     /* ─ What you are paying ─ */
@@ -7948,6 +7960,14 @@
 
     const yoy = (l, v, unit = '%') => v == null ? '' :
       `<div class="yy"><span>${esc(l)}</span><b class="${dir(v)}">${v > 0 ? '+' : ''}${Number(v).toFixed(1)}${unit}</b></div>`;
+    /* A LEVEL IS NOT A CHANGE. Cash conversion, ROCE and debt/equity went
+     * through yoy(), so every positive level printed "+" in green — a D/E of
+     * 4.02 read "+4.0" as if it were good news. They are levels: no sign, no
+     * colour. For a lender the three that do not apply say so. */
+    const lvl = (l, v, unit = '', dp = 2) => v == null ? '' :
+      `<div class="yy"><span>${esc(l)}</span><b>${Number(v).toFixed(dp)}${unit ? `<i class="u">${esc(unit)}</i>` : ''}</b></div>`;
+    const na = l => `<div class="yy"><span>${esc(l)}</span><b class="na" title="${esc(LENDER_NOTE)}">n/a · lender</b></div>`;
+    const lender = isLender(r);
 
     /* THE SAME LINE THE TABLES USE, AT CARD SIZE. It is the first thing on the
      * card because it answers the first question — where is this price in its
@@ -8080,8 +8100,9 @@
         ${fact('PE vs its own 5-year range', r.pe_pctile, 'pctile')}${fact('Dividend yield', r.div_yield)}</div>
 
       <h4 class="sh">Balance sheet</h4>
-      <div class="yoy">${fact('Debt / equity', r.de, '')}${fact('Interest cover', r.icover, 'x')}
-        ${fact('Current ratio', r.curr, 'x')}${fact('Tax rate', r.tax)}</div>
+      <div class="yoy">${fact('Debt / equity', r.de, '')}${lender ? na('Interest cover') + na('Current ratio') : `${fact('Interest cover', r.icover, 'x')}
+        ${fact('Current ratio', r.curr, 'x')}`}${fact('Tax rate', r.tax)}</div>
+      ${lender ? `<p class="alloc-n">A lender: debt/equity is its business model, not a risk reading. The screen leaves leverage, cash conversion, interest cover and ROCE out of this name's scores and risk grade.</p>` : ''}
 
       <h4 class="sh">Who owns it</h4>
       ${instiCard(r)}
@@ -8094,8 +8115,9 @@
       <div class="yoy">${yoy('Revenue', r.rev_yoy)}${yoy('EBITDA', r.ebitda_yoy)}${yoy('Profit', r.pat_yoy)}
         ${yoy('EPS', r.eps_yoy)}${yoy('EBIT margin', r.margin_delta, 'pt')}</div>
       <h4 class="sh">Cash quality</h4>
-      <div class="yoy">${yoy('Cash conversion (CFO/PAT)', r.cfo_pat, 'x')}${yoy('Free cash / profit', r.fcf_pat, 'x')}
-        ${yoy('ROCE', r.roce)}${yoy('Debt / equity', r.de, '')}</div>
+      <div class="yoy">${lender ? na('Cash conversion (CFO/PAT)') + na('Free cash / profit') + na('ROCE') + lvl('ROE', r.roe, '%', 1)
+        : `${lvl('Cash conversion (CFO/PAT)', r.cfo_pat, 'x')}${lvl('Free cash / profit', r.fcf_pat, 'x')}
+        ${lvl('ROCE', r.roce, '%', 1)}${lvl('Debt / equity', r.de)}`}</div>
       <h4 class="sh">Where price sits</h4>
       <div class="yoy">${yoy('vs 50-day', r.sma50 ? (r.price - r.sma50) / r.sma50 * 100 : null)}
         ${yoy('vs 200-day', r.sma200 ? (r.price - r.sma200) / r.sma200 * 100 : null)}
@@ -11121,6 +11143,7 @@
           const p1 = v => n(v) == null ? null : n(v).toFixed(1) + '%';
           const has = ['roce', 'roe', 'pe', 'rev_yoy', 'pat_yoy', 'mcap_cr']
             .some(k => n(row[k]) != null);
+          const lend = isLender(row);
           if (!has) return `<div class="empty" style="margin-top:22px">This name is not on the
             NSE screen, so no fundamental data is published for it here. The price half of
             this brief still stands; the business half is simply not measured.</div>`;
@@ -11129,9 +11152,10 @@
             ${cell('Sector', row.sector ? esc(row.sector) : null)}
             ${cell('P / E', x(row.pe), n(row.pe) != null && n(row.pe) > 50 ? 'richly valued' : '')}
             ${cell('P / B', x(row.pb))}
-            ${cell('ROCE', p1(row.roce), n(row.roce_med) != null ? `median ${n(row.roce_med).toFixed(1)}%` : '')}
-            ${cell('ROE', p1(row.roe))}
-            ${cell('Debt / equity', x(row.de), n(row.de) != null && n(row.de) < 0.5 ? 'lightly geared' : '')}
+            ${lend ? cell('ROCE', 'n/a', 'not meaningful for a lender') : cell('ROCE', p1(row.roce), n(row.roce_med) != null ? `median ${n(row.roce_med).toFixed(1)}%` : '')}
+            ${cell('ROE', p1(row.roe), lend ? 'how a lender is judged' : '')}
+            ${cell('Debt / equity', x(row.de), n(row.de) != null && n(row.de) < 0 ? 'negative equity — insolvency'
+                   : lend ? (n(row.de) != null ? LENDER_NOTE : '') : n(row.de) != null && n(row.de) < 0.5 ? 'lightly geared' : '')}
             ${cell('Piotroski', n(row.piotroski) != null ? `${n(row.piotroski)} / ${n(row.piotroski_of) || 9}` : null)}
           </dl>
 
@@ -11142,9 +11166,9 @@
             ${cell('Profit', n(row.pat_yoy) != null ? `<span class="${dir(row.pat_yoy)}">${pct(row.pat_yoy)}</span>` : null, 'year on year')}
             ${cell('EPS', n(row.eps_yoy) != null ? `<span class="${dir(row.eps_yoy)}">${pct(row.eps_yoy)}</span>` : null, 'year on year')}
             ${cell('Net margin', p1(row.net_margin))}
-            ${cell('Cash conversion', x(row.cfo_pat),
+            ${lend ? cell('Cash conversion', 'n/a', 'moves with the loan book') : cell('Cash conversion', x(row.cfo_pat),
                    n(row.cfo_pat) != null && n(row.cfo_pat) < 0.8 ? 'profit is not all arriving as cash' : '')}
-            ${cell('Interest cover', x(row.icover),
+            ${lend ? cell('Interest cover', 'n/a', 'interest is its cost of goods') : cell('Interest cover', x(row.icover),
                    n(row.icover) != null && n(row.icover) < 3 ? 'thin' : '')}
             ${cell('Promoter holding', p1(row.insiders))}
           </dl>

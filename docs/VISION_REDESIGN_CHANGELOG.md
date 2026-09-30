@@ -33,3 +33,23 @@ No sideways scroll at 320, 390 or 1440 px; nav clear of the header controls at 1
 ## Not built, and why
 Quarterly financials, a filings timeline, price charts with event markers and Ask Vision all need
 data or a backend this stack does not have. VISION_AUDIT.md §3 says what each needs, and gives the Ask Vision contract.
+
+## 2026-09-30 — lenders, and the range label
+Reported on EDELWEISS: "Risk LOW" beside "Debt / equity 4.02 heavily geared" in red and a green
+"Cash conversion 7.64×", with "−7.2% from the high" under a live ₹142.73 against a ₹146 high.
+- **Risk LOW was right.** The screen's `_is_financial` (sector or industry contains financial,
+  bank, insurance or real estate) leaves leverage, cash conversion, interest cover, margins and
+  ROCE out of a lender's scores and risk grade. The pages judged them anyway. Now `insight.js`,
+  `vision.js` and `signal.js` use the same four words: a lender shows ROE (with its median) in
+  place of EBIT margin and cash conversion, D/E carries "a lender borrows to lend — not a risk
+  measure here", and the compare table prints "n/a · lender" for the four rows. Negative equity
+  is still named for everyone.
+- **The range label read the build's close; the marker read the live price.** −7.2% was the
+  28 Sep close (₹135.45). It is now computed from the displayed price (−2.2% live) and says
+  "at close" when no live quote is available.
+- **Signal's stock card printed levels as changes.** D/E, cash conversion and ROCE went through
+  the YoY formatter, so 4.02 read as a green "+4.0". They print as levels now.
+- The same fixes on news.askakshay.com (trading-dashboard): the shared brief Business section,
+  the stock sheet and the screen's cash block.
+Pinned by `guard.mjs` (lender rule is the four words in every copy; EDELWEISS fixture; no `yoy()`
+on a level; range label computed from the displayed price) and `test_stock_screen.py`.

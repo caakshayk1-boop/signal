@@ -42,7 +42,7 @@ const KEEP = ["sym", "name", "sector", "ind", "mcap_cr", "price", "r1d", "r1w", 
   "high52", "low52", "from_high", "sma20", "sma50", "sma200", "rsi", "atr_pct", "turnover_cr", "vol_spike", "brk52w",
   "above_mas", "fy", "fy_count", "roce", "roce_med", "roce_trend", "roe", "de", "icover", "rev_cagr", "ebitda_cagr",
   "eps_cagr", "rev_yoy", "ebitda_yoy", "eps_yoy", "pat_yoy", "ebit_margin", "net_margin", "margin_delta", "em_label",
-  "cfo_pat", "fcf_pat", "pe", "pb", "pe_pctile", "piotroski", "q", "g", "v", "tech", "comp", "risk", "delta",
+  "cfo_pat", "fcf_pat", "roe_med", "pe", "pb", "pe_pctile", "piotroski", "q", "g", "v", "tech", "comp", "risk", "delta",
   "rank_move", "shares_changed", "next_earnings", "last_date", "is_new"];
 
 const breadth = (lite && lite.breadth) || (full && full.breadth) || {};
