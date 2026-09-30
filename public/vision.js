@@ -1250,6 +1250,57 @@
      Everything the book knows about one name, in scan order: where it is,
      what the engines have said about it (all of it, losses included), why,
      the shape of its move, and what to do next. */
+  /* ── OWNERSHIP, QUARTER BY QUARTER ──────────────────────────────────────
+     FII and DII holding across every filed quarter institutional.json
+     carries (up to six). One axis — both are % of shares. The change is the
+     point, so the lines carry it; the end labels carry the latest level.
+     Colours validated for both themes (dataviz validate_palette.js: CVD
+     ΔE ≥ 24.7 on each panel surface); identity also carried by the legend
+     and the labels, never colour alone. */
+  function ownChart(series, width) {
+    const S0 = (series || []).filter((q) => q && q.p && (num(q.f) != null || num(q.d) != null));
+    if (S0.length < 2) return '';
+    /* Drawn at the panel's real width so 10px text stays 10px. */
+    const W = Math.round(clamp(num(width) || 320, 260, 760)), H = 160, L = 38, R = 78, T = 12, B = 22;
+    const vals = S0.flatMap((q) => [num(q.f), num(q.d)]).filter((v) => v != null);
+    const top = Math.max(1, Math.ceil(Math.max(...vals) * 1.15 / 5) * 5);
+    const x = (i) => L + (S0.length === 1 ? 0 : i * (W - L - R) / (S0.length - 1));
+    const y = (v) => T + (1 - v / top) * (H - T - B);
+    const line = (k) => S0.map((q, i) => num(q[k]) == null ? null : `${x(i).toFixed(1)},${y(num(q[k])).toFixed(1)}`).filter(Boolean).join(' ');
+    const ticks = [0, top / 2, top];
+    const last = S0[S0.length - 1];
+    const ends = [['f', 'FII', 'var(--viz-1)'], ['d', 'DII', 'var(--viz-2)']].filter(([k]) => num(last[k]) != null)
+      .map(([k, n, c]) => ({ k, n, c, v: num(last[k]), yy: y(num(last[k])) })).sort((a, b) => a.yy - b.yy);
+    if (ends.length === 2 && ends[1].yy - ends[0].yy < 12) { const m = (ends[0].yy + ends[1].yy) / 2; ends[0].yy = m - 6; ends[1].yy = m + 6; }
+    const svg = `<svg class="own-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="FII and DII holding by quarter, ${esc(S0[0].p)} to ${esc(last.p)}">
+      ${ticks.map((t) => `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" class="own-g"/><text x="${L - 6}" y="${y(t) + 3}" class="own-t" text-anchor="end">${t % 1 ? t.toFixed(1) : t}%</text>`).join('')}
+      ${S0.map((q, i) => `<text x="${x(i)}" y="${H - 6}" class="own-t" text-anchor="middle">${esc(String(q.p).replace(' FY', "'"))}</text>`).join('')}
+      <polyline points="${line('f')}" class="own-l" style="stroke:var(--viz-1)"/><polyline points="${line('d')}" class="own-l" style="stroke:var(--viz-2)"/>
+      ${S0.map((q, i) => ['f', 'd'].map((k) => num(q[k]) == null ? '' : `<circle cx="${x(i)}" cy="${y(num(q[k]))}" r="3.5" class="own-m" style="fill:var(--viz-${k === 'f' ? 1 : 2})"/>`).join('')).join('')}
+      ${ends.map((e) => `<line x1="${W - R + 6}" x2="${W - R + 14}" y1="${e.yy}" y2="${e.yy}" style="stroke:${e.c}" class="own-l"/><text x="${W - R + 18}" y="${e.yy + 3.5}" class="own-e">${e.n} ${e.v.toFixed(1)}%</text>`).join('')}
+      <line class="own-x" x1="0" x2="0" y1="${T}" y2="${H - B}" style="display:none"/>
+      ${S0.map((q, i) => `<rect class="own-h" data-i="${i}" x="${x(i) - (W - L - R) / (2 * Math.max(1, S0.length - 1))}" y="0" width="${(W - L - R) / Math.max(1, S0.length - 1)}" height="${H - B}"/>`).join('')}
+    </svg>`;
+    const leg = `<div class="own-leg"><span><i style="background:var(--viz-1)"></i>FII / FPI</span><span><i style="background:var(--viz-2)"></i>DII</span><span class="mut">% of shares, as filed</span></div>`;
+    const tbl = `<details class="own-tbl"><summary>Table</summary><table class="tbl dense"><thead><tr><th scope="col">Quarter</th><th class="r" scope="col">FII</th><th class="r" scope="col">DII</th><th class="r" scope="col">Together</th></tr></thead><tbody>
+      ${S0.map((q) => `<tr><td>${esc(q.p)}</td><td class="r num">${num(q.f) == null ? '—' : fmt(q.f, 2) + '%'}</td><td class="r num">${num(q.d) == null ? '—' : fmt(q.d, 2) + '%'}</td><td class="r num">${num(q.f) == null || num(q.d) == null ? '—' : fmt(num(q.f) + num(q.d), 2) + '%'}</td></tr>`).join('')}</tbody></table></details>`;
+    return `<div class="own" data-w="${W}" data-own='${esc(JSON.stringify(S0))}'>${leg}<div class="own-c">${svg}<div class="own-tip" role="status"></div></div>${tbl}</div>`;
+  }
+  /* Hover and tap: one crosshair and one tooltip, for whichever quarter is under the pointer. */
+  document.addEventListener('pointerover', (e) => {
+    const h = e.target.closest && e.target.closest('.own-h'); if (!h) return;
+    const box = h.closest('.own'), S0 = JSON.parse(box.dataset.own), q = S0[+h.dataset.i];
+    const svg = h.ownerSVGElement, xl = svg.querySelector('.own-x'), cx = +h.getAttribute('x') + +h.getAttribute('width') / 2;
+    xl.setAttribute('x1', cx); xl.setAttribute('x2', cx); xl.style.display = '';
+    const tip = box.querySelector('.own-tip');
+    tip.innerHTML = `<b>${esc(q.p)}</b> FII ${num(q.f) == null ? '—' : fmt(q.f, 2) + '%'} · DII ${num(q.d) == null ? '—' : fmt(q.d, 2) + '%'}`;
+    tip.style.left = `${Math.min(70, Math.max(0, cx / (+box.dataset.w || 320) * 100 - 15))}%`; tip.classList.add('on');
+  });
+  document.addEventListener('pointerout', (e) => {
+    const h = e.target.closest && e.target.closest('.own-h'); if (!h || (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.own-h'))) return;
+    const box = h.closest('.own'); box.querySelector('.own-tip').classList.remove('on'); box.querySelector('.own-x').style.display = 'none';
+  });
+
   V.cockpit = (...a) => V.overview(...a);
 
   V.asset = async (el, arg, alive) => {
@@ -1355,7 +1406,9 @@
         <div><em>FII</em><b>${fmt(x.fii, 2)}%</b><small>${signed(x.fii_pp, 2, ' pp')} q/q</small></div>
         <div><em>DII</em><b>${fmt(x.dii, 2)}%</b><small>${signed(x.dii_pp, 2, ' pp')} q/q</small></div>
         <div><em>Promoter</em><b>${fmt(x.promoter, 2)}%</b></div></div>
-      <p class="note" style="margin-top:var(--s-2)"><b>${esc(x.signal_label || x.band_label || '')}</b> · ${esc(x.period || '')} against ${esc(x.prev_period || '')}. Quarterly filings — this moves four times a year.</p>`
+      ${ownChart(x.series, ($('#aIns') || {}).clientWidth)}
+      <p class="note" style="margin-top:var(--s-2)"><b>${esc(x.signal_label || x.band_label || '')}</b> · ${esc(x.period || '')} against ${esc(x.prev_period || '')}. Quarterly filings — this moves four times a year.</p>
+      <p class="note src">Source: NSE shareholding pattern filings (SEBI XBRL), ${esc((x.series || []).length)} quarters.</p>`
       : empty('No complete shareholding', x ? esc(x.reason || 'partial filing') : 'Not in the institutional feed.');
 
     const W = await F.wire(); if (!alive()) return;

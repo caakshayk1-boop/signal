@@ -15576,8 +15576,11 @@
         you. Reply to any brief asking to be removed and the record is deleted.</p>
 
       <h3>Third parties</h3>
-      <p>Fonts are served from this domain, not a font network. There is no analytics script, no
-        advertising, no social pixel and no session recording. Price requests go to the data
+      <p>Fonts are served from this domain, not a font network. The one measurement script is
+        Cloudflare Web Analytics, which the host adds to every page: it counts views of each page
+        and how fast it loaded, in aggregate, without cookies, without an identifier for you and
+        without following you to other sites. There is no advertising, no social pixel, no session
+        recording and no tracking of clicks or searches. Price requests go to the data
         providers named on the <a href="/sources" style="color:var(--accent)">Data sources</a>
         page; those requests come from the server, not from your browser.</p>
 
