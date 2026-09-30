@@ -337,6 +337,14 @@ jobs:
           # ones: the JSON said Monday, the HTML a crawler saw still said
           # Sunday. Prerender reads public/*.json, which the copy above has
           # just replaced, so it has to run here and not before.
+          # THE COMPANY FILES ARE GENERATED, NOT COMMITTED (public/c/ is
+          # gitignored), so a deploy that skips this step ships a site with no
+          # /c/*.json at all: every vision.askakshay.com/company page 404s and
+          # every "What matters" panel is empty until the next code deploy.
+          # That is what this job did twice a day. Same order as `npm run
+          # deploy`: route meta, then the company files, then the snapshot.
+          node scripts/route-meta.mjs
+          node scripts/company-pages.mjs
           node scripts/prerender.mjs
           # Stamp AFTER the feeds and the snapshot are in place, so the build
           # hash describes what is actually being uploaded.
