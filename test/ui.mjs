@@ -1093,7 +1093,7 @@ try {
    * them. */
   const verdicts = await p.evaluate(() =>
     [...document.querySelectorAll(".rd-v, .vtag")].map(x => x.textContent.trim()));
-  const allowed = new Set(["Buy", "Wait for entry", "Watch", "Avoid", "Not rated"]);
+  const allowed = new Set(["Criteria met", "Entry not met", "Watch", "Fails screen", "Not rated"]);
   ok("it uses the site's own verdict words, not a new taxonomy",
      verdicts.every(v => allowed.has(v) || v === VOID), [...new Set(verdicts)]);
 

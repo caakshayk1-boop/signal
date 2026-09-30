@@ -770,6 +770,13 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      stray.length === 0, stray);
   ok("the two files agree on the whole set",
      words.length === allowed.length, { words, allowed });
+  /* Gems words the same field; it must say the same words, and none of the
+     site's verdict words may be an instruction. */
+  const GJ = readFileSync("public/gems.js", "utf8");
+  const gw = (GJ.match(/const VD_WORDS = \{([^}]*)\}/) || ["", ""])[1];
+  const gwords = [...gw.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  ok("gems words the verdict exactly as signal.js does", JSON.stringify([...gwords].sort()) === JSON.stringify([...words].sort()), { gwords, words });
+  ok("no verdict word is an instruction to trade", !words.some((w) => /^(buy|sell|avoid|act|ignore)\b/i.test(w)), words);
   // UNRATED must be declared, not reached by falling off the end of the table.
   ok("UNRATED is a declared verdict, not an accident of the default",
      /UNRATED:\s*\[/.test(JS));

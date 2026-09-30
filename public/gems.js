@@ -27,6 +27,10 @@
  * ───────────────────────────────────────────────────────────────────────────── */
 (() => {
   'use strict';
+  /* The screen's verdict, as signal.js words it — descriptions, not
+     instructions. guard.mjs holds this equal to signal.js's VERDICT table. */
+  const VD_WORDS = { BUY: 'Criteria met', WAIT: 'Entry not met', WATCH: 'Watch', AVOID: 'Fails screen', UNRATED: 'Not rated' };
+  const vdWord = (c) => VD_WORDS[String(c || '').toUpperCase()] || VD_WORDS.UNRATED;
 
   const app = document.getElementById('app');
   const jump = document.getElementById('jump');
@@ -337,7 +341,7 @@
         : `This name has no average range on its row, so the move could not be scaled and the
            tile is drawn flat rather than at an intensity nobody computed.`}
         ${x.news ? ' It is named in <b>today\'s wire</b>, above.' : ''}</p>`}
-      ${vd.c ? `<p class="said"><b>The screen says ${esc(vd.c)}</b>${
+      ${vd.c ? `<p class="said"><b>The screen says: ${esc(vdWord(vd.c))}</b>${
         vd.l ? ` · ${esc(vd.l)}` : ''}${vd.o ? `. ${esc(vd.o)}.` : '.'}
         ${(x.change_pct > 0 && vd.c === 'AVOID') || (x.change_pct < 0 && vd.c === 'BUY')
           ? ' <b>Today is moving against that call</b>, which is the interesting case.' : ''}</p>` : ''}
@@ -1232,23 +1236,23 @@
       const buys = rows.filter(r => r.vd && r.vd.c === 'BUY' && (r.turnover_cr ?? 0) >= 5)
         .sort((x, y) => (num(y.rs3m) ?? -1e9) - (num(x.rs3m) ?? -1e9)).slice(0, 6);
       add('verdicts', 'Verdicts', sec('verdicts', `The call on ${rows.length} names`,
-        `<b>${cnt('BUY')}</b> rate a buy, <b>${cnt('WATCH')}</b> a watch,
-         <b class="dn">${cnt('AVOID')}</b> an avoid. Most of a market is
+        `<b>${cnt('BUY')}</b> meet the screen's criteria, <b>${cnt('WATCH')}</b> are on watch,
+         <b class="dn">${cnt('AVOID')}</b> fail it. Most of a market is
          <span class="dim">neither</span> at any moment, and a screen that says otherwise
          is not screening.`,
-        `<div class="vd-bar" role="img" aria-label="${order.map(([k]) => `${cnt(k)} ${k}`).join(', ')}">
+        `<div class="vd-bar" role="img" aria-label="${order.map(([k]) => `${cnt(k)} ${vdWord(k)}`).join(', ')}">
           ${order.map(([k, c]) => {
             const w = cnt(k) / vds.length * 100;
             return w < 0.5 ? '' : `<span class="vd-s ${c}" style="width:${w.toFixed(2)}%"
-              title="${k} ${cnt(k)}"><em>${w >= 8 ? esc(k) : ''}</em></span>`;
+              title="${vdWord(k)} ${cnt(k)}"><em>${w >= 8 ? esc(vdWord(k)) : ''}</em></span>`;
           }).join('')}
         </div>
         <div class="vd-k">${order.map(([k, c]) =>
-          `<span><i class="${c}"></i>${esc(k)} <b>${cnt(k)}</b></span>`).join('')}</div>` +
-        (buys.length ? `<h3 class="sub">Buy-rated, strongest relative strength</h3>
+          `<span><i class="${c}"></i>${esc(vdWord(k))} <b>${cnt(k)}</b></span>`).join('')}</div>` +
+        (buys.length ? `<h3 class="sub">Criteria met, strongest relative strength</h3>
           <div class="rows">${buys.map((r, i) => xr(
             rowHead(i + 1, r.sym, `${esc(r.sector || r.ind || '')}${r.vd.l ? ' · ' + esc(r.vd.l) : ''}`,
-              inr(r.price), [pct(r.r1m) + ' 1M', dir(r.r1m)], ['Buy', 'up'], r.sym),
+              inr(r.price), [pct(r.r1m) + ' 1M', dir(r.r1m)], [vdWord('BUY'), 'up'], r.sym),
             chartSlot(r.sym) +
             `<p class="xd-q">${esc(r.vd.o || '')}</p>
              ${figs([
@@ -1280,7 +1284,7 @@
           const inIdx = known.filter(r => r.ahimsa === true);
           const buyIn = inIdx.filter(r => r.vd && r.vd.c === 'BUY').length;
           return `<p class="said"><b>${inIdx.length}</b> of the ${known.length} names here sit in
-            NSE's <b>Nifty500 Ahimsa</b> index${buyIn ? `, and <b>${buyIn}</b> of those rate a buy` : ''}.
+            NSE's <b>Nifty500 Ahimsa</b> index${buyIn ? `, and <b>${buyIn}</b> of those meet the screen's criteria` : ''}.
             It is membership in an index, not a score: NSE publishes the list and no
             per-company figure, so there is none to show — and it is deliberately kept out
             of the composite, because nothing measured says a constituent outperforms.</p>`;
@@ -1644,7 +1648,7 @@
           <b class="${kind === 'up' ? 'up' : 'dn'}">${x.hit}%</b>
           <span class="cal-m">median ${x.med > 0 ? '+' : ''}${x.med}%</span>
           <span class="cal-n">${x.n} years${x.r && x.r.vd && x.r.vd.c
-            ? ` · screen says ${esc(x.r.vd.c)}` : ''}</span>
+            ? ` · screen: ${esc(vdWord(x.r.vd.c))}` : ''}</span>
         </div>`;
         return `<h3 class="sub">${esc(title)} — ${esc(MN[mi])}</h3>
           <p class="said">${all.length} names have ${MN[mi]} on record.

@@ -6179,10 +6179,10 @@
      * at all, and nothing anywhere said "don't touch this" or "right business,
      * wrong entry". verdict.py supplies one call per row — see its header for
      * every threshold. It is a reading of the evidence, not a forecast. */
-    buy_lt:     ['Buy · long term', r => r.vd?.c === 'BUY' && r.vd?.h === 'long term'],
-    buy_pos:    ['Buy · positional', r => r.vd?.c === 'BUY' && r.vd?.h === 'positional'],
-    buy_swing:  ['Buy · swing',    r => r.vd?.c === 'BUY' && r.vd?.h === 'swing'],
-    waiting:    ['Wait for entry', r => r.vd?.c === 'WAIT'],
+    buy_lt:     ['Criteria met · long term', r => r.vd?.c === 'BUY' && r.vd?.h === 'long term'],
+    buy_pos:    ['Criteria met · positional', r => r.vd?.c === 'BUY' && r.vd?.h === 'positional'],
+    buy_swing:  ['Criteria met · swing', r => r.vd?.c === 'BUY' && r.vd?.h === 'swing'],
+    waiting:    ['Entry not met', r => r.vd?.c === 'WAIT'],
     avoid:      ['Red flags',      r => r.vd?.c === 'AVOID' || (r.vd?.f || []).length > 0],
     breakout:   ['Breaking out',   r => (r.setup?.tags || []).some(t => /BREAKOUT/.test(t))],
     rsleader:   ['RS leaders',     r => (r.setup?.tags || []).includes('RS LEADER')],
@@ -6550,14 +6550,15 @@
       const seg = (n, cls, label) => n <= 0 ? '' :
         `<i class="${cls}" style="flex:0 0 ${(n / total * 100).toFixed(1)}%"
             title="${label}: ${n} of ${total}">${(n / total * 100) > 9 ? n : ''}</i>`;
+      const W = verdictWord;
       return `<div class="splitb" role="img"
-          aria-label="${c.BUY} buy, ${c.WAIT} wait, ${c.WATCH} watch, ${c.AVOID} avoid">
-          ${seg(c.BUY, 'sb-u', 'Buy')}${seg(c.WAIT, 'sb-f', 'Wait')}
-          ${seg(c.WATCH, 'sb-f', 'Watch')}${seg(c.AVOID, 'sb-d', 'Avoid')}
+          aria-label="${c.BUY} ${W('BUY')}, ${c.WAIT} ${W('WAIT')}, ${c.WATCH} ${W('WATCH')}, ${c.AVOID} ${W('AVOID')}">
+          ${seg(c.BUY, 'sb-u', W('BUY'))}${seg(c.WAIT, 'sb-f', W('WAIT'))}
+          ${seg(c.WATCH, 'sb-f', W('WATCH'))}${seg(c.AVOID, 'sb-d', W('AVOID'))}
         </div>
-        <div class="splitl"><span><b class="up">${c.BUY}</b> buy</span>
-          <span>${c.WAIT + c.WATCH} wait or watch</span>
-          <span><b class="dn">${c.AVOID}</b> avoid</span></div>
+        <div class="splitl"><span><b class="up">${c.BUY}</b> ${W('BUY').toLowerCase()}</span>
+          <span>${c.WAIT + c.WATCH} ${W('WAIT').toLowerCase()} or watch</span>
+          <span><b class="dn">${c.AVOID}</b> ${W('AVOID').toLowerCase()}</span></div>
         <p class="hint">The screen's own call on every name it can judge. A call is
           not a recommendation — no engine here has proved itself yet.</p>`;
     };
@@ -6999,11 +7000,24 @@
    * UNRATED is here as well as being the fallback: the radar had no entry for
    * it and reached the default by accident, which works right up until someone
    * changes the default. */
+  /* DESCRIPTIONS, NOT INSTRUCTIONS (2026-09-30).
+   *
+   * The words were "Buy" and "Avoid" — instructions, on a site whose own
+   * disclaimer says nothing here is a recommendation to buy or sell, run by a
+   * publisher not registered with SEBI as an RA or IA. verdict.py's codes are
+   * unchanged (BUY, WAIT, WATCH, AVOID stay in the data, in the tests and in
+   * every filter); what a reader sees now says which of the screen's rules
+   * passed, which is what the code has always meant:
+   *
+   *   BUY    tradeable, thesis holds, entry quality passes  → Criteria met
+   *   WAIT   thesis holds, the entry does not               → Entry not met
+   *   AVOID  failed a tradeability or accounts gate          → Fails screen
+   */
   const VERDICT = {
-    BUY:     ['up',   'Buy'],
-    WAIT:    ['warn', 'Wait for entry'],
+    BUY:     ['up',   'Criteria met'],
+    WAIT:    ['warn', 'Entry not met'],
     WATCH:   ['',     'Watch'],
-    AVOID:   ['dn',   'Avoid'],
+    AVOID:   ['dn',   'Fails screen'],
     UNRATED: ['',     'Not rated'],
   };
   const verdictWord = c => (VERDICT[c] || VERDICT.UNRATED)[1];
@@ -7762,7 +7776,7 @@
        those would have rendered an empty heading under every call. */
     const vd = r.vd || {};
     return `${vd.c ? `<div class="bible-vd vd-${esc(String(vd.c).toLowerCase())}">
-        <span class="bvd-k">${esc(vd.c)}</span>
+        <span class="bvd-k">${esc(verdictWord(String(vd.c).toUpperCase()))}</span>
         <span class="bvd-h">${esc(vd.l || '')}</span>
         ${vd.o ? `<p>${esc(vd.o)}.</p>` : ''}
         ${vd.t ? `<p class="bvd-t"><b>What would trigger it:</b> ${esc(vd.t)}.</p>` : ''}</div>` : ''}
@@ -14596,7 +14610,7 @@
     verdict: { label: 'The call',
       help: 'The screen’s own verdict on each name.',
       of: (r) => ({ BUY: 92, WAIT: 55, WATCH: 45, AVOID: 8 })[String((r.vd && r.vd.c) || '').toUpperCase()],
-      fmt: (r) => (r.vd && r.vd.c) || '—' },
+      fmt: (r) => (r.vd && r.vd.c) ? verdictWord(String(r.vd.c).toUpperCase()) : '—' },
     momentum: { label: 'Momentum',
       help: 'Six-month return, scaled across the universe.',
       of: (r) => { const v = lvl(r.r6m); return v == null ? null : Math.max(0, Math.min(100, 50 + v * 1.2)); },
