@@ -127,4 +127,11 @@ jobs:
             exit 1
           fi
           npm ci --omit=dev --no-audit --no-fund || npm install --no-audit --no-fund
+          # The company files are generated at deploy (public/c/ is gitignored)
+          # and read institutional.json — so they must be rebuilt here, or this
+          # deploy removes every Vision company page. See sync-data.yml.
+          node scripts/route-meta.mjs
+          node scripts/company-pages.mjs
+          node scripts/prerender.mjs
+          node scripts/stamp-build.mjs
           npx wrangler deploy

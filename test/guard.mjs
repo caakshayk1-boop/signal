@@ -2317,6 +2317,27 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
    one). A figure is printed once, exactly; nothing animates it. */
 ok("no figure counts up", !/countUp/.test(JS));
 
+/* EVERY DEPLOY BUILDS THE COMPANY FILES. public/c/ is generated and gitignored,
+   so a workflow that runs `wrangler deploy` without scripts/company-pages.mjs
+   first ships a site with no company files: sync-data.yml and institutional.yml
+   both did, and every Vision company page 404'd after each data sync. */
+{
+  const wfDir = ".github/workflows";
+  const bad = [];
+  let deploys = 0;
+  for (const f of readdirSync(wfDir).filter((x) => /\.ya?ml$/.test(x))) {
+    const y = readFileSync(`${wfDir}/${f}`, "utf8");
+    for (const m of y.matchAll(/^[ \t]*npx wrangler deploy/gm)) {   // executed lines, not comments
+      deploys++;
+      const before = y.slice(0, m.index);
+      if (!/node scripts\/company-pages\.mjs/.test(before.slice(before.lastIndexOf("run:")))) bad.push(f);
+    }
+    if (/npm run deploy/.test(y)) deploys++;
+  }
+  ok("every workflow that deploys builds the company files first", deploys >= 3 && bad.length === 0, { deploys, bad });
+  ok("npm run deploy builds them too", /company-pages\.mjs[\s\S]*wrangler deploy/.test(readFileSync("package.json", "utf8")));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);
