@@ -1449,11 +1449,8 @@
    * evidence, then method. A tile is the answer; its explanation must not
    * compete with it for the eye, so the control sits on the small grey label
    * and opens the same tip card every other help mark on the site uses. */
-  /* Every tile's figure counts up. `cnum` is added HERE rather than at each of
-     the ~60 call sites: one place to add it is one place it can be removed
-     again, and it means a tile written next week gets the behaviour without
-     anyone remembering to ask for it. The value in the markup is the true one
-     — see countUp() for why that matters in a hidden tab. */
+  /* `cnum` marks a tile's figure: tabular numerals, one place to change them.
+     It no longer animates — see "NO FIGURE COUNTS UP" below. */
   const tile = (v, k, sub, cls, tipKey) =>
     `<div class="tile"><div class="k">${esc(k)}${tipKey ? ' ' + tip(tipKey) : ''}</div><div class="v cnum ${cls || ''}">${v}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
 
@@ -9178,47 +9175,15 @@
    * The ELEMENT CARRIES THE FINAL TEXT. This only rewrites it while running
    * and puts the original back at the end, so a thrown error, a hidden tab or
    * no JS at all leaves the true figure on screen. */
-  const countUp = (el) => {
-    if (!el || el.dataset.ran) return;
-    const finalText = el.textContent;
-    const m = finalText.match(/-?[\d,]+\.?\d*/);
-    if (!m) return;
-    const target = Number(m[0].replace(/,/g, ''));
-    if (!Number.isFinite(target) || Math.abs(target) < 1) return;
-    el.dataset.ran = '1';
-    /* A HIDDEN PAGE GETS THE NUMBER, NOT THE ANIMATION. requestAnimationFrame
-       does not run in a background tab or a headless crawler, so the first
-       frame's "0" was the figure such a reader was left with — measured on the
-       live page after the negative-progress fix: "Published 0". */
-    if (document.hidden) return;
-    const dp = (m[0].split('.')[1] || '').length;
-    const dur = 620;
-    const t0 = performance.now();
-    el.classList.add('is-run');
-    /* And a hard stop: whatever the frame clock does, the exact text is back
-       shortly after the animation should have ended. */
-    setTimeout(() => { el.textContent = finalText; el.classList.remove('is-run'); }, dur + 150);
-    const step = (now) => {
-      /* CLAMPED AT BOTH ENDS. A rAF timestamp is the START of the frame, which
-         can be earlier than performance.now() read when the animation was
-         queued — so k came out negative, and easeOutCubic turns a negative k
-         into a large negative multiplier: the live page printed "Published
-         -18,139" and a win rate of "-4,900.6%" for a frame, and a page captured
-         mid-run (a crawler, a throttled background tab) kept it. */
-      const k = Math.max(0, Math.min(1, (now - t0) / dur));
-      // easeOutCubic — fast then settling, which reads as a figure arriving
-      // rather than a slot machine.
-      const e = 1 - Math.pow(1 - k, 3);
-      const v = target * e;
-      el.textContent = finalText.replace(m[0],
-        v.toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp }));
-      if (k < 1) { requestAnimationFrame(step); return; }
-      el.textContent = finalText;          // exact, always
-      el.classList.remove('is-run');
-    };
-    requestAnimationFrame(step);
-  };
-
+  /* ── NO FIGURE COUNTS UP ─────────────────────────────────────────────────
+   * There was a count-up here: every tile's number ran from 0 to its value on
+   * paint. It shipped wrong figures twice in one evening. A frame timestamp
+   * earlier than the start made progress negative ("Published -18,139"), and
+   * once clamped, any reader whose frames and timers stop — a background tab,
+   * a crawler, a captured page — kept the first frame: "Published 0", a 0.0%
+   * win rate. A site whose argument is that its numbers can be trusted cannot
+   * print a false one as decoration, however briefly. DESIGN.md already said
+   * it: "no number that counts up". The figure is in the markup and stays. */
   /* A 0-100 ring. The arc length is computed here and written INLINE, so the
      ring is already correct before the sweep keyframe touches it. */
   const ringGauge = (score, label, cls = '', size = 116) => {
@@ -9306,13 +9271,7 @@
   /* Run the count-ups after a paint. Called from paint(), guarded, and
      deliberately NOT observer-gated: the numbers are already on screen and
      this is decoration on top of them. */
-  const runWidgets = (scope) => {
-    const els = scope.querySelectorAll('.cnum:not([data-ran])');
-    // A cap, because a page with 300 figures animating at once is a page
-    // that stutters. The rest simply keep the value they already show.
-    let n = 0;
-    for (const el of els) { if (n++ > 40) break; countUp(el); }
-  };
+  const runWidgets = () => { /* figures are printed, never animated — see above */ };
 
   /* ── THE BAROMETER, AND WHEN A BAD MARKET BECOMES AN OPPORTUNITY ─────────
    *
