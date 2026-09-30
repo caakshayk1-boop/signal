@@ -9191,7 +9191,13 @@
     const t0 = performance.now();
     el.classList.add('is-run');
     const step = (now) => {
-      const k = Math.min(1, (now - t0) / dur);
+      /* CLAMPED AT BOTH ENDS. A rAF timestamp is the START of the frame, which
+         can be earlier than performance.now() read when the animation was
+         queued — so k came out negative, and easeOutCubic turns a negative k
+         into a large negative multiplier: the live page printed "Published
+         -18,139" and a win rate of "-4,900.6%" for a frame, and a page captured
+         mid-run (a crawler, a throttled background tab) kept it. */
+      const k = Math.max(0, Math.min(1, (now - t0) / dur));
       // easeOutCubic — fast then settling, which reads as a figure arriving
       // rather than a slot machine.
       const e = 1 - Math.pow(1 - k, 3);
