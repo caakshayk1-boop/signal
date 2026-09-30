@@ -2556,11 +2556,17 @@ try {
      phone could not be closed. Click opens a dialog; Escape closes it. */
   await v.evaluate(() => { location.hash = "#/heatmap"; });
   await settled(v, SETTLE + 2000);
-  await v.click(".hm-t");
+  /* A NAME WITH A YEAR OF HISTORY, NOT WHICHEVER TILE IS FIRST. Deploy 225
+     clicked AEQUS — listed weeks ago — whose card rightly says it has no
+     52-week range, and the check blamed the code. The first tile depends on
+     the day's turnover; the question is whether a full card shows its levels. */
+  const vTile = await v.evaluate(() => { for (const s of ["RELIANCE", "HDFCBANK", "ICICIBANK", "SBIN", "INFY", "TCS"]) if (document.querySelector(`.hm-t[data-sym="${s}"]`)) return `.hm-t[data-sym="${s}"]`; return ".hm-t"; });
+  await v.click(vTile);
   await v.waitForTimeout(500);
   const vCard = await v.evaluate(() => { const d = document.querySelector("#layer .drw"); return d ? d.innerText : null; });
   ok("a heatmap tile opens its card", !!vCard);
-  ok("...with the 50-day, 200-day and 52-week range", !!vCard && /50-day/.test(vCard) && /200-day/.test(vCard) && /52w high/.test(vCard) && /52w low/.test(vCard), (vCard || "").slice(0, 120));
+  ok("...with the 50-day, 200-day and 52-week range (or says a young listing has none)", !!vCard && /50-day/.test(vCard) && /200-day/.test(vCard)
+     && ((/52w high/.test(vCard) && /52w low/.test(vCard)) || (vTile === ".hm-t" && /No 52-week range/.test(vCard))), { tile: vTile, card: (vCard || "").slice(0, 160) });
   await v.keyboard.press("Escape");
   await v.waitForTimeout(300);
   ok("...and Escape closes it", !(await v.$("#layer .drw")));
