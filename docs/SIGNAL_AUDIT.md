@@ -33,15 +33,15 @@ Pages (27): `/ /markets /discover /watch /signals /brief /ideas /screen /heat /m
 
 ## 3. Other findings
 
-- **Verdict wording (compliance, open — top recommendation).** Stock pages render the screen's
-  `vd.c` field verbatim — "BUY"/"SELL" — in `bibleHtml` (`public/signal.js`, the `bible-vd` block)
-  (the same field is read in at least four other views). The site's own disclaimer says nothing here is a recommendation to buy
-  or sell. Relabelling a core output is a product and compliance decision, not a style fix, so it
-  is **not changed here**. Recommendation: render the field as a descriptive state ("Screen:
-  constructive / negative / neutral") and keep the raw code in the data.
-- **Index feed is null.** `barometer.json.history[].nifty` and `screen.breadth.nifty_1m` have been
-  null since at least 28 Sep. Relative strength against Nifty cannot be computed; Vision benchmarks
-  against the screen's median instead and says so.
+- **Verdict wording — fixed 30 Sep.** The screen's `vd.c` was shown as "Buy" / "Avoid" (and raw
+  "BUY" on stock pages and the map), instructions on a site whose disclaimer says nothing here is
+  a recommendation. The codes in the data are unchanged; readers now see what the code means:
+  **Criteria met** (BUY), **Entry not met** (WAIT), **Watch**, **Fails screen** (AVOID), **Not
+  rated**. One table in `signal.js`; Gems holds the same words; the guard pins both and refuses an
+  instruction-shaped word.
+- **Index feed was null — fixed 30 Sep (trading-dashboard).** Two causes: the barometer took an
+  unclosed bar when its cron landed after midnight IST, and the screen dropped `^NSEI` once the
+  universe hit 1,000 names (it fell alone into a batch whose single-ticker parse was wrong).
 - **Scheduled scans run hours late.** `vision_scan.yml` is set for 07:58 and 10:15 UTC; the nine runs
   so far started 13:04–18:10 UTC (GitHub cron under load). The rule reads only completed bars, so
   the signals are correct but late. **Fixed:** `vision_scan.yml` is now a watchdog entry
@@ -59,6 +59,6 @@ Done in this pass: edge-written heads and bodies for every route (§2), sitemap 
 table, "Today", Closed filter, Vision links in the bar, on every stock row, on the stock page and
 in ⌘K.
 
-Next, in order: (1) the verdict wording above; (2) split the home page's hero from its ten-feed
-`Promise.all` (AUDIT-PHASE0 #10) and set a JS budget after measuring; (3) Workers Analytics
+Next, in order: (1) split the home page's hero from its ten-feed
+`Promise.all` (AUDIT-PHASE0 #10) and set a JS budget after measuring; (2) Workers Analytics
 Engine for the events, cookie-free.
