@@ -82,8 +82,8 @@ export const SIGNAL_META = {
   "What this site stores, and what it does not."
  ],
  "/join": [
-  "The brief — every morning",
-  "One setup a day, in full, by email."
+  "The morning list",
+  "Join the list for the daily email. It is not being sent yet; the brief is on the site every morning."
  ],
  "/research": [
   "The research floor — three engines, and the record that rejects them",

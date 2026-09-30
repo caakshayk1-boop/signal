@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -10,18 +10,19 @@
      vision.askakshay.com the Worker (src/seo.js) rewrites this tag, the title,
      the description and the canonical for the home and every /company/ page. -->
 <meta name="robots" content="noindex,follow">
-<meta name="theme-color" content="#07090D">
-<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#F8F7F4">
+<meta name="color-scheme" content="light dark">
 <link rel="icon" href="/icon.svg">
 <link rel="preload" href="/fonts/PlusJakarta-var-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/JetBrainsMono-500-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/vision.css">
 <script>
-/* Theme before first paint. DARK IS THE DEFAULT here — a cockpit is read on a
-   dark ground — under a storage key of this product's own. */
+/* Theme before first paint. An explicit choice wins; otherwise the system
+   decides — the same rule as Signal, so moving between the two products does
+   not flip the page from white to black. */
 (function(){try{
   var c=localStorage.getItem('vis:theme');
-  if(c!=='dark'&&c!=='light') c='dark';
+  if(c!=='dark'&&c!=='light') c=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
   document.documentElement.setAttribute('data-theme',c);
 }catch(e){}
 /* The server-written page (.ssr) is for readers and crawlers WITHOUT
@@ -32,17 +33,21 @@ document.documentElement.classList.add('js');})();
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<aside class="dscl" role="note"><span class="dscl-full"><b>Research and market data, published for education.</b>
-  Not registered with SEBI as a Research Analyst or Investment Adviser. Nothing here is a recommendation to buy or sell.
-  <a href="#/disclaimer">Disclaimer</a></span>
-  <button class="dscl-m" type="button" data-dscl>⚠ Educational research · not SEBI RA/IA · not advice <span aria-hidden="true">›</span></button></aside>
 
 <header class="top">
   <div class="top-in">
     <!-- The parent, always one click away. Signal decides what deserves
          attention; Vision is where a name is understood. -->
-    <a class="up-link" href="https://signal.askakshay.com/" aria-label="Back to Signal, the parent product">← Signal</a>
-    <a class="brand" href="#/" aria-label="Vision — companies"><i></i>VISION<em>.AKSHAY</em></a>
+    <!-- THE FAMILY LINE. Vision is Signal's company-research product, and the
+         header says so the way a path does: Signal / Vision. The parent is a
+         link back; the current product is the brand. -->
+    <div class="fam">
+      <a class="up-link" href="https://signal.askakshay.com/" aria-label="Signal, the parent product">
+        <svg class="fam-mark" viewBox="0 0 20 20" aria-hidden="true"><rect width="20" height="20" rx="5"/><path d="M4 14.5h12M10.5 5v9.5M5.5 12.5v2M15 12.5v2"/></svg><span>Signal</span></a>
+      <span class="fam-sep" aria-hidden="true">/</span>
+      <a class="brand" href="#/" aria-label="Vision — companies">
+        <svg class="brand-mark" viewBox="0 0 20 20" aria-hidden="true"><rect x=".75" y=".75" width="18.5" height="18.5" rx="4.5"/><path d="M4 14.5h12M10.5 5v9.5"/></svg><span>Vision</span></a>
+    </div>
     <nav class="nav" id="nav" aria-label="Primary"></nav>
     <div class="top-r">
       <span class="mkt" id="mkt" role="status" aria-live="off"></span>
@@ -56,6 +61,10 @@ document.documentElement.classList.add('js');})();
     </div>
   </div>
 </header>
+<aside class="dscl" role="note"><span class="dscl-full"><b>Education only.</b>
+  Not registered with SEBI as a Research Analyst or Investment Adviser. Nothing here is a recommendation to buy or sell.
+  <a href="#/disclaimer">Read the disclaimer</a></span>
+  <button class="dscl-m" type="button" data-dscl><b>Education only.</b> Not SEBI-registered research or advice <span aria-hidden="true">›</span></button></aside>
 <div class="tick" id="tick" role="region" aria-label="Live market ticker"><div class="tick-in" id="tickIn"></div></div>
 
 <div id="live" class="vh" role="status" aria-live="polite" aria-atomic="true"></div>

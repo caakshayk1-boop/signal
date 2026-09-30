@@ -113,8 +113,11 @@
      both reference sites: Groww's cards are 22px and Tickertape's feature
      panels 32px, against this site's 12px. The small steps stay for chips and
      hairline elements — a 22px pill is a blob. */
-  --r-1:6px;   --r-2:10px;  --r-3:14px;  --r-4:18px;  --r-5:24px;
-  --r-6:32px;
+  /* 2026-10: RADII CAME BACK DOWN. The 14-32px steps were borrowed from a
+     consumer brokerage and made every panel a pillow. A research desk draws
+     its panels with a ruler: small, consistent corners, hairline borders. */
+  --r-1:4px;   --r-2:6px;   --r-3:8px;   --r-4:10px;  --r-5:12px;
+  --r-6:16px;
   --r-pill:999px;
   /* Hairline elements a 4px radius would visibly deform. */
   --r-hair:1px;
@@ -175,7 +178,12 @@
      figures that must line up in a column. --serif and --disp keep their
      names so the ~200 sites that reference them need no edit, but both now
      resolve to the new face — a token is a place to be right once. */
-  --disp:'Jakarta',system-ui,sans-serif;
+  /* 2026-10: THE DISPLAY VOICE IS THE BRIEF'S. The one page that already read
+     like an argument set its headlines in Newsreader; every other route used a
+     heavy geometric sans that read as a brokerage. --disp now carries the
+     serif for route titles and the masthead ONLY. Labels, UI and body stay on
+     Jakarta; figures stay on JBMono. Three faces, one job each. */
+  --disp:'Newsreader',Georgia,'Times New Roman',serif;
   --ui:'Jakarta',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --mono:'JBMono',ui-monospace,SFMono-Regular,Menlo,monospace;
   --serif:'Jakarta',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
@@ -210,10 +218,13 @@
    * than scaling one alpha — the dark values are not the light ones times a
    * factor, they are what actually separates a surface from a near-black
    * page, which is a much heavier shadow plus a light rim. */
-  --e-1:0 1px 2px rgba(12,18,32,.04), 0 3px 14px rgba(12,18,32,.07);
-  --e-2:0 2px 6px rgba(12,18,32,.06), 0 6px 20px rgba(12,18,32,.13);
-  --e-3:0 4px 12px rgba(12,18,32,.08), 0 18px 44px rgba(12,18,32,.16);
-  --e-4:0 8px 24px rgba(12,18,32,.12), 0 24px 70px rgba(12,18,32,.26);
+  /* 2026-10: ELEVATION IS FOR THINGS THAT FLOAT. A data panel sits on the page
+     and is drawn by its hairline; only menus, sheets, popovers and dialogs
+     cast a shadow, and a small one. */
+  --e-1:0 1px 0 rgba(22,24,29,.03), 0 1px 2px rgba(22,24,29,.04);
+  --e-2:0 1px 2px rgba(22,24,29,.05), 0 6px 16px rgba(22,24,29,.08);
+  --e-3:0 2px 4px rgba(22,24,29,.05), 0 16px 36px rgba(22,24,29,.12);
+  --e-4:0 4px 8px rgba(22,24,29,.06), 0 24px 56px rgba(22,24,29,.18);
 
   /* LIGHT IS THE DEFAULT NOW. The reference site is a white page with
      near-black type and black buttons, and that is the look this was asked to
@@ -244,30 +255,36 @@
    * The data colours stay legible rather than copied: Groww's #04B488 is
    * beautiful and fails contrast on white for small figures, so the up/down
    * pair below is tuned toward their hue and kept at a readable depth. */
-  --bg:#FFFFFF; --surface:#FFFFFF; --raised:#F1F4F8; --raised2:#F9FAFC;
-  --line:#E7EAF0; --line2:#D8DEE8;
+  /* 2026-10: PAPER, NOT SCREEN-WHITE. A warm neutral page with white panels on
+     it, so a panel is a sheet laid on a desk rather than a tint. Contrast of
+     every text token was measured on all three grounds (docs/REDESIGN_2026-10.md). */
+  --bg:#F8F7F4; --surface:#FFFFFF; --raised:#F1F0EC; --raised2:#FBFAF8;
+  --line:#E4E2DC; --line2:#D3D0C8;
   /* --warn carried nine meanings and three of them are not warnings: the
      200-day average is a price level, a starred row is a thing you saved, and
      the trailing-stop block is a rule. Amber for those taught the reader that
      amber means caution and then used it for three things that are not. */
   --ma:#8A6A1F; --saved:#7A5CC4;
-  --text:#1A2233; --muted:#44475B; --dim:#707A8C;
+  --text:#16181D; --muted:#474B53; --dim:#676B73;
 
   /* The primary action is BLACK, as theirs is — not a brand hue. Accent is
      kept for links and live data only. */
   /* The primary action is the accent now, not black. A black button on a
      blue-grey page is the one element that still belonged to the old look. */
-  --ink-btn:#5669FF; --on-ink:#FFFFFF;
-  --accent:#5669FF; --accent-soft:rgba(86,105,255,.08); --on-accent:#FFFFFF;
+  /* ONE ACCENT: COBALT. It marks where you are, what you can press next and the
+     tick that runs through the site. It is never a gain, a loss or a warning,
+     so it cannot be confused with a price moving. 7.2:1 on the page. */
+  --ink-btn:#16181D; --on-ink:#FFFFFF;
+  --accent:#2743C8; --accent-soft:rgba(39,67,200,.07); --on-accent:#FFFFFF;
   /* Toward Groww's hue, held at a depth that stays readable at 11px on white:
      their #04B488 measures 2.4:1 against white and this site prints gains at
      small sizes all day. */
-  --up:#0A9D74; --down:#E0483D; --warn:#B07A08;
-  --up-soft:rgba(10,157,116,.10); --down-soft:rgba(224,72,61,.09); --warn-soft:rgba(176,122,8,.10);
+  --up:#0B7A55; --down:#C4372C; --warn:#8F5E00;
+  --up-soft:rgba(11,122,85,.09); --down-soft:rgba(196,55,44,.08); --warn-soft:rgba(143,94,0,.09);
   /* The same two colours as bare channels, so the heatmap can lay its hue over
      a surface at five alphas without color-mix. Verified in both themes:
      light #F1F4F8 under rgba(10,157,116), dark #1A2230 under rgba(46,204,147). */
-  --up-rgb:10 157 116; --down-rgb:224 72 61;
+  --up-rgb:11 122 85; --down-rgb:196 55 44;
 
   /* ── ALIASES FOR NAMES THAT WERE NEVER DEFINED ──────────────────────────
    *
@@ -298,7 +315,7 @@
   /* The default card radius every component reaches for. 8 -> 16: this one
      token is the largest single change in how the page reads, because almost
      every panel on the site resolves its corners through it. */
-  --r:16px;
+  --r:10px;
   --gut:clamp(20px,5vw,40px);
   --barh:64px; --tkrh:33px; --tabh:58px;
 }
@@ -318,22 +335,22 @@
    neutral grey would read as a different product at midnight. Every surface
    here is that same hue rotated to the dark end. */
 :root[data-theme="dark"]{
-  --bg:#0C1017; --surface:#141B25; --raised:#1A2230; --raised2:#151C27;
-  --line:#242E3E; --line2:#33404F;
+  --bg:#0F1012; --surface:#16171A; --raised:#1D1F23; --raised2:#131417;
+  --line:#2A2C31; --line2:#383B41;
   --ma:#C6A24E; --saved:#A98CF0;
-  --text:#EEF2F8; --muted:#AEB9C9; --dim:#7E8AA0;
-  --ink-btn:#5669FF; --on-ink:#FFFFFF;
-  --accent:#8091FF; --accent-soft:rgba(128,145,255,.15); --on-accent:#0C1017;
-  --up:#2ECC93; --down:#FF6B60; --warn:#F0B429;
-  --up-soft:rgba(46,204,147,.14); --down-soft:rgba(255,107,96,.14); --warn-soft:rgba(240,180,41,.13);
-  --up-rgb:46 204 147; --down-rgb:255 107 96;
+  --text:#EDEDEB; --muted:#B4B6BA; --dim:#8C8F95;
+  --ink-btn:#EDEDEB; --on-ink:#0F1012;
+  --accent:#8DA2FF; --accent-soft:rgba(141,162,255,.12); --on-accent:#0F1012;
+  --up:#3CC98C; --down:#FF7B6F; --warn:#E3AE45;
+  --up-soft:rgba(60,201,140,.12); --down-soft:rgba(255,123,111,.12); --warn-soft:rgba(227,174,69,.12);
+  --up-rgb:60 201 140; --down-rgb:255 123 111;
   /* A rim, then a shadow. On a near-black page the shadow alone cannot show
      where a surface ends, so the top inset hairline does the separating and
      the black does the depth. */
-  --e-1:inset 0 1px 0 rgba(255,255,255,.04), 0 2px 10px rgba(0,0,0,.40);
-  --e-2:inset 0 1px 0 rgba(255,255,255,.05), 0 6px 20px rgba(0,0,0,.50);
-  --e-3:inset 0 1px 0 rgba(255,255,255,.06), 0 18px 44px rgba(0,0,0,.58);
-  --e-4:inset 0 1px 0 rgba(255,255,255,.07), 0 24px 70px rgba(0,0,0,.66);
+  --e-1:inset 0 1px 0 rgba(255,255,255,.03), 0 1px 2px rgba(0,0,0,.30);
+  --e-2:inset 0 1px 0 rgba(255,255,255,.04), 0 6px 16px rgba(0,0,0,.40);
+  --e-3:inset 0 1px 0 rgba(255,255,255,.05), 0 16px 36px rgba(0,0,0,.50);
+  --e-4:inset 0 1px 0 rgba(255,255,255,.06), 0 24px 56px rgba(0,0,0,.60);
 }
 /* The old light-theme block is gone. Light IS :root now, so a separate
    [data-theme="light"] block could only ever disagree with it — and it did:
@@ -383,7 +400,6 @@ a{color:inherit;text-decoration:none}
   border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:8px}
 .brand-name{font:800 var(--t-7)/1 var(--disp);letter-spacing:var(--ls-wide)}
-.brand-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
 /* 12, NOT 8. The header buttons carry a 44px hit area that is larger than the
    button; at an 8px gap two of those overlap by 4px, and in an overlap the
    later element in the DOM wins — which is a mis-tap, not a bigger target.
@@ -662,7 +678,6 @@ main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh
 .foot{max-width:1280px;margin:0 auto;padding:24px var(--gut) 34px;border-top:1px solid var(--line);
   font:400 var(--t-3)/1.7 var(--mono);color:var(--dim)}
 .foot b{color:var(--muted);font-weight:500}
-.foot-link a{color:var(--accent)}
 @media(min-width:760px){.foot{padding-bottom:44px}}
 
 /* ══════════════════ WIDGETS ══════════════════════════════════════════════ */
@@ -915,9 +930,6 @@ main,.foot{position:relative;z-index:1}
 .mkt-open .clk-s::before{content:'●';color:var(--up);margin-right:5px}
 .mkt-pre .clk-s::before{content:'●';color:var(--warn);margin-right:5px}
 @media(max-width:560px){ .clk-d,.clk-z{display:none} }
-.brand-dot{background:var(--live);box-shadow:0 0 0 3px color-mix(in srgb,var(--live) 18%,transparent);
-  animation:pip 2.6s ease-in-out infinite}
-@keyframes pip{0%,100%{opacity:1}50%{opacity:.45}}
 
 /* Heat tiles are buttons now. */
 .heat-t{border:0;text-align:left;cursor:pointer;font:inherit;
@@ -952,7 +964,7 @@ main,.foot{position:relative;z-index:1}
                      to{opacity:1;transform:translateX(-50%)}}
 }
 @media(prefers-reduced-motion:reduce){
-  .sheet-in{animation:none} .bar::after{animation:none} .brand-dot{animation:none}}
+  .sheet-in{animation:none} .bar::after{animation:none}}
 
 /* ── SCORES ──────────────────────────────────────────────────────────────── */
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
@@ -1244,8 +1256,6 @@ body{font-family:var(--ui);font-size:var(--t-6);line-height:1.5;letter-spacing:v
    look; on a white page they are dirt. */
 body::before{display:none}
 .bar::after{display:none}
-.brand-dot{background:var(--accent);box-shadow:none;animation:none}
-:root[data-theme="dark"] .brand-dot{background:var(--live)}
 
 /* Heat tiles keep their colour but lose the terminal type. */
 .heat-t .hs{font:500 var(--t-4)/1.3 var(--ui);opacity:1;color:var(--text)}
@@ -1308,7 +1318,7 @@ body::before{display:none}
    the site's — these were tuned for a full-bleed dark surface and the site's
    dark tokens are tuned for cards on a dark ground. */
 :root[data-theme="dark"] .brief{
-  --b-bg:#0A0C0F; --b-sur:#13161B; --b-hi:#191D23;
+  --b-bg:#0F1012; --b-sur:#16171A; --b-hi:#1D1F23;
   --b-line:rgba(255,255,255,.08); --b-line2:rgba(255,255,255,.15);
   /* Measured against all three brief surfaces, not picked by eye. --b-dim was
      #6E7681, which lands at 3.68:1 on --b-hi and 3.95:1 on --b-sur — under AA
@@ -2255,10 +2265,6 @@ body::before{display:none}
  * They are not the same size, because they are not the same kind of statement
  * — the first names the product and the second qualifies it — but the second
  * is inside the <h1> on purpose so it cannot be scrolled past. */
-.hero h1 .h1-sub{display:block;margin-top:.28em;
-  font:400 clamp(17px,2vw,24px)/1.3 var(--ui);letter-spacing:var(--ls-0);
-  color:var(--muted);text-wrap:balance}
-.hero h1 .h1-sub b{font-weight:650}
 
 /* The second call to action is the record. Outlined rather than filled: two
    solid buttons of equal weight make neither of them the primary. */
@@ -2303,7 +2309,6 @@ body::before{display:none}
 .dscl-m[open] summary::after{transform:rotate(90deg)}
 .dscl .dscl-m p{padding:0 16px 10px}
 /* `.dscl p` sets display, so the hide needs the same specificity plus one. */
-@media(max-width:760px){ .dscl p.dscl-w{display:none} .dscl .dscl-m{display:block} }
 .dscl a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;
   white-space:nowrap}
 @media (hover:hover) and (pointer:fine){.dscl a:hover{text-decoration-thickness:2px}}
@@ -3139,10 +3144,6 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
    mean nothing apart: FII selling into DII buying is a different market from
    both selling. */
 .hero-fl{display:block}
-.fl-r{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:5px}
-.fl-r b{font:500 var(--t-2)/1.3 var(--mono);letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--dim)}
-.fl-r i{font:600 var(--t-6)/1.2 var(--mono);font-style:normal;font-variant-numeric:tabular-nums;color:var(--text)}
-.fl-r i.up{color:var(--up)} .fl-r i.dn{color:var(--down)}
 .fl-n{display:block;margin-top:8px;font:400 var(--t-2)/1.45 var(--ui);color:var(--dim)}
 .hero-reg .s b.up{color:var(--up)} .hero-reg .s b.dn{color:var(--down)}
 
@@ -6276,3 +6277,411 @@ h1, .sec-lead { letter-spacing: var(--ls-tight); }
 @media (max-width:820px){ .to-vision-bar{padding:0 7px} .to-vision-bar span{display:none} }
 @media (max-width:820px){ #densBtn{display:none} }
 @media (max-width:359px){ .to-vision-bar{display:none} }
+
+/* ════════════════════════════════════════════════════════════════════════
+ * THE OCTOBER 2026 REDESIGN — SHELL
+ *
+ * Everything from here down is the redesign layer. It is appended rather than
+ * threaded through the six thousand lines above because the cascade already
+ * holds five generations of the header; the last word has to be one place a
+ * reader can find. Brief: docs/REDESIGN_2026-10.md and DESIGN.md §0.
+ *
+ * Anatomy: one 60px row — family (brand + Vision), the five destinations,
+ * utilities, one filled button. Under 1024px the same <nav> docks to the
+ * bottom of the screen as a five-cell tab bar.
+ * ════════════════════════════════════════════════════════════════════════ */
+:root{--barh:60px; --tkrh:32px; --tabh:60px; --maxw:1240px}
+body{background:var(--bg)}
+
+.bar{height:var(--barh);padding:0 var(--gut);background:var(--bg);
+  backdrop-filter:none;-webkit-backdrop-filter:none;border-bottom:1px solid var(--line)}
+.bar-in{max-width:var(--maxw);gap:var(--s-5);height:100%}
+.fam{display:flex;align-items:center;gap:var(--s-3);flex:none}
+.brand{display:inline-flex;align-items:center;gap:var(--s-2);min-height:44px;color:var(--text)}
+.brand-mark{width:22px;height:22px;flex:none}
+.brand-mark rect{fill:var(--accent)}
+.brand-mark path{stroke:var(--on-accent);stroke-width:1.6;stroke-linecap:round;fill:none}
+.brand-name{font:600 var(--t-8)/1 var(--disp);letter-spacing:var(--ls-snug);text-transform:none}
+.to-vision-bar{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 var(--s-3) 0 var(--s-2);
+  border:1px solid var(--line);border-radius:var(--r-pill);color:var(--muted);
+  font:500 var(--t-3)/1 var(--ui);background:none;white-space:nowrap;
+  transition:color var(--t-fast),border-color var(--t-fast)}
+.to-vision-bar .vis-mark{width:14px;height:14px}
+.to-vision-bar .vis-mark rect{fill:none;stroke:currentColor;stroke-width:1.5}
+.to-vision-bar .vis-mark path{stroke:currentColor;stroke-width:1.6;stroke-linecap:round;fill:none}
+.to-vision-bar .ext{color:var(--dim)}
+@media (hover:hover) and (pointer:fine){.to-vision-bar:hover{color:var(--text);border-color:var(--line2)}}
+
+/* The five destinations. Text first at desktop: the icons are for the thumb
+   on a phone, where a label alone at 11px is harder to hit and to read. */
+.tabs{position:static;display:flex;align-items:stretch;gap:2px;height:100%;
+  margin:0;padding:0;border:0;background:none;max-width:none;flex:1;justify-content:center;
+  backdrop-filter:none;-webkit-backdrop-filter:none}
+.tabs a{position:relative;display:inline-flex;align-items:center;gap:8px;margin:0;padding:0 14px;
+  min-height:44px;border-radius:0;background:none;color:var(--muted);
+  font:500 var(--t-5)/1 var(--ui);letter-spacing:var(--ls-0);overflow:visible}
+.tabs a svg{display:none}
+.tabs a[aria-current="page"]{color:var(--text);background:none}
+/* THE TICK. The active destination is marked the way this site marks every
+   graded thing: a short accent stroke on a hairline, not a pill. */
+.tabs a[aria-current="page"]::before{content:"";position:absolute;left:14px;right:14px;bottom:-1px;top:auto;
+  height:2px;background:var(--accent);border-radius:0}
+@media (hover:hover) and (pointer:fine){.tabs a:hover{color:var(--text);background:none}}
+
+.bar-right{gap:var(--s-2);flex:none}
+.icon-btn{width:36px;height:36px;border:1px solid transparent;border-radius:var(--r-3);
+  color:var(--muted);background:none}
+.icon-btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round}
+@media (hover:hover) and (pointer:fine){.icon-btn:hover{color:var(--text);background:var(--raised);border-color:transparent}}
+.icon-btn[aria-current="page"]{color:var(--accent)}
+.cmdk{height:36px;gap:8px;padding:0 var(--s-3);border:1px solid var(--line);border-radius:var(--r-3);
+  background:var(--surface);color:var(--dim);font:400 var(--t-4)/1 var(--ui)}
+.cmdk svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
+.cmdk kbd{border-color:var(--line);background:var(--raised);color:var(--dim)}
+.fresh{height:36px;padding:0 var(--s-2);border:0;border-radius:var(--r-3);background:none;
+  font:400 var(--t-3)/1 var(--ui)}
+.btn-cta{flex-direction:row;align-items:center;gap:8px;height:36px;min-height:36px;padding:0 14px;
+  border-radius:var(--r-3);background:var(--accent);color:var(--on-accent);box-shadow:none}
+.btn-cta .cta-l{font:600 var(--t-4)/1 var(--ui)}
+.btn-cta .cta-s{font:400 var(--t-2)/1 var(--mono);opacity:.78;letter-spacing:0}
+@media (hover:hover) and (pointer:fine){.btn-cta:hover{opacity:1;background:color-mix(in srgb,var(--accent) 88%,var(--text))}}
+.bar-where{display:none}
+
+@media(max-width:1239px){
+  .fresh span{display:none}
+  .cmdk .cmdk-l,.cmdk kbd{display:none}
+  .cmdk{width:36px;padding:0;justify-content:center;border-color:transparent;background:none}
+  .btn-cta .cta-s{display:none}
+}
+
+/* ── UNDER 1024px THE DESTINATIONS DOCK TO THE THUMB ──────────────────────
+   Five equal cells, icon over label, 60px tall plus the home-indicator inset.
+   The active cell carries the accent and the tick above it. */
+@media(max-width:1023px){
+  body{padding-bottom:calc(var(--tabh) + env(safe-area-inset-bottom))}
+  .tabs{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:41;height:calc(var(--tabh) + env(safe-area-inset-bottom));
+    padding:0 0 env(safe-area-inset-bottom);display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
+    gap:0;background:var(--bg);border-top:1px solid var(--line);justify-content:stretch}
+  .tabs a{flex-direction:column;justify-content:center;gap:4px;padding:0 2px;min-height:44px;
+    font:500 var(--t-2)/1 var(--ui);color:var(--dim)}
+  .tabs a svg{display:block;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;
+    stroke-linecap:round;stroke-linejoin:round}
+  .tabs a[aria-current="page"]{color:var(--accent)}
+  .tabs a[aria-current="page"]::before{top:-1px;bottom:auto;left:30%;right:30%}
+  .bar-where{display:inline;font:500 var(--t-4)/1 var(--ui);color:var(--muted);
+    padding-left:var(--s-3);border-left:1px solid var(--line);white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;min-width:0;flex:0 1 auto;margin-right:auto}
+  .bar-where:empty{display:none}
+  .bar-in{gap:var(--s-3)}
+}
+@media(max-width:640px){
+  .to-vision-bar{display:none}
+  .bar-right > .btn-cta{display:none}
+  .fresh{padding:0 8px}
+}
+
+/* ── THE DISCLAIMER STRIP ─────────────────────────────────────────────────
+   One quiet line on the page colour. It is not a warning banner — the site is
+   not in trouble — it is a statement of what this is, which is why it is
+   always there and never shouts. */
+.dscl{background:var(--raised);border-bottom:1px solid var(--line);padding:0 var(--gut)}
+.dscl .dscl-m{display:block;max-width:var(--maxw);margin:0 auto}
+.dscl-m summary{padding:0;min-height:32px;font:400 var(--t-3)/1.3 var(--ui);color:var(--muted);gap:6px;flex-wrap:wrap}
+.dscl-m summary b{color:var(--text);font-weight:600}
+.dscl-m summary .dscl-more{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.dscl-m summary::after{content:none}
+.dscl .dscl-m p{display:block;padding:0 0 12px;margin:0;font:400 var(--t-3)/1.5 var(--ui);max-width:80ch}
+@media(max-width:640px){.dscl-m summary .dscl-more{display:none}
+  .dscl-m summary::after{content:'›';color:var(--dim)}}
+
+/* ── THE TICKER ────────────────────────────────────────────────────────── */
+.tkr{display:flex;align-items:stretch;height:var(--tkrh);background:var(--bg);border-bottom:1px solid var(--line)}
+.tkr[hidden]{display:none}
+.tkr .stat-live{display:inline-flex;align-items:center;flex:none;padding:0 var(--s-4) 0 var(--gut);
+  border-right:1px solid var(--line);font:500 var(--t-2)/1 var(--mono);color:var(--muted);white-space:nowrap}
+.tkr-row{flex:1;min-width:0}
+.tkr-i{padding:0 14px;align-items:center;height:var(--tkrh)}
+.tkr-seg{height:var(--tkrh);color:var(--dim);background:none}
+@media(max-width:760px){.tkr .stat-live{display:none}}
+
+/* ── MORE ─────────────────────────────────────────────────────────────── */
+.more-dlg{width:min(720px,calc(100vw - 32px));max-height:min(80vh,720px);padding:0;margin:auto;
+  border:1px solid var(--line);border-radius:var(--r-5);background:var(--surface);color:var(--text);
+  box-shadow:var(--e-4);overflow:hidden}
+.more-dlg[open]{display:flex;flex-direction:column}
+.more-dlg::backdrop{background:rgba(15,16,18,.32)}
+.more-dlg-h{display:flex;align-items:center;justify-content:space-between;gap:var(--s-3);
+  padding:var(--s-4) var(--s-5);border-bottom:1px solid var(--line)}
+.more-dlg-h h2{margin:0;font:400 var(--t-9)/1.1 var(--disp);letter-spacing:var(--ls-snug)}
+.more-dlg-b{overflow:auto;padding:var(--s-4) var(--s-5) var(--s-5);display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s-5)}
+.more-g h3{margin:0 0 var(--s-2);font:600 var(--t-2)/1 var(--ui);letter-spacing:var(--ls-wider);
+  text-transform:uppercase;color:var(--dim)}
+.more-l{display:grid;gap:2px}
+.more-l a{display:grid;gap:2px;padding:var(--s-2) var(--s-3);margin:0 calc(var(--s-3) * -1);border-radius:var(--r-3);color:var(--text)}
+.more-l a b{font:500 var(--t-5)/1.3 var(--ui)}
+.more-l a span{font:400 var(--t-3)/1.4 var(--ui);color:var(--dim)}
+@media (hover:hover) and (pointer:fine){.more-l a:hover{background:var(--raised)}}
+.more-dlg-f{display:flex;gap:var(--s-2);padding:var(--s-3) var(--s-5);border-top:1px solid var(--line);background:var(--raised2)}
+.set-btn{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid var(--line);
+  border-radius:var(--r-3);background:var(--surface);color:var(--muted);font:500 var(--t-4)/1 var(--ui);cursor:pointer}
+.set-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6}
+.set-btn[aria-pressed="true"]{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+@media (hover:hover) and (pointer:fine){.set-btn:hover{color:var(--text);border-color:var(--line2)}}
+@media(max-width:640px){
+  .more-dlg{width:100vw;max-width:100vw;max-height:88vh;margin:auto 0 0;border-radius:var(--r-5) var(--r-5) 0 0;border-bottom:0}
+  .more-dlg-b{grid-template-columns:1fr;gap:var(--s-4)}
+  .more-dlg-f{padding-bottom:calc(var(--s-3) + env(safe-area-inset-bottom))}
+}
+
+/* ── FOOTER ───────────────────────────────────────────────────────────── */
+.foot{max-width:none;margin:var(--s-8) 0 0;padding:var(--s-7) var(--gut) var(--s-6);
+  border-top:1px solid var(--line);background:var(--raised2);font:400 var(--t-4)/1.6 var(--ui);color:var(--dim)}
+.foot-in{max-width:var(--maxw);margin:0 auto;display:grid;
+  grid-template-columns:minmax(0,1.6fr) repeat(4,minmax(0,1fr));gap:var(--s-6)}
+.foot-brand p{margin:var(--s-3) 0 0;max-width:38ch;color:var(--muted)}
+.foot-brand .foot-by{color:var(--dim)}
+.foot-col{display:flex;flex-direction:column;gap:var(--s-2);min-width:0}
+.foot-col h2{margin:0 0 var(--s-1);font:600 var(--t-2)/1 var(--ui);letter-spacing:var(--ls-wider);
+  text-transform:uppercase;color:var(--dim)}
+.foot a{color:var(--muted)}
+.foot b{color:var(--text)}
+@media (hover:hover) and (pointer:fine){.foot a:hover{color:var(--text);text-decoration:none}}
+.foot-vis{display:grid;gap:2px;padding:var(--s-3);border:1px solid var(--line);border-radius:var(--r-4);background:var(--surface)}
+.foot-vis span{font-size:var(--t-3);line-height:1.45;color:var(--dim)}
+.foot-legal{max-width:var(--maxw);margin:var(--s-6) auto 0;padding-top:var(--s-4);border-top:1px solid var(--line);
+  font-size:var(--t-3);color:var(--dim)}
+.foot p + p{margin-top:var(--s-2)}
+@media(max-width:1023px){.foot-in{grid-template-columns:repeat(2,minmax(0,1fr))}.foot-brand{grid-column:1/-1}}
+
+/* ════════════════════════════════════════════════════════════════════════
+ * THE OCTOBER 2026 REDESIGN — TYPE AND COMPONENTS
+ *
+ * THREE VOICES, ONE JOB EACH. Newsreader (--disp) sets the few lines that
+ * state what a page is: route titles, the masthead, a lead sentence. Jakarta
+ * (--ui) sets everything a reader operates or scans. JBMono (--mono) sets
+ * figures that must line up. Nothing else.
+ *
+ * THE TICK. The site's one motif: a hairline rule with a short accent stroke
+ * at its start — the mark a grader makes against a scale. It heads every
+ * section and marks the active destination. It is never decoration on its
+ * own; it always sits on a line that divides something.
+ * ════════════════════════════════════════════════════════════════════════ */
+:root{--t-13:52px; --t-14:60px}
+
+main{max-width:var(--maxw);padding:var(--s-6) var(--gut) var(--s-7)}
+h1,.route-h h1{font-family:var(--disp);font-weight:400;letter-spacing:-.018em;line-height:1.06}
+h2,.sec-h h2,h3,h4{font-family:var(--ui)}
+
+/* Route head: eyebrow, serif title, one sentence. Closed by a hairline, not a
+   heavy rule, because the page below it is the point. */
+.route-h{margin:0 0 var(--s-6);padding:0 0 var(--s-5);border-bottom:1px solid var(--line)}
+.route-h .eyebrow,.eyebrow{display:block;font:500 var(--t-3)/1.3 var(--ui);letter-spacing:var(--ls-0);
+  text-transform:none;color:var(--accent);margin-bottom:var(--s-2)}
+.route-h h1{font:400 clamp(var(--t-11),4.2vw,var(--t-13))/1.06 var(--disp);letter-spacing:-.018em;
+  margin:0;color:var(--text);max-width:22ch}
+.route-h p{margin:var(--s-3) 0 0;font:400 clamp(var(--t-6),1.3vw,var(--t-7))/1.55 var(--ui);
+  color:var(--muted);max-width:62ch;letter-spacing:0}
+
+/* Section head: the tick on a hairline, a sentence-case label, a count. */
+.sec{margin-top:var(--s-7)}
+.sec-h{position:relative;display:flex;align-items:baseline;gap:var(--s-3);margin:0 0 var(--s-4);
+  padding-top:var(--s-3);border-top:1px solid var(--line)}
+.sec-h::before{content:"";position:absolute;left:0;top:-1px;width:24px;height:2px;background:var(--accent)}
+.sec-h h2{margin:0;font:600 var(--t-5)/1.2 var(--ui);letter-spacing:-.005em;text-transform:none;color:var(--text)}
+.sec-n{margin-left:auto;font:400 var(--t-3)/1 var(--mono);letter-spacing:0;text-transform:none;color:var(--dim)}
+.sec-lead{margin:0 0 var(--s-4);font:400 clamp(var(--t-7),1.8vw,var(--t-8))/1.3 var(--disp);letter-spacing:-.005em;
+  color:var(--text);max-width:48ch}
+.sec.is-lead{margin-top:var(--s-6);padding-top:0;border-top:0}
+.sec.is-lead .sec-h h2{color:var(--text)}
+.sec.is-lead .sec-lead{font-size:clamp(var(--t-8),2.6vw,var(--t-10));line-height:1.2}
+.sec-note,.hint{color:var(--muted)}
+.sec-note b,.hint b{color:var(--text)}
+.hint a,.sec-note a,.hero-sub a{color:var(--accent);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}
+.secgrid{gap:var(--s-6) var(--s-7)}
+
+/* Tiles are figures on a ruled sheet, not pillows: one hairline, one radius,
+   no fill change on the page colour. */
+.grid{gap:var(--s-2)}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-4);box-shadow:none;
+  padding:var(--s-4);min-height:0}
+.tile .k{font:500 var(--t-3)/1.3 var(--ui);letter-spacing:0;text-transform:none;color:var(--dim);margin-bottom:var(--s-2)}
+.tile .v{font:500 clamp(var(--t-8),2.2vw,var(--t-9))/1.05 var(--mono);letter-spacing:-.02em}
+.tile .sub{font-size:var(--t-3);color:var(--dim)}
+.card,.rank-r{border-radius:var(--r-4)}
+.card{box-shadow:none;border-color:var(--line)}
+@media (hover:hover) and (pointer:fine){.card[data-sym]:hover{transform:none;border-color:var(--line2)}}
+
+/* Controls: chips are toggles on a hairline, the pressed one is ink. */
+.chip{min-height:34px;padding:0 12px;border-radius:var(--r-3);border:1px solid var(--line);background:var(--surface);
+  color:var(--muted);font:500 var(--t-4)/1 var(--ui);display:inline-flex;align-items:center}
+.chip[aria-pressed="true"],.chip.on,.chip.is-on{background:var(--text);color:var(--bg);border-color:var(--text)}
+@media (hover:hover) and (pointer:fine){.chip:hover{border-color:var(--line2);color:var(--text)}
+  .chip[aria-pressed="true"]:hover,.chip.on:hover,.chip.is-on:hover{color:var(--bg)}}
+.pill{border-radius:var(--r-1)}
+.btn-primary{background:var(--accent);color:var(--on-accent);border-radius:var(--r-3);box-shadow:none}
+input[type="search"],input[type="text"],input[type="email"],select{border-radius:var(--r-3)}
+
+/* ── THE MASTHEAD ─────────────────────────────────────────────────────── */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:var(--s-7);align-items:start;
+  padding:var(--s-5) 0 var(--s-6);border-bottom:1px solid var(--line)}
+.hero-l{min-width:0}
+.hero .eyebrow{margin-bottom:var(--s-4)}
+.hero h1{margin:0;font:400 clamp(var(--t-11),5vw,var(--t-14))/1.04 var(--disp);letter-spacing:-.022em;
+  color:var(--text);max-width:17ch;text-wrap:balance}
+.hero-sub{margin:var(--s-5) 0 0;font:400 clamp(var(--t-6),1.35vw,var(--t-7))/1.6 var(--ui);color:var(--muted);max-width:60ch}
+.hero-sub b{color:var(--text);font-weight:600}
+.hero-cta{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s-3);margin-top:var(--s-5)}
+.btn-hero{display:inline-flex;flex-direction:column;justify-content:center;gap:4px;min-height:52px;padding:var(--s-2) var(--s-5);
+  border-radius:var(--r-3);background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);
+  font:600 var(--t-5)/1.1 var(--ui);box-shadow:none}
+.btn-hero em{font:400 var(--t-2)/1.2 var(--ui);font-style:normal;opacity:.82;letter-spacing:0}
+.btn-hero-2{background:var(--surface);color:var(--text);border-color:var(--line2)}
+.btn-hero-2 em{color:var(--dim);opacity:1}
+@media (hover:hover) and (pointer:fine){.btn-hero:hover{background:color-mix(in srgb,var(--accent) 88%,var(--text))}
+  .btn-hero-2:hover{background:var(--raised);border-color:var(--line2)}}
+.btn-ghost{min-height:44px;display:inline-flex;align-items:center;font:500 var(--t-4)/1 var(--ui);color:var(--accent);padding:0 var(--s-1)}
+
+/* Before the open: one ruled table, figures right-aligned in mono. */
+.hero-r{display:block;align-self:stretch;padding:var(--s-4) var(--s-5);border:1px solid var(--line);
+  border-radius:var(--r-4);background:var(--surface)}
+.hero-rh{margin:0 0 var(--s-2);font:600 var(--t-3)/1.2 var(--ui);color:var(--dim)}
+.hero-t{margin:0;display:grid}
+.hero-t > div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--s-1) var(--s-3);align-items:baseline;
+  padding:var(--s-3) 0;border:0;border-top:1px solid var(--line);border-radius:0;background:none}
+.hero-t > div:first-child{border-top:0}
+.hero-t dt{font:500 var(--t-4)/1.3 var(--ui);color:var(--muted)}
+.hero-t dt small{display:block;font:400 var(--t-2)/1.3 var(--ui);color:var(--dim)}
+.hero-t dd{margin:0;display:flex;align-items:baseline;gap:var(--s-2);justify-content:flex-end;flex-wrap:wrap;text-align:right}
+.hero-t .v{font:500 var(--t-6)/1.1 var(--mono);color:var(--text);letter-spacing:-.01em}
+.hero-t .v.up{color:var(--up)} .hero-t .v.dn{color:var(--down)}
+.hero-t .c{font:500 var(--t-3)/1 var(--mono);color:var(--dim)}
+.hero-t .c.up{color:var(--up)} .hero-t .c.dn{color:var(--down)}
+.hero-t .hero-fl dd{flex-direction:column;align-items:flex-end;gap:2px}
+.hero-t .fl-n{font-size:var(--t-3);color:var(--dim)}
+
+/* What Signal does: three numbered columns on one rule. */
+.howto{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:1px solid var(--line)}
+.howto-i{display:grid;gap:var(--s-1);align-content:start;padding:var(--s-5) var(--s-5) var(--s-5) 0;color:var(--text);
+  border-right:1px solid var(--line);transition:background var(--t-fast)}
+.howto-i + .howto-i{padding-left:var(--s-5)}
+.howto-i:last-child{border-right:0}
+.howto-k{font:500 var(--t-2)/1 var(--mono);color:var(--accent);margin-bottom:var(--s-1)}
+.howto-i b{font:600 var(--t-6)/1.3 var(--ui)}
+.howto-i span:not(.howto-k){font:400 var(--t-4)/1.5 var(--ui);color:var(--muted);max-width:40ch}
+@media (hover:hover) and (pointer:fine){.howto-i:hover b{color:var(--accent)}}
+
+/* The sibling band. */
+.fam-band{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:var(--s-6);align-items:center;
+  margin-top:var(--s-7);padding:var(--s-6);border:1px solid var(--line);border-radius:var(--r-5);background:var(--surface)}
+.fam-band h2{margin:0;font:400 clamp(var(--t-8),2.4vw,var(--t-10))/1.2 var(--disp);letter-spacing:-.01em;max-width:24ch}
+.fam-band p{margin:var(--s-3) 0 0;color:var(--muted);font-size:var(--t-5);line-height:1.55;max-width:52ch}
+.fam-band-r{display:grid;gap:var(--s-2)}
+.fam-co{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--s-3);align-items:baseline;padding:var(--s-3) var(--s-4);
+  border:1px solid var(--line);border-radius:var(--r-3);color:var(--text);background:var(--bg)}
+.fam-co b{font:500 var(--t-4)/1 var(--mono)}
+.fam-co span{font-size:var(--t-4);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fam-go{justify-self:start;font:600 var(--t-4)/1 var(--ui);color:var(--accent);padding:var(--s-2) 0}
+.fam-band-r .hint{margin:0;font-size:var(--t-2)}
+@media (hover:hover) and (pointer:fine){.fam-co:hover{border-color:var(--line2)}}
+
+@media(max-width:1023px){
+  .hero{grid-template-columns:1fr;gap:var(--s-5)}
+  .fam-band{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+  main{padding-top:var(--s-4)}
+  .hero{padding-top:var(--s-2)}
+  .hero h1{font-size:var(--t-11)}
+  .hero-cta{display:grid;grid-template-columns:1fr;gap:var(--s-2)}
+  .btn-hero{width:100%}
+  .howto{grid-template-columns:1fr}
+  .howto-i,.howto-i + .howto-i{padding:var(--s-4) 0;border-right:0;border-bottom:1px solid var(--line)}
+  .howto-i:last-child{border-bottom:0}
+  .fam-band{padding:var(--s-5)}
+  .route-h h1{font-size:var(--t-10)}
+}
+
+/* All tools: a ruled list, not a grid of cards. */
+.disc{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 var(--s-6);border-top:1px solid var(--line)}
+.disc-c{grid-template-columns:minmax(0,1fr) auto;padding:var(--s-4) 0;border:0;border-bottom:1px solid var(--line);
+  border-radius:0;background:none;box-shadow:none}
+.disc-n{font:600 var(--t-6)/1.3 var(--ui);text-align:left;grid-column:1}
+.disc-s{font:500 var(--t-4)/1.4 var(--ui);color:var(--muted)}
+.disc-w{font:400 var(--t-4)/1.5 var(--ui);color:var(--dim);max-width:56ch}
+.disc-go{grid-column:2;grid-row:1/4;color:var(--dim)}
+@media (hover:hover) and (pointer:fine){.disc-c:hover{background:none}.disc-c:hover .disc-n{color:var(--accent)}.disc-c:hover .disc-go{color:var(--accent)}}
+@media(max-width:760px){.disc{grid-template-columns:1fr}}
+
+/* Motion: one entrance, and none for a reader who asked for none. */
+@media (prefers-reduced-motion:reduce){
+  .sec,main.is-nav,main.route-in{animation:none}
+}
+
+/* NO SCROLL-DRIVEN REVEAL. Every section faded in as it crossed the viewport
+   (animation-timeline:view()), so a reader scrolling fast saw half-transparent
+   figures and a printed or captured page showed blanks where data was. Data
+   is on the page or it is not; it does not perform its arrival. The one
+   entrance kept is the route change, which acknowledges an input. */
+@supports (animation-timeline:view()){
+  @media (prefers-reduced-motion:no-preference){
+    .sec,.secgrid .sec,.hero,.howto{animation:none;opacity:1;transform:none}
+  }
+}
+main{max-width:calc(var(--maxw) + var(--gut) * 2)}
+.hero-r{align-self:start}
+@media(max-width:640px){.dscl-m summary{font-size:var(--t-2)}}
+/* One weight of rule on the whole site: the hairline, with the tick. The 2px
+   ink bars above a "lead" section were a newspaper's column rule, and on a
+   page already ruled by .sec-h they read as a second, louder system. */
+.sec:first-of-type:has(.sec-lead){margin-top:var(--s-7);padding-top:0;border-top:0}
+.spk{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-4)}
+@media (hover:hover) and (pointer:fine){.spk:hover{background:var(--surface);border-color:var(--line2)}}
+/* A CLASS COLLISION THAT SCROLLED EVERY STOCK PAGE SIDEWAYS. The stock card
+   lists its bar rows (.bar-r) inside a `.baro`, which is also the front
+   page's barometer — a flex ROW. Six 276px rows side by side made /stock/*
+   576px wider than a 1280px window. A .baro holding bar rows stacks them. */
+.baro:has(> .bar-r){display:grid;gap:var(--s-2);grid-template-columns:minmax(0,1fr)}
+/* The first section's thesis line was blown up to 44px on every route; with
+   the serif back as the display voice that turned two short sentences into a
+   poster (measured on /stock: 190px of headline in each column). One size for
+   a lead line; the page's h1 is the only thing allowed to be big. */
+.sec:first-of-type:has(.sec-lead) .sec-lead,.sec.is-lead .sec-lead{font-size:clamp(var(--t-7),1.9vw,var(--t-9));line-height:1.25}
+.secgrid .sec-lead,.sec.is-lead ~ .sec.is-lead .sec-lead{font-size:clamp(var(--t-6),1.6vw,var(--t-8))}
+/* Tiles and the summary strip are figures on the sheet: white on paper, one
+   hairline, no tint. The tint made the most important numbers on each page
+   read as the least important surface. */
+.grid > .tile,.snap > *{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-4)}
+@media (hover:hover) and (pointer:fine){.grid > .tile:hover,.snap > *:hover{background:var(--surface);border-color:var(--line2)}}
+.snap{background:none}
+.snap-r{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-4)}
+.snap-k{font:500 var(--t-3)/1.3 var(--ui);letter-spacing:0;text-transform:none;color:var(--dim)}
+.snap-v{font:500 var(--t-7)/1.1 var(--mono)}
+.snap-s{font-size:var(--t-3);color:var(--dim)}
+
+.fam-band-l{min-width:0}
+.foot-fam .foot-vis{margin-bottom:var(--s-1)}
+/* On a phone the company page's "Open in Vision" line is longer than the
+   column; it wraps rather than pushing the page 2px sideways. */
+@media(max-width:560px){.to-vision{white-space:normal}}
+/* The pre-rendered snapshot wears the masthead's type, so the swap to the live
+   page changes the numbers and nothing else. */
+.pre{max-width:calc(var(--maxw) + var(--gut) * 2);margin:0 auto;padding:var(--s-6) var(--gut) var(--s-4)}
+.pre-k{font:500 var(--t-3)/1.3 var(--ui);letter-spacing:0;text-transform:none;color:var(--accent)}
+.pre-h{font:400 clamp(var(--t-11),5vw,var(--t-14))/1.04 var(--disp);letter-spacing:-.022em;max-width:17ch}
+.pre-s{max-width:60ch}
+/* The tool list is twice as long as the other three groups together, so it
+   takes the first column whole and the rest stack beside it. */
+@media(min-width:641px){.more-g:first-child{grid-row:1 / span 3}}
+@media(max-width:640px){.more-dlg{width:100vw;max-width:100vw;left:0;right:0}}
+.join h1{font:400 clamp(var(--t-11),4.2vw,var(--t-13))/1.06 var(--disp);letter-spacing:-.018em}
+/* The pre-rendered snapshot is shorter than the live page, so the footer and
+   the freshness line sat inside the first screen and jumped when the app
+   painted — most of the measured CLS on the front page. <main> reserves a full
+   screen, so nothing below it is on screen to move. */
+main{min-height:calc(100vh - var(--barh))}
+/* A price is ink; its change carries the colour. Nifty's level turned red on
+   a down day while Sensex's did not — two answers to one question in one
+   table. Only the FII/DII net figures, which ARE signed amounts, are tinted. */
+.hero-t .hero-reg .v:not(.up):not(.dn),.hero-t .hero-q .v:not(.up):not(.dn){color:var(--text)}

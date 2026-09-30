@@ -8,9 +8,10 @@
  *    small on purpose: 7 sizes (plus --t-2xs for axis and tile labels
  *    only), 6 gaps, 2 radii. A value that is not on the
  *    scale is a decision nobody made.
- *  - Dark is the primary ground. Light is designed separately, not inverted:
- *    the up/down hues, the elevation and the hairlines are all re-chosen for a
- *    white ground, because an inverted dark theme reads grey and washed out.
+ *  - Light is the default and follows the reader's system, as on Signal; the
+ *    two products share one palette, one accent and one display face. Dark is
+ *    designed separately, not inverted: the up/down hues, the elevation and
+ *    the hairlines are re-chosen for each ground.
  *  - Direction is never colour alone. Every move carries its sign and a glyph
  *    (▲ ▼), so the page reads in greyscale and to a red-green colour-blind eye.
  *  - Motion states something (a value changed, a panel opened, data is being
@@ -19,6 +20,8 @@
 
 @font-face{font-family:'Jakarta';font-style:normal;font-weight:200 800;font-display:swap;
   src:url('/fonts/PlusJakarta-var-latin.woff2') format('woff2-variations')}
+@font-face{font-family:'Newsreader';font-style:normal;font-weight:400;font-display:swap;
+  src:url('/fonts/Newsreader-400-latin.woff2') format('woff2')}
 @font-face{font-family:'JBMono';font-style:normal;font-weight:400;font-display:swap;
   src:url('/fonts/JetBrainsMono-400-latin.woff2') format('woff2')}
 @font-face{font-family:'JBMono';font-style:normal;font-weight:500;font-display:swap;
@@ -29,68 +32,75 @@
   /* type — one family for words, one for numbers */
   --f-sans:'Jakarta',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
   --f-mono:'JBMono',ui-monospace,'SF Mono',Menlo,monospace;
+  /* The display voice, shared with Signal: page titles and the home's one
+     headline. Never a label, a figure or a paragraph. */
+  --f-disp:'Newsreader',Georgia,'Times New Roman',serif;
   --t-2xs:10px; --t-xs:11px; --t-sm:12px; --t-md:13px; --t-lg:14px; --t-xl:16px; --t-2x:20px; --t-3x:28px;
+  /* Display steps, for the serif titles only (2026-10). */
+  --t-d1:34px; --t-d2:40px; --t-d3:56px;
 
   /* space — a 4px grid, six steps */
   --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px;
 
-  --r-1:6px; --r-2:10px;
-  --top-h:52px; --tick-h:34px; --tab-h:58px;
-  --maxw:1480px;
+  --r-1:6px; --r-2:10px; --r-3:14px;
+  --top-h:60px; --tick-h:32px; --tab-h:60px;
+  --maxw:1240px;
 
   --ease:cubic-bezier(.2,.7,.2,1);
   --d-fast:120ms; --d-med:200ms; --d-slow:320ms;
 }
 
-/* DARK — primary. Near-black with a blue cast, three surface steps, and
-   hairlines drawn in white at low alpha so they sit ON the surface rather
-   than cutting through it. */
-:root,:root[data-theme="dark"]{
+/* DARK — the same neutrals as Signal's dark theme: near-black without a blue
+   cast, three surface steps, solid hairlines. */
+:root[data-theme="dark"]{
   color-scheme:dark;
-  --bg:#07090D;
-  --bg-2:#0B0E14;
-  --panel:#0F131A;
-  --panel-2:#141922;
-  --panel-3:#1A202B;
-  --line:rgba(255,255,255,.065);
-  --line-2:rgba(255,255,255,.11);
-  --ink:#E7EBF1;
-  --ink-2:#A6AFBD;
-  --ink-3:#6F7988;
-  --ink-4:#4A5261;
-  --accent:#7C9BFF;
-  --accent-bg:rgba(124,155,255,.12);
-  --up:#3DD68C;  --up-rgb:61,214,140;
-  --dn:#FF6B6B;  --dn-rgb:255,107,107;
-  --warn:#F2B84B; --warn-rgb:242,184,75;
-  --neutral-rgb:140,150,165;
-  --shadow:0 0 0 1px rgba(255,255,255,.04) inset,0 12px 40px -12px rgba(0,0,0,.7);
-  --shadow-pop:0 0 0 1px rgba(255,255,255,.07) inset,0 24px 80px -16px rgba(0,0,0,.85);
-  --scrim:rgba(3,5,8,.62);
+  --bg:#0F1012;
+  --bg-2:#131417;
+  --panel:#16171A;
+  --panel-2:#1D1F23;
+  --panel-3:#24262B;
+  --line:#2A2C31;
+  --line-2:#383B41;
+  --ink:#EDEDEB;
+  --ink-2:#B4B6BA;
+  --ink-3:#8C8F95;
+  --ink-4:#62656B;
+  --accent:#8DA2FF;
+  --accent-bg:rgba(141,162,255,.12);
+  --up:#3CC98C;  --up-rgb:60,201,140;
+  --dn:#FF7B6F;  --dn-rgb:255,123,111;
+  --warn:#E3AE45; --warn-rgb:227,174,69;
+  --neutral-rgb:140,143,149;
+  --shadow:0 0 0 1px rgba(255,255,255,.03) inset,0 1px 2px rgba(0,0,0,.3);
+  --shadow-pop:0 0 0 1px rgba(255,255,255,.05) inset,0 24px 56px rgba(0,0,0,.6);
+  --scrim:rgba(8,9,10,.6);
 }
-:root[data-theme="light"]{
+/* LIGHT — the default since 2026-10, following the reader's system setting
+   exactly as Signal does. Paper page, white panels, one cobalt accent: the
+   same values as signal.css, because two products from one desk that look
+   like strangers is the problem this redesign exists to fix. */
+:root,:root[data-theme="light"]{
   color-scheme:light;
-  --bg:#F4F5F7;
-  --bg-2:#ECEEF2;
+  --bg:#F8F7F4;
+  --bg-2:#F1F0EC;
   --panel:#FFFFFF;
-  --panel-2:#F7F8FA;
-  --panel-3:#EEF0F4;
-  --line:rgba(12,18,28,.08);
-  --line-2:rgba(12,18,28,.14);
-  --ink:#0D1117;
-  --ink-2:#434B57;
-  --ink-3:#6B7482;
-  --ink-4:#9AA2AE;
-  --accent:#3056E0;
-  --accent-bg:rgba(48,86,224,.09);
-  /* Darker than the dark theme's hues: a mid-green on white fails contrast. */
-  --up:#0B8A55;  --up-rgb:11,138,85;
-  --dn:#D23B3B;  --dn-rgb:210,59,59;
-  --warn:#A86B00; --warn-rgb:168,107,0;
-  --neutral-rgb:120,128,140;
-  --shadow:0 0 0 1px rgba(12,18,28,.06),0 8px 24px -12px rgba(12,18,28,.18);
-  --shadow-pop:0 0 0 1px rgba(12,18,28,.08),0 24px 64px -16px rgba(12,18,28,.28);
-  --scrim:rgba(12,18,28,.32);
+  --panel-2:#FBFAF8;
+  --panel-3:#F1F0EC;
+  --line:#E4E2DC;
+  --line-2:#D3D0C8;
+  --ink:#16181D;
+  --ink-2:#474B53;
+  --ink-3:#676B73;
+  --ink-4:#9A9DA3;
+  --accent:#2743C8;
+  --accent-bg:rgba(39,67,200,.07);
+  --up:#0B7A55;  --up-rgb:11,122,85;
+  --dn:#C4372C;  --dn-rgb:196,55,44;
+  --warn:#8F5E00; --warn-rgb:143,94,0;
+  --neutral-rgb:120,123,130;
+  --shadow:0 1px 0 rgba(22,24,29,.03),0 1px 2px rgba(22,24,29,.04);
+  --shadow-pop:0 2px 4px rgba(22,24,29,.05),0 24px 56px rgba(22,24,29,.18);
+  --scrim:rgba(15,16,18,.32);
 }
 
 /* ── BASE ───────────────────────────────────────────────────────────────── */
@@ -774,3 +784,80 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
   font-size:var(--t-xs);color:var(--ink);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s}
 .own-tip.on{opacity:1}
 .own-tbl{margin-top:var(--s-2)} .own-tbl summary{cursor:pointer;font-size:var(--t-xs);color:var(--ink-3)}
+
+/* ════════════════════════════════════════════════════════════════════════
+ * THE OCTOBER 2026 REDESIGN — VISION ON SIGNAL'S SYSTEM
+ *
+ * Same header anatomy as Signal (family, five destinations, utilities), same
+ * paper neutrals and cobalt accent, same display serif for titles, same tick
+ * on the hairline for section heads. What stays Vision's own is its layout:
+ * panels arranged for scanning one company, which is the product's job.
+ * ════════════════════════════════════════════════════════════════════════ */
+.top{height:var(--top-h);background:var(--bg);backdrop-filter:none;-webkit-backdrop-filter:none;
+  border-bottom:1px solid var(--line)}
+.top-in{max-width:var(--maxw);padding:0 var(--s-5);gap:var(--s-5)}
+.fam{display:flex;align-items:center;gap:var(--s-2);flex:none}
+.fam svg{width:20px;height:20px;flex:none}
+.up-link{display:inline-flex;align-items:center;gap:var(--s-2);padding:0;border:0;border-radius:0;
+  color:var(--ink-3);font:500 var(--t-md)/1 var(--f-sans);min-height:44px}
+.up-link .fam-mark rect{fill:var(--ink-3)}
+.up-link .fam-mark path{stroke:var(--panel);stroke-width:1.6;stroke-linecap:round;fill:none}
+.up-link:hover{color:var(--ink)} .up-link:hover .fam-mark rect{fill:var(--accent)}
+.fam-sep{color:var(--line-2);font:300 var(--t-2x)/1 var(--f-sans)}
+.brand{display:inline-flex;align-items:center;gap:var(--s-2);min-height:44px;letter-spacing:0;
+  font:400 var(--t-2x)/1 var(--f-disp);color:var(--ink)}
+.brand i,.brand em{display:none}
+.brand .brand-mark rect{fill:none;stroke:var(--accent);stroke-width:1.6}
+.brand .brand-mark path{stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;fill:none}
+.brand:hover{color:var(--ink)}
+
+.nav{justify-content:center;gap:2px;height:100%;overflow:visible}
+.nav a,.nav-more{position:relative;display:inline-flex;align-items:center;height:100%;padding:0 var(--s-3);
+  border-radius:0;background:none;color:var(--ink-2);font:500 var(--t-lg)/1 var(--f-sans)}
+.nav a:hover,.nav-more:hover{background:none;color:var(--ink)}
+.nav a[aria-current="page"],.nav-more[aria-current="page"]{background:none;color:var(--ink)}
+.nav a[aria-current="page"]::after,.nav-more[aria-current="page"]::after{content:"";position:absolute;
+  left:var(--s-3);right:var(--s-3);bottom:-1px;height:2px;background:var(--accent)}
+.kbtn{height:36px;border:1px solid var(--line);border-radius:var(--r-2);background:var(--panel);color:var(--ink-3)}
+.kbtn kbd,.kbd{background:var(--panel-3);border-color:var(--line)}
+.ibtn{width:36px;height:36px;border-radius:var(--r-2)}
+
+.dscl{background:var(--bg-2);border-bottom:1px solid var(--line);color:var(--ink-2);font-size:var(--t-sm)}
+.dscl b{color:var(--ink)}
+.dscl a{color:var(--accent)}
+.tick{background:var(--bg);border-bottom:1px solid var(--line)}
+
+/* Titles: the display serif, as on Signal. */
+.vhead h1{font:400 clamp(var(--t-3x),3.6vw,var(--t-d2))/1.08 var(--f-disp);letter-spacing:-.018em}
+.vhead .eb{font:500 var(--t-sm)/1.3 var(--f-sans);letter-spacing:0;text-transform:none;color:var(--accent)}
+.hero2{padding:var(--s-6) 0 var(--s-5);max-width:820px}
+.hero2 h1{font:400 clamp(var(--t-d1),5vw,var(--t-d3))/1.05 var(--f-disp);letter-spacing:-.022em;max-width:18ch}
+.hero2 .sub{font-size:var(--t-xl);color:var(--ink-2);margin:var(--s-4) 0 var(--s-5)}
+
+/* Panels: white sheet, hairline, the tick above the heading. */
+.pn{border-radius:var(--r-3);box-shadow:none;border-color:var(--line);background:var(--panel)}
+.ph{position:relative;border-bottom:1px solid var(--line)}
+.ph::before{content:"";position:absolute;left:var(--s-4);top:-1px;width:20px;height:2px;background:var(--accent)}
+.ph h2{font:600 var(--t-md)/1.2 var(--f-sans);letter-spacing:-.005em;text-transform:none;color:var(--ink)}
+
+@media (max-width:1080px){ .fam-sep,.up-link span{display:none} }
+@media (max-width:760px){
+  .top-in{padding:0 var(--s-3);gap:var(--s-3)}
+  .up-link{min-height:44px}
+  .tabs{background:var(--bg);border-top:1px solid var(--line)}
+  .tabs a[aria-current="page"],.tabs button[aria-current="page"]{color:var(--accent)}
+  .hero2 h1{font-size:var(--t-d1)}
+}
+.nav a{text-transform:none;letter-spacing:0}
+.ah h1{font:400 var(--t-d2)/1.05 var(--f-disp);letter-spacing:-.02em}
+@media (max-width:760px){ .ah h1{font-size:var(--t-d1)} }
+/* Labels in sentence case, as on Signal: an uppercase tracked label is a
+   dashboard's voice, and these are the names of measurements. */
+.kv em,.ph h2,.drw-b h3,h3.k,.wc h3{text-transform:none;letter-spacing:0}
+.kv em{font-size:var(--t-sm)}
+/* The ruled grid draws its lines with a 1px gap over the line colour, so an
+   empty trailing cell showed as a grey block. The filler takes the rest of
+   the last row in the panel colour. */
+.kv::after{content:"";background:var(--panel);grid-column:auto / -1}
+.dscl{text-align:left}
+@media (min-width:761px){ .dscl-full{display:block;max-width:var(--maxw);margin:0 auto} }
