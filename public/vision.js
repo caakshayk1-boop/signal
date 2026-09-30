@@ -297,7 +297,9 @@
     quotes: {}, prevPx: {},
     watch: store.get('vis:watch', []),
     alerts: store.get('vis:alerts', []),
+    recent: store.get('vis:recent', []),
   };
+  const noteRecent = (sym) => { S.recent = [sym].concat(S.recent.filter((x) => x !== sym)).slice(0, 12); store.set('vis:recent', S.recent); };
   const saveWatch = () => { store.set('vis:watch', S.watch); paintStars(); };
   const watching = (sym) => S.watch.some((w) => w.s === bare(sym));
   const toggleWatch = (sym) => {
@@ -366,41 +368,63 @@
   /* ── ROUTES ─────────────────────────────────────────────────────────────
      Hash routes. The Worker maps the vision host's "/" to this one shell, so
      every route is a fragment — no route list to keep in step server-side. */
+  /* ONE PARENT, ONE CHILD. signal.askakshay.com decides what deserves
+     attention; Vision explains why. Every link back to the parent goes
+     through this constant — guard.mjs allows no other spelling of it. */
+  const SIGNAL_URL = 'https://signal.askakshay.com';
+  const VISION_URL = 'https://vision.askakshay.com';
+  /* The file key for a symbol: M&M and GMRP&UI carry characters a path
+     should not. The same rule as scripts/company-pages.mjs and src/seo.js. */
+  const keyOf = (sym) => String(sym).toUpperCase().replace(/[^A-Z0-9-]/g, '_');
+  const resolveSym = (k) => { const K = bare(k); if (!SCR || SCR[K]) return K;
+    return Object.keys(SCR).find((x) => keyOf(x) === K) || K; };
+
+  /* COMPANY-FIRST. The first six are the research path — find a company,
+     compare it, the two setups, the screen, the map, the day. The rest are
+     one tap away under More; nothing was removed. */
   const NAV = [
-    ['today', 'Today', '#/today'], ['overview', 'Overview', '#/'], ['markets', 'Markets', '#/markets'],
-    ['screener', 'Screener', '#/screener'], ['setups', 'Signals', '#/setups'], ['heatmap', 'Heatmap', '#/heatmap'], ['news', 'News', '#/news'],
+    ['home', 'Companies', '#/'], ['compare', 'Compare', '#/compare'], ['setups', 'Signals', '#/setups'],
+    ['screener', 'Screener', '#/screener'], ['heatmap', 'Heatmap', '#/heatmap'], ['today', 'Today', '#/today'],
+    ['cockpit', 'Cockpit', '#/cockpit'], ['markets', 'Markets', '#/markets'], ['news', 'News', '#/news'],
     ['watchlist', 'Watchlist', '#/watchlist'], ['alerts', 'Alerts', '#/alerts'],
   ];
+  const PRIMARY = ['home', 'compare', 'setups', 'screener', 'heatmap', 'today'];
   const ICON = {
+    home: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+    setups: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+    compare: '<path d="M5 20V9M12 20V4M19 20v-7"/>',
     today: '<path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/>',
-    overview: '<path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z"/>',
+    cockpit: '<path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z"/>',
     screener: '<path d="M4 6h16M4 12h16M4 18h10"/>',
     heatmap: '<path d="M4 4h9v9H4zM15 4h5v5h-5zM15 11h5v9h-5zM4 15h9v5H4z"/>',
     watchlist: '<path d="m12 2.8 2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.3l-5.6 2.9 1.1-6.3L2.9 9.5l6.3-.9z"/>',
     more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   };
-  /* Today leads the phone tabs: it is the morning read, and the screener is
-     one tap away under More. */
-  const TABS = ['today', 'overview', 'heatmap', 'watchlist'];
+  const TABS = ['home', 'setups', 'screener', 'heatmap'];
   const svgI = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
 
   function paintNav(cur) {
-    $('#nav').innerHTML = NAV.map(([k, t, h]) => `<a href="${h}"${k === cur ? ' aria-current="page"' : ''}>${t}</a>`).join('');
+    $('#nav').innerHTML = NAV.filter(([k]) => PRIMARY.includes(k)).map(([k, t, h]) => `<a href="${h}"${k === cur ? ' aria-current="page"' : ''}>${t}</a>`).join('')
+      + `<button type="button" class="nav-more" id="navMore"${PRIMARY.includes(cur) || !cur ? '' : ' aria-current="page"'} aria-haspopup="dialog">More</button>`;
+    $('#navMore').onclick = openMore;
     $('#tabs').innerHTML = TABS.map((k) => { const n = NAV.find((x) => x[0] === k);
       return `<a href="${n[2]}"${k === cur ? ' aria-current="page"' : ''}>${svgI(k)}${n[1]}</a>`; }).join('')
-      + `<button type="button" id="moreBtn"${TABS.includes(cur) ? '' : ' aria-current="page"'}>${svgI('more')}More</button>`;
+      + `<button type="button" id="moreBtn"${TABS.includes(cur) || !cur ? '' : ' aria-current="page"'}>${svgI('more')}More</button>`;
     $('#moreBtn').onclick = openMore;
   }
   function openMore() {
-    drawer('More', `<div class="more">${NAV.filter(([k]) => !TABS.includes(k)).map(([k, t, h]) =>
+    const small = innerWidth < 1100;
+    drawer('More', `<div class="more">${NAV.filter(([k]) => !(small ? TABS : PRIMARY).includes(k)).map(([k, t, h]) =>
       `<a href="${h}"><b>${t}</b><span>${esc(BLURB[k] || '')}</span></a>`).join('')}
+      <a href="${SIGNAL_URL}/"><b>← Signal</b><span>The parent product: what deserves attention today, and the public ledger</span></a>
       <a href="#" data-act="theme"><b>Theme</b><span>Switch dark / light</span></a>
-      <a href="#" data-act="search"><b>Search</b><span>Any symbol or page</span></a></div>`);
+      <a href="#" data-act="search"><b>Search</b><span>Any company or page</span></a></div>`);
   }
   const BLURB = {
+    home: 'Search any company — what matters, what changed', compare: 'Up to five companies, side by side',
     markets: 'Indices, FX, commodities, crypto, flows', screener: 'Every name on the NSE screen',
     setups: 'Bottom reversal and 4H breakout, with levels', news: 'The wire, matched to names', alerts: 'Price alerts in this browser',
-    today: 'The day in two minutes — it ends', overview: 'The market on one screen', heatmap: 'Every liquid name, by sector', watchlist: 'Names you follow',
+    today: 'The day in two minutes — it ends', cockpit: 'The market on one screen', heatmap: 'Every liquid name, by sector', watchlist: 'Names you follow',
   };
 
   /* ── TICKER ─────────────────────────────────────────────────────────────
@@ -504,10 +528,17 @@
     const Q = q.trim().toUpperCase(), out = [];
     const pages = NAV.map(([k, t, h]) => ({ k: 'Page', t, sub: BLURB[k] || '', go: h }));
     const acts = [
+      { k: 'Action', t: 'Compare companies', sub: 'Up to five, side by side', go: '#/compare' },
+      { k: 'Action', t: 'Back to Signal', sub: 'signal.askakshay.com — the parent product', href: SIGNAL_URL + '/' },
       { k: 'Action', t: 'Switch theme', sub: 'Dark / light', run: toggleTheme },
       { k: 'Page', t: 'Disclaimer', sub: 'What this site is and is not', go: '#/disclaimer' },
     ];
-    if (!Q) return pages.concat(acts).concat(S.watch.slice(0, 6).map((w) => ({ k: 'Watch', t: w.s, sub: (SCR && SCR[w.s] && SCR[w.s].name) || '', go: '#/asset/' + w.s })));
+    const nm = (x) => (SCR && SCR[x] && SCR[x].name) || '';
+    if (!Q) return S.recent.slice(0, 5).map((x) => ({ k: 'Recent', t: x, sub: nm(x), go: '#/asset/' + x }))
+      .concat(S.watch.slice(0, 5).filter((w) => !S.recent.includes(w.s)).map((w) => ({ k: 'Watch', t: w.s, sub: nm(w.s), go: '#/asset/' + w.s })))
+      .concat(pages, acts);
+    if (SCR && SCR[Q]) out.push({ k: 'Action', t: `Compare ${Q} with peers`, sub: 'Its closest peers by industry and size', go: '#/compare?s=' + [Q].concat(peersOf(Q)).join(','), sc: 0.5 },
+      { k: 'Action', t: `${Q} on Signal`, sub: 'Its published record on the parent site ↗', href: `${SIGNAL_URL}/stock/${encodeURIComponent(Q)}`, sc: 0.6 });
     const seen = new Set();
     const addSym = (sym, name, k) => { if (seen.has(sym)) return; seen.add(sym);
       const sc = sym === Q ? 0 : sym.startsWith(Q) ? 1 : (name || '').toUpperCase().startsWith(Q) ? 2 : sym.includes(Q) ? 3 : (name || '').toUpperCase().includes(Q) ? 4 : 9;
@@ -535,7 +566,7 @@
       $('#palN').textContent = SCR ? `${Object.keys(SCR).length.toLocaleString('en-IN')} names searchable` : 'loading the screen…';
       const sel = $('#po' + palSel); if (sel) sel.scrollIntoView({ block: 'nearest' });
     };
-    const run = (it) => { if (!it) return; closeLayer(); if (it.run) it.run(); else if (it.go) location.hash = it.go; };
+    const run = (it) => { if (!it) return; closeLayer(); if (it.run) it.run(); else if (it.href) location.href = it.href; else if (it.go) location.hash = it.go; };
     inp.addEventListener('input', () => { palSel = 0; paint(); });
     inp.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowDown') { e.preventDefault(); palSel = Math.min(palSel + 1, palItems.length - 1); paint(); }
@@ -564,15 +595,22 @@
     const raw = location.hash.replace(/^#\/?/, ''), qi = raw.indexOf('?');
     const h = decodeURIComponent(qi < 0 ? raw : raw.slice(0, qi));
     const [name, ...rest] = h.split('/');
-    return { name: name || 'overview', arg: rest.join('/'), params: new URLSearchParams(qi < 0 ? '' : raw.slice(qi + 1)) };
+    /* /company/<KEY> is a real path — the Worker writes its HTML for readers
+       without JavaScript and for search — and the app opens it as that
+       company's page. Any hash route wins over the path. */
+    if (!raw) { const m = location.pathname.match(/^\/company\/([^/]+)\/?$/); if (m) return { name: 'asset', arg: decodeURIComponent(m[1]), params: new URLSearchParams() }; }
+    return { name: name || 'home', arg: rest.join('/'), params: new URLSearchParams(qi < 0 ? '' : raw.slice(qi + 1)) };
   };
   async function render() {
     hideTip();
+    /* Leaving a /company/ page for a hash route: put the path back to the
+       root, or the address bar reads /company/TCS#/screener. */
+    if (location.hash && /^\/company\//.test(location.pathname)) history.replaceState(null, '', '/' + location.hash);
     const { name, arg, params } = route();
     const tok = ++navTok;
     closeLayer();
     cur = { name, arg, tok, live: null };
-    paintNav(NAV.some((n) => n[0] === name) ? name : (name === 'asset' ? '' : name));
+    paintNav(NAV.some((n) => n[0] === name) ? name : '');
     const main = $('#main');
     main.innerHTML = '';
     const view = document.createElement('div'); view.className = 'view'; main.appendChild(view);
@@ -587,7 +625,7 @@
     }
     paintStars(); paintBadges();
   }
-  const setTitle = (t) => { document.title = t ? `${t} · Vision` : 'Vision — your market cockpit'; };
+  const setTitle = (t) => { document.title = t ? `${t} · Vision` : 'Vision — understand any Indian company in minutes'; };
   const vhead = (eb, title, sub, right) => { setTitle(title);
     return `<div class="vhead"><div><span class="eb">${esc(eb)}</span><h1>${esc(title)}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${right ? `<div class="vhead-r">${right}</div>` : ''}</div>`; };
 
@@ -849,6 +887,153 @@
      numbers came from and how old they are, and a last line that says the
      page is over. It computes nothing new — every figure is one the other
      views already show — so the brief cannot disagree with the cockpit. */
+  /* ── COMPANY DATA, INSIGHT, DEFINITIONS ─────────────────────────────────
+     /c/<KEY>.json is written at deploy (scripts/company-pages.mjs): the
+     screen's row for one company including the fields screen-lite drops
+     (margins, the since-last-build deltas), its shareholding and any open
+     Vision setup. insight.js turns it into "what matters" and "what changed"
+     — the same file the Worker runs to write the page's HTML. */
+  const INS = () => window.VisionInsight || null;
+  F.co = (sym) => get(`/c/${keyOf(sym)}.json`, 600000);
+  F.site = () => get('/c/_site.json', 600000);
+  /* Peers: same industry, else same sector, nearest in market value. */
+  const peersOf = (sym, n = 3) => {
+    const r = SCR && SCR[sym]; if (!r) return [];
+    const lm = (x) => Math.log(Math.max(1, num(x.mcap_cr) || 1));
+    const pool = Object.values(SCR).filter((x) => x.sym !== sym && num(x.mcap_cr) != null);
+    const same = pool.filter((x) => r.ind && x.ind === r.ind);
+    const base = same.length >= n ? same : pool.filter((x) => x.sector && x.sector === r.sector);
+    return base.sort((a, b) => Math.abs(lm(a) - lm(r)) - Math.abs(lm(b) - lm(r))).slice(0, n).map((x) => x.sym);
+  };
+  /* A definition next to the number it defines. */
+  const defn = (term) => (INS() && INS().GLOSSARY[term]) ? `<button type="button" class="def" data-def="${esc(term)}" aria-label="What is ${esc(term)}?">i</button>` : '';
+  document.addEventListener('click', (e) => { const b = e.target.closest('[data-def]'); if (!b || !INS()) return; e.preventDefault(); e.stopPropagation();
+    drawer(esc(b.dataset.def), `<p class="note" style="font-size:var(--t-md)">${esc(INS().GLOSSARY[b.dataset.def] || '')}</p>`); }, true);
+  const srcNote = (items) => { const u = [...new Set(items.map((i) => i.src).filter(Boolean))];
+    return u.length ? `<p class="note src">Sources: ${u.map(esc).join(' · ')}.</p>` : ''; };
+  const MT_DEF = { ROCE: 'ROCE', Valuation: 'PE percentile', 'Cash conversion': 'Cash conversion', 'Price, 1 month': 'Relative strength' };
+  const mattersHtml = (mt) => mt.length ? `<div class="kv intel-kv" style="margin-top:0">${mt.map((m) => `<div title="${esc(m.src)}"><em>${esc(m.k)} ${defn(MT_DEF[m.k])}</em><b class="${m.tone}">${esc(m.v)}</b><small>${esc(m.sub || '')}</small></div>`).join('')}</div>${srcNote(mt)}`
+    : empty('Nothing measured', 'The screen carries no statements for this company.');
+  const changesHtml = (ch, T) => {
+    const grp = (k, h, cls) => ch[k].length ? `<div class="wc ${cls}"><h3>${h}</h3><ul>${ch[k].map((i) => `<li><b>${esc(i.t)}</b><span>${esc(i.basis)}</span><small>${esc(i.src)}</small></li>`).join('')}</ul></div>` : '';
+    const any = ch.improved.length + ch.weakened.length + ch.watch.length + ch.events.length;
+    return (any ? `<div class="wcg">${grp('improved', 'Improved', 'up')}${grp('weakened', 'Weakened', 'dn')}${grp('watch', 'Worth weighing', 'warn')}${grp('events', 'Events', '')}</div>`
+      : empty('No measured change crossed its threshold', 'Since the last filing and the last screen build, nothing moved far enough to report. That is a result, not a gap.'))
+      + (T ? `<details class="how"><summary>How these are decided</summary><p class="note">Each line is a threshold on a published field, never a model: growth ±${T.growthPP} pp against the multi-year rate · ROCE ±${T.rocePP} pp against its own median · EBIT margin ±${T.marginPP} pp · 1-month return ±${T.relPP} pp against the screen's median · a screen score move of ${T.scoreMove}+ points · volume ${T.volX}× · results within ${T.earnDays} days · PE above the ${T.peHi}th or below the ${T.peLo}th percentile of its own history. Descriptive, not a recommendation.</p></details>` : '');
+  };
+
+  /* ── COMPANIES (home) ──────────────────────────────────────────────────
+     Search is the hero. Signal finds what deserves attention; this is where
+     a name is understood. */
+  const hilite = (txt, Q) => { const t = String(txt || ''), i = Q ? t.toUpperCase().indexOf(Q) : -1;
+    return i < 0 ? esc(t) : `${esc(t.slice(0, i))}<mark>${esc(t.slice(i, i + Q.length))}</mark>${esc(t.slice(i + Q.length))}`; };
+  const findCo = (q, n = 8) => { const Q = q.trim().toUpperCase(); if (!Q || !SCR) return [];
+    const out = [];
+    for (const s in SCR) { const nm = (SCR[s].name || '').toUpperCase();
+      const sc = s === Q ? 0 : s.startsWith(Q) ? 1 : nm.startsWith(Q) ? 2 : s.includes(Q) ? 3 : nm.includes(Q) ? 4 : 9;
+      if (sc < 9) out.push([sc, -(num(SCR[s].turnover_cr) || 0), s]); }
+    return out.sort((a, b) => a[0] - b[0] || a[1] - b[1]).slice(0, n).map((x) => x[2]); };
+  V.home = async (el, arg, alive) => {
+    setTitle('');
+    el.innerHTML = `<section class="hero2">
+        <p class="up"><a href="${SIGNAL_URL}/">← Signal</a> finds what deserves attention. Vision shows why.</p>
+        <h1>Understand any Indian company in minutes.</h1>
+        <p class="sub">Price, financials, ownership, events, technical structure and market context — one research workspace for the ~1,000 NSE names on the screen. Every figure carries its source and its age.</p>
+        <div class="hsearch"><input id="hQ" type="search" role="combobox" aria-expanded="false" aria-controls="hL" aria-autocomplete="list" autocomplete="off" spellcheck="false"
+          placeholder="Search a company — Reliance, TCS, HDFC Bank…" aria-label="Search a company"><ul id="hL" role="listbox" aria-label="Matching companies"></ul></div>
+        <div id="hRecent" class="row wrap hrec"></div></section>
+      <div class="grid g-2">${panel('What changed across the screen', skel(6), { bodyId: 'hChg', fb: 'Screen' })}${panel('Unusual today', skel(5), { bodyId: 'hUnu', fb: 'Screen' })}</div>
+      <div style="height:var(--s-4)"></div>
+      <div class="grid g-2">${panel('Signals on the last scan', skel(4), { bodyId: 'hSig', flush: true, fb: 'Signals', more: '#/setups', moreText: 'All signals' })}${panel('Most-traded companies', skel(6), { bodyId: 'hTop', fb: 'Screen' })}</div>`;
+    const inp = $('#hQ'), L = $('#hL');
+    let hits = [], sel = 0;
+    const paintL = () => { const Q = inp.value.trim().toUpperCase(); hits = findCo(inp.value); sel = clamp(sel, 0, Math.max(0, hits.length - 1));
+      inp.setAttribute('aria-expanded', String(!!Q));
+      L.innerHTML = !Q ? '' : hits.length ? hits.map((x, i) => `<li role="option" id="ho${i}" aria-selected="${i === sel}" data-go="${esc(x)}"><b>${hilite(x, Q)}</b><span>${hilite(SCR[x].name, Q)}</span><em>${esc(SCR[x].sector || '')}</em></li>`).join('')
+        : `<li aria-disabled="true"><span>${SCR ? 'No company on the screen matches' : 'Loading the screen…'}</span></li>`;
+      inp.setAttribute('aria-activedescendant', hits.length ? 'ho' + sel : ''); };
+    const go = (x) => { if (x) location.hash = '#/asset/' + x; };
+    inp.addEventListener('input', () => { sel = 0; paintL(); });
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(sel + 1, hits.length - 1); paintL(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(sel - 1, 0); paintL(); }
+      else if (e.key === 'Enter') { e.preventDefault(); go(hits[sel]); }
+      else if (e.key === 'Escape') { inp.value = ''; paintL(); }
+    });
+    L.addEventListener('click', (e) => { const li = e.target.closest('[data-go]'); if (li) go(li.dataset.go); });
+    if (FINE()) inp.focus();
+    const [sr, site] = await Promise.all([F.screen(), F.site(), F.vsig()]);
+    if (!alive()) return;
+    paintL();
+    const chip = (x) => `<a class="chip" href="#/asset/${esc(x)}">${esc(x)}</a>`;
+    const rec = S.recent.filter((x) => SCR && SCR[x]).slice(0, 6), wl = S.watch.map((w) => w.s).filter((x) => !rec.includes(x)).slice(0, 6);
+    $('#hRecent').innerHTML = (rec.length ? `<span class="mut">Recent</span>${rec.map(chip).join('')}` : '') + (wl.length ? `<span class="mut">Watching</span>${wl.map(chip).join('')}` : '')
+      + (!rec.length && !wl.length ? `<span class="mut">Try</span>${['RELIANCE', 'TCS', 'HDFCBANK', 'INFY'].filter((x) => SCR && SCR[x]).map(chip).join('')}` : '');
+    const d = site.ok ? site.data : null, C = d && d.changed;
+    const lk = (x) => `<a class="sym" href="#/asset/${esc(x.sym)}">${esc(x.sym)}</a>`;
+    $('#hChg').innerHTML = !C ? failBox('The screen summary', site.error) : `<div class="grid g-2" style="gap:var(--s-3)">
+        <div><h3 class="k up">Scores rising</h3>${C.up.length ? `<ul class="plain">${C.up.map((x) => `<li>${lk(x)} <span class="up num">+${x.d.toFixed(1)}</span> <span class="mut">${esc(x.name || '')}</span></li>`).join('')}</ul>` : '<p class="mut">No composite score rose 5+ points.</p>'}</div>
+        <div><h3 class="k dn">Scores falling</h3>${C.down.length ? `<ul class="plain">${C.down.map((x) => `<li>${lk(x)} <span class="dn num">${x.d.toFixed(1)}</span> <span class="mut">${esc(x.name || '')}</span></li>`).join('')}</ul>` : '<p class="mut">No composite score fell 5+ points.</p>'}</div></div>
+      <p class="note src">The screen's composite (quality, growth, value, technical) against its build of ${esc(C.compared_with || 'the previous run')}; names trading at least ₹${C.min_turnover_cr} cr a day; moves of 5 points or more. A change in a description, not a call.</p>`;
+    $('#hUnu').innerHTML = !C ? failBox('The screen summary', site.error) : `<div class="kv" style="margin-top:0">
+        <div><em>Volume 3×+ average ${defn('Volume spike')}</em><b>${C.vol_n}</b></div><div><em>Closed at a 52-week high</em><b>${C.hi52_n}</b></div><div><em>Results in 7 days</em><b>${C.results_n}</b></div></div>
+        ${C.vol.length ? `<p class="note" style="margin:var(--s-3) 0 4px"><b>Heaviest volume</b></p><div class="row wrap">${C.vol.slice(0, 10).map((x) => `<a class="chip" href="#/asset/${esc(x.sym)}">${esc(x.sym)}</a>`).join('')}</div>` : ''}
+        ${C.results.length ? `<p class="note" style="margin:var(--s-3) 0 4px"><b>Results due</b></p><div class="row wrap">${C.results.map((x) => `<a class="chip" href="#/asset/${esc(x.sym)}">${esc(x.sym)} · ${esc(dshort(x.on))}</a>`).join('')}</div>` : ''}
+        <p class="note src">From the screen's last close. Results dates as listed on the screen — confirm on the exchange.</p>`;
+    const T0 = S.vsig ? S.vsig.today || [] : [];
+    $('#hSig').innerHTML = !S.vsig ? empty('Not published yet', 'The signals feed has not arrived.') : T0.length ? `<ul class="plain pad">${T0.slice(0, 8).map((x) => `<li><a class="sym" href="#/asset/${esc(x.sym)}">${esc(x.sym)}</a> <span class="chip ${x.engine === 'bottom' ? 'ghost' : ''}">${esc(VS_WORD[x.engine] || x.engine)}</span> <span class="mut">entry ${inr(x.entry)} · stop ${inr(x.sl)} · T1 ${inr(x.t1)}</span></li>`).join('')}</ul>`
+      : empty('Nothing qualified on the last scan', 'Neither rule was met on the last completed bar.');
+    $('#hTop').innerHTML = d && d.top ? `<div class="dir">${d.top.slice(0, 30).map((x) => `<a href="#/asset/${esc(x.sym)}"><b>${esc(x.sym)}</b><span>${esc(x.name || '')}</span></a>`).join('')}</div>` : failBox('The screen summary', site.error);
+  };
+
+  /* ── COMPARE ──────────────────────────────────────────────────────────
+     Up to five companies on the same measured rows. No row is coloured
+     "better": which way is good depends on what the reader is looking for.
+     The key differences are the extremes, stated with both numbers. */
+  const CMP_ROWS = [
+    ['Price', (d) => d.r.price, (v) => inr(v)], ['Sector', (d) => d.r.sector, (v) => v ? esc(v) : NA],
+    ['Market value', (d) => d.r.mcap_cr, (v) => v == null ? NA : v >= 100000 ? `₹${fmt(v / 100000, 2)} lakh cr` : `₹${fmt(v, 0)} cr`],
+    ['1 month', (d) => d.r.r1m, (v) => chg(v, 1)], ['3 months', (d) => d.r.r3m, (v) => chg(v, 1)], ['1 year', (d) => d.r.r1y, (v) => chg(v, 1)],
+    ['Revenue, multi-year', (d) => d.r.rev_cagr, (v) => v == null ? NA : signed(v, 1)], ['Revenue, last year', (d) => d.r.rev_yoy, (v) => v == null ? NA : signed(v, 1)],
+    ['EBIT margin', (d) => d.r.ebit_margin, (v) => v == null ? NA : fmt(v, 1) + '%'], ['ROCE', (d) => d.r.roce, (v) => v == null ? NA : fmt(v, 1) + '%', 'ROCE'],
+    ['ROE', (d) => d.r.roe, (v) => v == null ? NA : fmt(v, 1) + '%'], ['Debt / equity', (d) => d.r.de, (v) => v == null ? NA : v < 0 ? '<span class="dn">Negative equity</span>' : fmt(v, 2)],
+    ['Cash conversion', (d) => d.r.cfo_pat, (v) => v == null ? NA : fmt(v, 2) + '×', 'Cash conversion'], ['PE', (d) => d.r.pe, (v) => v == null ? NA : fmt(v, 1)],
+    ['PE percentile', (d) => d.r.pe_pctile, (v) => v == null ? NA : Math.round(v) + 'th', 'PE percentile'],
+    ['FII + DII, q/q', (d) => d.x && d.x.quality === 'complete' ? d.x.insti_pp : null, (v) => v == null ? NA : signed(v, 2, ' pp')],
+    ['Quality score', (d) => d.r.q, (v) => v == null ? NA : Math.round(v)], ['Growth score', (d) => d.r.g, (v) => v == null ? NA : Math.round(v)],
+    ['Technical score', (d) => d.r.tech, (v) => v == null ? NA : Math.round(v)],
+  ];
+  V.compare = async (el, arg, alive, params) => {
+    let syms = [...new Set(String((params && params.get('s')) || '').split(',').map(bare).filter(Boolean))].slice(0, 5);
+    el.innerHTML = vhead('Compare', 'Companies, side by side',
+      'Up to five companies on the same measured rows — growth, returns on capital, margins, leverage, valuation, price and ownership. Unmeasured is shown as a dash, never filled in.', fb('Screen'))
+      + `<div class="pn"><div class="ph" style="flex-wrap:wrap;gap:var(--s-2)"><form id="cmpF" class="row" autocomplete="off"><input class="inp" id="cmpQ" list="cmpDL" placeholder="Add a company" aria-label="Add a company" style="width:180px;text-transform:uppercase">
+        <datalist id="cmpDL"></datalist><button class="btn sm" type="submit">Add</button></form><div class="ph-r row wrap" id="cmpChips"></div></div>
+        <div class="pb flush" id="cmpBody">${skel(8)}</div><div class="pf" id="cmpFoot"></div></div>`;
+    await F.screen(); if (!alive()) return;
+    syms = syms.map(resolveSym).filter((x) => SCR && SCR[x]);
+    $('#cmpDL').innerHTML = Object.keys(SCR || {}).slice(0, 1200).map((x) => `<option value="${esc(x)}">${esc(SCR[x].name || '')}</option>`).join('');
+    const paint = async () => {
+      history.replaceState(null, '', '#/compare' + (syms.length ? '?s=' + syms.map(encodeURIComponent).join(',') : ''));
+      $('#cmpChips').innerHTML = syms.map((x) => `<span class="chip">${esc(x)} <button type="button" class="x" data-rmc="${esc(x)}" aria-label="Remove ${esc(x)}">×</button></span>`).join('');
+      if (!syms.length) { const base = S.recent[0] || (S.watch[0] && S.watch[0].s) || 'TCS';
+        $('#cmpBody').innerHTML = empty('Pick companies to compare', `Add up to five above, or start with <a href="#/compare?s=${[base].concat(peersOf(base)).join(',')}">${esc(base)} and its closest peers</a>.`); $('#cmpFoot').innerHTML = ''; return; }
+      const rs = await Promise.all(syms.map((x) => F.co(x))); if (!alive()) return;
+      const ds = rs.map((r, i) => r.ok ? r.data : { r: Object.assign({ sym: syms[i] }, SCR[syms[i]] || {}), x: null });
+      $('#cmpBody').innerHTML = `<div class="tw cmp-w"><table class="tbl cmp"><thead><tr><th scope="col">Measure</th>${ds.map((d) => `<th scope="col"><a class="sym" href="#/asset/${esc(d.r.sym)}">${esc(d.r.sym)}</a><small>${esc(d.r.name || '')}</small></th>`).join('')}</tr></thead>
+        <tbody>${CMP_ROWS.map(([k, g, f, dk]) => `<tr><th scope="row">${esc(k)} ${dk ? defn(dk) : ''}</th>${ds.map((d) => `<td class="num">${f(num(g(d)) != null ? num(g(d)) : g(d))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      const dif = INS() ? INS().differences(ds.map((d) => d.r)) : [];
+      $('#cmpFoot').innerHTML = (dif.length ? `<b>Key differences</b><ul class="plain">${dif.map((x) => `<li>${esc(x.t)}</li>`).join('')}</ul>` : '<b>Key differences</b> — none large enough to state.')
+        + `<p class="note src">Company filings via the stock screen; shareholding from exchange filings; prices at the screen's last close. Descriptive — no row is scored better or worse.</p>`;
+    };
+    $('#cmpF').addEventListener('submit', (e) => { e.preventDefault(); const x = resolveSym($('#cmpQ').value);
+      if (!SCR[x]) { toast(`${x || 'That'} is not on the screen`); return; }
+      if (syms.length >= 5) { toast('Five at most — remove one first'); return; }
+      if (!syms.includes(x)) syms.push(x); $('#cmpQ').value = ''; paint(); });
+    el.addEventListener('click', (e) => { const b = e.target.closest('[data-rmc]'); if (!b) return; syms = syms.filter((x) => x !== b.dataset.rmc); paint(); });
+    await paint();
+  };
+
   V.today = async (el, arg, alive) => {
     const day = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
     el.innerHTML = vhead('Today', day, 'The market, what moved and why, the two setups and your names — written from the live feeds. Two minutes, and it ends.', fb('Quotes'))
@@ -896,14 +1081,14 @@
         <section><h2>Worth reading</h2>${named.length ? `<ul>${named.map((st) => `<li><a href="${esc(st.link)}" target="_blank" rel="noopener">${esc(st.title)}</a> <span class="mut">${esc(st.source)}</span></li>`).join('')}</ul>`
           : `<p class="mut">${W.ok ? 'No headline on the wire names a stock on the screen.' : 'The wire did not answer.'}</p>`}
           ${src(W.ok ? (W.live ? 'The live wire, headlines that name a stock on the screen.' : 'The wire\'s last build — live wire unavailable.') : '')}</section>
-        <p class="end">That is the day. <a href="#/">Open the cockpit</a> or <a href="#/heatmap">the full heatmap</a> for the rest.</p>`;
+        <p class="end">That is the day. <a href="#/cockpit">Open the cockpit</a> or <a href="#/heatmap">the full heatmap</a> for the rest.</p>`;
     };
     paint();
     return async () => { await F.heat(); if (alive()) paint(); };
   };
 
   V.overview = async (el, arg, alive) => {
-    setTitle('');
+    setTitle('Cockpit');
     const hero = store.get('vis:hero', true);
     el.innerHTML = `${hero ? `<div class="hero"><div><h1>Your market cockpit.</h1>
         <p>From the state of the market to a single name and what is driving it, on one screen. Nothing here is a forecast, and every number carries its age.</p>
@@ -1065,11 +1250,18 @@
      Everything the book knows about one name, in scan order: where it is,
      what the engines have said about it (all of it, losses included), why,
      the shape of its move, and what to do next. */
+  V.cockpit = (...a) => V.overview(...a);
+
   V.asset = async (el, arg, alive) => {
-    const s = bare(arg);
-    if (!s) { location.hash = '#/screener'; return; }
-    setTitle(s);
+    if (!bare(arg)) { location.hash = '#/'; return; }
+    el.innerHTML = `<div id="aHead">${skel(3)}</div>`;
+    if (!SCR) await F.screen();
+    if (!alive()) return;
+    const s = resolveSym(arg);
+    setTitle(SCR && SCR[s] ? `${s} — ${SCR[s].name}` : s);
     el.innerHTML = `<div id="aHead">${skel(3)}</div><div style="height:var(--s-4)"></div>
+      <div class="grid g-2 intel">${panel('What matters', skel(5), { bodyId: 'aMat', fb: 'Screen' })}${panel('What changed', skel(5), { bodyId: 'aChg', fb: 'Screen' })}</div>
+      <div style="height:var(--s-4)"></div>
       <div class="grid g-7-5"><div class="stack">
         ${panel('Why it reads the way it does', skel(5), { bodyId: 'aWhy', fb: 'Screen' })}
         ${panel('Move profile', skel(4), { bodyId: 'aChart', fb: 'Screen' })}
@@ -1079,11 +1271,12 @@
         ${panel('Institutional holding', skel(4), { bodyId: 'aIns', fb: 'Institutional' })}
         ${panel('In the news', skel(3), { bodyId: 'aNews', flush: true, fb: 'Wire' })}
       </div></div>`;
-    const [sr, , q] = await Promise.all([F.screen(), F.insti(), F.quotes([s])]);
+    const [sr, , q, co] = await Promise.all([F.screen(), F.insti(), F.quotes([s]), F.co(s), F.vsig()]);
     if (!alive()) return;
     Object.assign(S.quotes, q);
     const r = SCR && SCR[s], lv = liveOf(s), x = instiOf(s);
-    if (!r) {
+    if (r) noteRecent(s);
+    if (!r) { for (const id of ['aMat', 'aChg']) { const b = $('#' + id); if (b) b.closest('.pn').remove(); }
       $('#aHead').innerHTML = vhead('Asset', s, sr.ok ? `<b>${esc(s)}</b> is not on the NSE screen. Check the symbol — the screen covers ${Object.keys(SCR || {}).length.toLocaleString('en-IN')} names.` : 'The screen did not load, so this name cannot be looked up.');
       for (const id of ['aWhy', 'aChart', 'aLvl', 'aFun', 'aIns', 'aNews']) { const b = $('#' + id); if (b) b.closest('.pn').remove(); }
       return;
@@ -1098,6 +1291,9 @@
       <div class="ah-px"><div class="px">${px != null ? '₹' + fmt(px, 2) : '—'}</div>
         <div class="px-s">${lv ? chg(lv.change_pct) + ' <span class="mut">live</span>' : r ? chg(r.r1d) + ` <span class="mut">close of ${esc(r.last_date || r.price_date || 'the last build')}</span>` : ''}</div>
         <div class="row ah-act" style="margin-top:var(--s-2);gap:6px">
+          <a class="btn sm" href="#/compare?s=${[s].concat(peersOf(s)).map(encodeURIComponent).join(',')}">Compare</a>
+          <a class="btn sm" href="${SIGNAL_URL}/stock/${encodeURIComponent(s)}">On Signal ↗</a>
+          <button class="btn sm" type="button" data-copy="${VISION_URL}/company/${keyOf(s)}">Copy link</button>
           <a class="btn sm" href="#/alerts?sym=${esc(s)}">Alert</a>
           <a class="btn sm" href="https://www.tradingview.com/chart/?symbol=NSE:${encodeURIComponent(s)}" target="_blank" rel="noopener">Chart ↗</a>
           <a class="btn sm" href="https://www.screener.in/company/${encodeURIComponent(s)}/consolidated/" target="_blank" rel="noopener">Filings ↗</a></div></div></div>
@@ -1105,6 +1301,19 @@
         <div class="rng-l"><span>52w low ₹${fmt(r.low52, 1)}</span><span>${r.from_high != null ? signed(r.from_high, 1) + ' from the high' : ''}</span><span>52w high ₹${fmt(r.high52, 1)}</span></div></div>`
       : r && r.rng_lo != null && r.rng_hi != null ? `<p class="note" style="margin-top:var(--s-3)">No 52-week range yet — ${r.rng_sessions || 'too few'} sessions of history. Its ${r.rng_sessions}-session range is ₹${fmt(r.rng_lo, 1)} – ₹${fmt(r.rng_hi, 1)}.</p>` : ''}
       </div></div>`;
+
+    /* What matters and what changed — insight.js over this company's file.
+       If the file did not arrive, the panels say so; the rest of the page
+       still reads from the screen. */
+    const I = INS();
+    if (co.ok && I) {
+      const d = co.data, ctx = Object.assign({ today: istToday() }, d.ctx, { vsig: d.vsig });
+      $('#aMat').innerHTML = mattersHtml(I.matters(d.r, d.x, ctx));
+      $('#aChg').innerHTML = changesHtml(I.changes(d.r, d.x, ctx), I.T);
+    } else {
+      const why = co.ok ? 'insight.js did not load' : co.error;
+      $('#aMat').innerHTML = failBox('This company\'s file', why); $('#aChg').innerHTML = failBox('This company\'s file', why);
+    }
 
     $('#aWhy').innerHTML = r ? `${moveFactors(mv.parts)}
       <p class="note" style="margin:var(--s-3) 0 var(--s-4)"><b>Move score ${mv.score == null ? 'not scored' : mv.score}</b> · ${esc(strengthWord(mv.score))}. Trend, momentum and volume from the daily screen; institutional from the latest shareholding. Missing components leave the mean — they are never scored zero.</p>
@@ -1825,7 +2034,7 @@
       <div style="height:var(--s-4)"></div>
       <section class="pn"><div class="ph"><h2>Closed</h2><span class="n" id="vsClosedN"></span></div><div class="pb flush" id="vsClosed"></div></section>
       <div style="height:var(--s-4)"></div>
-      ${panel('How the levels are set', `<p class="note" style="margin:0">${esc(D.levels || '')}</p>
+      ${panel('How the levels are set', `<p class="note" style="margin:0">${esc(D.levels || '')} ${defn('ATR')} ${defn('R')}</p>
         <p class="note">Graded on completed bars after the one that fired. A bar that touches both the stop and a target is booked as the stop and marked <i>ambiguous</i> — assuming the favourable order is how a record flatters itself. The stop does not trail.</p>
         <p class="note" style="margin-bottom:0"><b>${esc(D.note || '')}</b></p>`, {})}`;
     paint();
@@ -1864,7 +2073,7 @@
   };
 
   V.notfound = async (el) => { setTitle('Not found');
-    el.innerHTML = vhead('404', 'No such view', `There is no <code>${esc(location.hash)}</code>. Try search (<span class="kbd">⌘K</span>) or go to the <a href="#/">overview</a>.`); };
+    el.innerHTML = vhead('404', 'No such view', `There is no <code>${esc(location.hash)}</code>. Try search (<span class="kbd">⌘K</span>) or go to <a href="#/">Companies</a>.`); };
 
   /* ── BOOT ─────────────────────────────────────────────────────────────── */
   async function refreshTicker(force) {
@@ -1896,6 +2105,8 @@
     if (e.target.closest('[data-close]')) { closeLayer(); return; }
     const ac = e.target.closest('[data-act]'); if (ac) { e.preventDefault(); closeLayer(); if (ac.dataset.act === 'theme') toggleTheme(); else openPalette(); return; }
     if (e.target.closest('[data-palette]')) { openPalette(); return; }
+    const cp = e.target.closest('[data-copy]'); if (cp) { const u = cp.dataset.copy;
+      (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast('Link copied'), () => { prompt('Copy this link', u); }); return; }
     if (e.target.closest('[data-dscl]')) { drawer('Educational research, not advice', `<p class="note" style="font-size:var(--t-md)"><b>Not registered with SEBI as a Research Analyst or Investment Adviser.</b>
       Everything here is market data and research, for education. Nothing is a recommendation to buy or sell any security, and nothing is personalised to you.
       Prices may be delayed or wrong; every panel prints its age.</p><a class="btn" href="#/disclaimer">Read the full disclaimer</a>`); return; }

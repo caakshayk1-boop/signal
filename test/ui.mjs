@@ -2473,7 +2473,8 @@ try {
   const vErr = [];
   v.on("pageerror", (e) => vErr.push(e.message));
   v.on("console", (m) => { if (m.type() === "error" && /Content Security Policy|Refused/.test(m.text())) vErr.push(m.text()); });
-  await v.goto(SITE + "/vision", { waitUntil: "domcontentloaded" });
+  /* The cockpit moved to #/cockpit when #/ became the company-search home. */
+  await v.goto(SITE + "/vision#/cockpit", { waitUntil: "domcontentloaded" });
   await settled(v, SETTLE + 4000);
   const vInfo = await v.evaluate(() => ({
     theme: document.documentElement.getAttribute("data-theme"),
@@ -2483,7 +2484,10 @@ try {
     /* The ATTRIBUTE, not a.href. This suite serves vision at SIGNAL_URL/vision,
        so every in-app "#/markets" RESOLVES to signal.askakshay.com and the
        first version of this check failed deploy 216 on Vision's own links. */
-    signalLinks: [...document.querySelectorAll("a[href]")].map((a) => a.getAttribute("href")).filter((h) => /signal\.askakshay|gems\.askakshay/.test(h)),
+    /* Signal is the parent: Vision may link to its root and its /stock/
+       pages, and to nothing else there — never the ledger or gems. */
+    signalLinks: [...document.querySelectorAll("a[href]")].map((a) => a.getAttribute("href"))
+      .filter((h) => /gems\.askakshay/.test(h) || (/signal\.askakshay/.test(h) && !/^https:\/\/signal\.askakshay\.com\/(stock\/[^/]+)?$/.test(h))),
     tiles: document.querySelectorAll("#oHeat .hm-t").length,
     ticker: document.querySelectorAll("#tickIn .tk").length,
     badges: [...document.querySelectorAll(".fb")].map((b) => b.textContent.trim()),
@@ -2495,11 +2499,30 @@ try {
      ["Market pulse", "Move leaders", "Market heatmap", "Top movers", "Market intelligence", "Watchlist"]
        .every((t) => vInfo.panels.some((p) => p.toLowerCase() === t.toLowerCase())), vInfo.panels);
   ok("move leaders are ranked, or the panel says why not", vInfo.leaders > 0 || vInfo.leadersEmpty, vInfo.leaders);
-  ok("vision links to no signal site", vInfo.signalLinks.length === 0, vInfo.signalLinks);
+  ok("vision links to Signal only at its root or a stock page", vInfo.signalLinks.length === 0, vInfo.signalLinks);
   ok("the heatmap drew tiles", vInfo.tiles >= 50, vInfo.tiles);
   ok("the ticker strip rendered", vInfo.ticker >= 6, vInfo.ticker);
   ok("no freshness badge is stuck on 'loading'", !vInfo.badges.includes("loading"), vInfo.badges);
   ok("vision prints no NaN, undefined or null", !/\bNaN\b|\bundefined\b|\bnull\b/.test(vInfo.text), (vInfo.text.match(/.{0,30}(NaN|undefined).{0,30}/) || [""])[0]);
+
+  /* The company-search home, a company page and compare. */
+  await v.evaluate(() => { location.hash = "#/"; });
+  await settled(v, SETTLE + 2500);
+  const vHome = await v.evaluate(() => ({ h1: (document.querySelector(".hero2 h1") || {}).textContent || "", back: !!document.querySelector('.hero2 a[href="https://signal.askakshay.com/"]'),
+    dir: document.querySelectorAll("#hTop .dir a").length }));
+  ok("vision's home leads with company search and a way back to Signal", /Understand any Indian company/.test(vHome.h1) && vHome.back, vHome);
+  await v.fill("#hQ", "RELIAN"); await v.waitForTimeout(300);
+  ok("...and search finds a company as you type", (await v.$$("#hL [data-go]")).length > 0);
+  await v.evaluate(() => { location.hash = "#/asset/TCS"; });
+  await settled(v, SETTLE + 3000);
+  const vCo = await v.evaluate(() => ({ mat: document.querySelectorAll("#aMat .intel-kv > div").length, chg: !!document.querySelector("#aChg .wcg, #aChg .st"),
+    src: /Company filings via the stock screen/.test((document.getElementById("aMat") || {}).innerText || "") }));
+  ok("a company page says what matters, with sources", vCo.mat >= 4 && vCo.src, vCo);
+  ok("...and what changed, or that nothing crossed a threshold", vCo.chg, vCo);
+  await v.evaluate(() => { location.hash = "#/compare?s=TCS,INFY"; });
+  await settled(v, SETTLE + 2500);
+  const vCmp = await v.evaluate(() => ({ cols: document.querySelectorAll(".cmp thead th").length, rows: document.querySelectorAll(".cmp tbody tr").length }));
+  ok("compare lays two companies side by side", vCmp.cols === 3 && vCmp.rows >= 15, vCmp);
 
   for (const [hash, sel] of [["#/screener", "#cBody"], ["#/heatmap", "#hMap"], ["#/markets", "#mBoards"], ["#/watchlist", "#wBody"]]) {
     await v.evaluate((h) => { location.hash = h; }, hash);
@@ -2589,6 +2612,27 @@ try {
   await vCtx.close();
 } finally {
   await browser.close();
+}
+
+/* ── THE EDGE WRITES EACH ROUTE'S OWN HTML ─────────────────────────────────
+ * Read raw, with no browser: this is what a crawler or a link preview gets.
+ * /about used to be the front page under another URL. */
+{
+  const raw = async (u) => { try { const r = await fetch(u, { redirect: "manual" }); return { status: r.status, html: await r.text() }; } catch (e) { return { status: 0, html: "" }; } };
+  const title = (h) => (h.match(/<title>([^<]*)<\/title>/) || ["", ""])[1];
+  const canon = (h) => (h.match(/rel="canonical" href="([^"]*)"/) || ["", ""])[1];
+  const a = await raw(SITE + "/about"), m = await raw(SITE + "/markets"), home = await raw(SITE + "/");
+  ok("/about has its own title and canonical before JavaScript", /^About/.test(title(a.html)) && /\/about$/.test(canon(a.html)), title(a.html));
+  ok("/markets has its own title, not the front page's", title(m.html) !== title(home.html) && /Markets/.test(title(m.html)), title(m.html));
+  ok("/markets carries an H1 of its own in the served HTML", /<h1 class="pre-h">Markets/.test(m.html));
+  const st = await raw(SITE + "/stock/NOSUCHNAME123");
+  ok("a stock that is not on the screen is a real 404, noindex", st.status === 404 && /noindex/.test(st.html), st.status);
+  if (/signal\.askakshay\.com/.test(SITE)) {
+    const vc = await raw("https://vision.askakshay.com/company/RELIANCE");
+    ok("vision's company page reads without JavaScript", vc.status === 200 && /What matters/.test(vc.html) && /vision\.askakshay\.com\/company\/RELIANCE/.test(canon(vc.html)), vc.status);
+    const vh = await raw("https://vision.askakshay.com/");
+    ok("vision's home is indexable and says what it is", /index,follow/.test(vh.html) && /Understand any Indian company/.test(vh.html));
+  }
 }
 
 console.log("");

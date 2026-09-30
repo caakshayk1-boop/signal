@@ -468,8 +468,15 @@
    */
   const chartUrl  = (sym, tv) => `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tv || ('NSE:' + sym))}`;
   const detailUrl = sym => `https://www.screener.in/company/${encodeURIComponent(sym)}/consolidated/`;
+  /* VISION IS THE CHILD PRODUCT: Signal says what deserves attention, Vision
+     is where one company is understood. Every link to it goes through these
+     two — guard.mjs allows no other spelling of the host. The file key rule is
+     the one scripts/company-pages.mjs writes company pages under. */
+  const VISION_URL = 'https://vision.askakshay.com';
+  const visionUrl = sym => `${VISION_URL}/company/${String(sym).toUpperCase().replace(/\.NS$/, '').replace(/[^A-Z0-9-]/g, '_')}`;
   const symLinks = (sym, tv) => !sym ? '' :
     `<span class="lnks">
+      ${!tv || /^NSE:/.test(tv) ? `<a href="${visionUrl(sym)}" title="Open ${esc(sym)} in Vision — what matters, what changed">Vision ↗</a>` : ''}
       <a href="${detailUrl(sym)}" target="_blank" rel="noopener" title="Fundamentals on Screener.in">Details</a>
       <a href="${chartUrl(sym, tv)}" target="_blank" rel="noopener" title="Chart on TradingView">Chart</a>
     </span>`;
@@ -7829,7 +7836,7 @@
     return `<div class="route-h stock-h">
         <span class="eyebrow">Company · ${esc(r.sector || 'NSE')}${r.ind ? ' · ' + esc(r.ind) : ''}</span>
         <h1>${watchBtn(r.sym)}${esc(r.sym)}</h1>
-        <p>${esc(r.name || '')}</p>
+        <p>${esc(r.name || '')} · <a class="to-vision" href="${visionUrl(r.sym)}">Open in Vision — what matters, what changed ↗</a></p>
       </div>
       ${liveMark(r, q)}
       ${/* NOT { lead: true }. That flag gives a section the route's hero
@@ -8453,7 +8460,10 @@
 
   const sigPass = (r) => {
     const b = (r.badge || '').toLowerCase();
-    if (sigFilter !== 'all' && b !== sigFilter) return false;
+    /* "Closed" is every graded outcome — won, lost or expired — so the ledger
+       can be read as one finished record without choosing a side first. */
+    if (sigFilter === 'closed') { if (!['win', 'loss', 'expired'].includes(b)) return false; }
+    else if (sigFilter !== 'all' && b !== sigFilter) return false;
     if (SIGF.eng !== 'all' && String(r.signal_type || '') !== SIGF.eng) return false;
     if (SIGF.dir !== 'all' && sigDir(r) !== SIGF.dir) return false;
     if (SIGF.tf !== 'all' && String(r.timeframe || '') !== SIGF.tf) return false;
@@ -8873,7 +8883,8 @@
       });
     }
 
-    const chips = [['all', `All ${all.length}`], ['open', `Open ${opens.length}`],
+    const closedN = all.filter(r => ['win', 'loss', 'expired'].includes((r.badge || '').toLowerCase())).length;
+    const chips = [['all', `All ${all.length}`], ['open', `Open ${opens.length}`], ['closed', `Closed ${closedN}`],
                    ['win', `Winners ${wins}`], ['loss', `Losers ${losses}`],
                    ['expired', 'Expired']];
 
@@ -11892,7 +11903,7 @@
       } else if (ev.key === 'Enter') {
         ev.preventDefault();
         const hit = cmdRows[cmdIdx];
-        if (hit) { cmdEl.close(); go(hit.href); }
+        if (hit) { cmdEl.close(); if (hit.ext) location.href = hit.href; else go(hit.href); }
       }
     });
     return cmdEl;
@@ -11918,7 +11929,11 @@
               .map(r => ({ href: '/stock/' + encodeURIComponent(r.sym), name: r.sym, desc: r.name || '', kind: 'Company',
                            sym: r.sym }))
       : [];
-    cmdRows = routes.concat(names);
+    // The top match also offers the deep page, in the child product.
+    if (names.length) names.splice(1, 0, { href: visionUrl(names[0].sym), name: `Open ${names[0].sym} in Vision`,
+      desc: 'What matters, what changed — sourced', kind: 'Vision', ext: true });
+    const vis = !t || 'vision company research'.includes(t) ? [{ href: VISION_URL + '/', name: 'Vision ↗', desc: 'Company research — understand any NSE company', kind: 'Vision', ext: true }] : [];
+    cmdRows = routes.concat(vis, names);
     cmdIdx = 0;
     const list = cmdEl.querySelector('#cmdList');
     list.innerHTML = cmdRows.length ? cmdRows.map((r, i) => `
@@ -11932,7 +11947,8 @@
     list.querySelectorAll('.cmd-r').forEach(b => b.addEventListener('click', () => {
       const hit = cmdRows[Number(b.dataset.i)];
       cmdEl.close();
-      if (hit.sym) go('/stock/' + encodeURIComponent(hit.sym));
+      if (hit.ext) location.href = hit.href;
+      else if (hit.sym) go('/stock/' + encodeURIComponent(hit.sym));
       else go(hit.href);
     }));
     markCmd();
@@ -16082,6 +16098,16 @@
                      'BUOY, ANCHOR and BEDROCK: unproven engines published with their own measured null results beside every name.'],
     '/buoy':        ['BUOY — the 200-period average, reclaimed on the 4-hour',
                      'A fallen name closing a 4-hour candle back above its 200-period average, with momentum already turning. Measured over two years, and the measurement says no edge.'],
+    /* THESE THREE HAD NO ROW, so each fell through to META['/'] and told a
+       crawler, a link preview and the tab bar that it was the front page —
+       same title, same description, same canonical. An external audit read it
+       as "/about returns the home page". It did, in the head. */
+    '/about':       ['About — who builds Signal, and why it publishes its losses',
+                     'Signal is built by Akshay Kothari, a Chartered Accountant working in FP&A: what the site is, what it is not, and why its ledger is not curated.'],
+    '/disclaimer':  ['Disclaimer — educational research, not investment advice',
+                     'Signal is not registered with SEBI as a Research Analyst or Investment Adviser. Nothing on it is a recommendation or personalised advice.'],
+    '/disclosures': ['Disclosures — conflicts, incentives and who pays for this',
+                     'Who pays for Signal (nobody), personal positions, employment, and the conflict of an author grading his own engines — stated plainly.'],
     '/404':         ['Not found — signal.askakshay.com',
                      'There is no page at this address.'],
   };

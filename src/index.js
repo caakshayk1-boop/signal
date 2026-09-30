@@ -35,6 +35,7 @@ import subscribe from "./api/subscribe.js";
 import telegramWebhook from "./bot/webhook.js";
 import clientError from "./api/clienterror.js";
 import heat from "./api/heat.js";
+import { signalPage, visionHome, visionCompany } from "./seo.js";
 
 const ROUTES = {
   "/api/ticker": ticker,
@@ -406,11 +407,12 @@ export default {
      * fall through untouched: they are shared, which is the point. */
     if (host.startsWith("vision.")) {
       const vp = url.pathname.replace(/\/+$/, "") || "/";
-      if (vp === "/") {
-        const v = new URL(request.url);
-        v.pathname = "/vision";     // extensionless, as for gems: /vision.html 307s here
-        return env.ASSETS.fetch(new Request(v.toString(), request));
-      }
+      /* The home and every company page are written by the Worker (src/seo.js)
+         so they read without JavaScript and each carries its own title,
+         description and canonical. The app then takes over in place. */
+      if (vp === "/") return visionHome(request, env);
+      const cm = vp.match(/^\/company\/([^/]+)$/);
+      if (cm) return visionCompany(request, env, cm[1]);
       if (!/\.[a-z0-9]+$/i.test(vp) && !vp.startsWith("/api/")) {
         return Response.redirect(new URL("/", request.url).toString(), 302);
       }
@@ -484,6 +486,10 @@ export default {
      * The SPA fallback is right for ROUTES and wrong for FILES. If a path with
      * an extension comes back as HTML, the fallback fired and the file is not
      * there — unless HTML is what was asked for. */
+    /* A PAGE ROUTE GETS ITS OWN HEAD AND ITS OWN PRE-RENDER — see seo.js.
+       /gems and /vision are other products' shells, served as they are. */
+    if (isPage && p !== "/gems" && p !== "/vision") return signalPage(request, env, p);
+
     const res = await env.ASSETS.fetch(request);
     /* !isPage MATTERS AS MUCH AS isFile.
      * A ticker is not a file extension. /stock/PAYTM.NS ends in ".NS", which

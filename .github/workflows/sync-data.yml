@@ -46,10 +46,12 @@ on:
     - cron: "40 12 * * *"
     # Vision's two setups are scanned upstream at 13:28 and 15:45 IST on
     # trading days (vision_scan.yml, 07:58 and 10:15 UTC). These collect each
-    # run ~20 minutes later; without them a 4H breakout filed at 13:28 would
-    # sit unpublished until the evening sync, a whole candle later.
-    - cron: "20 8 * * 1-5"
-    - cron: "35 10 * * 1-5"
+    # run ~40 minutes later — late enough to follow a scan the Cloudflare
+    # watchdog had to dispatch because GitHub's own cron did not fire (it has
+    # started that scan 5-8 hours late). The watchdog carries these two slots
+    # too (src/watchdog_schedule.js); move one, move both.
+    - cron: "40 8 * * 1-5"
+    - cron: "55 10 * * 1-5"
   workflow_dispatch:
   push:
     # ON MAIN ONLY. The branch filter was missing and the trigger fires on a

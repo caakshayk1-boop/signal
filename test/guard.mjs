@@ -1308,7 +1308,15 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
        (uiCode.match(/browser\.newContext\(/g) || []).length === 1, "only newCtx may call it");
   }
 
-  ok("the watchdog watches something", WATCH.length === 4, WATCH.length);
+  ok("the watchdog watches something", WATCH.length === 5, WATCH.length);
+  {
+    /* Every sync-data cron is a watchdog slot and vice versa — a slot here
+       without a cron dispatches daily with nothing to explain why. */
+    const SY = readFileSync(".github/workflows/sync-data.yml", "utf8");
+    const crons = [...SY.matchAll(/cron: "(\d+) (\d+) \* \* ([\d*-]+)"/g)].map((m) => `${+m[2]}:${+m[1]}`).sort();
+    const slots = WATCH.find((w) => w.file === "sync-data.yml").slots.map((s) => `${s.h}:${s.m}`).sort();
+    ok("sync-data's crons and the watchdog's slots are the same list", JSON.stringify(crons) === JSON.stringify(slots), { crons, slots });
+  }
   for (const w of WATCH) {
     ok(`${w.file}: says which repo, and why it is watched`,
        /^[\w-]+\/[\w-]+$/.test(w.repo || "") && !!w.why && w.why.length > 8, w);
@@ -2116,10 +2124,57 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("vision.html keeps the SEBI disclaimer", /Not registered with SEBI/.test(VHTML));
   ok("...and links it to its own full disclaimer, not another site's", /href="#\/disclaimer"/.test(VHTML) && /V\.disclaimer = /.test(VJS));
 
-  /* No trace of the signal product. */
+  /* PARENT AND CHILD, ONE SPELLING EACH. Signal is the parent, Vision the
+     child: Vision links back to Signal and Signal links into Vision — by
+     design since the 2026-09-30 audit, reversing the earlier "no trace" rule.
+     What stays pinned is that each side names the other in exactly one
+     constant (plus vision.html's static header link), so a host move is one
+     edit, and Vision still reads nothing of the ledger (checks below). */
   const all = VJS + VCSS + VHTML;
-  ok("vision names no signal site", !/signal\.askakshay\.com|gems\.askakshay\.com/.test(all),
-     (all.match(/.{0,40}signal\.askakshay\.com.{0,20}/) || [""])[0]);
+  const sigRefs = (VJS.match(/https:\/\/signal\.askakshay\.com/g) || []).length;
+  ok("vision.js names Signal only in SIGNAL_URL", sigRefs === 1 && /const SIGNAL_URL = 'https:\/\/signal\.askakshay\.com';/.test(VJS), sigRefs);
+  ok("vision.html links back to Signal in its header", /class="up-link" href="https:\/\/signal\.askakshay\.com\/"/.test(VHTML));
+  ok("vision names no gems site", !/gems\.askakshay\.com/.test(all));
+  ok("signal.js names Vision only in VISION_URL (and the shell's bar link)",
+     (JS.match(/https:\/\/vision\.askakshay\.com/g) || []).length === 1 && /const VISION_URL = 'https:\/\/vision\.askakshay\.com';/.test(JS));
+  ok("every stock link on Signal offers Vision", /const symLinks = [\s\S]{0,200}visionUrl\(sym\)/.test(JS));
+
+  /* THE EDGE LAYER — each route its own head, written before JavaScript. */
+  const SEO = readFileSync("src/seo.js", "utf8"), IDX2 = readFileSync("src/index.js", "utf8");
+  const KEY_RE = /replace\(\/\[\^A-Z0-9-\]\/g, ["']_["']\)/;
+  ok("one file-key rule in the Worker, the builder, Vision and Signal",
+     [SEO, readFileSync("scripts/company-pages.mjs", "utf8"), VJS, JS].every((t) => KEY_RE.test(t)));
+  ok("the Worker renders Signal's page routes and Vision's home and company pages",
+     /signalPage\(request, env, p\)/.test(IDX2) && /visionHome\(request, env\)/.test(IDX2) && /visionCompany\(request, env, cm\[1\]\)/.test(IDX2));
+  {
+    const { execFileSync } = await import("node:child_process");
+    let fresh = true; try { execFileSync("node", ["scripts/route-meta.mjs", "--check"], { stdio: "pipe" }); } catch { fresh = false; }
+    ok("src/route-meta.js matches signal.js's META", fresh);
+    const pagesLit = (IDX2.match(/const PAGES = new Set\(\[([\s\S]*?)\]\)/) || ["", ""])[1];
+    const pages = [...pagesLit.matchAll(/"(\/[a-z]*)"/g)].map((m) => m[1]).filter((x) => !["/gems", "/vision"].includes(x));
+    const { SIGNAL_META } = await import(new URL("../src/route-meta.js", import.meta.url));
+    const noMeta = pages.filter((x) => !SIGNAL_META[x]);
+    ok("every page route has its own title — none falls back to the front page's", noMeta.length === 0 && pages.length > 20, noMeta);
+  }
+  ok("vision.html loads insight.js before vision.js", VHTML.indexOf('src="/insight.js"') > 0 && VHTML.indexOf('src="/insight.js"') < VHTML.indexOf('src="/vision.js"'));
+  ok("the Worker runs the same insight.js the browser does", /import "\.\.\/public\/insight\.js"/.test(SEO));
+  {
+    /* insight.js itself: missing is silent, never zero; thresholds hold. */
+    await import(new URL("../public/insight.js", import.meta.url));
+    const I = globalThis.VisionInsight;
+    const bare = I.changes({ sym: "X" }, null, {});
+    ok("insight: an empty row yields no claims", Object.values(bare).every((l) => l.length === 0));
+    const m0 = I.matters({ sym: "X" }, null, {});
+    ok("insight: an empty row yields no 'what matters' tiles (no zero-fill)", m0.length === 0);
+    const c = I.changes({ sym: "X", rev_yoy: 20, rev_cagr: 10, roce: 10, roce_med: 11, de: -0.4 }, null, {});
+    ok("insight: 10 pp revenue acceleration is reported, 1 pp ROCE gap is not",
+       c.improved.some((i) => /Revenue growth accelerated/.test(i.t)) && !c.weakened.some((i) => /Returns on capital/.test(i.t)));
+    ok("insight: negative D/E is named negative equity", c.watch.some((i) => /Negative equity/.test(i.t)));
+    ok("insight: every claim carries a basis and a source", [...c.improved, ...c.watch].every((i) => i.basis && i.src));
+    ok("insight: no recommendation language", !/\b(buy|sell|accumulate|target price|should)\b/i.test(readFileSync("public/insight.js", "utf8").replace(/\/\*[\s\S]*?\*\//g, "")));
+  }
+  ok("vision has a company-search home and a compare view", /V\.home = /.test(VJS) && /V\.compare = /.test(VJS));
+  ok("the ledger offers a Closed filter", /\['closed', `Closed \$\{closedN\}`\]/.test(JS) && /sigFilter === 'closed'/.test(JS));
   ok("vision reads no ledger", !/\/api\/signals\?(limit|symbol)|alerts\.json|\/api\/stats/.test(VJS));
   ok("vision loads no engine registry", !/engines\.js|ENGINE_BOOK/.test(all));
   ok("vision has no signal or record route", !/V\.(signals|record) = |['"]#\/(signals|record)['"]/.test(VJS));
