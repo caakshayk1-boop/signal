@@ -2312,6 +2312,12 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("the Worker routes the vision host to its shell", /host\.startsWith\("vision\."\)/.test(IDX));
 }
 
+/* THE COUNT-UP CANNOT RUN BACKWARDS. A frame timestamp earlier than the start
+   made progress negative and the ease amplified it: "Published -18,139" on the
+   live front page. Progress is clamped at zero as well as one. */
+ok("the count-up clamps its progress at zero and one",
+   /const k = Math\.max\(0, Math\.min\(1, \(now - t0\) \/ dur\)\);/.test(JS));
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);
