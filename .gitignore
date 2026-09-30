@@ -10,3 +10,8 @@ node_modules/
 
 # The component workbench — scripts/gallery.mjs regenerates it. Never deployed.
 public/.gallery/
+
+# Written at deploy by scripts/company-pages.mjs from the synced feeds. A
+# committed copy would be a second, older answer beside the feed it came from.
+public/c/
+public/vision-sitemap.xml

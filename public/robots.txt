@@ -7,3 +7,6 @@ Allow: /
 Disallow: /api/
 
 Sitemap: https://signal.askakshay.com/sitemap.xml
+# Vision's home and one page per company. Listed here as well as served on
+# vision.askakshay.com, because this one robots.txt answers for every host.
+Sitemap: https://vision.askakshay.com/vision-sitemap.xml

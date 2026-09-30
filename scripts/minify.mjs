@@ -61,6 +61,7 @@ const TARGETS = [
   ["public/gems.js", "js"],
   ["public/brief_fundamentals.js", "js"],
   ["public/vision.js", "js"],
+  ["public/insight.js", "js"],
   ["public/vision.css", "css"],
 ];
 

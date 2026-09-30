@@ -141,6 +141,25 @@ export const WATCH = [
     ],
   },
   {
+    /* VISION'S TWO SETUPS, AT THE 4-HOUR CLOSES.
+     *
+     * Scheduled for 07:58 and 10:15 UTC, its first nine runs started between
+     * 13:04 and 18:10 — GitHub's scheduler under load, five to eight hours
+     * late. The rule reads completed bars only, so late runs were right but
+     * useless: a 13:15 IST breakout reported after the next day's open.
+     *
+     * The default grace is safe here because a duplicate is a no-op:
+     * vision_scan files a bar once (engine, symbol, fired_at) and grading is
+     * idempotent, and the workflow's concurrency group queues a second copy. */
+    repo: "caakshayk1-boop/trading-dashboard",
+    file: "vision_scan.yml",
+    why: "Vision's bottom-reversal and 4H-breakout scan",
+    slots: [
+      { dow: [1, 2, 3, 4, 5], h: 7, m: 58 },
+      { dow: [1, 2, 3, 4, 5], h: 10, m: 15 },
+    ],
+  },
+  {
     repo: "caakshayk1-boop/signal",
     file: "sync-data.yml",
     why: "the mirrored feeds this site renders",
@@ -151,6 +170,10 @@ export const WATCH = [
       { dow: [0, 1, 2, 3, 4, 5, 6], h: 1, m: 30 },
       { dow: [0, 1, 2, 3, 4, 5, 6], h: 6, m: 40 },
       { dow: [0, 1, 2, 3, 4, 5, 6], h: 12, m: 40 },
+      // After each Vision scan, including one the entry above had to
+      // dispatch: slot + 12 min grace + a 10-minute tick + a ~4-minute run.
+      { dow: [1, 2, 3, 4, 5], h: 8, m: 40 },
+      { dow: [1, 2, 3, 4, 5], h: 10, m: 55 },
     ],
   },
 ];

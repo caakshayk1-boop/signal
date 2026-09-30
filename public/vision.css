@@ -648,3 +648,108 @@ select.inp{padding-right:var(--s-5)}
 .sc-news{margin:0 0 4px;padding-left:1.1em;font-size:var(--t-sm);line-height:1.45}
 .sc-news li{margin:3px 0}
 .sc-news a{color:var(--ink)}
+
+/* ── Parent link, the More button in the bar ──────────────────────────────── */
+.up-link{font-size:var(--t-sm);color:var(--ink-3);white-space:nowrap;padding:4px 8px;border-radius:var(--r-1);border:1px solid var(--line-2)}
+.up-link:hover{color:var(--ink);border-color:var(--ink-4)}
+.nav-more{padding:6px 10px;border-radius:var(--r-1);color:var(--ink-3);font-size:var(--t-sm);white-space:nowrap;background:none;border:0;cursor:pointer}
+.nav-more:hover{color:var(--ink);background:var(--panel-2)}
+.nav-more[aria-current="page"]{color:var(--ink);background:var(--panel-3)}
+@media (max-width:760px){ .up-link{padding:3px 6px;font-size:var(--t-xs)} }
+
+/* ── Companies home: search is the hero ───────────────────────────────────── */
+.hero2{padding:var(--s-6) 0 var(--s-5);max-width:760px}
+.hero2 .up{margin:0 0 var(--s-3);font-size:var(--t-sm);color:var(--ink-3)}
+.hero2 .up a{color:var(--accent)}
+.hero2 h1{margin:0;font-size:clamp(24px,4.2vw,36px);line-height:1.15;letter-spacing:-.01em;font-weight:700}
+.hero2 .sub{margin:var(--s-2) 0 var(--s-4);color:var(--ink-2);font-size:var(--t-lg);line-height:1.55;max-width:62ch}
+.hsearch{position:relative}
+.hsearch input{width:100%;height:48px;padding:0 var(--s-4);border-radius:var(--r-2);border:1px solid var(--line-2);background:var(--panel);
+  color:var(--ink);font-size:var(--t-xl)}
+.hsearch input:focus{outline:2px solid var(--accent);outline-offset:1px}
+#hL{list-style:none;margin:6px 0 0;padding:0;border-radius:var(--r-2);overflow:hidden;background:var(--panel);border:1px solid var(--line-2)}
+#hL:empty{display:none}
+#hL li{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:var(--s-3);align-items:center;padding:10px var(--s-4);cursor:pointer;min-height:44px;font-size:var(--t-md)}
+#hL li[aria-selected="true"],#hL li:hover{background:var(--panel-3)}
+#hL li span{color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#hL li em{font-style:normal;color:var(--ink-3);font-size:var(--t-xs);white-space:nowrap}
+#hL mark{background:var(--accent-bg);color:var(--ink);border-radius:2px}
+.hrec{margin-top:var(--s-3);gap:6px;align-items:center}
+.hrec .mut{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.06em;margin:0 2px 0 6px}
+.hrec .mut:first-child{margin-left:0}
+@media (max-width:560px){ #hL li{grid-template-columns:90px minmax(0,1fr)} #hL li em{display:none} }
+.dir{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px}
+.dir a{display:flex;flex-direction:column;padding:8px 10px;border-radius:var(--r-1);min-width:0}
+.dir a:hover{background:var(--panel-2)}
+.dir b{font-size:var(--t-md)} .dir span{font-size:var(--t-xs);color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ul.plain{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:var(--t-md)}
+ul.plain.pad{padding:var(--s-3) var(--s-4)}
+h3.k{margin:0 0 var(--s-2);font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.08em}
+
+/* ── What matters / what changed ──────────────────────────────────────────── */
+.intel-kv{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.intel-kv b{font-size:var(--t-lg)}
+.wcg{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--s-4)}
+.wc h3{margin:0 0 var(--s-2);font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3)}
+.wc.up h3{color:var(--up)} .wc.dn h3{color:var(--dn)} .wc.warn h3{color:var(--warn)}
+.wc ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--s-2)}
+.wc li{display:flex;flex-direction:column;gap:2px;padding-left:10px;border-left:2px solid var(--line-2)}
+.wc.up li{border-left-color:rgba(var(--up-rgb),.5)} .wc.dn li{border-left-color:rgba(var(--dn-rgb),.5)} .wc.warn li{border-left-color:rgba(var(--warn-rgb),.5)}
+.wc li b{font-size:var(--t-md);font-weight:600} .wc li span{font-size:var(--t-sm);color:var(--ink-2)}
+.wc li small{font-size:var(--t-2xs);color:var(--ink-3)}
+details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:var(--t-sm);color:var(--ink-3)}
+.note.src{font-size:var(--t-xs);color:var(--ink-3);margin:var(--s-3) 0 0}
+.def{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--ink-4);color:var(--ink-3);
+  font:italic 600 10px/1 Georgia,serif;background:none;cursor:pointer;vertical-align:1px;padding:0;margin-left:2px}
+.def:hover{color:var(--accent);border-color:var(--accent)}
+.def::after{content:"";position:absolute;inset:-14px}
+.def{position:relative}
+
+/* ── Compare: a real table, first column held while the rest scrolls ─────── */
+.cmp-w{overflow-x:auto}
+.cmp th[scope="row"]{position:sticky;left:0;background:var(--panel);z-index:1;text-align:left;font-weight:500;color:var(--ink-2);white-space:nowrap}
+.cmp thead th{vertical-align:bottom;min-width:120px}
+.cmp thead th small{display:block;font-weight:400;color:var(--ink-3);font-size:var(--t-2xs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.cmp td{text-align:right;white-space:nowrap}
+.chip .x{background:none;border:0;color:inherit;cursor:pointer;padding:0 0 0 4px;font-size:14px;line-height:1}
+
+/* ── Written by the server: readable before the app paints ────────────────── */
+.ssr{max-width:880px;margin:0 auto;padding:var(--s-5) var(--s-4) var(--s-6);color:var(--ink-2);font-size:var(--t-lg);line-height:1.6}
+.ssr h1{color:var(--ink);font-size:clamp(24px,4vw,34px);line-height:1.2;margin:var(--s-2) 0}
+.ssr h1 span{color:var(--ink-3);font-size:.6em;font-weight:500;margin-left:6px}
+.ssr h2{color:var(--ink);font-size:var(--t-xl);margin:var(--s-5) 0 var(--s-2)}
+.ssr h3{color:var(--ink);font-size:var(--t-md);margin:var(--s-3) 0 var(--s-1)}
+.ssr a{color:var(--accent)}
+.ssr .ssr-k{font-size:var(--t-sm);color:var(--ink-3);margin:0}
+.ssr .ssr-s{color:var(--ink-2)}
+.ssr dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px var(--s-3);margin:0}
+.ssr dt{color:var(--ink);font-weight:600} .ssr dd{margin:0}
+.ssr small{color:var(--ink-3)}
+.ssr table{border-collapse:collapse;font-size:var(--t-md);width:100%;overflow-x:auto;display:block}
+.ssr th,.ssr td{padding:4px 10px 4px 0;text-align:left;white-space:nowrap}
+.ssr-dir{columns:3 180px;padding-left:18px}
+.ssr-n{margin-top:var(--s-5);font-size:var(--t-xs);color:var(--ink-3)}
+
+/* The parent link costs the phone header ~60px. The ".AKSHAY" suffix gives
+   it back under 560px; under 380px the alerts bell goes too — Alerts stays
+   one tap away under More. */
+@media (max-width:560px){ .brand em{display:none} .top-in{gap:var(--s-2)} }
+@media (max-width:380px){ #aBtn{display:none} .up-link{padding:3px 5px} }
+.ah-act{flex-wrap:wrap}
+@media (max-width:760px){ .ah-px{min-width:0;max-width:100%} }
+.def{letter-spacing:0;text-transform:none;text-indent:0;line-height:15px;flex:none}
+@media (max-width:760px){ .cmp th[scope="row"]{white-space:normal;min-width:104px;max-width:120px;font-size:var(--t-xs)} .cmp thead th{min-width:108px} }
+.js .ssr{display:none}
+
+/* A company page's header and its two intel panels are filled in one pass
+   when the screen and the company file arrive. Their skeletons now reserve
+   the height they will take — the 3-line skeleton under a 172-312px header
+   moved everything below it (measured CLS 0.54 at 390px). */
+#aHead{min-height:172px}
+.intel .pn{min-height:314px}
+@media (max-width:1080px){ #aHead{min-height:188px} .intel .pn{min-height:452px} }
+@media (max-width:760px){ .intel .pn{min-height:400px} }
+@media (max-width:560px){ #aHead{min-height:296px} }
+#hRecent{min-height:30px}
+#hChg,#hUnu{min-height:330px}
+@media (max-width:760px){ #hChg{min-height:560px} #hUnu{min-height:250px} }
