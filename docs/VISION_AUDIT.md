@@ -34,7 +34,7 @@ claims checked in code; measurements local and throttled, not production Lightho
 | Quarterly statements, QoQ | **No** — the screen carries annual figures only | Not built; needs a quarterly feed upstream |
 | Filings / events timeline | **No** — no filings feed; only a next-results date | Results date shown as an event, labelled "confirm on the exchange" |
 | Price chart with event markers | **No** — no per-stock bar history is published | Still links out to TradingView |
-| Ownership over time | Partly — four quarters of FII/DII in `institutional.json` | q/q change shown; a four-quarter chart is next |
+| Ownership over time | Yes — up to six quarters of FII/DII in `institutional.json` (886 of 984 have six) | **Yes** (30 Sep), charted per quarter with a table view |
 | Ask Vision (evidence-constrained Q&A) | **No backend** | Not built. A UI with no working backend would be a fabricated feature. Contract below. |
 
 **Ask Vision — the contract, for when a backend exists.** `POST /api/ask {sym, q}` → `{answer,
@@ -55,6 +55,5 @@ header skeleton was a fraction of the header's height. Heights are now reserved.
 ## 5. Staged plan
 
 1. A quarterly results feed upstream → Financials tab (quarterly/annual, YoY/QoQ).
-2. Four-quarter ownership series on the company page (data already there).
-3. A filings feed (NSE corporate announcements) → an events timeline.
-4. Only then an evidence-bound Ask Vision, to the contract above.
+2. A filings feed (NSE corporate announcements) → an events timeline.
+3. Only then an evidence-bound Ask Vision, to the contract above.

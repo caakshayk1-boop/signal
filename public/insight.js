@@ -158,7 +158,7 @@
     R: 'R is the risk taken on a trade: entry minus stop. A result of +2R made twice what was risked; −1R lost exactly the planned amount.',
     ATR: 'Average true range: how far the price typically moves in one bar, including gaps. Stops and targets are placed in ATR so they fit each stock\'s own noise.',
     ROCE: 'Return on capital employed: operating profit (EBIT) ÷ (equity + debt). Computed from filings — no data vendor publishes it.',
-    'Relative strength': 'How a stock moved against a benchmark over the same window. Here the benchmark is the screen\'s median, because the index feed is not reliably populated.',
+    'Relative strength': 'How a stock moved against a benchmark over the same window. Here the benchmark is the median of the ~1,000 names on the screen — the same universe every other Vision figure describes — rather than the 50 in the Nifty.',
     Breadth: 'How many names rose against how many fell. A broad rise lifts most stocks; a narrow one is carried by a few.',
     'Confidence interval': 'The range the true average plausibly lies in, given how few trades there are. If it spans zero, the sign of the result is not yet settled.',
     'PE percentile': 'Where today\'s price-to-earnings sits within this company\'s own history — 90th means higher than 90% of its past readings.',
