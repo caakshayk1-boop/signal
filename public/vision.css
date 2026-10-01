@@ -869,3 +869,16 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 @media (max-width:760px){
   .tabs a[aria-current="page"] svg,.tabs button[aria-current="page"] svg{fill:color-mix(in srgb,currentColor 22%,transparent);stroke-width:2.1}
 }
+
+/* ── Setups: end-of-day plans ─────────────────────────────────────────── */
+.ve-steps{margin:0;padding-left:20px;font-size:var(--t-sm);color:var(--ink);line-height:1.55}
+.ve-steps li+li{margin-top:2px}
+.ve-steps b{font-family:var(--f-mono);font-weight:600;font-variant-numeric:tabular-nums}
+.ve-flags{display:flex;flex-wrap:wrap;gap:6px}
+.ve-rules{margin:0;padding-left:18px;font-size:var(--t-sm);color:var(--ink-2);line-height:1.55}
+.ve-rules li+li{margin-top:var(--s-1)}
+.ve-arch>summary{cursor:pointer;list-style:none}
+.ve-arch>summary::-webkit-details-marker{display:none}
+.ve-arch>summary h2::before{content:"▸ ";color:var(--ink-3)}
+.ve-arch[open]>summary h2::before{content:"▾ "}
+.ve-card .vs-lv>div:first-child b{white-space:normal}

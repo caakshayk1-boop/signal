@@ -2255,9 +2255,51 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      does not fail, it freezes. */
   const SYNC_V = readFileSync(".github/workflows/sync-data.yml", "utf8");
   const PULL_V = readFileSync("scripts/pull-feeds.mjs", "utf8");
-  ok("vision's setups read the one signals feed", /V\.setups = /.test(VJS) && /get\('\/vision_signals\.json'/.test(VJS));
-  ok("the signals feed is mirrored by the scheduled sync and the deploy",
-     /contents\/feeds\/\$f"/.test(SYNC_V) && /f=vision_signals\.json/.test(SYNC_V) && /feeds\/vision_signals\.json/.test(PULL_V));
+  /* Since 2026-10-01 Setups renders the end-of-day plans (/vision_eod.json,
+     from a PRIVATE engine) and keeps the retired engines as an archive
+     (/vision_signals.json). Both feeds must be mirrored by both paths. */
+  ok("vision's setups read the end-of-day plans and the legacy archive",
+     /V\.setups = /.test(VJS) && /get\('\/vision_eod\.json'/.test(VJS) && /get\('\/vision_signals\.json'/.test(VJS));
+  ok("both Vision feeds are mirrored by the scheduled sync and the deploy",
+     /contents\/feeds\/\$f"/.test(SYNC_V) && /f=vision_signals\.json/.test(SYNC_V) && /f=vision_eod\.json/.test(SYNC_V)
+     && /vision-eod-public\/1/.test(SYNC_V) && /vision_signals\.json/.test(PULL_V) && /vision_eod\.json/.test(PULL_V));
+  /* PRIVATE LOGIC. The engine's rules run server-side; the browser gets an
+     allowlisted projection. This file is checked for the shape of a leak —
+     indicator names, thresholds, a score or rank, a probability — anywhere in
+     the code that renders the plans (comments stripped). */
+  const VE_SRC = (VJS.match(/\/\* ── SETUPS: VISION EOD[\s\S]*?\n  V\.disclaimer = /) || [""])[0].replace(/\/\*[\s\S]*?\*\//g, "");
+  const VE_CODE = VE_SRC.split("/* ── Legacy archive")[0] + (VE_SRC.match(/V\.setups = [\s\S]*$/) || [""])[0];
+  ok("no Vision EOD selection logic ships to the browser",
+     VE_CODE.length > 2000 && !/\b(EMA|SMA|ATR|RSI|MACD)\d*\b|\bRS63\b|pullback_|touch_band|depth_atr|\.score\b|\.rank\b|\.features?\b|probability of|win rate of/i.test(VE_CODE.replace(/Not a probability/g, "")),
+     (VE_CODE.match(/\b(EMA|SMA|ATR|RSI)\d*\b|\.score\b|\.rank\b|\.features?\b/gi) || []).slice(0, 5));
+  /* The public allowlist, mirrored from vision-engine/vision_eod/publish.py.
+     The deployed feed (pulled at deploy) is held to it key by key; a key the
+     engine adds without adding it here fails the deploy, not the reader. */
+  const VE_KEYS = {
+    top: ["schema", "engine", "model_version", "mode", "status", "status_detail", "session_date", "published_at", "data_as_of", "coverage",
+      "next_session", "next_scan_due", "calendar_verified", "exit_plan", "entry_expiry_sessions", "time_exit_sessions", "reference_size",
+      "plans", "summary", "fills_are", "notice"],
+    plan: ["id", "symbol", "name", "session_date", "published_at", "state", "entry_low", "entry_high", "stop", "initial_stop", "t1", "t2", "t3",
+      "valid_through", "qty", "risk_per_share", "risk_pct", "flags", "fill", "exits", "remaining_qty", "remaining_pct", "realized_r",
+      "unrealized_r", "total_r", "last_close", "last_session", "closed_session"],
+  };
+  let veFeed = null;
+  try { veFeed = JSON.parse(readFileSync("public/vision_eod.json", "utf8")); } catch { /* not pulled yet: a state */ }
+  const veBad = !veFeed ? [] : [...Object.keys(veFeed).filter((k) => !VE_KEYS.top.includes(k)),
+    ...(veFeed.plans || []).flatMap((p) => Object.keys(p).filter((k) => !VE_KEYS.plan.includes(k)))];
+  ok("the published end-of-day feed carries only allow-listed keys", veBad.length === 0, veBad.slice(0, 5));
+  /* Five distinct scan states, never blurred into one another. */
+  ok("setups distinguish no-setup, market filter, data unavailable, stale and error",
+     /D\.status === 'error'/.test(VJS) && /veStale\(D\)/.test(VJS) && /D\.status === 'data_unavailable'/.test(VJS)
+     && /D\.status === 'market_filter'/.test(VJS) && /thresholds are not lowered to fill this page/.test(VJS));
+  /* A plan is not a trade: awaiting, expired and cancelled are never results,
+     fills are labelled simulated, and no average prints before 30 complete. */
+  ok("a published plan is never counted as a result, and fills say simulated",
+     /const VE_DONE = new Set\(\['closed', 'stopped', 'time_exited'\]\)/.test(VJS) && /simulated<\/span>/.test(VJS)
+     && /const VE_NEED = 30;/.test(VJS) && /Never filled/.test(VJS));
+  ok("the retired engines are an archive, not current opportunities",
+     /Legacy archive — bottom reversal and 4H breakout/.test(VJS) && !/S\.vsig\.today|vsig\.today/.test(VJS)
+     && !/vsig\.today/.test(readFileSync("scripts/company-pages.mjs", "utf8")) && !/site\.vsig/.test(SEO));
   /* Deploy 220: the Worker 404s a missing feed with "no such file: …" and the
      page matched the error TEXT for "HTTP 404", so the pre-scan state read
      "failed". Executed against what the Worker and get() actually produce. */

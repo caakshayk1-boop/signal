@@ -107,19 +107,25 @@ for (const f of FEEDS) {
    "Fetch Vision's signals" step for why. Same rule: only a valid feed that
    says ok replaces the committed copy, and a 404 before the first scan is a
    state, not a failure. */
-const EXTRA = [["vision_signals", "https://raw.githubusercontent.com/caakshayk1-boop/trading-dashboard/main/feeds/vision_signals.json"]];
-for (const [f, url] of EXTRA) {
+const FEEDS_RAW = "https://raw.githubusercontent.com/caakshayk1-boop/trading-dashboard/main/feeds/";
+/* Each extra feed brings its own validity test: the legacy archive is a
+   signals feed; the end-of-day plans declare their public schema. */
+const EXTRA = [
+  ["vision_signals", FEEDS_RAW + "vision_signals.json", (d) => d && d.ok && Array.isArray(d.history), "signals feed", "generated_at"],
+  ["vision_eod", FEEDS_RAW + "vision_eod.json", (d) => d && d.schema === "vision-eod-public/1" && !!d.status && Array.isArray(d.plans), "end-of-day plans feed", "published_at"],
+];
+for (const [f, url, valid, what, stampKey] of EXTRA) {
   const path = `public/${f}.json`;
   try {
     const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const text = await r.text(), d = JSON.parse(text);
-    if (!d || !d.ok || !Array.isArray(d.history)) throw new Error("not a valid signals feed");
+    if (!valid(d)) throw new Error(`not a valid ${what}`);
     let before = null;
     try { before = readFileSync(path, "utf8"); } catch { /* first pull */ }
     if (before === text) { kept++; console.log(`  same  ${f}`); continue; }
     writeFileSync(path, text); changed++;
-    console.log(`  NEW   ${f}  ${String(d.generated_at || "").slice(0, 19)}`);
+    console.log(`  NEW   ${f}  ${String(d[stampKey] || "").slice(0, 19)}`);
   } catch (e) {
     failed++;
     console.log(`  keep  ${f} — ${String(e.message || e)} (committed copy, if any, left in place)`);

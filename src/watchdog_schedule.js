@@ -141,24 +141,32 @@ export const WATCH = [
     ],
   },
   {
-    /* VISION'S TWO SETUPS, AT THE 4-HOUR CLOSES.
+    /* VISION'S RETIRED ENGINES — LEGACY GRADING ONLY (since 2026-10-01).
      *
-     * Scheduled for 07:58 and 10:15 UTC, its first nine runs started between
-     * 13:04 and 18:10 — GitHub's scheduler under load, five to eight hours
-     * late. The rule reads completed bars only, so late runs were right but
-     * useless: a 13:15 IST breakout reported after the next day's open.
+     * Bottom reversal and 4H breakout no longer file anything. One slot, after
+     * the close, grades the filings that were open at retirement until each
+     * reaches its stop, T3 or horizon. The 07:58 slot existed to read the
+     * morning 4H candle for NEW breakouts and is gone, here and upstream.
      *
-     * The default grace is safe here because a duplicate is a no-op:
-     * vision_scan files a bar once (engine, symbol, fired_at) and grading is
-     * idempotent, and the workflow's concurrency group queues a second copy. */
+     * The default grace is safe here because a duplicate is a no-op: grading
+     * is idempotent and the workflow's concurrency group queues a second copy. */
     repo: "caakshayk1-boop/trading-dashboard",
     file: "vision_scan.yml",
-    why: "Vision's bottom-reversal and 4H-breakout scan",
+    why: "Vision's legacy-archive grading (retired engines)",
     slots: [
-      { dow: [1, 2, 3, 4, 5], h: 7, m: 58 },
       { dow: [1, 2, 3, 4, 5], h: 10, m: 15 },
     ],
   },
+  /* VISION EOD lives in a PRIVATE repository (caakshayk1-boop/vision-engine),
+   * eod.yml at 13:35 / 15:35 / 17:35 UTC. It is idempotent per session, so
+   * dispatching a missed slot is safe — but this watchdog's token cannot reach
+   * that repo until the owner grants it Actions: write there. Enable by
+   * uncommenting once the token is widened:
+   *
+   * { repo: "caakshayk1-boop/vision-engine", file: "eod.yml", why: "Vision's end-of-day plans",
+   *   slots: [{ dow: [1, 2, 3, 4, 5], h: 13, m: 35 }, { dow: [1, 2, 3, 4, 5], h: 15, m: 35 },
+   *           { dow: [1, 2, 3, 4, 5], h: 17, m: 35 }] },
+   */
   {
     repo: "caakshayk1-boop/signal",
     file: "sync-data.yml",
@@ -170,10 +178,11 @@ export const WATCH = [
       { dow: [0, 1, 2, 3, 4, 5, 6], h: 1, m: 30 },
       { dow: [0, 1, 2, 3, 4, 5, 6], h: 6, m: 40 },
       { dow: [0, 1, 2, 3, 4, 5, 6], h: 12, m: 40 },
-      // After each Vision scan, including one the entry above had to
-      // dispatch: slot + 12 min grace + a 10-minute tick + a ~4-minute run.
-      { dow: [1, 2, 3, 4, 5], h: 8, m: 40 },
+      // Vision: legacy grading (10:15 UTC) and the end-of-day plans (first
+      // attempt 13:35 UTC, final retry 17:35 UTC), each plus a run's length.
       { dow: [1, 2, 3, 4, 5], h: 10, m: 55 },
+      { dow: [1, 2, 3, 4, 5], h: 14, m: 10 },
+      { dow: [1, 2, 3, 4, 5], h: 18, m: 15 },
     ],
   },
 ];

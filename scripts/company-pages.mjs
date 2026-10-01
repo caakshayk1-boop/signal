@@ -34,7 +34,6 @@ if (!src || !Array.isArray(src.rows) || !src.rows.length) {
   process.exit(0);
 }
 const insti = read("institutional.json") || {};
-const vsig = read("vision_signals.json") || {};
 const baro = read("barometer.json") || {};
 const pulse = read("pulse.json") || {};
 
@@ -54,14 +53,17 @@ const ctxBase = {
   built_at: src.built_at || src.generated_at || null,
 };
 
+/* A company's current Vision plan, if it has one: the end-of-day engine's
+   plan that is awaiting entry or held as a paper position. The retired
+   engines are not surfaced on company pages — they live in the archive. */
+const veod = read("vision_eod.json") || {};
 const openSig = {};
-for (const h of vsig.history || []) {
-  const st = (h.grade || {}).status || "open";
-  if (st === "open" && !openSig[h.sym]) {
-    openSig[h.sym] = { name: h.engine === "bottom" ? "Bottom reversal" : "4H breakout", fired_at: h.fired_at,
-      entry: h.entry, sl: h.sl, t1: h.t1, t2: h.t2, t3: h.t3, status: (h.grade || {}).targets_hit ? `T${h.grade.targets_hit} reached` : "open" };
-  }
+for (const p of veod.plans || []) {
+  if (!["awaiting_entry", "activated", "partially_exited"].includes(p.state) || openSig[p.symbol]) continue;
+  openSig[p.symbol] = { name: "Vision end-of-day plan", fired_at: p.session_date, entry_low: p.entry_low, entry_high: p.entry_high,
+    sl: p.stop, t1: p.t1, t2: p.t2, t3: p.t3, status: p.state === "awaiting_entry" ? `awaiting entry until ${p.valid_through}` : "paper position" };
 }
+const nextPlans = (veod.plans || []).filter((p) => p.state === "awaiting_entry" && p.session_date === veod.session_date);
 
 rmSync("public/c", { recursive: true, force: true });
 mkdirSync("public/c", { recursive: true });
@@ -107,7 +109,8 @@ writeFileSync("public/c/_site.json", JSON.stringify({
   week: pulse.breadth ? { up: pulse.breadth.up, down: pulse.breadth.down, counted: pulse.breadth.counted, built_on: pulse.built_on } : null,
   changed,
   top: byTurn.slice(0, 60).map((r) => ({ sym: r.sym, name: r.name, sector: r.sector, price: r.price, r1d: r.r1d })),
-  vsig: { generated_at: vsig.generated_at || null, today: (vsig.today || []).map((s) => ({ sym: s.sym, name: s.name, engine: s.engine, entry: s.entry, sl: s.sl, t1: s.t1, t2: s.t2, t3: s.t3, fired_at: s.fired_at })) },
+  veod: { published_at: veod.published_at || null, session_date: veod.session_date || null, next_session: veod.next_session || null, status: veod.status || null,
+    mode: veod.mode || null, plans: nextPlans.map((p) => ({ sym: p.symbol, name: p.name, entry_low: p.entry_low, entry_high: p.entry_high, stop: p.stop, t1: p.t1, t2: p.t2, t3: p.t3 })) },
 }));
 
 const day = String(ctxBase.built_at || new Date().toISOString()).slice(0, 10);

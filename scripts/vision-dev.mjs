@@ -24,6 +24,11 @@
  *   VDEV_VSIG=none node scripts/vision-dev.mjs    404 the feed exactly as the
  *                                                 Worker does, for the page's
  *                                                 "not published yet" state.
+ *   VDEV_VEOD=/path/feed.json | none              the same for /vision_eod.json,
+ *                                                 the end-of-day plans. Preview
+ *                                                 feeds come from the private
+ *                                                 engine's own code run on
+ *                                                 SYNTHETIC bars, never market data.
  */
 import http from "node:http";
 import { readFile } from "node:fs/promises";
@@ -42,6 +47,7 @@ const SLOW = Number(process.env.VDEV_SLOW || 0);
    genuinely carries no R, and the page must be seen refusing that too. */
 const GRADE = !!process.env.VDEV_GRADE;
 const VSIG = process.env.VDEV_VSIG || "";
+const VEOD = process.env.VDEV_VEOD || "";
 const SITE = process.env.VDEV_SITE === "signal" ? "signal" : "vision";
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css",
   ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png",
@@ -154,6 +160,11 @@ http.createServer(async (req, res) => {
   if (p === "/vision_signals.json" && VSIG) {
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     return res.end(readFileSync(VSIG));
+  }
+  if (p === "/vision_eod.json" && VEOD === "none") return noFile(res, p);
+  if (p === "/vision_eod.json" && VEOD) {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    return res.end(readFileSync(VEOD));
   }
   if (SITE === "vision" && (p === "/" || p === "/vision")) p = "/vision.html";
   /* The signal site routes by PATH: anything that is not a file is its shell. */
