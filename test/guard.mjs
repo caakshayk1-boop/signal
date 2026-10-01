@@ -2319,7 +2319,11 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   const VE_KEYS = {
     top: ["schema", "product", "model_version", "mode", "status", "status_detail", "session_date", "published_at", "data_as_of", "coverage",
       "next_session", "next_scan_due", "calendar_verified", "cutover_at", "forward_record_start", "strategies", "exit_plan",
-      "entry_expiry_sessions", "time_exit_sessions", "reference_size", "costs", "plans", "metrics", "fills_are", "notice"],
+      "entry_expiry_sessions", "time_exit_sessions", "reference_size", "costs", "plans", "metrics", "fills_are", "notice", "history"],
+    history: ["basis", "benchmark", "exposed", "sessions", "drawdown", "nav_change_pct", "benchmark_change_pct"],
+    session: ["session", "status", "published", "filled", "closed", "wins", "losses", "breakevens", "nav_inr", "nav_index",
+      "benchmark_close", "benchmark_index"],
+    drawdown: ["max_pct", "max_session", "current_pct", "peak_session", "sessions_since_peak"],
     plan: ["id", "strategy_id", "setup", "symbol", "name", "exchange", "currency", "direction", "session_date", "published_at", "state",
       "outcome", "entry_low", "entry_high", "stop", "initial_stop", "stop_rule", "management", "t1", "t2", "t3", "rr_t1", "rr_t2", "rr_t3",
       "valid_through", "qty", "risk_per_share", "risk_pct", "flags", "fill", "exits", "remaining_qty", "remaining_pct", "realized_r",
@@ -2328,7 +2332,10 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   let veFeed = null;
   try { veFeed = JSON.parse(readFileSync("public/signal_v2.json", "utf8")); } catch { /* not pulled yet: a state */ }
   const veBad = !veFeed ? [] : [...Object.keys(veFeed).filter((k) => !VE_KEYS.top.includes(k)),
-    ...(veFeed.plans || []).flatMap((p) => Object.keys(p).filter((k) => !VE_KEYS.plan.includes(k)))];
+    ...(veFeed.plans || []).flatMap((p) => Object.keys(p).filter((k) => !VE_KEYS.plan.includes(k))),
+    ...Object.keys(veFeed.history || {}).filter((k) => !VE_KEYS.history.includes(k)).map((k) => "history." + k),
+    ...((veFeed.history || {}).sessions || []).flatMap((r) => Object.keys(r).filter((k) => !VE_KEYS.session.includes(k))),
+    ...Object.keys((veFeed.history || {}).drawdown || {}).filter((k) => !VE_KEYS.drawdown.includes(k)).map((k) => "drawdown." + k)];
   ok("the published V2 feed carries only allow-listed keys", veBad.length === 0, veBad.slice(0, 5));
   /* Five distinct scan states, never blurred into one another. */
   ok("setups distinguish no-setup, market filter, data unavailable, stale and error",
