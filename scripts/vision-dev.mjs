@@ -29,6 +29,7 @@
  *                                                 feeds come from the private
  *                                                 engine's own code run on
  *                                                 SYNTHETIC bars, never market data.
+ *   VDEV_TREAD=/path/reads.json                   the same for /technical_read.json.
  */
 import http from "node:http";
 import { readFile } from "node:fs/promises";
@@ -48,6 +49,7 @@ const SLOW = Number(process.env.VDEV_SLOW || 0);
 const GRADE = !!process.env.VDEV_GRADE;
 const VSIG = process.env.VDEV_VSIG || "";
 const VEOD = process.env.VDEV_VEOD || "";
+const TREAD = process.env.VDEV_TREAD || "";   // a technical_read.json from the engine's code on synthetic bars
 const SITE = process.env.VDEV_SITE === "signal" ? "signal" : "vision";
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css",
   ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png",
@@ -156,6 +158,10 @@ http.createServer(async (req, res) => {
   if (p === "/signal_v2.json" && VEOD) {
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     return res.end(readFileSync(VEOD));
+  }
+  if (p === "/technical_read.json" && TREAD) {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    return res.end(readFileSync(TREAD));
   }
   if (SITE === "vision" && (p === "/" || p === "/vision")) p = "/vision.html";
   /* The signal site routes by PATH: anything that is not a file is its shell. */

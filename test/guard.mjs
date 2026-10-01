@@ -372,8 +372,11 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   const fetched = new Set(
     [...JS.matchAll(/get\(\s*['"]\/([a-z0-9_-]+)\.json['"]/g)].map((m) => m[1])
   );
+  // Feeds the private engine writes to trading-dashboard/feeds/ (not docs/)
+  // are mirrored by their own named step, each with its schema check.
+  const fromFeedsDir = (f) => SYNC.includes(`f=${f}.json`);
   const unmirrored = [...fetched].filter(
-    (f) => !LIVE.has(f) && !feeds.has(f) && !builtHere(f));
+    (f) => !LIVE.has(f) && !feeds.has(f) && !builtHere(f) && !fromFeedsDir(f));
   ok("every .json the app fetches is in sync-data.yml's FEEDS (else it freezes)",
      unmirrored.length === 0, unmirrored);
 
@@ -2319,7 +2322,13 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   const VE_KEYS = {
     top: ["schema", "product", "model_version", "mode", "status", "status_detail", "session_date", "published_at", "data_as_of", "coverage",
       "next_session", "next_scan_due", "calendar_verified", "cutover_at", "forward_record_start", "strategies", "exit_plan",
-      "entry_expiry_sessions", "time_exit_sessions", "reference_size", "costs", "plans", "metrics", "fills_are", "notice", "history"],
+      "entry_expiry_sessions", "time_exit_sessions", "reference_size", "costs", "plans", "metrics", "fills_are", "notice", "history",
+      "paper"],
+    paper: ["basis", "as_of", "engines", "plans", "intraday", "retired", "min_closed_for_avg"],
+    paperEngine: ["id", "name", "module", "kind", "what", "since", "last_session", "filed", "open", "closed", "wins", "losses", "avg_r"],
+    paperPlan: ["id", "engine", "symbol", "filed_session", "for_session", "valid_through", "entry_low", "entry_high", "stop", "t1", "t2",
+      "t3", "sell_pct", "qty", "state", "fill_price", "fill_session", "exits", "total_r", "why", "trailing", "risk_pct"],
+    paperIntra: ["id", "engine", "symbol", "session", "decided_at", "entry", "stop", "t1", "t2", "t3", "qty", "exits", "total_r"],
     history: ["basis", "benchmark", "exposed", "sessions", "drawdown", "nav_change_pct", "benchmark_change_pct"],
     session: ["session", "status", "published", "filled", "closed", "wins", "losses", "breakevens", "nav_inr", "nav_index",
       "benchmark_close", "benchmark_index"],
@@ -2335,7 +2344,11 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
     ...(veFeed.plans || []).flatMap((p) => Object.keys(p).filter((k) => !VE_KEYS.plan.includes(k))),
     ...Object.keys(veFeed.history || {}).filter((k) => !VE_KEYS.history.includes(k)).map((k) => "history." + k),
     ...((veFeed.history || {}).sessions || []).flatMap((r) => Object.keys(r).filter((k) => !VE_KEYS.session.includes(k))),
-    ...Object.keys((veFeed.history || {}).drawdown || {}).filter((k) => !VE_KEYS.drawdown.includes(k)).map((k) => "drawdown." + k)];
+    ...Object.keys((veFeed.history || {}).drawdown || {}).filter((k) => !VE_KEYS.drawdown.includes(k)).map((k) => "drawdown." + k),
+    ...Object.keys(veFeed.paper || {}).filter((k) => !VE_KEYS.paper.includes(k)).map((k) => "paper." + k),
+    ...((veFeed.paper || {}).engines || []).flatMap((e) => Object.keys(e).filter((k) => !VE_KEYS.paperEngine.includes(k)).map((k) => "paper.engine." + k)),
+    ...((veFeed.paper || {}).plans || []).flatMap((e) => Object.keys(e).filter((k) => !VE_KEYS.paperPlan.includes(k)).map((k) => "paper.plan." + k)),
+    ...((veFeed.paper || {}).intraday || []).flatMap((e) => Object.keys(e).filter((k) => !VE_KEYS.paperIntra.includes(k)).map((k) => "paper.intraday." + k))];
   ok("the published V2 feed carries only allow-listed keys", veBad.length === 0, veBad.slice(0, 5));
   /* Five distinct scan states, never blurred into one another. */
   ok("setups distinguish no-setup, market filter, data unavailable, stale and error",
@@ -2468,7 +2481,9 @@ ok("no figure counts up", !/countUp/.test(JS));
   const V2B = (JS.match(/\/\* ══ SIGNAL V2 ═+[\s\S]*?\n  \/\/ The phone tab bar's "More"/) || [""])[0];
   const V2C = V2B.replace(/\/\*[\s\S]*?\*\//g, "");
   ok("the V2 block exists and reads one feed", V2B.length > 5000 && /const V2_URL = '\/signal_v2\.json'/.test(V2B)
-     && (V2C.match(/get\('\/[a-z_0-9-]+\.json'\)/g) || []).every((x) => /regime|signal_v2|pulse/.test(x)));
+     && (V2C.match(/get\('\/[a-z_0-9-]+\.json'\)/g) || []).every((x) => /regime|signal_v2|pulse|technical_read/.test(x)));
+  /* technical_read.json is the Technical Confluence READ of each stock, shown
+     on the stock page only; it is never a plan and never a figure in the record. */
   /* pulse.json is MARKET data for the market cards, never a source of plan
      figures; those still come from signal_v2.json alone. */
   for (const r of ["/", "/opportunities", "/performance", "/plan/:id", "/brief"])
@@ -2477,6 +2492,30 @@ ok("no figure counts up", !/countUp/.test(JS));
     ok(`retired route ${r} shows the retired-version notice`, new RegExp(`R\\['${r.replace(/\//g, "\\/")}'\\] = v2Retired\\(`).test(V2B));
   ok("a retired page never maps an old call onto a new plan", /No V1 call was turned into a V2 plan/.test(V2B));
   ok("every R:R printed is the feed's own field", /p\['rr_' \+ k\]/.test(V2C) && !/\(p\.t[123] - p\.entry_high\) \/ \(p\.entry_high - p\.(?:initial_)?stop\)/.test(V2C));
+  /* PAPER TEST + TECHNICAL READ (owner decision 2026-10-02). Four engines run
+     forward on paper and are shown on both sites; a stock's five-part read is
+     shown on both stock pages. Both are printed from upstream fields, labelled
+     as what they are, and kept out of the record. */
+  {
+    const W2 = readFileSync("public/v2widgets.js", "utf8");
+    const PAPER_FN = (W2.match(/function paper\(d, opts = \{\}\) \{[\s\S]*?\n  \}\n/) || [""])[0];
+    const READ_FN = (W2.match(/function read\(feed, sym, opts = \{\}\) \{[\s\S]*?\n  \}\n/) || [""])[0];
+    ok("the paper board is labelled paper and says it is not the record",
+       PAPER_FN.length > 1500 && /v2w-tag pp">paper</.test(PAPER_FN) && /not the published record/.test(PAPER_FN)
+       && /has not published yet/.test(PAPER_FN) && /avg after \$\{need\} closed/.test(PAPER_FN));
+    ok("the paper board and the read compute no signal: no threshold in the browser",
+       READ_FN.length > 1500 && !/(?:rsi|score|ext|rr|vol_ratio)\s*[<>]=?\s*\d/.test(READ_FN + PAPER_FN)
+       && !/\(p\.entry_high - p\.stop\)/.test(PAPER_FN) && /rules, not a forecast/.test(READ_FN) && /not a probability|Not advice/.test(READ_FN));
+    ok("the analyst counts paper setups from the engines' own fields",
+       /PP\.engines\.reduce\(\(a, e\) => a \+ \(e\.open \|\| 0\)/.test(W2) && /not counted in the record/.test(W2));
+    ok("both sites show the paper board and the read",
+       /v2Paper\(d, \{\}\)/.test(V2B) && /v2Paper\(d, \{ compact: true/.test(V2B) && /sec\('Technical read', treadBlock\(r\.sym\)/.test(JS)
+       && /window\.V2W\.paper\(D, \{ stockHref/.test(readFileSync("public/vision.js", "utf8"))
+       && /window\.V2W\.read\(ok \? tr\.data : null, s/.test(readFileSync("public/vision.js", "utf8")));
+    const SYNC_T = readFileSync(".github/workflows/sync-data.yml", "utf8"), PULL_T = readFileSync("scripts/pull-feeds.mjs", "utf8");
+    ok("the technical reads are mirrored, schema-checked, in both feed paths",
+       /f=technical_read\.json/.test(SYNC_T) && /technical-read\/1/.test(SYNC_T) && /technical_read/.test(PULL_T) && /technical-read\/1/.test(PULL_T));
+  }
   ok("counts and rates come from the feed's metrics block, never recounted",
      /const m = d\.metrics \|\| \{\}/.test(V2C) && !/filter\([^)]*outcome === 'win'\)\.length/.test(V2C) && !/\.filter\([^)]*r_multiple/.test(V2C));
   ok("Day 1 shows no completed sample, never a 0% rate",
@@ -2538,7 +2577,12 @@ ok("no figure counts up", !/countUp/.test(JS));
   ok("every widget custom property ends in a literal fallback",
      Object.keys(wDecl).length >= 8 && bareVar.length === 0, bareVar.slice(0, 5));
   ok("the cards never read or re-add the plan list; totals come from metrics",
-     !/\.plans\b/.test(W2C) && !/\.reduce\(/.test(W2C) && /const m = d\.metrics \|\| \{\}/.test(W2C)
+     /* The record's plan list is never read here. The paper board reads its
+        OWN list (P.plans, a separate block that is not the record), and the
+        only sums are over the paper engines' own published counts. */
+     !/\b(?:d|F|feed|D)\.plans\b/.test(W2C) && /P\.plans/.test(W2C)
+     && (W2C.match(/\.reduce\(/g) || []).length === (W2C.match(/PP\.engines\.reduce\(/g) || []).length
+     && /const m = d\.metrics \|\| \{\}/.test(W2C)
      && /h\.nav_change_pct/.test(W2C) && /h\.drawdown/.test(W2C));
   ok("an unexposed book shows no return and no drawdown, and a missing history says so",
      /Not invested/.test(W2C) && /no plan has filled/.test(W2C) && /No session history in this feed yet/.test(W2C)

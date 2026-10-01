@@ -138,7 +138,45 @@
 .v2w .v2w-ex{margin:0;padding:0 0 0 20px;display:grid;gap:10px;font:400 14px/1.55 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink)}
 .v2w .v2w-ex li::marker{color:var(--w-dim);font-variant-numeric:tabular-nums}
 .v2w .v2w-src{display:inline-block;margin-left:4px;padding:1px 7px;border:1px solid var(--w-line);border-radius:999px;font:500 11px/1.5 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut);text-decoration:none;white-space:nowrap}
-a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}`;
+a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
+/* paper test + technical read */
+.v2w .v2w-tag{display:inline-block;padding:1px 8px;border:1px solid var(--w-line);border-radius:999px;font:600 10px/1.6 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.06em;text-transform:uppercase;color:var(--w-mut);vertical-align:middle}
+.v2w .v2w-tag.pp{border-color:var(--w-warn);color:var(--w-warn)}
+.v2w .v2w-eng{display:grid;gap:8px;margin:0 0 14px;padding:0;list-style:none}
+.v2w .v2w-eng li{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;padding:10px 12px;border:1px solid var(--w-line);border-radius:8px;background:var(--w-bg)}
+.v2w .v2w-eng b{font:600 14px/1.3 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink)}
+.v2w .v2w-eng .n{font:400 12px/1.4 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink);font-variant-numeric:tabular-nums}
+.v2w .v2w-eng p{margin:0;font:400 12px/1.45 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut)}
+.v2w h4.v2w-h{font:600 12px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim);margin:16px 0 8px}
+.v2w .v2w-pcs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.v2w .v2w-pc{border:1px solid var(--w-line);border-radius:8px;padding:12px;background:var(--w-surf);display:grid;gap:6px;min-width:0}
+.v2w .v2w-pc header{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.v2w .v2w-pc header a{font:700 15px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink);text-decoration:none}
+.v2w .v2w-pc header a:hover{color:var(--w-acc);text-decoration:underline}
+.v2w .v2w-pc header small{font:400 11px/1.3 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-dim);text-align:right}
+.v2w .v2w-pc dl{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 10px;font:400 13px/1.4 var(--ui,var(--f-sans,system-ui,sans-serif))}
+.v2w .v2w-pc dt{color:var(--w-mut)}
+.v2w .v2w-pc dd{margin:0;color:var(--w-ink);font-variant-numeric:tabular-nums}
+.v2w .v2w-pc p{margin:0;font:400 12px/1.45 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut)}
+.v2w .v2w-rl{list-style:none;margin:0;padding:0;display:grid;gap:4px;font:400 13px/1.45 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink)}
+.v2w .v2w-rl li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--w-line);padding:4px 0}
+.v2w .v2w-rl .r{font-variant-numeric:tabular-nums;white-space:nowrap}
+.v2w .up{color:var(--w-up)}.v2w .dn{color:var(--w-dn)}
+.v2w .v2w-vd{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;padding:12px;border:1px solid var(--w-line);border-radius:8px;background:var(--w-bg);margin:0 0 12px}
+.v2w .v2w-vd b{font:700 18px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink)}
+.v2w .v2w-vd.enter{border-color:var(--w-up)}.v2w .v2w-vd.enter b{color:var(--w-up)}
+.v2w .v2w-vd.avoid b{color:var(--w-dn)}
+.v2w .v2w-vd span{font:400 13px/1.4 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut)}
+.v2w .v2w-sc{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:3px;margin:0 0 4px}
+.v2w .v2w-sc i{height:8px;border-radius:2px;background:var(--w-line)}
+.v2w .v2w-sc i.on{background:var(--w-acc)}
+.v2w .v2w-rdg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0 0}
+@media (max-width:599px){.v2w .v2w-rdg{grid-template-columns:minmax(0,1fr)}}
+.v2w .v2w-rdg>div{border:1px solid var(--w-line);border-radius:8px;padding:10px 12px;min-width:0}
+.v2w .v2w-rdg h4{display:flex;justify-content:space-between;font:600 11px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim);margin:0 0 6px}
+.v2w .v2w-rdg h4 em{font-style:normal;letter-spacing:0;color:var(--w-ink);font-variant-numeric:tabular-nums}
+.v2w .v2w-rdg p{margin:0;font:400 13px/1.5 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink)}
+.v2w .v2w-rdg p small{color:var(--w-mut);font-size:12px}`;
 
   function injectCss() {
     if (document.getElementById('v2w-css')) return;
@@ -608,7 +646,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}`;
    * free text, so nothing here can quote a number that is not on the page, and
    * nothing is said about what happens next.
    */
-  const STATUS_WORD = { research: 'research, not publishing', shadow: 'tracked privately',
+  const STATUS_WORD = { research: 'research, not publishing', shadow: 'paper test',
                         forward_paper: 'forward paper', validated: 'validated', retired: 'retired' };
   function explain(ctx = {}) {
     injectCss();
@@ -649,6 +687,13 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}`;
           ctx.enginesRef || null, 'Engines');
       }
     }
+    const PP = F && F.paper;
+    if (PP && Array.isArray(PP.engines)) {
+      const live = PP.engines.reduce((a, e) => a + (e.open || 0), 0);
+      const closed = PP.engines.reduce((a, e) => a + (e.closed || 0), 0);
+      add(`Separately, ${PP.engines.length} engines run as a paper test (${PP.engines.map((e) => e.name).join(', ')}): ${live} paper setup${live === 1 ? ' is' : 's are'} open or waiting, and ${closed} paper trade${closed === 1 ? ' has' : 's have'} closed. Paper trades are not counted in the record.`,
+        ctx.paperRef || null, 'Paper test');
+    }
     if (!S.length) return failCard(Q, 'The figures this explanation is written from', ctx.error);
     return `<section class="v2w v2w-ai" aria-label="${esc(Q)}">
       <h3>${esc(Q)}</h3>
@@ -657,6 +702,112 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}`;
         ? ` <a class="v2w-src" href="${esc(x.ref.startsWith('/') || x.ref.startsWith('#/') || /^https?:/.test(x.ref) ? x.ref : '#' + x.ref)}"${x.ref.startsWith('/') || x.ref.startsWith('#/') || /^https?:/.test(x.ref) ? '' : ` data-v2w-jump="${esc(x.ref)}"`}>${esc(x.label)} ↗</a>`
         : ` <span class="v2w-src">${esc(x.label)}</span>`}</li>`).join('')}</ol>
       <p class="v2w-note">This describes what has already happened and what the record holds. It does not predict, rank or recommend anything.</p></section>`;
+  }
+
+
+  /* ══ PAPER TEST ════════════════════════════════════════════════════════════
+   * The four engines kept after the 2 Oct 2026 review, tracked forward on
+   * paper. Everything printed is a field of the feed's `paper` block: this
+   * renderer computes no signal, ranks nothing and applies no threshold.
+   * It is labelled paper everywhere it appears, and it never feeds the record.
+   */
+  const PAPER_LIVE = new Set(['awaiting_entry', 'activated', 'partially_exited']);
+  const PSTATE = { awaiting_entry: 'Waiting for entry', activated: 'Filled', partially_exited: 'Part sold',
+                   closed: 'Closed at targets', stopped: 'Stopped', time_exited: 'Time exit',
+                   expired_unfilled: 'Never filled', cancelled: 'Cancelled' };
+  const rR = (v) => v == null ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(2)}R`;
+  const px = (v) => v == null ? '—' : '₹' + Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function paper(d, opts = {}) {
+    injectCss();
+    const Q = 'Paper test';
+    const P = d && d.paper;
+    const stock = opts.stockHref || ((s) => '#/' + encodeURIComponent(s));
+    if (!P || !Array.isArray(P.engines)) {
+      return `<section class="v2w" id="paper" aria-label="${Q}"><h3>Paper test <span class="v2w-tag pp">paper</span></h3>
+        <p class="v2w-empty"><b>The paper test has not published yet.</b>Four engines (Technical Confluence, Failed Breakdown Reclaim,
+        Compression Release, Opening Demand) start recording after the next session's close. Nothing here is a plan until then.</p></section>`;
+    }
+    const names = Object.fromEntries(P.engines.map((e) => [e.id, e.name]));
+    const need = P.min_closed_for_avg || 30;
+    const eng = `<ul class="v2w-eng">${P.engines.map((e) => `<li><b>${esc(e.name)} <span class="v2w-tag">${e.kind === 'intraday' ? 'intraday' : 'daily'}</span></b>
+        <span class="n">${e.filed || 0} filed · ${e.open || 0} open · ${e.closed || 0} closed${e.closed ? ` (${e.wins || 0}W ${e.losses || 0}L)` : ''} · ${e.avg_r == null ? `avg after ${need} closed (${e.closed || 0}/${need})` : 'avg ' + rR(e.avg_r)}</span>
+        <p>${esc(e.what)} ${e.since ? `Recording since ${esc(day(e.since))}.` : 'Starts recording after the next session closes.'}</p></li>`).join('')}</ul>`;
+    const live = (P.plans || []).filter((p) => PAPER_LIVE.has(p.state));
+    const done = (P.plans || []).filter((p) => !PAPER_LIVE.has(p.state));
+    const card = (p) => {
+      const sp = p.sell_pct || [40, 35, 25];
+      return `<article class="v2w-pc"><header><a href="${esc(stock(p.symbol))}">${esc(p.symbol)}</a>
+          <small>${esc(names[p.engine] || p.engine)}<br>${esc(PSTATE[p.state] || p.state)}</small></header>
+        <dl><dt>Buy</dt><dd>${px(p.entry_low)} – ${px(p.entry_high)}</dd>
+          <dt>Window</dt><dd>${esc(dayShort(p.for_session))} – ${esc(dayShort(p.valid_through))}</dd>
+          <dt>Stop</dt><dd>${px(p.stop)}${p.trailing ? ' (raised)' : p.risk_pct != null ? ` · ${Number(p.risk_pct).toFixed(1)}% under the top` : ''}</dd>
+          <dt>Sell</dt><dd>${sp[0]}% ${px(p.t1)} · ${sp[1]}% ${px(p.t2)} · ${sp[2]}% ${px(p.t3)}</dd>
+          ${p.fill_price != null ? `<dt>Filled</dt><dd>${px(p.fill_price)}${p.fill_session ? ' on ' + esc(dayShort(p.fill_session)) : ''} · ${rR(p.total_r)} so far</dd>` : ''}</dl>
+        ${p.why ? `<p>Why: ${esc(p.why)}</p>` : ''}</article>`;
+    };
+    const liveHtml = live.length ? `<div class="v2w-pcs">${live.map(card).join('')}</div>`
+      : `<p class="v2w-empty"><b>No paper setup is open or waiting.</b>The engines found nothing that met their rules on the ${esc(day(P.as_of))} close. They are not loosened to fill this space.</p>`;
+    const doneHtml = done.length ? `<h4 class="v2w-h">Closed recently</h4><ul class="v2w-rl">${done.map((p) =>
+      `<li><span><a class="sym" href="${esc(stock(p.symbol))}">${esc(p.symbol)}</a> · ${esc(names[p.engine] || '')} · ${esc(PSTATE[p.state] || p.state)}</span>
+       <span class="r ${p.total_r > 0 ? 'up' : p.total_r < 0 ? 'dn' : ''}">${p.fill_price == null ? 'no fill' : rR(p.total_r)}</span></li>`).join('')}</ul>` : '';
+    const intra = (P.intraday || []);
+    const intraHtml = intra.length ? `<h4 class="v2w-h">Intraday, graded after the close</h4><ul class="v2w-rl">${intra.map((p) =>
+      `<li><span><a class="sym" href="${esc(stock(p.symbol))}">${esc(p.symbol)}</a> · ${esc(dayShort(p.session))} · bought ${px(p.entry)}, stop ${px(p.stop)}</span>
+       <span class="r ${p.total_r > 0 ? 'up' : p.total_r < 0 ? 'dn' : ''}">${rR(p.total_r)}</span></li>`).join('')}</ul>` : '';
+    const ret = (P.retired || []).length ? ` Retired: ${P.retired.map((r) => `${esc(r.name)} (${esc(r.why)})`).join('; ')}.` : '';
+    return `<section class="v2w" id="paper" aria-label="${Q}">
+      <h3>${opts.title ? esc(opts.title) : 'Paper test: four engines, tracked forward'} <span class="v2w-tag pp">paper</span></h3>
+      <p class="v2w-per">As of the ${esc(day(P.as_of))} close · simulated fills · no order is placed · not the published record</p>
+      ${opts.compact ? '' : eng}
+      <h4 class="v2w-h">Paper setups</h4>${liveHtml}${opts.compact ? '' : doneHtml + intraHtml}
+      <p class="v2w-note">${esc(P.basis || '')}${opts.compact ? '' : ret}</p>
+      ${opts.moreHref ? `<p class="v2w-more"><a href="${esc(opts.moreHref)}">Every paper engine and result →</a></p>` : ''}</section>`;
+  }
+
+  /* ══ TECHNICAL READ ════════════════════════════════════════════════════════
+   * One stock's five-part chart read, exactly as the engine computed it after
+   * the close (technical_read.json). Printed, never re-derived: no threshold
+   * lives here, so the browser cannot disagree with the engine.
+   */
+  const PHASE = { markup: ['Markup', 'uptrend: 50 EMA above the 200, price above the 50'],
+                  distribution: ['Distribution', 'uptrend structure, price has lost the 50 EMA'],
+                  markdown: ['Markdown', 'downtrend: 50 EMA below the 200, price below the 50'],
+                  accumulation: ['Accumulation', 'downtrend structure, price has reclaimed the 50 EMA'] };
+  const VERDICT = { enter: 'Setup favours entry now', wait: 'Wait', avoid: 'Avoid for now' };
+  function read(feed, sym, opts = {}) {
+    injectCss();
+    const Q = 'Technical read';
+    if (!feed) return failCard(Q, 'The technical reads', opts.error || 'technical_read.json did not load');
+    const r = feed.reads && feed.reads[sym];
+    if (!r) {
+      return `<section class="v2w" aria-label="${Q}"><h3>${Q}</h3>
+        <p class="v2w-empty"><b>No read for ${esc(sym)}.</b>It needs about a year of completed daily bars and a bar on the ${esc(day(feed.session_date))} close; this name has not got both.</p></section>`;
+    }
+    const pts = r.pts || [];
+    const MAX = [3, 2, 2, 2, 1];
+    const ph = PHASE[r.phase] || [r.phase, ''];
+    const sc = `<div class="v2w-sc" role="img" aria-label="${r.score} of 10 conditions met">${Array.from({ length: 10 }, (_, i) => `<i${i < r.score ? ' class="on"' : ''}></i>`).join('')}</div>`;
+    const v = r.action === 'wait' && r.wait_at != null ? `Wait for ${esc(r.wait_for || 'a better level')} (${px(r.wait_at)})` : VERDICT[r.action] || r.action;
+    const box = (t, i, body) => `<div><h4>${t}<em>${pts[i] != null ? pts[i] + '/' + MAX[i] : ''}</em></h4><p>${body}</p></div>`;
+    return `<section class="v2w" aria-label="${Q}">
+      <h3>${Q} <span class="v2w-tag">rules, not a forecast</span></h3>
+      <p class="v2w-per">${esc(sym)} · ${esc(day(feed.session_date))} close · ${px(r.c)}</p>
+      <div class="v2w-vd ${esc(r.action)}"><b>${v}</b>
+        <span>Conditions met: <strong>${r.score}/10</strong> · Favoured timeframe: ${r.tf ? esc(r.tf) : 'none'}${r.action === 'enter' && r.stop != null ? ` · stop under support ${px(r.stop)}` : ''}</span></div>
+      ${sc}
+      <div class="v2w-rdg">
+        ${box('Trend structure', 0, `<b>${esc(ph[0])}</b> <small>${esc(ph[1])}</small><br>50 EMA ${px(r.e50)} · 200 EMA ${px(r.e200)} ${r.e200_up ? '(rising)' : '(not rising)'}`)}
+        ${box('Key levels', 1, `Support ${px(r.sup)}${r.sup_n ? ` <small>(${r.sup_n} touches)</small>` : ''}${r.near_sup ? ' · <b>approaching</b>' : ''}<br>
+          Resistance ${r.res == null ? 'none within a year' : px(r.res)}${r.res_52w ? ' <small>(52-week high)</small>' : ''}${r.near_res ? ' · <b>approaching</b>' : ''}
+          ${r.rr != null ? `<br><small>${r.rr.toFixed(1)}R of room to resistance</small>` : ''}`)}
+        ${box('Momentum', 2, `RSI ${r.rsi == null ? '—' : r.rsi.toFixed(0)} <small>(${esc(r.rsi_state || '—')})</small><br>Divergence: ${r.div ? esc(r.div) : 'none'}`)}
+        ${box('Volume', 3, `${esc(r.vol_state || '—')}${r.vol_ratio != null ? ` <small>· up-day volume ${r.vol_ratio.toFixed(2)}× down-day</small>` : ''}`)}
+        <div><h4>Outlook <em>by rule</em></h4><p>Next session: ${esc(r.lean)}<br>1 week: ${px(r.wk && r.wk[0])} – ${px(r.wk && r.wk[1])} <small>(typical range)</small><br>
+          6 months: ${esc(r.m6 || '—')} · Long term: ${esc(r.lt || '—')}</p></div>
+        ${box('Extension', 4, `${r.ext == null ? '—' : r.ext.toFixed(1) + ' ATR'} above the 50 EMA`)}
+      </div>
+      ${(r.why || []).length ? `<p class="v2w-note">Why: ${esc(r.why.join('; '))}.</p>` : ''}
+      <p class="v2w-note">${esc(feed.basis || '')} Technicals alone never make a holding thesis. Not advice.</p></section>`;
   }
 
   /* One set of listeners for every card on either site, bound once. */
@@ -692,5 +843,5 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}`;
   }
   bind();
 
-  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers }, explain };
+  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers }, explain, paper, read };
 })();

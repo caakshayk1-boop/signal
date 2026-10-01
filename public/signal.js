@@ -6409,6 +6409,9 @@
           + 'assembled from this company’s own row.')}
       ${sec('Signal V2 plan', v2StockBlock(r.sym), null,
             'The one canonical plan for this stock, if there is one — the same plan every page and Vision show.')}
+      ${sec('Technical read', treadBlock(r.sym), null,
+            'Trend, levels, momentum and volume as rules computed after the close, scored out of ten. '
+          + 'Not a plan, not a forecast.')}
       ${sec('What this month has historically done', seasBlock(r.sym), null,
             'Eleven years of calendar months. A record of what repeatedly happened, which is '
           + 'a weaker claim than a forecast and the only one the data supports.')}
@@ -9375,7 +9378,7 @@
       const r0 = noteLadder(await get(FULL_URL));
       if (r0.ok) setScreen((r0.data.rows || []).filter(x => x && x.sym), false);
     }
-    await Promise.all([loadInsti(), v2Load().catch(() => null)]);
+    await Promise.all([loadInsti(), v2Load().catch(() => null), treadLoad().catch(() => null)]);
     const r = (SCREEN || []).find(x => x.sym === sym);
     if (!r) {
       paint(head(esc(sym), '', 'Company') + `<div class="empty">
@@ -11254,8 +11257,20 @@
 
       <h3>Strategy status</h3>
       <p>A rule's status is published beside it on Opportunities and Performance. <i>Research</i> means it has not
-        shown a reliable edge and publishes nothing. <i>Shadow</i> means it is tracked privately and publishes nothing.
+        shown a reliable edge and publishes nothing. <i>Paper test</i> (registry status <i>shadow</i>) means it is tracked forward on paper and shown in its own labelled
+        section, but files no plan and never enters the record.
         <i>Forward paper</i> means it publishes paper plans. No status means a rule is proven, and none places a trade.</p>
+
+      <h3>The paper test and the technical read</h3>
+      <p>Four engines run as a paper test: Technical Confluence, Failed Breakdown Reclaim, Compression Release and
+        Opening Demand. Each setup is recorded after the close, before the session it is for, and graded forward under
+        the same rules with simulated fills. No average is shown for an engine before 30 of its paper trades have
+        closed. Opening Demand decides between 09:35 and 11:00, so it is graded after the close on 5-minute bars and
+        can never be acted on from an evening message.</p>
+      <p>The technical read on each stock page is Technical Confluence's five parts, computed after the close: trend
+        phase from the 50- and 200-day EMAs, support and resistance zones price has turned at twice or more, RSI and
+        divergence, volume confirmation, and extension. It scores conditions met out of ten. That is a count, not a
+        probability, and every outlook line is a stated rule, not a forecast.</p>
 
       <h3>The screen and company research</h3>
       <p>The screen covers the liquid NSE universe that the nightly build can read (the exact count is printed on
@@ -12022,6 +12037,22 @@
     V2 = r.data;
     return { ok: true, d: r.data, stale: r.stale, age: r.age };
   }
+  /* The Technical Confluence reads (technical_read.json): one stock's
+     five-part chart read as the engine computed it after the close. Loaded
+     only by the stock page; a read is never a plan and sets no level. */
+  let TREAD = null, TREAD_WHY = '';
+  async function treadLoad() {
+    if (TREAD) return TREAD;
+    const r = await get('/technical_read.json').catch(() => ({ ok: false }));
+    if (r && r.ok && r.data && r.data.schema === 'technical-read/1') TREAD = r.data;
+    else TREAD_WHY = (r && r.error) || 'technical_read.json did not load';
+    return TREAD;
+  }
+  const treadBlock = (sym) => window.V2W && window.V2W.read
+    ? window.V2W.read(TREAD, sym, { error: TREAD_WHY })
+    : `<p class="muted">The read could not load (v2widgets.js did not arrive).</p>`;
+  const v2Paper = (d, opts) => window.V2W && window.V2W.paper
+    ? window.V2W.paper(d, { stockHref: (s) => '/stock/' + encodeURIComponent(s), ...opts }) : '';
   // A plan whose last close is already above its entry cap can still fill —
   // only if price comes back to the cap. Said in words, never a colour alone.
   const v2Extended = (p) => p.state === 'awaiting_entry' && p.last_close != null && p.last_close > p.entry_high;
@@ -12104,7 +12135,7 @@
     const sr = nx && nx.ok ? nx.data : null, pd = pu && pu.ok ? pu.data : null;
     const why = (x) => (x && (x.error || x.why)) || 'no answer';
     const ex = window.V2W.explain ? window.V2W.explain({ series: sr, pulse: pd, feed: d, plansRef: '/opportunities',
-      recordRef: '/performance', enginesRef: '/performance', error: why(nx) }) : '';
+      recordRef: '/performance', enginesRef: '/performance', paperRef: '/opportunities#paper', error: why(nx) }) : '';
     return vsec('The market', `${ex}<div class="v2w-grid2">${W.nifty(sr, { more: '/markets', error: why(nx) })}${W.days(sr, { error: why(nx) })}</div>
       <div class="v2w-grid2">${W.sectors(pd, { more: '/map', error: why(pu) })}${W.movers(pd, { error: why(pu) })}</div>`);
   }
@@ -12192,6 +12223,7 @@
       v2Market(nx, pu, d) +
       vsec(`Plans for ${v2Date(d.next_session)}`, next.length ? `<div class="v2-cards">${next.map(p => v2Card(p, d)).join('')}</div>`
         : v2Empty(d, v2NoneWhy(d)), String(next.length), null, { lead: true }) +
+      v2Paper(d, { compact: true, title: 'Paper setups — a test, not plans', moreHref: '/opportunities#paper' }) +
       vsec('Active paper positions', active.length ? `<div class="v2-cards">${active.map(p => v2Card(p, d)).join('')}</div>`
         : `<p class="muted">No open paper position.</p>`, String(active.length)) +
       vsec('Your watchlist', watchHtml, watch.length ? String(watch.length) : '') +
@@ -12218,6 +12250,7 @@
     paint(head(T, S, 'Signal V2') + v2StatusStrip(d) +
       (eligible.length ? '' : v2Empty(d, 'Nothing is eligible for the next session.')) +
       block('Eligible next session', eligible, 'No plan is waiting for entry.', true) +
+      v2Paper(d, {}) +
       block('Extended — above the entry cap', extended, 'No plan is extended.') +
       block('Active', active, 'No paper position is open.') +
       block('Closed', done, 'Nothing has closed yet.') +
@@ -12230,7 +12263,7 @@
   function v2Strategies(d) {
     const s = d.strategies || [];
     if (!s.length) return '<p class="muted">No strategy is listed.</p>';
-    const word = { research: 'Research — not publishing', shadow: 'Shadow — tracked privately, not published',
+    const word = { research: 'Research — not publishing', shadow: 'Paper test — tracked forward, not published',
                    forward_paper: 'Forward paper — publishing paper plans', validated: 'Validated' };
     return `<ul class="v2-strat">${s.map(x => `<li><b>${esc(x.name)}</b> <span class="v2-pill">${esc(word[x.status] || x.status)}</span>
       <p>${esc(x.public_summary || '')}</p></li>`).join('')}</ul>`;

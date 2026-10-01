@@ -225,6 +225,24 @@ jobs:
             rm -f ".incoming/$f"
           fi
 
+      # The Technical Confluence reads: one file, written by the same private
+      # engine beside the plan feed, shown on both stock pages. Same rule: only
+      # a file that parses and declares its schema replaces the copy here.
+      - name: Fetch the technical reads
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          f=technical_read.json
+          if gh api "repos/$UPSTREAM/contents/feeds/$f" \
+               -H "Accept: application/vnd.github.raw" > ".incoming/$f" 2>/dev/null \
+             && python3 -c "import json,sys; d=json.load(open('.incoming/$f')); sys.exit(0 if d.get('schema')=='technical-read/1' and isinstance(d.get('reads'), dict) and d.get('session_date') else 1)" 2>/dev/null; then
+            printf '  ok    %-18s %s\n' "$f" "$(du -h ".incoming/$f" | cut -f1)"
+          else
+            printf '  MISS  %-18s not published upstream yet, or not a valid feed — keeping the copy in this repo\n' "$f"
+            rm -f ".incoming/$f"
+          fi
+
       # Age is reported, never asserted, because staleness is upstream's
       # problem to fix and this job's problem to make visible.
       - name: Report feed freshness
