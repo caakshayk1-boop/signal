@@ -2514,6 +2514,9 @@ ok("no figure counts up", !/countUp/.test(JS));
   const stale = NAVS.flatMap((b) => [...b.matchAll(/['"](\/(?:signals|engines|research|ideas|buoy))['"]/g)].map((x) => x[1]));
   ok("no menu, palette, tool list or 404 page sends a reader to a retired route",
      NAVS.every((b) => b.length > 50) && stale.length === 0, stale);
+  const VJS2 = readFileSync("public/vision.js", "utf8");
+  ok("both mastheads know NSE holidays: Vision reads the calendar, Signal repaints when it lands",
+     /get\('\/api\/calendar'/.test(VJS2) && /!NSE_HOL\[k\]/.test(VJS2) && /try \{ tickClock\(\); \}/.test(JS));
   const TICK = readFileSync("src/api/ticker.js", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
   ok("the header rail carries no V1 picks", !/seg\("multibagger"/.test(TICK) && !/multibaggers\(\)\s*[,\]]/.test(TICK));
   ok("the Worker serves the V2 pages and plan URLs",

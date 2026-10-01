@@ -474,18 +474,29 @@
      IST, and relative to the session — "1h 32m to close" is the only clock a
      trader reads. Repainted once a minute: a per-second clock is battery and
      layout work for no information. The schedule is NSE's (pre-open 09:00,
-     trading 09:15–15:30, Mon–Fri); holidays are not in any feed this page
-     reads, so when the live Nifty quote says the session is shut on a
-     weekday, the chip says so rather than counting down to an open that is
-     not coming. */
-  const istNow = () => { const d = new Date(Date.now() + 330 * 60000); return { dow: d.getUTCDay(), min: d.getUTCHours() * 60 + d.getUTCMinutes(), hhmm: d.toISOString().slice(11, 16) }; };
+     trading 09:15–15:30, Mon–Fri). Holidays come from /api/calendar, the
+     same NSE list Signal reads: without it the chip said "opens tomorrow"
+     on the eve of Gandhi Jayanti. Until it answers, a weekday reads as a
+     session, and the live Nifty quote still catches a shut market. */
+  const NSE_HOL = Object.create(null);
+  get('/api/calendar', 6 * 3600000).then((r) => {
+    const rows = r && r.ok && r.data && r.data.holidays && r.data.holidays.rows;
+    for (const h of rows || []) if (h && h.date) NSE_HOL[h.date] = h.why || 'Exchange holiday';
+    if (rows && rows.length) paintMarket();
+  }).catch(() => { /* no calendar: weekdays stand */ });
+  const istNow = () => { const d = new Date(Date.now() + 330 * 60000); return { dow: d.getUTCDay(), min: d.getUTCHours() * 60 + d.getUTCMinutes(), hhmm: d.toISOString().slice(11, 16), ymd: d.toISOString().slice(0, 10), ms: d.getTime() }; };
   const dur = (m) => m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
   function marketState() {
-    const { dow, min, hhmm } = istNow(), PRE = 540, OPEN = 555, CLOSE = 930;
-    const weekday = dow >= 1 && dow <= 5;
+    const { dow, min, hhmm, ymd, ms } = istNow(), PRE = 540, OPEN = 555, CLOSE = 930;
+    const hol = NSE_HOL[ymd];
+    const weekday = dow >= 1 && dow <= 5 && !hol;
     const nifty = tickRows()['Nifty 50'], feed = nifty && nifty.session;
     const nextOpen = () => {
-      let add = 1; while (((dow + add) % 7) === 0 || ((dow + add) % 7) === 6) add++;
+      let add = 1;
+      for (; add < 10; add++) {
+        const w = (dow + add) % 7, k = new Date(ms + add * 86400000).toISOString().slice(0, 10);
+        if (w !== 0 && w !== 6 && !NSE_HOL[k]) break;
+      }
       return add === 1 ? 'tomorrow 09:15' : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][(dow + add) % 7] + ' 09:15';
     };
     let k, t;
@@ -494,7 +505,7 @@
       else { k = 'open'; t = `Open · ${dur(CLOSE - min)} to close`; }
     } else if (weekday && min >= PRE && min < OPEN) { k = 'pre'; t = `Pre-open · opens in ${dur(OPEN - min)}`; }
     else if (weekday && min < PRE) { k = 'shut'; t = `Closed · opens in ${dur(OPEN - min)}`; }
-    else { k = 'shut'; t = `Closed · opens ${nextOpen()}`; }
+    else { k = 'shut'; t = `${hol ? 'Holiday' : 'Closed'} · opens ${nextOpen()}`; }
     return { k, t, hhmm };
   }
   function paintMarket() {
