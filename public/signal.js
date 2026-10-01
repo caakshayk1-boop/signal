@@ -12087,6 +12087,14 @@
   const v2Empty = (d, what) => `<div class="empty v2-empty"><b>${esc(what)}</b>
     <p>${esc(d.status_detail || '')}</p></div>`;
 
+  /* The shared cards (public/v2widgets.js). A bundle that did not arrive is a
+     state the page names, never a hole where a section should be. */
+  function v2Widgets(d, ...which) {
+    const W = window.V2W;
+    if (!W) return vsec('Over time', `<p class="muted">The record's charts could not load. The figures above are complete without them.</p>`);
+    return vsec('Over time', which.map((k) => W[k](d, { recordHref: '/performance' })).join(''));
+  }
+
   /* Day 1 shows the absence of a sample, never a 0% that reads as measured. */
   function v2Record(d, compact) {
     const m = d.metrics || {};
@@ -12269,6 +12277,8 @@
        <p>${v2Badge(p.state)} <span class="muted">Plan ${esc(p.id)} · signal close ${v2Date(p.session_date)} · published ${v2Time(p.published_at)}${px != null ? ` · delayed quote ${price(px)}` : ' · no live quote'}</span></p>
        ${p.flags && p.flags.length ? `<p class="v2-warn"><b>Notes:</b> ${p.flags.map(f => esc(V2_FLAG[f] || f)).join('; ')}.</p>` : ''}` +
       vsec('Entry', `<p>${esc(elig)}</p><p class="muted">Published after the close; it can fill no earlier than the next session's open. An open above the cap is not chased.</p>`, null, null, { lead: true }) +
+      vsec('Progress', window.V2W ? window.V2W.lifecycle(p, d)
+        : `<p class="muted">The plan's progress chart could not load. Its fills and exits are listed under Updates.</p>`) +
       vsec('Levels', levels + `<p class="muted">R:R uses the plan's own prices: (target − cap) ÷ (cap − stop). The right-hand column re-measures from a delayed quote and changes nothing in the plan.</p>`) +
       vsec('Stop and management', `<p>${esc(p.stop_rule)}</p><p>${esc(p.management)}</p><p class="muted">After ${d.time_exit_sessions} held sessions, whatever remains is sold at the next open. A stop does not cap a gap loss.</p>`) +
       vsec('Position', pos) +
@@ -12292,6 +12302,7 @@
     const c = d.costs || {};
     paint(head(T, S, 'Signal V2') +
       vsec('The record', v2Record(d, false), null, null, { lead: true }) +
+      v2Widgets(d, 'perf', 'calendar') +
       vsec('Closed trades', closed.length ? `<table class="v2-tbl"><thead><tr><th scope="col">Symbol</th><th scope="col" class="hm">Signal</th><th scope="col" class="hm">Fill</th><th scope="col" class="hm">Exit</th><th scope="col">Outcome</th><th scope="col">Net R</th><th scope="col">Net ₹</th></tr></thead><tbody>${rows}</tbody></table>`
         : `<p class="muted">No V2 trade has closed. A win rate needs closed trades, so none is shown.</p>`, String(closed.length)) +
       vsec('How it is counted', `<ul class="v2-list">

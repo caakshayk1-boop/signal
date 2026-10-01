@@ -2521,6 +2521,31 @@ ok("no figure counts up", !/countUp/.test(JS));
   const stale = NAVS.flatMap((b) => [...b.matchAll(/['"](\/(?:signals|engines|research|ideas|buoy))['"]/g)].map((x) => x[1]));
   ok("no menu, palette, tool list or 404 page sends a reader to a retired route",
      NAVS.every((b) => b.length > 50) && stale.length === 0, stale);
+  /* THE SHARED CARDS. One renderer for both sites, reading only what the
+     engine computed: it may count sessions, never re-add the record. */
+  const W2 = readFileSync("public/v2widgets.js", "utf8"), W2C = W2.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  const HTMLV = readFileSync("public/vision.html", "utf8");
+  ok("both sites load the one shared widget file, and it is minified",
+     /<script src="\/v2widgets\.js"/.test(HTML) && /<script src="\/v2widgets\.js"/.test(HTMLV)
+     && /"public\/v2widgets\.js", "js"/.test(readFileSync("scripts/minify.mjs", "utf8")));
+  /* Bare var() is allowed only for the card's own --w-* tokens, and each of
+     those must be declared in the file with a chain that ends in a literal. */
+  const wDecl = Object.fromEntries([...W2C.matchAll(/(--w-[a-z]+):(var\([^;]+?\)|#[0-9a-f]{3,6})(?=;)/gi)].map((x) => [x[1], x[2]]));
+  const bareVar = (W2C.match(/var\(--[a-z0-9-]+\)/g) || []).map((v) => v.slice(4, -1))
+    .filter((k) => !(k in wDecl) || !/(#[0-9a-f]{3,6}|\d)\)*$/i.test(wDecl[k]));
+  ok("every widget custom property ends in a literal fallback",
+     Object.keys(wDecl).length >= 8 && bareVar.length === 0, bareVar.slice(0, 5));
+  ok("the cards never read or re-add the plan list; totals come from metrics",
+     !/\.plans\b/.test(W2C) && !/\.reduce\(/.test(W2C) && /const m = d\.metrics \|\| \{\}/.test(W2C)
+     && /h\.nav_change_pct/.test(W2C) && /h\.drawdown/.test(W2C));
+  ok("an unexposed book shows no return and no drawdown, and a missing history says so",
+     /Not invested/.test(W2C) && /no plan has filled/.test(W2C) && /No session history in this feed yet/.test(W2C));
+  ok("a missing chart point breaks the line rather than being bridged",
+     /if \(p\[key\] == null\) \{ pen = false; continue; \}/.test(W2C));
+  ok("the cards make no forecast", !/probabilit|expected return|likely to|will (rise|fall)|target price/i.test(W2C));
+  ok("both pages name a widget bundle that did not arrive",
+     /could not load/.test((JS.match(/function v2Widgets[\s\S]*?\n  \}/) || [""])[0])
+     && /The record's charts could not load/.test(readFileSync("public/vision.js", "utf8")));
   const VJS2 = readFileSync("public/vision.js", "utf8");
   ok("both mastheads know NSE holidays: Vision reads the calendar, Signal repaints when it lands",
      /get\('\/api\/calendar'/.test(VJS2) && /!NSE_HOL\[k\]/.test(VJS2) && /try \{ tickClock\(\); \}/.test(JS));
