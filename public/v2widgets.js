@@ -143,10 +143,11 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 .v2w .v2w-tag{display:inline-block;padding:1px 8px;border:1px solid var(--w-line);border-radius:999px;font:600 10px/1.6 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.06em;text-transform:uppercase;color:var(--w-mut);vertical-align:middle}
 .v2w .v2w-tag.pp{border-color:var(--w-warn);color:var(--w-warn)}
 .v2w .v2w-eng{display:grid;gap:8px;margin:0 0 14px;padding:0;list-style:none}
-.v2w .v2w-eng li{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;padding:10px 12px;border:1px solid var(--w-line);border-radius:8px;background:var(--w-bg)}
+.v2w .v2w-eng li{display:block;padding:10px 12px;border:1px solid var(--w-line);border-radius:8px;background:var(--w-bg)}
 .v2w .v2w-eng b{font:600 14px/1.3 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink)}
 .v2w .v2w-eng .n{font:400 12px/1.4 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink);font-variant-numeric:tabular-nums}
-.v2w .v2w-eng p{margin:0;font:400 12px/1.45 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut)}
+.v2w .v2w-eng .n::before{content:" · ";color:var(--w-dim)}
+.v2w .v2w-eng p{margin:4px 0 0;font:400 12px/1.45 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut)}
 .v2w h4.v2w-h{font:600 12px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim);margin:16px 0 8px}
 .v2w .v2w-pcs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
 .v2w .v2w-pc{border:1px solid var(--w-line);border-radius:8px;padding:12px;background:var(--w-surf);display:grid;gap:6px;min-width:0}
@@ -742,7 +743,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
           <dt>Stop</dt><dd>${px(p.stop)}${p.trailing ? ' (raised)' : p.risk_pct != null ? ` · ${Number(p.risk_pct).toFixed(1)}% under the top` : ''}</dd>
           <dt>Sell</dt><dd>${sp[0]}% ${px(p.t1)} · ${sp[1]}% ${px(p.t2)} · ${sp[2]}% ${px(p.t3)}</dd>
           ${p.fill_price != null ? `<dt>Filled</dt><dd>${px(p.fill_price)}${p.fill_session ? ' on ' + esc(dayShort(p.fill_session)) : ''} · ${rR(p.total_r)} so far</dd>` : ''}</dl>
-        ${p.why ? `<p>Why: ${esc(p.why)}</p>` : ''}</article>`;
+        ${p.why ? `<p>Why: ${esc(p.symbol)} ${esc(p.why)}</p>` : ''}</article>`;
     };
     const liveHtml = live.length ? `<div class="v2w-pcs">${live.map(card).join('')}</div>`
       : `<p class="v2w-empty"><b>No paper setup is open or waiting.</b>The engines found nothing that met their rules on the ${esc(day(P.as_of))} close. They are not loosened to fill this space.</p>`;
