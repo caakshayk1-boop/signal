@@ -2338,6 +2338,33 @@ ok("no figure counts up", !/countUp/.test(JS));
   ok("npm run deploy builds them too", /company-pages\.mjs[\s\S]*wrangler deploy/.test(readFileSync("package.json", "utf8")));
 }
 
+/* ── 2026-10-01: THE RECORD AS TRADES, THE VISIT, THE BELL, THE INSTALL ────── */
+{
+  const VJS2 = readFileSync("public/vision.js", "utf8");
+  const VSW = readFileSync("public/vision-sw.js", "utf8");
+  const VH = readFileSync("public/vision.html", "utf8");
+  ok("the front page lists recent closes from the ledger, losses included",
+     /<b>Recent closes<\/b>/.test(JS) && /LRclosed\.slice\(0, 5\)/.test(JS));
+  ok("toward a verdict draws each engine against the 30-trade rule",
+     /<b>Toward a verdict<\/b>/.test(JS) && /const need = 30/.test(JS));
+  ok("the trailing-window chip says when nothing closed, never a zero",
+     /no closes yet/.test(JS) && /const LR30 = windowOf\(LRclosed, 30\)/.test(JS));
+  ok("an expired or time-stopped close says its R was marked, not realised",
+     /EXPIRED: 'expired, marked at the close'/.test(JS) && /TIME_STOP: 'time stop, marked at the close'/.test(JS));
+  ok("since-your-last-visit lives in the browser on both sites",
+     /const VKEY = 'sig:visit'/.test(JS) && /sessionStorage/.test(JS) && /const VISIT = 'vis:visit'/.test(VJS2));
+  ok("the bell counts alerts fired since the watchlist was last opened",
+     /id="bellBtn"/.test(HTML) && /lsSet\(FSEEN, Date\.now\(\)\); paintBell\(\);/.test(JS));
+  ok("vision is installable: manifest, touch icon, its own worker",
+     /rel="manifest" href="\/vision\.webmanifest"/.test(VH) && /rel="apple-touch-icon"/.test(VH)
+     && existsSync("public/vision.webmanifest") && existsSync("public/vision-icon-512.png"));
+  ok("vision's worker registers on the vision host only",
+     /\/\^vision\\\.\/\.test\(location\.hostname\)/.test(VJS2) && /register\('\/vision-sw\.js'\)/.test(VJS2));
+  ok("no worker ever caches a price, a feed or a company file",
+     /url\.pathname\.endsWith\("\.json"\)\) return;/.test(VSW)
+     && /url\.pathname\.endsWith\("\.json"\)\) return;/.test(readFileSync("public/sw.js", "utf8")));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
   : `\n${checks}/${checks} guard checks pass`);

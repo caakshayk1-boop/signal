@@ -26,7 +26,10 @@
 // Newsreader is deliberately NOT here. It is 23 KB for --b-serif, which one
 // route uses; precaching it would spend the offline budget on the headings of
 // a page a reader is unlikely to be looking at when the network drops.
-const CACHE = "signal-shell-v3";
+// v4 (2026-10): the redesign set every route title in Newsreader, so the
+// offline shell now carries it — the reasoning below for leaving it out held
+// while one route used it, and no longer does.
+const CACHE = "signal-shell-v4";
 const SHELL = [
   "/", "/index.html", "/signal.css", "/signal.js", "/icon.svg",
   // One variable face, weights 200-800, replacing the five static Manrope and
@@ -35,6 +38,7 @@ const SHELL = [
   // The numbers. Both weights: 400 is the table figure, 500 the eyebrow.
   "/fonts/JetBrainsMono-400-latin.woff2",
   "/fonts/JetBrainsMono-500-latin.woff2",
+  "/fonts/Newsreader-400-latin.woff2",
 ];
 
 self.addEventListener("install", (e) => {

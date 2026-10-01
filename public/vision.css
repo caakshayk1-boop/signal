@@ -861,3 +861,11 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 .kv::after{content:"";background:var(--panel);grid-column:auto / -1}
 .dscl{text-align:left}
 @media (min-width:761px){ .dscl-full{display:block;max-width:var(--maxw);margin:0 auto} }
+/* Since your last visit — one quiet line under the recent/watching chips. */
+.since{margin:var(--s-3) 0 0;font-size:var(--t-md);line-height:1.55;color:var(--ink-2);max-width:68ch}
+.since b{color:var(--ink);font-weight:600} .since b.up{color:var(--up)} .since b.dn{color:var(--dn)}
+.since a{color:var(--accent)}
+/* The active tab's icon is filled, as on Signal. */
+@media (max-width:760px){
+  .tabs a[aria-current="page"] svg,.tabs button[aria-current="page"] svg{fill:color-mix(in srgb,currentColor 22%,transparent);stroke-width:2.1}
+}

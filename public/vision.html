@@ -12,7 +12,14 @@
 <meta name="robots" content="noindex,follow">
 <meta name="theme-color" content="#F8F7F4">
 <meta name="color-scheme" content="light dark">
-<link rel="icon" href="/icon.svg">
+<link rel="icon" href="/vision-icon.svg">
+<!-- Installable: on a phone, "Add to Home Screen" opens Vision as an app with
+     its own icon. The service worker (vision-sw.js) caches the shell only. -->
+<link rel="manifest" href="/vision.webmanifest">
+<link rel="apple-touch-icon" href="/vision-icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vision">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preload" href="/fonts/PlusJakarta-var-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/JetBrainsMono-500-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/vision.css">

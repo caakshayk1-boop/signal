@@ -40,6 +40,18 @@
     get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* per-viewer convenience only */ } },
   };
+  /* ── SINCE YOUR LAST VISIT ─────────────────────────────────────────────
+     What moved for this reader since they were last here, from the device
+     alone: the screen price of every name they watch or recently opened, the
+     alerts that fired, the setups filed. The baseline is fixed per browsing
+     session (sessionStorage), so repaints compare against the same visit.
+     Nothing is sent anywhere. */
+  const VISIT = 'vis:visit';
+  const visitBase = (() => { try {
+    const held = sessionStorage.getItem(VISIT);
+    if (held) return JSON.parse(held);
+    const prev = store.get(VISIT, null); sessionStorage.setItem(VISIT, JSON.stringify(prev)); return prev;
+  } catch (e) { return null; } })();
 
   /* ── FORMAT ─────────────────────────────────────────────────────────────
      NA is a dash WITH a reason on hover: in a dense table the word would cost
@@ -951,7 +963,7 @@
         <p class="sub">Price, financials, ownership, events, technical structure and market context — one research workspace for the ~1,000 NSE names on the screen. Every figure carries its source and its age.</p>
         <div class="hsearch"><input id="hQ" type="search" role="combobox" aria-expanded="false" aria-controls="hL" aria-autocomplete="list" autocomplete="off" spellcheck="false"
           placeholder="Search a company — Reliance, TCS, HDFC Bank…" aria-label="Search a company"><ul id="hL" role="listbox" aria-label="Matching companies"></ul></div>
-        <div id="hRecent" class="row wrap hrec"></div></section>
+        <div id="hRecent" class="row wrap hrec"></div><p id="hSince" class="since" hidden></p></section>
       <div class="grid g-2">${panel('What changed across the screen', skel(6), { bodyId: 'hChg', fb: 'Screen' })}${panel('Unusual today', skel(5), { bodyId: 'hUnu', fb: 'Screen' })}</div>
       <div style="height:var(--s-4)"></div>
       <div class="grid g-2">${panel('Setups on the last scan', skel(4), { bodyId: 'hSig', flush: true, fb: 'Signals', more: '#/setups', moreText: 'All setups' })}${panel('Most-traded companies', skel(6), { bodyId: 'hTop', fb: 'Screen' })}</div>`;
@@ -979,6 +991,26 @@
     const rec = S.recent.filter((x) => SCR && SCR[x]).slice(0, 6), wl = S.watch.map((w) => w.s).filter((x) => !rec.includes(x)).slice(0, 6);
     $('#hRecent').innerHTML = (rec.length ? `<span class="mut">Recent</span>${rec.map(chip).join('')}` : '') + (wl.length ? `<span class="mut">Watching</span>${wl.map(chip).join('')}` : '')
       + (!rec.length && !wl.length ? `<span class="mut">Try</span>${['RELIANCE', 'TCS', 'HDFCBANK', 'INFY'].filter((x) => SCR && SCR[x]).map(chip).join('')}` : '');
+    {
+      const mine = [...new Set([...S.watch.map((w) => w.s), ...S.recent])].filter((x) => SCR && SCR[x] && num(SCR[x].price) > 0);
+      const px = {}; for (const x of mine) px[x] = num(SCR[x].price);
+      const was = store.get(VISIT, {}) || {};
+      store.set(VISIT, { at: Date.now(), px: Object.keys(px).length ? px : (was.px || {}) });
+      const b = visitBase, parts = [];
+      if (b && b.at) {
+        const mv = mine.filter((x) => b.px && b.px[x] > 0).map((x) => [x, (px[x] / b.px[x] - 1) * 100])
+          .filter(([, c]) => Math.abs(c) >= 3).sort((p, q) => Math.abs(q[1]) - Math.abs(p[1])).slice(0, 3);
+        if (mv.length) parts.push(mv.map(([x, c]) => `<a href="#/asset/${esc(x)}">${esc(x)}</a> <b class="${c < 0 ? 'dn' : 'up'}">${c > 0 ? '+' : ''}${c.toFixed(1)}%</b>`).join(', '));
+        const fired = S.alerts.filter((a) => a.fired && Date.parse(a.fired) > b.at).length;
+        if (fired) parts.push(`<b>${fired}</b> alert${fired === 1 ? '' : 's'} fired`);
+        const filed = ((S.vsig && S.vsig.history) || []).filter((h) => Date.parse(h.fired_at) > b.at).length;
+        if (filed) parts.push(`<b>${filed}</b> new setup${filed === 1 ? '' : 's'} <a href="#/setups">filed</a>`);
+      }
+      const h = (Date.now() - ((b && b.at) || Date.now())) / 3600000;
+      const ago = h < 1 ? 'under an hour ago' : h < 24 ? `${Math.round(h)} h ago` : `${Math.round(h / 24)} d ago`;
+      const el2 = $('#hSince');
+      if (el2) { el2.hidden = !parts.length; el2.innerHTML = parts.length ? `Since your last visit, ${ago}: ${parts.join(' · ')}.` : ''; el2.title = 'Kept in this browser only'; }
+    }
     const d = site.ok ? site.data : null, C = d && d.changed;
     const lk = (x) => `<a class="sym" href="#/asset/${esc(x.sym)}">${esc(x.sym)}</a>`;
     $('#hChg').innerHTML = !C ? failBox('The screen summary', site.error) : `<div class="grid g-2" style="gap:var(--s-3)">
@@ -2215,4 +2247,12 @@
   setInterval(paintMarket, 60000);
   paintAlertDot();
   render();
+
+  /* INSTALLABLE ON A PHONE. The shell-only worker registers on the vision host
+     alone: on signal.askakshay.com/vision the same scope belongs to Signal's
+     worker, and two workers cannot share one scope. After load, so it never
+     competes with the first paint. Failure is silent by design. */
+  if ('serviceWorker' in navigator && /^vision\./.test(location.hostname)) {
+    addEventListener('load', () => navigator.serviceWorker.register('/vision-sw.js').catch(() => {}));
+  }
 })();

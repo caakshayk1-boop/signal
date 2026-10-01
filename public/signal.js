@@ -1009,6 +1009,34 @@
     && Number.isFinite(Number(r.r_multiple))
     && (r.badge || '') !== 'open';
 
+  /* ── HOW A CLOSE READS, AND WHEN IT HAPPENED ─────────────────────────────
+   * The front page shows the record as totals and as single trades. These are
+   * the words and dates the single trades use, in one place, so the home page
+   * and anything after it say "stopped out" for SL_HIT the same way. An
+   * EXPIRED or TIME_STOP close has an R marked at the last close rather than
+   * realised at an exit, and it says so — that is not the same sentence as a
+   * stop or a target. */
+  const CLOSE_WORD = { SL_HIT: 'stopped out', T1_HIT: 'first target', T2_HIT: 'second target',
+                       T3_HIT: 'third target', TIME_STOP: 'time stop, marked at the close',
+                       EXPIRED: 'expired, marked at the close' };
+  const closeWord = r => CLOSE_WORD[String(r.status || '').toUpperCase()]
+    || String(r.status || r.badge || 'closed').toLowerCase().replace(/_/g, ' ');
+  const closedDay = r => String(r.closed_at || '').slice(0, 10);
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const shortDay = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${Number(d.slice(8, 10))} ${MON[Number(d.slice(5, 7)) - 1]}` : '—';
+  const signedR = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(2) + 'R';
+  /* Today in IST, as YYYY-MM-DD — the exchange's calendar, not the reader's. */
+  const istDay = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
+  /* The trailing window, not the calendar month. A month-to-date figure reads
+     "no closes" on the 1st of every month, which is the one day a reader most
+     wants to know how the last few weeks went. */
+  const windowOf = (closed, days = 30) => {
+    const from = new Date(Date.parse(istDay() + 'T00:00:00Z') - (days - 1) * 86400000).toISOString().slice(0, 10);
+    const inW = closed.filter(r => closedDay(r) >= from);
+    return { n: inW.length, wins: inW.filter(r => Number(r.r_multiple) > 0).length,
+             sum: inW.reduce((a, r) => a + Number(r.r_multiple), 0), days };
+  };
+
   /* ── "TOO FEW TO SETTLE ANYTHING" WAS A CLAIM, AND IT WAS FALSE ──────────
    *
    * The front page printed that caveat whenever fewer than thirty trades had
@@ -2282,7 +2310,80 @@
    * {sym, op:'above'|'below', px, note, made}. Checked against whatever quote
    * the page last fetched for that symbol. A fired alert is recorded so it
    * announces once rather than on every sixty-second repaint. */
+  /* ── SINCE YOUR LAST VISIT ───────────────────────────────────────────────
+   * What changed for THIS reader since they were last here — without an
+   * account. Everything it needs is already on the device: the ledger ids
+   * they had seen, the price of each starred name, the alerts that fired.
+   *
+   * The baseline is fixed for the whole browsing session (sessionStorage), so
+   * the 60-second refresh and every repaint compare against the same visit
+   * instead of against a minute ago. The stored visit is rewritten on every
+   * home render, and only becomes the baseline when the next session starts.
+   * Nothing leaves the browser. */
+  const VKEY = 'sig:visit';
+  const visitBase = (() => {
+    try {
+      const held = sessionStorage.getItem(VKEY);
+      if (held) return JSON.parse(held);
+      const prev = lsGet(VKEY, null);
+      sessionStorage.setItem(VKEY, JSON.stringify(prev));
+      return prev;
+    } catch (e) { return null; }
+  })();
+  /* A render without the ledger or the screen (a failed fetch, the first of
+     the front page's two passes) must not wipe what the last visit recorded,
+     so each half is only replaced when this render actually has it. */
+  const noteVisit = (closedIds, px) => {
+    const was = lsGet(VKEY, {}) || {};
+    lsSet(VKEY, { at: Date.now(),
+                  seen: closedIds.length ? closedIds.slice(0, 600) : (was.seen || []),
+                  px: Object.keys(px).length ? px : (was.px || {}) });
+  };
+  const agoWord = ms => { const h = (Date.now() - ms) / 3600000;
+    return h < 1 ? 'under an hour ago' : h < 24 ? `${Math.round(h)} h ago` : `${Math.round(h / 24)} d ago`; };
+  const sinceLine = (closed, screenRows) => {
+    const watched = watchAll();
+    const pxNow = {};
+    for (const r of screenRows || []) if (r && watched.includes(r.sym) && Number.isFinite(Number(r.price))) pxNow[r.sym] = Number(r.price);
+    const ids = closed.map(r => String(r.id ?? `${r.symbol}|${r.sent_at}`));
+    noteVisit(ids, pxNow);
+    const b = visitBase;
+    if (!b || !b.at) return '';
+    const parts = [];
+    if (Array.isArray(b.seen)) {
+      const seen = new Set(b.seen);
+      const fresh = closed.filter((r, i) => !seen.has(ids[i]));
+      if (fresh.length) {
+        const won = fresh.filter(r => Number(r.r_multiple) > 0).length;
+        const sum = fresh.reduce((a, r) => a + Number(r.r_multiple), 0);
+        parts.push(`<b>${fresh.length}</b> signal${fresh.length === 1 ? '' : 's'} closed — ${won} won, ${fresh.length - won} lost
+          (<b class="${sum < 0 ? 'dn' : sum > 0 ? 'up' : ''}">${signedR(sum)}</b>)`);
+      }
+    }
+    const moves = Object.keys(pxNow).filter(k => b.px && Number.isFinite(b.px[k]) && b.px[k] > 0)
+      .map(k => [k, (pxNow[k] / b.px[k] - 1) * 100]).filter(([, c]) => Math.abs(c) >= 3)
+      .sort((x, y) => Math.abs(y[1]) - Math.abs(x[1])).slice(0, 3);
+    if (moves.length) parts.push(moves.map(([k, c]) =>
+      `<a href="/stock/${encodeURIComponent(k)}">${esc(k)}</a> <b class="${c < 0 ? 'dn' : 'up'}">${c > 0 ? '+' : ''}${c.toFixed(1)}%</b>`).join(', ') + ' on your watchlist');
+    const fired = Object.values(lsGet(AFIRED, {})).filter(t => Number(t) > b.at).length;
+    if (fired) parts.push(`<b>${fired}</b> alert${fired === 1 ? '' : 's'} fired`);
+    return parts.length ? `<p class="since" title="Kept in this browser only">Since your last visit, ${esc(agoWord(b.at))}:
+      ${parts.join(' · ')}.</p>` : '';
+  };
   const alertsAll = () => lsGet(AKEY, []);
+  /* THE BELL. Alerts that fired since the reader last opened the watchlist,
+     where the alerts are listed. Opening /watch marks them seen. */
+  const FSEEN = 'sig:firedSeen';
+  const paintBell = () => {
+    const b = document.getElementById('bellBtn');
+    if (!b) return;
+    const seen = Number(lsGet(FSEEN, 0)) || 0;
+    const n = Object.values(lsGet(AFIRED, {})).filter(t => Number(t) > seen).length;
+    const dot = b.querySelector('.bell-n');
+    if (dot) { dot.hidden = !n; dot.textContent = n > 9 ? '9+' : String(n); }
+    b.setAttribute('aria-label', n ? `Watchlist and price alerts — ${n} fired since you last looked`
+                                   : 'Watchlist and price alerts');
+  };
   const addAlert = a => { const l = alertsAll(); l.push(a); return lsSet(AKEY, l); };
   const dropAlert = i => { const l = alertsAll(); l.splice(i, 1); lsSet(AKEY, l); };
 
@@ -2301,6 +2402,7 @@
       if (!hit && fired[key]) delete fired[key];        // re-arm once it crosses back
     });
     lsSet(AFIRED, fired);
+    paintBell();
     hits.forEach(h => toast(`${h.sym} is ${h.op} ${h.px}`,
       `Now ${h.px_now}. ${h.note || ''}`.trim()));
     // The browser notification is an ADDITION, never the only channel — it is
@@ -2831,6 +2933,11 @@
     const lrRows = sgx.ok ? (sgx.rows || []).filter(r => sinceLaunch(r) && !withdrawn(r)) : [];
     const LR = recordOf(lrRows);
     LR.published = lrRows.length;
+    /* The closed trades themselves, newest first — the record as individual
+       rows (recent closes) and over the trailing month (the masthead chip). */
+    const LRclosed = lrRows.filter(isScored)
+      .sort((a, b) => closedDay(b).localeCompare(closedDay(a)) || String(b.sent_at || '').localeCompare(String(a.sent_at || '')));
+    const LR30 = windowOf(LRclosed, 30);
     /* From the same bucket the reconciliation line prints. This counted
        badge === 'open' while the bucket counts status OPEN too, so the tile
        and the sum under it could name two different open counts. */
@@ -2990,6 +3097,16 @@
         <span class="eyebrow">${esc((t.ok && t.data.date_str) || 'Today')} · Independent research on NSE equities</span>
         <h1>Every NSE name, screened before the open. Every call, graded in public.</h1>
         <p class="hero-sub">${heroSub}</p>
+        ${/* THE LAST THIRTY DAYS, IN ONE FIGURE. Net R over the closes in the
+            * trailing window, with the count beside it so a big number off two
+            * trades cannot pass for a trend. Nothing closed says so in words. */''}
+        ${LR.published ? `<p class="hero-chip">Last ${LR30.days} days ${LR30.n
+          ? `<b class="${LR30.sum < 0 ? 'dn' : LR30.sum > 0 ? 'up' : ''}">${signedR(LR30.sum)}</b>
+             <span>· ${LR30.n} closed, ${LR30.wins} won</span>`
+          : `<span>· no closes yet</span>`}</p>` : ''}
+        ${/* Filled at the end of this render, once the screen rows (the
+            * starred names' prices) are in hand — they arrive after the
+            * masthead is built. */''}<!--SINCE-->
         <div class="hero-cta">
           <a class="btn-hero" href="/signals">See the record
             <em>every signal, graded — losses included</em></a>
@@ -3195,6 +3312,45 @@
              because the reader doing it and finding a gap is how this was
              found in the first place. */''}
         ${LR.published ? integrityBlock(LR) : ''}
+        ${/* ── TOWARD A VERDICT ─────────────────────────────────────────────
+             * The rule this book holds itself to, drawn as distance remaining:
+             * an engine is trusted with capital at 30 closed trades AND t ≥ 2.
+             * The book's own bar is the same 30, so a reader can see how far
+             * the sample is from meaning something. Engines appear once they
+             * have closed anything, with their win count. NOT their t: six
+             * near-identical -1R stops have almost no variance, so BREACH
+             * printed "t -38.5" — arithmetically right and unreadable. The t
+             * belongs on the floor, beside the sample it describes. */''}
+        ${LR.published ? (() => {
+          const need = 30, book = Math.min(LR.trades, need);
+          const engs = rows.filter(r => r.closed > 0).slice(0, 6);
+          return `<div class="rp">
+            <div class="rp-h"><b>Toward a verdict</b><span class="num">${LR.trades} / ${need} closed</span></div>
+            <div class="rp-bar" role="img" aria-label="${LR.trades} of ${need} closed trades"><i style="width:${(book / need * 100).toFixed(1)}%"></i></div>
+            <p class="hint">${LR.trades >= need
+              ? `The book has passed ${need} closed trades.`
+              : `<b>${need - LR.trades} more close${need - LR.trades === 1 ? '' : 's'}</b> before the book reaches ${need}, the sample this site requires before trusting an engine.`}
+              ${engs.some(e => e.closed >= need) ? '' : `No engine has reached ${need} on its own.`}</p>
+            ${engs.length ? `<div class="rp-e">${engs.map(e => `<div class="rp-r"><span>${esc(e.label)}</span>
+                <span class="rp-bar" role="img" aria-label="${esc(e.label)}: ${e.closed} of ${need} closed"><i style="width:${(Math.min(e.closed, need) / need * 100).toFixed(1)}%"></i></span>
+                <span class="num">${e.closed}/${need} · ${e.wins} won</span></div>`).join('')}</div>
+              <p class="hint"><a href="/engines">Each engine's t-statistic and rule</a></p>` : ''}
+          </div>`;
+        })() : ''}
+        ${/* ── RECENT CLOSES ───────────────────────────────────────────────
+             * The record as trades, not totals: the newest five closes with the
+             * engine, how each ended and its R. Losses are not filtered, sorted
+             * down or greyed — they are most of the list, and that is the
+             * record. Each name opens its card. */''}
+        ${LRclosed.length ? `<div class="rc">
+            <div class="rp-h"><b>Recent closes</b><a href="/signals">Every close →</a></div>
+            <ol class="rc-l">${LRclosed.slice(0, 5).map(r => {
+              const v = Number(r.r_multiple);
+              return `<li><a href="/stock/${encodeURIComponent(r.symbol)}"><b>${esc(r.symbol)}</b>
+                <small>${esc(engLabel(r.signal_type))} · ${esc(closeWord(r))} · ${esc(shortDay(closedDay(r)))}</small>
+                <span class="num ${v > 0 ? 'up' : v < 0 ? 'dn' : ''}">${signedR(v)}</span></a></li>`;
+            }).join('')}</ol>
+          </div>` : ''}
         <p class="sec-note">${!LR.published
           ? ``
           : !LR.trades
@@ -3656,6 +3812,7 @@
     }
     /* The reference, after the day it qualifies. */
     out += recordSec;
+    out = out.replace('<!--SINCE-->', sinceLine(LRclosed, FRONT_SCREEN));
     paint(out);
     // The front page renders the same IPO card as the IPO route, so it needs
     // the same upgrade to the live book. Wiring it to one route and not the
@@ -15694,6 +15851,7 @@
 
   let watchQ = '', watchSort = 'sym', watchSec = '', WVIEW = null;
   R['/watch'] = async () => {
+    lsSet(FSEEN, Date.now()); paintBell();
     const syms = watchAll();
     paint(head('Watchlist', 'Names you starred and price levels you asked to be told about.',
       'Yours, on this device') + skel('sk-row', 4), true);
@@ -16946,6 +17104,8 @@
       if (e.target === dlg || e.target.closest('[data-close]') || e.target.closest('a[href]')) dlg.close();
     });
   })();
+
+  paintBell();
 
   document.getElementById('themeBtn').addEventListener('click', () => {
     const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
