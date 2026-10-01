@@ -318,7 +318,10 @@ try {
   ok("Performance reconciles its counts in words", /published = .* awaiting entry \+ .* active \+ .* closed/.test(perfT.replace(/\s+/g, " ")));
   for (const r of ["/signals", "/engines", "/ideas", "/research"]) {
     await p.goto(SITE + r, { waitUntil: "domcontentloaded" });
-    await until(p, () => /retired/i.test(document.querySelector("main h1")?.innerText || ""));
+    /* Wait for the HYDRATED notice. The server pre-render's h1 already says
+       "Retired — …", so waiting on /retired/ in the h1 returned before the
+       client view existed and read the pre-render. */
+    await until(p, () => /No V1 call was turned into a V2 plan/.test(document.querySelector("main")?.innerText || ""));
     const t = await p.locator("main").innerText().catch(() => "");
     ok(`${r} shows the retired-version notice, not V1 calls`, /has been retired/.test(t) && /No V1 call was turned into a V2 plan/.test(t));
   }
@@ -326,7 +329,9 @@ try {
   await until(p, () => /Plan not found/.test(document.querySelector("main h1")?.innerText || ""));
   ok("an unknown plan id says so, and does not borrow another plan",
      /There is no V2 plan with the id/.test(await p.locator("main").innerText().catch(() => "")));
-  const apiOld = await p.evaluate(async () => { const r = await fetch("/api/signals?limit=5"); return r.status; }).catch(() => 0);
+  /* From Node, not the page: an in-page 410 is logged to the console as a
+     failed resource and would fail the no-errors check below on purpose. */
+  const apiOld = await fetch(SITE + "/api/signals?limit=5").then((r) => r.status).catch(() => 0);
   ok("the V1 ledger API answers 410 Gone", apiOld === 410, apiOld);
 
   ok("no JS errors on either route", errs.length === 0, errs.slice(0, 3));

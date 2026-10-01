@@ -7126,11 +7126,11 @@
         <p style="margin:14px 0 0">Where you probably meant to go:</p>
         <div class="chips" style="margin-top:10px">
           <a class="chip" href="/">Today</a>
-          <a class="chip" href="/signals">The ledger</a>
+          <a class="chip" href="/opportunities">Opportunities</a>
           <a class="chip" href="/screen">The NSE screen</a>
           <a class="chip" href="/radar">Radar</a>
           <a class="chip" href="/ipo">IPO</a>
-          <a class="chip" href="/engines">The floor</a>
+          <a class="chip" href="/performance">Performance</a>
         </div>
       </div>`);
   };
@@ -8141,18 +8141,17 @@
    * ends up unreachable by keyboard.
    */
   const CMD_ROUTES = [
-    ['/', 'Today', 'The morning edition — tape, sector heat, the wire'],
+    ['/', 'Today', 'The latest session, the next one, and the V2 plans'],
+    ['/opportunities', 'Opportunities', 'Every V2 plan by state, eligible first'],
+    ['/performance', 'Performance', 'The V2 forward record, from 1 Oct 2026'],
     ['/markets', 'Markets', 'The board: 71 instruments with a year of context'],
-    ['/ideas', 'Ideas', 'Ranked names and the orders a sized book would place'],
     ['/ipo', 'IPO', 'Books open now, and how last year’s listings did'],
     ['/screen', 'Screen', 'All names, searchable'],
     ['/watch', 'Watchlist', 'Names you starred, and your price alerts'],
     ['/news', 'News', 'The full wire, and the screened names each story touches'],
-    ['/signals', 'Signals', 'The public ledger — wins and losses'],
-    ['/brief', 'Brief', 'Today’s setup, in full'],
+    ['/brief', 'Brief', 'The current plan, in full'],
     ['/discover', 'Discover', 'Every way into the screen'],
     ['/radar', 'Signal radar', 'What the market is doing, and which names carry it'],
-    ['/engines', 'The floor', 'Every engine — what fires it, and what it has done'],
     ['/methodology', 'Methodology', 'How every number on this site is made'],
     ['/sources', 'Data sources', 'Where the prices come from, and what that means'],
     ['/terms', 'Terms', 'What this is and is not'],
@@ -10330,12 +10329,8 @@
                  'One per sector, written every Saturday — what they sell, how the money works, and what would break it.'],
     ['/radar',   'Signal radar',  'The market score, and the eight names carrying it',
                  `How broad the move is across ${universeN()} names, with the full working shown.`],
-    ['/research', 'The research floor', 'Three engines, none of them cleared',
-                 'Three engines still being tested, each shown with the numbers that reject it.'],
     ['/screen',  'Screen',        'All names, filterable',
                  'Price, trend, quality and value for every name — plus who is buying.'],
-    ['/ideas',   'Ideas',         'Ranked names and the orders behind them',
-                 'Entry, stop and three targets, sized as a share of your account.'],
     ['/markets', 'Markets',       'The board — 71 instruments',
                  'Each one measured against its own year, not against the others.'],
     ['/ipo',     'IPO',           'Books open now, and how last year listed',
@@ -10352,8 +10347,8 @@
    * floor and the brief are also linked from the pages that cite them. */
   const MORE = [
     ['Track', [
-      ['/brief',   'Today’s brief',  'One setup, in full'],
-      ['/engines', 'The floor',      'Every engine, what fires it, what it has done'],
+      ['/brief',       'The brief',   'The current plan, in full'],
+      ['/performance', 'Performance', 'The V2 forward record'],
     ]],
     ['How this works', [
       ['/methodology', 'Methodology', 'How every number here is made'],
@@ -13360,14 +13355,15 @@
     const dlg = document.getElementById('moreDlg');
     const body = document.getElementById('moreBody');
     if (!btn || !dlg || !body || typeof dlg.showModal !== 'function') return;
-    const PRIMARY = new Set(['/', '/brief', '/screen', '/signals', '/markets']);
+    /* PRIMARY is the phone tab bar. Market is a desktop nav item only, so
+       on a phone the sheet is its way in and it must stay listed here. */
+    const PRIMARY = new Set(['/', '/opportunities', '/watch', '/performance']);
     const groups = [
       ['Research tools', DISCOVER.filter(([h]) => !PRIMARY.has(h)).map(([h, n, sub]) => [h, n, sub])],
-      ['Your desk', [['/watch', 'Watchlist', 'The names you starred, marked to the latest price'],
+      ['Your desk', [['/brief', 'The brief', 'The current plan, in full'],
                      ['/discover', 'All tools', 'Every way into the screen, with what each is for']]],
       ['How the record is made', [['/methodology', 'Methodology', 'How every number here is made'],
                      ['/sources', 'Data sources', 'Where each figure comes from, and how fresh'],
-                     ['/engines', 'The engines', 'What fires each one, and what it has done'],
                      ['/about', 'About', 'Who builds this, and why the losses are published']]],
       ['Also from this desk', [[VISION_URL + '/', 'Vision ↗', 'Research one company in depth'],
                      ['https://news.askakshay.com/', 'The newspaper ↗', 'The long-form daily read']]],
