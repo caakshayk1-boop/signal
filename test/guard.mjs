@@ -2539,7 +2539,8 @@ ok("no figure counts up", !/countUp/.test(JS));
      !/\.plans\b/.test(W2C) && !/\.reduce\(/.test(W2C) && /const m = d\.metrics \|\| \{\}/.test(W2C)
      && /h\.nav_change_pct/.test(W2C) && /h\.drawdown/.test(W2C));
   ok("an unexposed book shows no return and no drawdown, and a missing history says so",
-     /Not invested/.test(W2C) && /no plan has filled/.test(W2C) && /No session history in this feed yet/.test(W2C));
+     /Not invested/.test(W2C) && /no plan has filled/.test(W2C) && /No session history in this feed yet/.test(W2C)
+     && /No sessions recorded yet/.test(W2C) && (W2C.match(/noHistory\(d\)/g) || []).length === 1);
   ok("a missing chart point breaks the line rather than being bridged",
      /if \(p\[key\] == null\) \{ pen = false; continue; \}/.test(W2C));
   ok("the cards make no forecast", !/probabilit|expected return|likely to|will (rise|fall)|target price/i.test(W2C));
