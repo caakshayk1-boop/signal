@@ -451,6 +451,10 @@ export default {
      * /screen 200. Same shape of fault as a page that only renders after an
      * in-app navigation — it cannot be caught by clicking around. */
     const PAGES = new Set(["/", "/about", "/brief", "/disclaimer", "/disclosures",
+      /* Signal V2 (2026-10-01). /signals, /engines, /research, /buoy and
+         /ideas stay as pages: an old link lands on a plain retired-version
+         notice rather than a 404 or a different trade. */
+      "/opportunities", "/performance",
       "/discover", "/engines", "/funds",
       "/gems", "/heat", "/ideas", "/ipo", "/join", "/map", "/markets",
       "/methodology", "/news", "/privacy", "/radar", "/reads", "/screen",
@@ -460,7 +464,7 @@ export default {
          which runs against SIGNAL_URL. */
       "/vision"]);
     const p = url.pathname.replace(/\/+$/, "") || "/";
-    const isPage = PAGES.has(p) || p.startsWith("/stock/");
+    const isPage = PAGES.has(p) || p.startsWith("/stock/") || /^\/plan\/[^/]+$/.test(p);
     // A request for a real file (/signal.js, /screen.json, /fonts/...) has an
     // extension and is left entirely alone — the assets binding answers it,
     // and a 404 from there is already a real 404.

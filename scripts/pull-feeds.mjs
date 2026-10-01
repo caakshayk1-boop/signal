@@ -27,8 +27,10 @@
 import { writeFileSync, readFileSync } from "node:fs";
 
 const RAW = "https://raw.githubusercontent.com/caakshayk1-boop/trading-dashboard/main/docs";
-const FEEDS = ["alerts", "conviction", "data-health", "edition", "ipo",
-               "mandate", "news", "pulse", "screen", "today",
+// Signal V2 (2026-10-01): alerts, alerts_log, conviction, engines, mandate,
+// research and today were the V1 call feeds; they are no longer mirrored.
+const FEEDS = ["data-health", "edition", "ipo",
+               "news", "pulse", "screen",
                // BUOY's forward scan. Written by scan_buoy.py in the
                // trading-dashboard repo; absent until that job has run, and a
                // missing feed leaves the committed copy alone rather than
@@ -38,7 +40,6 @@ const FEEDS = ["alerts", "conviction", "data-health", "edition", "ipo",
                // is dead weight that rots into a wrong answer the day somebody
                // wires it up, so it is not mirrored. scan_buoy.py still writes
                // it upstream; add it back here the day a page reads it.
-               "alerts_log", "research",
                // SWOT alone, three per quadrant — 0.6MB against the 4.1MB
                // detail file the brief will not load. This is the only place
                // the brief can get Strengths/Weaknesses/Opportunities/Threats.
@@ -55,7 +56,7 @@ const FEEDS = ["alerts", "conviction", "data-health", "edition", "ipo",
                // this one. TWO LISTS FOR ONE JOB, and they had drifted in both
                // directions — this file also carried buoy and swot, which that
                // one lacked. Whichever ran last decided what the site served.
-               "engines", "funds",
+               "funds",
                // THE THREE NEW FEEDS, ADDED WITH THE PAGES THAT READ THEM.
                // All three were sitting in public/ committed by hand and
                // absent from this list — which is the exact fault this file's
@@ -112,7 +113,7 @@ const FEEDS_RAW = "https://raw.githubusercontent.com/caakshayk1-boop/trading-das
    declare their public schema. (The retired engines' feed is no longer
    mirrored: it is not shown or linked anywhere on this site.) */
 const EXTRA = [
-  ["vision_eod", FEEDS_RAW + "vision_eod.json", (d) => d && d.schema === "vision-eod-public/1" && !!d.status && Array.isArray(d.plans), "end-of-day plans feed", "published_at"],
+  ["signal_v2", FEEDS_RAW + "signal_v2.json", (d) => d && d.schema === "signal-v2-public/1" && !!d.status && Array.isArray(d.plans) && d.metrics && typeof d.metrics === "object", "Signal V2 plan feed", "published_at"],
 ];
 for (const [f, url, valid, what, stampKey] of EXTRA) {
   const path = `public/${f}.json`;

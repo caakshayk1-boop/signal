@@ -24,7 +24,7 @@
  *   VDEV_VSIG=none node scripts/vision-dev.mjs    404 the feed exactly as the
  *                                                 Worker does, for the page's
  *                                                 "not published yet" state.
- *   VDEV_VEOD=/path/feed.json | none              the same for /vision_eod.json,
+ *   VDEV_VEOD=/path/feed.json | none              the same for /signal_v2.json,
  *                                                 the end-of-day plans. Preview
  *                                                 feeds come from the private
  *                                                 engine's own code run on
@@ -60,16 +60,10 @@ const noFile = (res, p) => { res.writeHead(404, { "content-type": "application/j
   return res.end(JSON.stringify({ ok: false, error: `no such file: ${p}` })); };
 const j = (f) => JSON.parse(readFileSync(join(ROOT, f), "utf8"));
 
-/* The ledger: alerts.json is generate.py's snapshot of all_signals, in the
-   /api/signals row shape. ?symbol= filters it the way the SQL LIKE does. */
+/* /api/signals as production answers it since Signal V2 (2026-10-01): ?px
+   quotes (from the screen's last close here) and ?series; the V1 ledger
+   itself is retired and answers 410. */
 function signals(q) {
-  const rows = j("alerts.json").map((r) => {
-    if (!GRADE) return r;
-    const done = ["win", "loss", "expired"].includes(String(r.badge || "").toLowerCase());
-    const risk = r.entry - r.sl;
-    return { ...r, r_multiple: done && Number.isFinite(r.exit_price) && risk > 0
-      ? Math.round((r.exit_price - r.entry) / risk * 1000) / 1000 : null };
-  });
   if (q.get("px")) {
     const scr = new Map((j("screen-lite.json").rows || []).map((r) => [r.sym, r]));
     const out = {};
@@ -80,10 +74,8 @@ function signals(q) {
     }
     return { ok: true, at: new Date().toISOString(), quotes: out };
   }
-  const sym = (q.get("symbol") || "").toUpperCase();
-  const pick = sym ? rows.filter((r) => String(r.symbol).toUpperCase().includes(sym)) : rows;
-  return { ok: true, count: pick.length, offset: 0, limit: 400, version: "v2",
-    generated_at: new Date().toISOString(), signals: pick };
+  return { __status: 410, ok: false, retired: true,
+    error: "Signal V1 was retired on 2026-10-01. Its calls are excluded from the V2 record.", successor: "/signal_v2.json" };
 }
 
 /* The ticker: only rows a committed file can actually price. Nifty and India
@@ -153,22 +145,21 @@ http.createServer(async (req, res) => {
       res.writeHead(FAIL.has(name) ? 502 : 404, { "content-type": "application/json" });
       return res.end(JSON.stringify({ ok: false, error: `dev: ${name} ${FAIL.has(name) ? "forced failure" : "no fixture"}` }));
     }
-    res.writeHead(200, { "content-type": "application/json" });
-    return res.end(JSON.stringify(API[key](u.searchParams)));
+    let out;
+    try { out = API[key](u.searchParams); }
+    catch (e) { out = { __status: 500, ok: false, error: `dev fixture failed: ${e.message}` }; }
+    const { __status, ...body } = out;
+    res.writeHead(__status || 200, { "content-type": "application/json" });
+    return res.end(JSON.stringify(body));
   }
-  if (p === "/vision_signals.json" && VSIG === "none") return noFile(res, p);
-  if (p === "/vision_signals.json" && VSIG) {
-    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-    return res.end(readFileSync(VSIG));
-  }
-  if (p === "/vision_eod.json" && VEOD === "none") return noFile(res, p);
-  if (p === "/vision_eod.json" && VEOD) {
+  if (p === "/signal_v2.json" && VEOD === "none") return noFile(res, p);
+  if (p === "/signal_v2.json" && VEOD) {
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     return res.end(readFileSync(VEOD));
   }
   if (SITE === "vision" && (p === "/" || p === "/vision")) p = "/vision.html";
   /* The signal site routes by PATH: anything that is not a file is its shell. */
-  if (SITE === "signal" && !/\.[a-z0-9]+$/i.test(p)) p = p === "/vision" ? "/vision.html" : "/index.html";
+  if (SITE === "signal" && (!/\.[a-z0-9]+$/i.test(p) || p.startsWith("/plan/") || p.startsWith("/stock/"))) p = p === "/vision" ? "/vision.html" : p === "/gems" ? "/gems.html" : "/index.html";
   const f = join(ROOT, p);
   if (!f.startsWith(ROOT) || !existsSync(f)) {
     if (/\.json$/i.test(p)) return noFile(res, p);

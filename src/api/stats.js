@@ -9,8 +9,13 @@
 //   tf=          restrict to one timeframe
 import { db, num, str, badgeOf, json, fail, columns, optional } from "./_db.js";
 
+import { retired } from "./signals.js";
+
 export default async function handler(req, res) {
   if (req.method !== "GET") return fail(res, 405, "GET only");
+  // Signal V2: performance over the V1 ledger is retired. The V2 record's
+  // metrics are computed once by the engine and served in /signal_v2.json.
+  return retired(res);
 
   const q = req.query || {};
   const where = [];

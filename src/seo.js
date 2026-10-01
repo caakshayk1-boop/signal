@@ -99,8 +99,8 @@ const crumbs = (items) => ({ "@type": "BreadcrumbList", itemListElement: items.m
 
 /* ─────────────────────────────── SIGNAL ─────────────────────────────── */
 
-const SIGNAL_LINKS = [["/", "Today"], ["/markets", "Markets"], ["/discover", "Discover"], ["/watch", "Watch"],
-  ["/ideas", "Signals"], ["/signals", "Ledger"], ["/brief", "Brief"], ["/methodology", "Methodology"], ["/about", "About"]];
+const SIGNAL_LINKS = [["/", "Today"], ["/opportunities", "Opportunities"], ["/watch", "Watchlist"],
+  ["/performance", "Performance"], ["/markets", "Market"], ["/screen", "Screen"], ["/methodology", "Methodology"], ["/about", "About"]];
 
 function signalFacts(route, site) {
   if (!site) return "";
@@ -114,8 +114,10 @@ function signalFacts(route, site) {
         + (site.above200 != null ? line(`<b>${esc(site.above200)}%</b> of names trade above their 200-day average.`) : "");
     case "/screen": case "/discover":
       return line(`<b>${esc(site.universe)}</b> NSE names screened on price, trend, quality, value and institutional flow${built ? ` — build of ${esc(built)}` : ""}.`);
-    case "/signals":
-      return line("Every published signal is listed with the entry, stop and targets it was sent with, and graded when it closes — the losses included. The live record loads from the ledger API.");
+    case "/signals": case "/engines": case "/research": case "/buoy": case "/ideas":
+      return line("This page belonged to Signal V1, retired on 1 October 2026. Its calls are excluded from the V2 record and no V1 call became a V2 plan.");
+    case "/opportunities": case "/performance": case "/brief":
+      return line("Signal V2: conditional next-session paper plans for NSE equities and a forward record of every one. The live page loads them from the canonical plan feed.");
     case "/watch":
       return line("Your watchlist is stored in this browser only. Star any name on the site to follow it here.");
     default: return "";
@@ -129,13 +131,16 @@ export async function signalPage(request, env, path) {
   const site = await asset(env, request, "/c/_site.json");
 
   if (path.startsWith("/stock/")) return signalStock(request, env, shell, decodeURIComponent(path.slice(7)), site);
+  // A plan page is one row of the live feed; the generic plan head is
+  // accurate for every id, and the app fills in the plan itself.
+  const key = path.startsWith("/plan/") ? "/plan/:id" : path;
 
-  const [title, desc] = SIGNAL_META[path] || SIGNAL_META["/404"];
+  const [title, desc] = SIGNAL_META[key] || SIGNAL_META["/404"];
   const h1 = title.split(" — ")[0];
   const canonical = SIGNAL + path;
   const body = `<p class="pre-k">Signal · ${esc(h1)}</p>
     <h1 class="pre-h">${esc(title)}</h1>
-    <p class="pre-s">${esc(desc)}</p>${signalFacts(path, site)}
+    <p class="pre-s">${esc(desc)}</p>${signalFacts(key, site)}
     <ul class="pre-l">${SIGNAL_LINKS.filter(([h]) => h !== path).map(([h, t]) => `<li><a href="${h}">${t}</a></li>`).join("")}<li><a href="${VISION}/">Vision — company research ↗</a></li></ul>
     <p class="pre-n">A summary written by the server${site && site.built_at ? ` from the build of ${esc(day(site.built_at))}` : ""}. The live page replaces it as soon as it loads.</p>`;
   const rw = headRewriter({ title, desc, canonical, site: "Signal", robots: "index,follow,max-image-preview:large",

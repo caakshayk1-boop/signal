@@ -280,7 +280,9 @@
     if (!window.HEAT || !HEAT_IDX_ROWS) return '';
     const idx = {};
     for (const r of HEAT_IDX_ROWS) if (r && r.sym) idx[r.sym] = r;
-    const rows = HEAT.rows((t && t.ledger) || {}, idx, WIRE_ROWS || []);
+    // Signal V2: the marks are the 200 most-traded screen names (/api/heat),
+    // not the retired V1 ledger's symbols.
+    const rows = HEAT.rows((t && t.heat) || {}, idx, WIRE_ROWS || []);
     HEAT_LAST = rows;                       // the panel resolves a symbol from these
     const big = rows.filter(x => x.h && x.h.sig != null)
       .sort((a, b) => b.h.sig - a.h.sig).slice(0, n);
@@ -485,10 +487,12 @@
      * than the one the record is accountable for. SINCE_SYMS is filled from
      * the launch-filtered ledger by the brief's own pass; until that lands the
      * panel shows what it has and the count is honest either way. */
-    const led = Object.entries((t && t.ledger) || {})
+    // Signal V2: only names with a live V2 plan (awaiting entry or open on
+    // paper) are "this site's own". None is a holding.
+    const led = Object.entries((t && t.heat) || {})
       .map(([sym, v]) => ({ sym, ...v }))
       .filter(x => num(x.change_pct) != null)
-      .filter(x => !SINCE_SYMS.size || SINCE_SYMS.has(x.sym));
+      .filter(x => OPEN_BY_SYM.has(x.sym));
     const ledUp = led.filter(x => x.change_pct > 0).length;
     const ledMove = led.slice().sort((a, b2) => Math.abs(b2.change_pct) - Math.abs(a.change_pct)).slice(0, 6);
 
@@ -563,11 +567,9 @@
 
       ${HEATSTRIP || ''}
 
-      ${led.length ? `<h3 class="lv-sh">This site's own names, marked live</h3>
-        <p class="lv-note"><b>${ledUp}</b> of the ${led.length} names this site has published a
-          signal on are up right now. Not a portfolio — every one of them is on paper, and no
-          engine here is cleared for capital. It is the book being marked in public, which is
-          the part that does not exist anywhere else.</p>
+      ${led.length ? `<h3 class="lv-sh">Names with a Signal V2 plan, marked live</h3>
+        <p class="lv-note"><b>${ledUp}</b> of the ${led.length} names with a current V2 plan are up
+          right now. Not a portfolio — every plan is on paper, with simulated fills.</p>
         ${/* CLICKABLE TOO. "Cannot click on any share price" was about every
              price on this board, not only the heatmap. These carry the same
              data-hsym the tiles do, so the one delegated listener opens them
@@ -587,6 +589,10 @@
 
   async function liveTick(host) {
     const t = await get('/api/ticker');
+    if (t && t.segments) {
+      const h = await get('/api/heat?part=0').catch(() => null);
+      t.heat = (h && h.quotes) || {};
+    }
     if (!t || !t.segments) {
       if (!host.dataset.ok) {
         host.innerHTML = `<div class="empty">The live board did not answer.</div>`;
@@ -827,7 +833,9 @@
          A fetch nobody consumes is not harmless: it is a request on every
          load, and the next person to see it in the list assumes a section
          depends on it. */
-      get('/screen.json'), get('/api/signals?limit=400'),
+      /* Signal V2 (2026-10-01): plans come from the ONE canonical feed both
+         sites read. The V1 ledger at /api/signals is retired (410). */
+      get('/screen.json'), get('/signal_v2.json'),
       get('/institutional.json'), get('/ipo.json'),
       /* THE SUBSCRIPTION BOOK HAS TO BE LIVE OR IT IS WORTHLESS.
        * ipo.json is built once, around midnight, so its subscription_x was
@@ -907,7 +915,8 @@
       const lh = document.getElementById('live');
       if (lh && lh.dataset.ok) liveTick(lh);
     } catch (e) { /* the brief must not fail over a decoration */ }
-    const ledger = (sigs && (sigs.signals || sigs.rows)) || [];
+    const V2 = sigs && sigs.schema === 'signal-v2-public/1' ? sigs : null;
+    const ledger = [];   // the V1 ledger is retired; nothing V1 is shown here
     /* THE SAME POPULATION SIGNAL PUBLISHES, which this page was not using.
      *
      * signal.askakshay.com's ledger() filters the feed twice before anything is
@@ -1324,73 +1333,35 @@
      * rupee, which is the currency field the feed sets per row, rather than on
      * a symbol suffix: `.NS` is absent on plenty of NSE rows and present on
      * none of the US ones. The full multi-market ledger stays on Signal. */
-    const open = since.filter(r => String(r.status || '').toUpperCase() === 'OPEN'
-                               && r.entry && r.sl && r.target1);
-    /* ── THE OPEN BOOK, KEYED FOR THE HEAT PANEL ──────────────────────────
-     * Akshay: "if it is part of any open signal from signal, show levels."
-     * Right, and it was the obvious gap: a tile could be a name this book has
-     * a LIVE ticket on — an entry, a stop, three targets — and the panel said
-     * only what the move was worth in ATR. The levels are the whole reason
-     * the name is on the board. Keyed bare because the ledger writes
-     * NIACL.NS and the heat tiles key on NIACL. */
-    /* FROM THE WHOLE OPEN BOOK, NOT THE LAUNCH WINDOW — and the first version
-       used `open`, which is `since`-filtered, so it missed 47 of the 103 live
-       tickets. TEGA's is dated 2026-08-15 and the panel found nothing for it
-       while TATACHEM's, dated 2026-09-15, worked; the difference was the
-       counting window and nothing about the position.
-       The launch filter exists so the RECORD counts one population. Whether
-       this book is currently holding a name is a different question, and every
-       open ticket answers it. */
-    for (const r of since) SINCE_SYMS.add(bare(r.symbol));
-    for (const r of ledger) {
-      if (String(r.status || '').toUpperCase() !== 'OPEN') continue;
-      if (!(r.entry && r.sl && r.target1)) continue;
-      OPEN_BY_SYM.set(bare(r.symbol), r);
-    }
-    const seen = new Set();
-    const picks = open.filter(r => {
-      const k = String(r.symbol || '').toUpperCase();
-      if (seen.has(k)) return false; seen.add(k); return true;
-    /* NOT SORTED BY REWARD:RISK.
-     * That ranking put the widest ratio first, and the widest ratio is
-     * produced by the tightest stop rather than the best setup — so the six
-     * it chose were the six with the most questionable levels, led by a 38R
-     * target. Newest first: this is a daily page, and the useful ordering is
-     * what the engines published most recently. */
-    }).sort((a, b2) => String(b2.date || '').localeCompare(String(a.date || ''))).slice(0, 6);
-    add('setups', 'Setups', sec('setups', 'Open setups',
-      picks.length
-        ? `<b>${open.length}</b> open since ${LAUNCH}. These are the ${picks.length} most
-           recently published — <span class="dim">an order of arrival, not of merit</span>.`
-        : 'Nothing is open. An empty list is a result — the engines publish when a setup clears their floors, and not otherwise.',
-      picks.length
-        ? `<div class="rows">${picks.map((r, i) => xr(
-            rowHead(i + 1, r.symbol, `${esc(engName(r.signal_type))} · ${esc(r.timeframe || '')}${
-                r.market && r.market !== 'NSE' ? ' · ' + esc(r.market) : ''}`,
-              money(r.entry, r.currency), [`stop ${money(r.sl, r.currency)}`, 'dn'],
-              num(r.rr) ? [`${Number(r.rr).toFixed(1)}R`, 'flat'] : null),
-            chartSlot(bare(r.symbol)) +
-            ladder(r) +
-            rangeBlock(screenOf(r.symbol), r.symbol, r.market) +
+    /* SETUPS = the Signal V2 plans: awaiting entry for the next session, or
+       open as paper positions. The same plans, prices and states Signal and
+       Vision show — this page adds nothing and recomputes nothing. */
+    const v2Plans = V2 ? (V2.plans || []).filter(p => ['awaiting_entry', 'activated', 'partially_exited'].includes(p.state)) : [];
+    for (const p of v2Plans) OPEN_BY_SYM.set(bare(p.symbol), { symbol: p.symbol, entry: p.entry_high, sl: p.stop,
+      target1: p.t1, target2: p.t2, target3: p.t3, date: p.session_date, signal_type: 'v2', currency: '₹' });
+    const v2Word = { awaiting_entry: 'awaiting entry', activated: 'open, paper', partially_exited: 'open, part sold, paper' };
+    add('setups', 'Setups', sec('setups', 'Signal V2 plans',
+      !V2 ? 'The plan feed did not load. The plans are on Signal.'
+        : v2Plans.length ? `<b>${v2Plans.length}</b> plan${v2Plans.length === 1 ? '' : 's'} awaiting entry or open as paper positions.`
+        : `No plan for the ${esc(String(V2.next_session || ''))} session. ${esc(V2.status_detail || '')}`,
+      v2Plans.length
+        ? `<div class="rows">${v2Plans.map((p, i) => xr(
+            rowHead(i + 1, p.symbol, `${esc(p.setup || 'Setup')} · ${esc(v2Word[p.state] || p.state)}`,
+              `${money(p.entry_low)}–${money(p.entry_high)}`, [`stop ${money(p.stop)}`, 'dn'],
+              p.rr_t1 != null ? [`T1 ${Number(p.rr_t1).toFixed(2)}R`, 'flat'] : null),
+            chartSlot(bare(p.symbol)) +
+            rangeBlock(screenOf(p.symbol), p.symbol, 'NSE') +
             figs([
-              [money(r.entry, r.currency), 'entry'],
-              [money(r.sl, r.currency), 'stop', 'dn'],
-              [money(r.target1, r.currency), 'first target', 'up'],
-              [num(r.rr) ? Number(r.rr).toFixed(2) + 'R' : '—', 'reward:risk'],
+              [`${money(p.entry_low)}–${money(p.entry_high)}`, 'entry range'],
+              [money(p.stop), 'stop', 'dn'],
+              [money(p.t1), 'T1', 'up'], [money(p.t2), 'T2', 'up'], [money(p.t3), 'T3', 'up'],
             ]) +
-            (nameOf(r.symbol) ? `<p class="said"><b>${esc(nameOf(r.symbol))}</b></p>` : '') +
-            (r.remarks ? `<p class="xd-q">${esc(String(r.remarks).slice(0, 240))}</p>` : '') +
-            `<p class="said">Published ${esc(String(r.date || '').slice(0, 10))} by
-              <b>${esc(engName(r.signal_type))}</b>, which is on <b>paper</b>. The levels
-              are the engine's; the outcome is recorded whichever way it goes.</p>`
-          )).join('')}</div>
-          <p class="said"><b>No engine on this site is cleared for capital.</b> The bar is
-            30 closed trades at a t-statistic of 2 or better, and nothing has reached it —
-            so every setup above is a record of what an engine published, not a position
-            anyone took. The full ledger, wins and losses, is at
-            <a href="https://signal.askakshay.com/signals">signal.askakshay.com/signals</a>.</p>`
-        : `<div class="empty">No open setup carries complete levels today.</div>`,
-      `${open.length} open since launch`));
+            `<p class="said">Plan ${esc(p.id)}, published ${esc(String(p.session_date || ''))} for the next session.
+              <a href="https://signal.askakshay.com/plan/${encodeURIComponent(p.id)}">The full plan on Signal</a>.
+              Paper only; fills are simulated.</p>`
+          )).join('')}</div>`
+        : `<div class="empty">No V2 plan is awaiting entry or open. An empty list is a result, not a gap.</div>`,
+      V2 && V2.forward_record_start ? `V2 record since ${esc(V2.forward_record_start)}` : ''));
 
     /* ── 5. INSTITUTIONAL FLOW — the distinctive one ───────────────────────
      * The only section here that no free Indian markets page carries: FII and

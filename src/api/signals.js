@@ -64,12 +64,28 @@ BADGE_SQL.expired = `(NOT ${BADGE_SQL.win} AND NOT ${BADGE_SQL.loss} AND NOT ${B
           AND (upper(coalesce(status,'')) IN (${EXPIRED_LIST}) OR upper(coalesce(lifecycle_status,'')) IN (${EXPIRED_LIST})))`;
 BADGE_SQL.cancelled = `(NOT ${BADGE_SQL.win} AND NOT ${BADGE_SQL.loss} AND NOT ${BADGE_SQL.open} AND NOT ${BADGE_SQL.expired})`;
 
+/* SIGNAL V2 (2026-10-01). The V1 ledger this route served is retired and kept
+ * privately; its rows are excluded from every V2 figure. ?px (quotes) and
+ * ?series (closes) are market data and stay. Every other query answers 410
+ * Gone with a body that says where V2 lives, rather than a V1 row that could
+ * be read as current. */
+export function retired(res) {
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  return res.status(410).json({
+    ok: false, retired: true,
+    error: "Signal V1 was retired on 2026-10-01. Its calls are excluded from the V2 record.",
+    successor: "/signal_v2.json",
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "GET") return fail(res, 405, "GET only");
 
   const q = req.query || {};
 
-  if (q.wallet) return handleWallet(res);
+  // Signal V1 is retired (2026-10-01): the paper wallet over the V1 ledger
+  // is answered with the retired-version body below, like the ledger itself.
+  if (q.wallet) return retired(res);
 
   /* ?px=SYM1,SYM2 — last traded price for arbitrary NSE symbols.
    *
@@ -178,6 +194,8 @@ export default async function handler(req, res) {
     }
   }
 
+  // Everything below this point served the V1 ledger. It is retired.
+  return retired(res);
   const where = [];
   const args = [];
 
