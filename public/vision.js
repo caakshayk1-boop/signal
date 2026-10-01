@@ -1007,7 +1007,7 @@
       if (m) m.innerHTML = !W ? `<p class="note">The market charts could not load.</p>` : (() => {
         const s2 = nx && nx.ok ? nx.data : null, p2 = pu && pu.ok ? pu.data : null, o = { stockHref: (x) => '#/asset/' + encodeURIComponent(x) };
         const ex = window.V2W.explain ? window.V2W.explain({ series: s2, pulse: p2, feed: S.veod, plansRef: '#/setups',
-          recordRef: SIGNAL_URL + '/performance', enginesRef: SIGNAL_URL + '/performance', error: nx && nx.error }) : '';
+          recordRef: SIGNAL_URL + '/performance', enginesRef: SIGNAL_URL + '/performance', paperRef: '#/setups', error: nx && nx.error }) : '';
         return `<div style="margin-top:var(--s-5)">${ex}</div><div class="v2w-grid2">${W.nifty(s2, { more: '#/markets', error: nx && nx.error })}${W.days(s2, { error: nx && nx.error })}</div>
           <div class="v2w-grid2">${W.sectors(p2, { more: '#/heatmap', error: pu && pu.error })}${W.movers(p2, { ...o, error: pu && pu.error })}</div>`;
       })();
@@ -1375,6 +1375,7 @@
       <div class="grid g-7-5"><div class="stack">
         ${panel('Why it reads the way it does', skel(5), { bodyId: 'aWhy', fb: 'Screen' })}
         ${panel('Move profile', skel(4), { bodyId: 'aChart', fb: 'Screen' })}
+        <div id="aTr">${skel(4)}</div>
       </div><div class="stack">
         ${panel('Levels', skel(6), { bodyId: 'aLvl', fb: 'Screen' })}
         ${panel('Business', skel(6), { bodyId: 'aFun', fb: 'Screen' })}
@@ -1389,8 +1390,21 @@
     if (!r) { for (const id of ['aMat', 'aChg']) { const b = $('#' + id); if (b) b.closest('.pn').remove(); }
       $('#aHead').innerHTML = vhead('Asset', s, sr.ok ? `<b>${esc(s)}</b> is not on the NSE screen. Check the symbol — the screen covers ${Object.keys(SCR || {}).length.toLocaleString('en-IN')} names.` : 'The screen did not load, so this name cannot be looked up.');
       for (const id of ['aWhy', 'aChart', 'aLvl', 'aFun', 'aIns', 'aNews']) { const b = $('#' + id); if (b) b.closest('.pn').remove(); }
+      const tr0 = $('#aTr'); if (tr0) tr0.remove();
       return;
     }
+    /* The Technical Confluence read, shared with Signal's stock page
+       (v2widgets.js). Printed as the engine computed it after the close: a
+       read is not a plan and sets no level. Loaded beside, never before, the
+       page, so a slow file cannot hold the rest back. */
+    get('/technical_read.json', 600000).then((tr) => {
+      const box = $('#aTr');
+      if (!box || !alive()) return;
+      const ok = tr && tr.ok && tr.data && tr.data.schema === 'technical-read/1';
+      box.innerHTML = window.V2W && window.V2W.read
+        ? window.V2W.read(ok ? tr.data : null, s, { error: ok ? '' : ((tr && tr.error) || 'technical_read.json did not load') })
+        : `<p class="note">The technical read could not load.</p>`;
+    });
     const px = lv ? lv.price : (r ? r.price : null);
     const mv = moveOf(r);
     /* The range label reads the SAME price as the marker beside it. It printed
@@ -2207,6 +2221,8 @@
       <div style="height:var(--s-4)"></div>
       <section class="pn"><div class="ph"><h2>Active paper positions</h2><span class="n">${active.length}</span></div>
         <div class="pb">${active.length ? `<div class="vs-grid">${active.map((p) => vePlanCard(p, D)).join('')}</div>` : empty('None open', 'A plan becomes a position only when the next session\'s prices fill it inside its range.')}</div></section>
+      <div style="height:var(--s-4)"></div>
+      ${window.V2W && window.V2W.paper ? '<div style="height:var(--s-4)"></div>' + window.V2W.paper(D, { stockHref: (x) => '#/asset/' + encodeURIComponent(x) }) : ''}
       <div style="height:var(--s-4)"></div>
       <section class="pn"><div class="ph"><h2>Completed</h2><span class="n">${done.length}</span></div><div class="pb flush">${veClosedTable(done)}</div>
         <div class="pf">${M.closed ? `${M.closed} closed — ${M.wins} win, ${M.losses} loss, ${M.breakevens} breakeven · net ${veR(M.sum_r_closed)} in total${M.mean_r_closed != null ? ` · mean ${veR(M.mean_r_closed)} a trade` : ''}` : 'No completed sample yet'}${M.win_rate == null && M.closed ? ` · rates are withheld until ${M.min_closed_for_rate || VE_NEED} have closed` : ''}. The same figures as <a href="${SIGNAL_URL}/performance">Signal's record</a>, which begins ${esc(dshort(D.forward_record_start || ''))}; previous model results are excluded. Not a probability.</div></section>

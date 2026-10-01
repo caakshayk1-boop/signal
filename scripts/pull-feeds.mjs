@@ -114,6 +114,8 @@ const FEEDS_RAW = "https://raw.githubusercontent.com/caakshayk1-boop/trading-das
    mirrored: it is not shown or linked anywhere on this site.) */
 const EXTRA = [
   ["signal_v2", FEEDS_RAW + "signal_v2.json", (d) => d && d.schema === "signal-v2-public/1" && !!d.status && Array.isArray(d.plans) && d.metrics && typeof d.metrics === "object", "Signal V2 plan feed", "published_at"],
+  /* One stock's Technical Confluence read, shown on both stock pages. */
+  ["technical_read", FEEDS_RAW + "technical_read.json", (d) => d && d.schema === "technical-read/1" && d.reads && typeof d.reads === "object" && !!d.session_date, "technical reads", "published_at"],
 ];
 for (const [f, url, valid, what, stampKey] of EXTRA) {
   const path = `public/${f}.json`;
