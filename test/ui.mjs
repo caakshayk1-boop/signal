@@ -2540,20 +2540,20 @@ try {
   }
   /* Setups: the end-of-day plans. Before the first private scan the feed
      404s and the page must say so in words; after it, every plan card carries
-     an entry range, a stop and three exits. The legacy archive is always
-     there, collapsed. Never a skeleton left spinning, never a NaN. */
+     an entry range, a stop and three exits. The retired engines are not on
+     the page at all. Never a skeleton left spinning, never a NaN. */
   await v.evaluate(() => { location.hash = "#/setups"; });
   await settled(v, SETTLE + 3000);
   const vSig = await v.evaluate(() => { const b = document.getElementById("veBody"); if (!b) return null;
     const cards = [...b.querySelectorAll(".ve-card")];
     return { sk: !!b.querySelector(".sk"), cards: cards.length, pending: /No scan published yet/.test(b.innerText),
-      scanned: /Scan of the session of/.test(b.innerText), failed: !!b.querySelector(".st.err"),
+      scanned: /Scan of the session of|Session of .* not scanned/.test(b.innerText), failed: !!b.querySelector(".st.err"),
       levels: cards.every((c) => /Entry range/i.test(c.innerText) && /Stop/i.test(c.innerText) && /T1/.test(c.innerText) && /T3/.test(c.innerText)),
-      bad: /\bNaN\b|\bundefined\b|\bnull\b/.test(b.innerText), archive: !!b.querySelector(".ve-arch") }; });
+      bad: /\bNaN\b|\bundefined\b|\bnull\b/.test(b.innerText), archive: /Legacy archive|Bottom reversal|4H breakout/i.test(b.innerText) }; });
   ok("vision #/setups finished loading", vSig && !vSig.sk, vSig);
   ok("...shows the latest scan or says none is published yet", vSig && (vSig.pending || (vSig.scanned && !vSig.failed)), vSig);
   ok("...every plan carries its entry range, stop and three exits", vSig && vSig.levels && !vSig.bad, vSig);
-  ok("...and keeps the retired engines as an archive", vSig && vSig.archive, vSig);
+  ok("...and shows nothing of the retired engines", vSig && !vSig.archive, vSig);
   /* Today: the morning read. Against production it must finish, carry its six
      sections, end, and count breadth from live quotes. */
   await v.evaluate(() => { location.hash = "#/today"; });

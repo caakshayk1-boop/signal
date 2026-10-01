@@ -108,10 +108,10 @@ for (const f of FEEDS) {
    says ok replaces the committed copy, and a 404 before the first scan is a
    state, not a failure. */
 const FEEDS_RAW = "https://raw.githubusercontent.com/caakshayk1-boop/trading-dashboard/main/feeds/";
-/* Each extra feed brings its own validity test: the legacy archive is a
-   signals feed; the end-of-day plans declare their public schema. */
+/* Each extra feed brings its own validity test: the end-of-day plans
+   declare their public schema. (The retired engines' feed is no longer
+   mirrored: it is not shown or linked anywhere on this site.) */
 const EXTRA = [
-  ["vision_signals", FEEDS_RAW + "vision_signals.json", (d) => d && d.ok && Array.isArray(d.history), "signals feed", "generated_at"],
   ["vision_eod", FEEDS_RAW + "vision_eod.json", (d) => d && d.schema === "vision-eod-public/1" && !!d.status && Array.isArray(d.plans), "end-of-day plans feed", "published_at"],
 ];
 for (const [f, url, valid, what, stampKey] of EXTRA) {

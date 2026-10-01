@@ -140,23 +140,6 @@ export const WATCH = [
       { dow: [1, 2, 3, 4, 5], h: 12, m: 0, inputs: { task: "brief_evening_catchup" }, job: "brief_evening" },
     ],
   },
-  {
-    /* VISION'S RETIRED ENGINES — LEGACY GRADING ONLY (since 2026-10-01).
-     *
-     * Bottom reversal and 4H breakout no longer file anything. One slot, after
-     * the close, grades the filings that were open at retirement until each
-     * reaches its stop, T3 or horizon. The 07:58 slot existed to read the
-     * morning 4H candle for NEW breakouts and is gone, here and upstream.
-     *
-     * The default grace is safe here because a duplicate is a no-op: grading
-     * is idempotent and the workflow's concurrency group queues a second copy. */
-    repo: "caakshayk1-boop/trading-dashboard",
-    file: "vision_scan.yml",
-    why: "Vision's legacy-archive grading (retired engines)",
-    slots: [
-      { dow: [1, 2, 3, 4, 5], h: 10, m: 15 },
-    ],
-  },
   /* VISION EOD lives in a PRIVATE repository (caakshayk1-boop/vision-engine),
    * eod.yml at 13:35 / 15:35 / 17:35 UTC. It is idempotent per session, so
    * dispatching a missed slot is safe — but this watchdog's token cannot reach
@@ -178,9 +161,8 @@ export const WATCH = [
       { dow: [0, 1, 2, 3, 4, 5, 6], h: 1, m: 30 },
       { dow: [0, 1, 2, 3, 4, 5, 6], h: 6, m: 40 },
       { dow: [0, 1, 2, 3, 4, 5, 6], h: 12, m: 40 },
-      // Vision: legacy grading (10:15 UTC) and the end-of-day plans (first
-      // attempt 13:35 UTC, final retry 17:35 UTC), each plus a run's length.
-      { dow: [1, 2, 3, 4, 5], h: 10, m: 55 },
+      // Vision: the end-of-day plans (first attempt 13:35 UTC, final retry
+      // 17:35 UTC), each plus a run's length.
       { dow: [1, 2, 3, 4, 5], h: 14, m: 10 },
       { dow: [1, 2, 3, 4, 5], h: 18, m: 15 },
     ],

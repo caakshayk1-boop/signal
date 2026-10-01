@@ -877,8 +877,4 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 .ve-flags{display:flex;flex-wrap:wrap;gap:6px}
 .ve-rules{margin:0;padding-left:18px;font-size:var(--t-sm);color:var(--ink-2);line-height:1.55}
 .ve-rules li+li{margin-top:var(--s-1)}
-.ve-arch>summary{cursor:pointer;list-style:none}
-.ve-arch>summary::-webkit-details-marker{display:none}
-.ve-arch>summary h2::before{content:"▸ ";color:var(--ink-3)}
-.ve-arch[open]>summary h2::before{content:"▾ "}
 .ve-card .vs-lv>div:first-child b{white-space:normal}

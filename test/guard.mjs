@@ -1329,7 +1329,9 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
        (uiCode.match(/browser\.newContext\(/g) || []).length === 1, "only newCtx may call it");
   }
 
-  ok("the watchdog watches something", WATCH.length === 5, WATCH.length);
+  /* 4 since 2026-10-01: the retired Vision engines' grading job left the
+     watchdog when the site stopped showing or linking their record. */
+  ok("the watchdog watches something", WATCH.length === 4, WATCH.length);
   {
     /* Every sync-data cron is a watchdog slot and vice versa — a slot here
        without a cron dispatches daily with nothing to explain why. */
@@ -2258,17 +2260,17 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   /* Since 2026-10-01 Setups renders the end-of-day plans (/vision_eod.json,
      from a PRIVATE engine) and keeps the retired engines as an archive
      (/vision_signals.json). Both feeds must be mirrored by both paths. */
-  ok("vision's setups read the end-of-day plans and the legacy archive",
-     /V\.setups = /.test(VJS) && /get\('\/vision_eod\.json'/.test(VJS) && /get\('\/vision_signals\.json'/.test(VJS));
-  ok("both Vision feeds are mirrored by the scheduled sync and the deploy",
-     /contents\/feeds\/\$f"/.test(SYNC_V) && /f=vision_signals\.json/.test(SYNC_V) && /f=vision_eod\.json/.test(SYNC_V)
-     && /vision-eod-public\/1/.test(SYNC_V) && /vision_signals\.json/.test(PULL_V) && /vision_eod\.json/.test(PULL_V));
+  ok("vision's setups read the end-of-day plans",
+     /V\.setups = /.test(VJS) && /get\('\/vision_eod\.json'/.test(VJS));
+  ok("the end-of-day feed is mirrored by the scheduled sync and the deploy",
+     /contents\/feeds\/\$f"/.test(SYNC_V) && /f=vision_eod\.json/.test(SYNC_V)
+     && /vision-eod-public\/1/.test(SYNC_V) && /vision_eod\.json/.test(PULL_V));
   /* PRIVATE LOGIC. The engine's rules run server-side; the browser gets an
      allowlisted projection. This file is checked for the shape of a leak —
      indicator names, thresholds, a score or rank, a probability — anywhere in
      the code that renders the plans (comments stripped). */
   const VE_SRC = (VJS.match(/\/\* ── SETUPS: VISION EOD[\s\S]*?\n  V\.disclaimer = /) || [""])[0].replace(/\/\*[\s\S]*?\*\//g, "");
-  const VE_CODE = VE_SRC.split("/* ── Legacy archive")[0] + (VE_SRC.match(/V\.setups = [\s\S]*$/) || [""])[0];
+  const VE_CODE = VE_SRC;
   ok("no Vision EOD selection logic ships to the browser",
      VE_CODE.length > 2000 && !/\b(EMA|SMA|ATR|RSI|MACD)\d*\b|\bRS63\b|pullback_|touch_band|depth_atr|\.score\b|\.rank\b|\.features?\b|probability of|win rate of/i.test(VE_CODE.replace(/Not a probability/g, "")),
      (VE_CODE.match(/\b(EMA|SMA|ATR|RSI)\d*\b|\.score\b|\.rank\b|\.features?\b/gi) || []).slice(0, 5));
@@ -2297,9 +2299,13 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("a published plan is never counted as a result, and fills say simulated",
      /const VE_DONE = new Set\(\['closed', 'stopped', 'time_exited'\]\)/.test(VJS) && /simulated<\/span>/.test(VJS)
      && /const VE_NEED = 30;/.test(VJS) && /Never filled/.test(VJS));
-  ok("the retired engines are an archive, not current opportunities",
-     /Legacy archive — bottom reversal and 4H breakout/.test(VJS) && !/S\.vsig\.today|vsig\.today/.test(VJS)
-     && !/vsig\.today/.test(readFileSync("scripts/company-pages.mjs", "utf8")) && !/site\.vsig/.test(SEO));
+  /* Owner decision 2026-10-01: the retired engines (bottom reversal, 4H
+     breakout) are not shown or linked ANYWHERE on this site. Their record is
+     kept upstream only. Nothing may fetch, mirror, render or ship it. */
+  ok("the retired engines are not shown, linked, mirrored or shipped",
+     !/vision_signals|Legacy archive|ve-arch|VS_WORD|F\.vsig/.test(VJS + readFileSync("public/vision.css", "utf8"))
+     && !/vision_signals/.test(SYNC_V + PULL_V + readFileSync("scripts/company-pages.mjs", "utf8") + SEO)
+     && !existsSync("public/vision_signals.json") && !/vision_scan/.test(readFileSync("src/watchdog_schedule.js", "utf8")));
   /* Deploy 220: the Worker 404s a missing feed with "no such file: …" and the
      page matched the error TEXT for "HTTP 404", so the pre-scan state read
      "failed". Executed against what the Worker and get() actually produce. */
@@ -2333,11 +2339,10 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      /F\.heat = async/.test(VJS) && /get\(`\/api\/heat\?part=/.test(VJS) && !/heatQuotes[\s\S]{0,200}F\.quotes/.test(VJS)
      && /HEAT_PART = 200/.test(HEATJS) && 200 / 20 <= 40 && /caches\.default/.test(HEATJS) && /quoteSpark/.test(HEATJS)
      && !/retryMissing/.test(HEATJS) && /url\.pathname === "\/api\/heat"\) return heat\(/.test(IDX));
-  /* Vision is the product, and it runs TWO engines: bottom reversal and the
-     4H breakout. A third arriving by copy-paste is the drift this pins. */
-  const VSW = (VJS.match(/const VS_WORD = \{([^}]*)\}/) || [])[1] || "";
-  ok("vision runs exactly two engines: bottom reversal and 4H breakout",
-     (VSW.match(/\b\w+:/g) || []).map((x) => x.slice(0, -1)).sort().join(",") === "bottom,brk4h", VSW);
+  /* Vision renders ONE engine's output: the end-of-day plans. A second
+     engine arriving by copy-paste is the drift this pins. */
+  ok("vision renders exactly one engine feed: the end-of-day plans",
+     (VJS.match(/get\('\/[a-z_]+_(?:eod|signals)\.json'/g) || []).join() === "get('/vision_eod.json'");
   /* Today is the morning read folded in from gems: a column that ends, built
      from the same live quotes as the cockpit rather than a second model. */
   const TODAY = (VJS.match(/V\.today = [\s\S]*?\n  \};/) || [""])[0];
