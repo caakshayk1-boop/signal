@@ -1006,7 +1006,9 @@
       const W = window.V2W && window.V2W.market, m = $('#hMkt');
       if (m) m.innerHTML = !W ? `<p class="note">The market charts could not load.</p>` : (() => {
         const s2 = nx && nx.ok ? nx.data : null, p2 = pu && pu.ok ? pu.data : null, o = { stockHref: (x) => '#/asset/' + encodeURIComponent(x) };
-        return `<div class="v2w-grid2" style="margin-top:var(--s-5)">${W.nifty(s2, { more: '#/markets', error: nx && nx.error })}${W.days(s2, { error: nx && nx.error })}</div>
+        const ex = window.V2W.explain ? window.V2W.explain({ series: s2, pulse: p2, feed: S.veod, plansRef: '#/setups',
+          recordRef: SIGNAL_URL + '/performance', enginesRef: SIGNAL_URL + '/performance', error: nx && nx.error }) : '';
+        return `<div style="margin-top:var(--s-5)">${ex}</div><div class="v2w-grid2">${W.nifty(s2, { more: '#/markets', error: nx && nx.error })}${W.days(s2, { error: nx && nx.error })}</div>
           <div class="v2w-grid2">${W.sectors(p2, { more: '#/heatmap', error: pu && pu.error })}${W.movers(p2, { ...o, error: pu && pu.error })}</div>`;
       })();
     }
@@ -1446,13 +1448,25 @@
       const add = (k, v, what) => { if (num(v) != null) lv2.push([k, num(v), what]); };
       add('52w high', r.high52, 'the year\'s high'); add('52w low', r.low52, 'the year\'s low');
       add('SMA 20', r.sma20, '20-day average'); add('SMA 50', r.sma50, '50-day average'); add('SMA 200', r.sma200, '200-day average');
-      if (r.lad) { add('Ladder stop', r.lad.s, 'the screen\'s ladder stop'); }
+      // A research reference from the screen, NOT a stop anyone should trade:
+      // the only actionable stop is a Signal V2 plan's, shown on its own card.
+      if (r.lad) { add('Screen ladder level', r.lad.s, 'research reference, not a trade stop'); }
     }
     lv2.sort((a, b) => b[1] - a[1]);
-    $('#aLvl').innerHTML = lv2.length && px != null ? `<div class="lvl">${lv2.filter((l) => l[1] > px).map((l) => `<div><span class="num">${l[0]}</span><em>${esc(l[2])}</em><span class="num">₹${fmt(l[1], 1)} <span class="mut">${signed((l[1] - px) / px * 100, 1)}</span></span></div>`).join('')}
-        <div class="now"><span>Now</span><em>${lv ? 'live' : 'at the last close'}</em><span class="num">₹${fmt(px, 1)}</span></div>
-        ${lv2.filter((l) => l[1] <= px).map((l) => `<div><span class="num">${l[0]}</span><em>${esc(l[2])}</em><span class="num">₹${fmt(l[1], 1)} <span class="mut">${signed((l[1] - px) / px * 100, 1)}</span></span></div>`).join('')}</div>
-      ${r.atr_pct != null ? `<p class="note" style="margin-top:var(--s-2)">A typical day moves it <b>${Number(r.atr_pct).toFixed(1)}%</b>; a level closer than that is noise, not a test.</p>` : ''}` : empty('No levels', 'Not on the screen.');
+    /* Two clocks on one ladder, said out loud: the levels are the screen's
+       (its last build), "Now" may be a live quote. A level inside one typical
+       day's move is marked as such on its own row, not only in a footnote. */
+    const atrp = r && r.atr_pct != null ? Number(r.atr_pct) : null;
+    const scrAt = (FR.Screen || {}).at;
+    const v2p = ((S.veod && S.veod.plans) || []).find((p) => p.symbol === s && ['awaiting_entry', 'activated', 'partially_exited'].includes(p.state));
+    const lrow = (l) => { const dpct = (l[1] - px) / px * 100, near = atrp != null && Math.abs(dpct) < atrp;
+      return `<div${near ? ' class="near"' : ''}><span class="num">${l[0]}</span><em>${esc(l[2])}${near ? ' · inside one typical day' : ''}</em><span class="num">₹${fmt(l[1], 1)} <span class="mut">${signed(dpct, 1)}</span></span></div>`; };
+    $('#aLvl').innerHTML = lv2.length && px != null ? `<p class="note" style="margin:0 0 var(--s-2)">Levels from the screen's build${scrAt ? ` of ${esc(dshort(String(scrAt).slice(0, 10)))}` : ''}; <b>Now</b> is ${lv ? 'a live, delayed quote' : 'the last close'}, and the distances are measured from it.</p>
+      <div class="lvl">${lv2.filter((l) => l[1] > px).map(lrow).join('')}
+        <div class="now"><span>Now</span><em>${lv ? 'live, delayed' : 'at the last close'}</em><span class="num">₹${fmt(px, 1)}</span></div>
+        ${lv2.filter((l) => l[1] <= px).map(lrow).join('')}</div>
+      ${atrp != null ? `<p class="note" style="margin-top:var(--s-2)">A typical day moves it <b>${atrp.toFixed(1)}%</b>; a level closer than that is inside ordinary noise, so it is a reference, not a test.</p>` : ''}
+      <p class="note" style="margin-top:var(--s-2)">These are research levels. ${v2p ? `The only actionable stop is the Signal V2 plan's: <b>₹${fmt(v2p.stop, 2)}</b> — <a href="#/setups">see the plan</a>.` : 'There is no Signal V2 plan for this company, so there is no actionable stop here.'}</p>` : empty('No levels', 'Not on the screen.');
 
     const de = num(r && r.de), lender = !!(r && isLender(r));
     $('#aFun').innerHTML = r ? `<div class="kv" style="margin-top:0">

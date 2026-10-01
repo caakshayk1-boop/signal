@@ -170,6 +170,27 @@ export default async function handler(req, res) {
       ),
       sparkSeries(defs.map((d) => d[1])),
     ]);
+    /* YAHOO'S PREVIOUS CLOSE, CHECKED AGAINST THE DAILY CLOSES ALREADY HERE.
+     *
+     * On 1 Oct 2026 the rail printed Nifty −1.30% while its own daily closes
+     * said 22,620.45 → 22,421.95, −0.88%: chartPreviousClose was the 29 Sep
+     * close, one session stale. The month of daily closes fetched just above
+     * carries timestamps, so the close BEFORE the quote's own session is known
+     * without another request. Where the two disagree, the series wins and the
+     * row says so (prev_basis); where the series cannot place the quote's
+     * session, Yahoo's figure stands unchanged. */
+    const istDay = (sec) => new Date(sec * 1000 + 330 * 60000).toISOString().slice(0, 10);
+    for (const [ysym, pairs] of series) {
+      const q = quotes.get(ysym);
+      if (!q || !q.asOf || !pairs || pairs.length < 2) continue;
+      const qd = istDay(q.asOf);
+      const before = pairs.filter(([t]) => t && istDay(t) < qd);
+      if (!before.length) continue;
+      const pc = before[before.length - 1][1];
+      if (pc > 0 && q.prev > 0 && Math.abs(q.prev / pc - 1) > 0.0005) {
+        quotes.set(ysym, { ...q, prev: pc, prev_basis: "daily close before this session" });
+      }
+    }
     // Closes only for the row payload; the timestamps stay server-side.
     const closesBySym = new Map(
       [...series].map(([k, pairs]) => [k, pairs.map((x) => x[1])])

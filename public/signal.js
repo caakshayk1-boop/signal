@@ -12098,12 +12098,14 @@
   /* THE MARKET, AS CARDS: the index's own closes and the screen's weekly
      pulse, drawn by the shared library. They describe the market; the plans
      below are the product's own output and are drawn separately. */
-  function v2Market(nx, pu) {
+  function v2Market(nx, pu, d) {
     const W = window.V2W && window.V2W.market;
     if (!W) return vsec('The market', `<p class="muted">The market charts could not load. Everything else on this page is complete without them.</p>`);
     const sr = nx && nx.ok ? nx.data : null, pd = pu && pu.ok ? pu.data : null;
     const why = (x) => (x && (x.error || x.why)) || 'no answer';
-    return vsec('The market', `<div class="v2w-grid2">${W.nifty(sr, { more: '/markets', error: why(nx) })}${W.days(sr, { error: why(nx) })}</div>
+    const ex = window.V2W.explain ? window.V2W.explain({ series: sr, pulse: pd, feed: d, plansRef: '/opportunities',
+      recordRef: '/performance', enginesRef: '/performance', error: why(nx) }) : '';
+    return vsec('The market', `${ex}<div class="v2w-grid2">${W.nifty(sr, { more: '/markets', error: why(nx) })}${W.days(sr, { error: why(nx) })}</div>
       <div class="v2w-grid2">${W.sectors(pd, { more: '/map', error: why(pu) })}${W.movers(pd, { error: why(pu) })}</div>`);
   }
 
@@ -12187,7 +12189,7 @@
     paint(head(H, S, 'Today') +
       (r.stale ? staleNote(r.age) : '') +
       v2StatusStrip(d) +
-      v2Market(nx, pu) +
+      v2Market(nx, pu, d) +
       vsec(`Plans for ${v2Date(d.next_session)}`, next.length ? `<div class="v2-cards">${next.map(p => v2Card(p, d)).join('')}</div>`
         : v2Empty(d, v2NoneWhy(d)), String(next.length), null, { lead: true }) +
       vsec('Active paper positions', active.length ? `<div class="v2-cards">${active.map(p => v2Card(p, d)).join('')}</div>`
