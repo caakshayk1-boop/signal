@@ -2,8 +2,20 @@
    guard.mjs fails the build if this falls out of step. */
 export const SIGNAL_META = {
  "/": [
-  "Signal — Indian markets, every morning",
-  "Nifty breadth, sector heat, IPO books open now, ranked trade ideas and a public signal ledger. India’s markets in one screen, rebuilt before every open."
+  "Signal — Indian equities, screened after the close",
+  "Review qualified setups, plan the next session, and track every paper trade. NSE equities, long only, with a forward record that starts empty."
+ ],
+ "/opportunities": [
+  "Opportunities — every V2 plan by state",
+  "Next-session plans for NSE equities, grouped as eligible, extended, active, closed and expired, each with its entry range, stop and three targets."
+ ],
+ "/performance": [
+  "Performance — the Signal V2 forward record",
+  "Every V2 paper plan, wins and losses alike, with reconciled counts, net P&L after modelled costs and the date the record began."
+ ],
+ "/plan/:id": [
+  "Plan — Signal V2",
+  "One conditional paper plan: entry range, stop, three targets, exit sizes, expiry and every update since publication."
  ],
  "/markets": [
   "Markets — the board, 71 instruments with a year of context",
@@ -14,8 +26,8 @@ export const SIGNAL_META = {
   "Every name in the universe on price, trend, quality, value and institutional flow. FII and DII holding quarter on quarter, from the company’s own filings."
  ],
  "/signals": [
-  "Signals — the public ledger, wins and losses both",
-  "Every call this book has published, open and closed, with the entry, stop and targets it was sent with and what it actually did."
+  "Retired — the V1 ledger",
+  "Signal V1 was retired on 1 October 2026. Its calls are excluded from the V2 record."
  ],
  "/heat": [
   "The heatmap — today in each name’s own units",
@@ -38,12 +50,12 @@ export const SIGNAL_META = {
   "A breadth-based market score with every term printed, and the eight highest-scoring names ranked on trend, momentum, volume and institutional flow."
  ],
  "/engines": [
-  "The floor — every engine, what fires it, what it has done",
-  "Every engine with its trigger conditions, where each stop comes from, how it can be wrong, and its measured record. Nothing is cleared for capital."
+  "Retired — the V1 engine floor",
+  "Signal V1 was retired on 1 October 2026."
  ],
  "/ideas": [
-  "Ideas — this week’s multibaggers and what they were picked at",
-  "The weekly leadership screen, with the price each name was picked at and what it has done since."
+  "Retired — V1 ideas",
+  "Ideas now live in Opportunities, as next-session plans."
  ],
  "/ipo": [
   "IPO — books open now, and how last year’s listings did",
@@ -62,12 +74,12 @@ export const SIGNAL_META = {
   "The names you follow, ranked by what changed rather than alphabetically."
  ],
  "/brief": [
-  "Today’s brief — one setup, in full",
-  "The highest-scoring open signal, with every figure behind it: levels, evidence, what would invalidate it, and the engine’s own record."
+  "The brief — the current plan, in full",
+  "The current V2 plan with every level and condition, or a plain statement that nothing qualified."
  ],
  "/methodology": [
-  "Methodology — how every number here is made",
-  "Every engine, every score, every stop and target rule, and the sample size behind each claim."
+  "Methodology — how a V2 plan is built and graded",
+  "Risk-first plans, next-session entry, three targets with fixed exit sizes, simulated fills and how the forward record is counted."
  ],
  "/sources": [
   "Data sources — where each number comes from",
@@ -86,16 +98,16 @@ export const SIGNAL_META = {
   "Join the list for the daily email. It is not being sent yet; the brief is on the site every morning."
  ],
  "/research": [
-  "The research floor — three engines, and the record that rejects them",
-  "BUOY, ANCHOR and BEDROCK: unproven engines published with their own measured null results beside every name."
+  "Retired — the V1 research floor",
+  "Signal V1 was retired on 1 October 2026."
  ],
  "/buoy": [
-  "BUOY — the 200-period average, reclaimed on the 4-hour",
-  "A fallen name closing a 4-hour candle back above its 200-period average, with momentum already turning. Measured over two years, and the measurement says no edge."
+  "Retired — BUOY",
+  "Signal V1 was retired on 1 October 2026."
  ],
  "/about": [
-  "About — who builds Signal, and why it publishes its losses",
-  "Signal is built by Akshay Kothari, a Chartered Accountant working in FP&A: what the site is, what it is not, and why its ledger is not curated."
+  "About — who builds Signal",
+  "Signal is built by Akshay Kothari, a Chartered Accountant working in FP&A: what the site is, what it is not, and when its V2 record began."
  ],
  "/disclaimer": [
   "Disclaimer — educational research, not investment advice",

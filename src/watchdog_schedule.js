@@ -78,46 +78,11 @@ export const WATCH = [
     graceMin: 180,
     slots: [{ dow: [0, 1, 2, 3, 4, 5, 6], h: 22, m: 0 }],
   },
-  {
-    repo: "caakshayk1-boop/trading-dashboard",
-    file: "daily_scan.yml",
-    why: "signals and Telegram alerts",
-    slots: [
-      /* 20:00 MYT — the day's only weekday scan, on the operator's
-       * instruction: "needed only 2 times a day - morning 8am MYT & night
-       * 8pm MYT". 12:00 UTC is 17:30 IST, two hours after the bell, so every
-       * close is final and the ledger settles.
-       *
-       * THE 13:00 MYT "SIGNALS OPENING" SLOT IS GONE FROM HERE TOO, AND HAD
-       * TO BE. This watchdog does not read the crons — it holds its own copy
-       * of the schedule. Removing the cron and leaving the slot would not have
-       * stopped the midday scan; it would have MOVED it here, dispatched every
-       * weekday at 05:12 UTC by the very mechanism built to repair drops,
-       * with no cron anywhere to explain why. */
-      { dow: [1, 2, 3, 4, 5], h: 12, m: 0, inputs: { slot: "eod" }, job: "scan_eod" },
-      { dow: [6], h: 4, m: 0, inputs: { slot: "weekend" }, job: "scan_weekend" },
-      /* 06:00 UTC — 11:30 IST, two hours into the NSE session. The `midday`
-       * slot, added to daily_scan.yml with the intraday engine, which until
-       * then had a cron nowhere and therefore had never run.
-       *
-       * THE PARAGRAPH ABOVE IS WHY THIS LINE HAS TO EXIST. Removing a cron
-       * there and leaving a slot here dispatches work no cron explains. The
-       * mirror image is this: ADDING a cron there and not adding a slot here
-       * leaves the one scan of the day that runs while the market is open
-       * with no watchdog at all — and this is the repo whose scheduler was
-       * measured dropping runs and both their retries.
-       *
-       * 11:30 was chosen over 11:45 because a dispatch that drifts three
-       * hours must still land inside the session: 14:30 IST worst case
-       * against a 15:30 close. standalone_scan refuses the slot outright
-       * after 14:30 IST rather than reporting a stale session as a live one,
-       * so a badly drifted dispatch files nothing instead of filing a lie.
-       *
-       * `scan_midday` is _scan_job("midday") in standalone_scan.py. Per slot,
-       * not per day, so a completed midday can never satisfy a missing eod. */
-      { dow: [1, 2, 3, 4, 5], h: 6, m: 0, inputs: { slot: "midday" }, job: "scan_midday" },
-    ],
-  },
+  /* daily_scan.yml IS GONE FROM HERE (Signal V2, 2026-10-01). Its engines
+   * are retired and the workflow has no schedule; re-dispatching it would
+   * start a job whose only correct action is to stand down
+   * (trading-dashboard v1_cutover.py). The V2 plans come from the private
+   * engine (vision-engine eod.yml), which this token cannot dispatch. */
   {
     /* THE BRIEF WAS THE ONE JOB NOTHING WATCHED.
      *
@@ -140,13 +105,13 @@ export const WATCH = [
       { dow: [1, 2, 3, 4, 5], h: 12, m: 0, inputs: { task: "brief_evening_catchup" }, job: "brief_evening" },
     ],
   },
-  /* VISION EOD lives in a PRIVATE repository (caakshayk1-boop/vision-engine),
+  /* SIGNAL V2 EOD lives in a PRIVATE repository (caakshayk1-boop/vision-engine),
    * eod.yml at 13:35 / 15:35 / 17:35 UTC. It is idempotent per session, so
    * dispatching a missed slot is safe — but this watchdog's token cannot reach
    * that repo until the owner grants it Actions: write there. Enable by
    * uncommenting once the token is widened:
    *
-   * { repo: "caakshayk1-boop/vision-engine", file: "eod.yml", why: "Vision's end-of-day plans",
+   * { repo: "caakshayk1-boop/vision-engine", file: "eod.yml", why: "Signal V2 end-of-day plans",
    *   slots: [{ dow: [1, 2, 3, 4, 5], h: 13, m: 35 }, { dow: [1, 2, 3, 4, 5], h: 15, m: 35 },
    *           { dow: [1, 2, 3, 4, 5], h: 17, m: 35 }] },
    */

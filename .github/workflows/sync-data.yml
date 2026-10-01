@@ -44,7 +44,7 @@ on:
     - cron: "30 1 * * *"
     - cron: "40 6 * * *"
     - cron: "40 12 * * *"
-    # Vision. The end-of-day plans (feeds/vision_eod.json) are published by
+    # Signal V2 and Vision. The canonical plan feed (feeds/signal_v2.json) is published by
     # the private engine after each session: 19:05 IST first attempt, 21:05
     # and 23:05 retries (13:35 / 15:35 / 17:35 UTC). 14:10 collects the first
     # attempt, 18:15 anything a retry produced. The watchdog carries the same
@@ -136,7 +136,10 @@ jobs:
           # That was invisible while the upstream job was itself broken: it had
           # never once completed, so there was nothing newer to miss. Fixing the
           # harvest made the scan run and go nowhere.
-          FEEDS="alerts alerts_log barometer conviction data-health edition engines funds ipo mandate news pulse regime research screen screen-lite seasonality swot today weekly_reads"
+          # Signal V2 (2026-10-01): the V1 call feeds (alerts, alerts_log,
+          # conviction, engines, mandate, research, today) are no longer
+          # mirrored. Plans come only from feeds/signal_v2.json below.
+          FEEDS="barometer data-health edition funds ipo news pulse regime screen screen-lite seasonality swot weekly_reads"
           # shellcheck disable=SC2086 -- word splitting is the point
           set -- $FEEDS; total=$#
           for j in $FEEDS; do
@@ -200,22 +203,22 @@ jobs:
             rm -f ".incoming/$f"
           fi
 
-      # ── VISION EOD PLANS, FROM feeds/ NOT docs/ ──────────────────────────
+      # ── THE CANONICAL V2 PLAN FEED, FROM feeds/ NOT docs/ ────────────────
       #
       # Written upstream by the PRIVATE engine (caakshayk1-boop/vision-engine)
-      # through the contents API, from an allowlist. Only a file that parses,
-      # declares the public schema and says what status it is replaces the
-      # copy here; before the first scan it 404s and Vision says "no scan
-      # published yet". A malformed file is refused, never half-applied.
-      - name: Fetch Vision's end-of-day plans
+      # through the contents API, from an allowlist. Signal and Vision both
+      # render this one file. Only a file that parses, declares the V2 public
+      # schema, a status and a metrics block replaces the copy here; a
+      # malformed file is refused, never half-applied.
+      - name: Fetch the Signal V2 plan feed
         env:
           GH_TOKEN: ${{ secrets.UPSTREAM_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          f=vision_eod.json
+          f=signal_v2.json
           if gh api "repos/$UPSTREAM/contents/feeds/$f" \
                -H "Accept: application/vnd.github.raw" > ".incoming/$f" 2>/dev/null \
-             && python3 -c "import json,sys; d=json.load(open('.incoming/$f')); sys.exit(0 if d.get('schema')=='vision-eod-public/1' and d.get('status') and isinstance(d.get('plans'), list) else 1)" 2>/dev/null; then
+             && python3 -c "import json,sys; d=json.load(open('.incoming/$f')); sys.exit(0 if d.get('schema')=='signal-v2-public/1' and d.get('status') and isinstance(d.get('plans'), list) and isinstance(d.get('metrics'), dict) else 1)" 2>/dev/null; then
             printf '  ok    %-18s %s\n' "$f" "$(du -h ".incoming/$f" | cut -f1)"
           else
             printf '  MISS  %-18s not published upstream yet, or not a valid feed — keeping the copy in this repo\n' "$f"

@@ -2001,9 +2001,12 @@
   /* ── DISCLAIMER ─────────────────────────────────────────────────────────
      Vision's own, so the legal line never depends on another product being
      up. The one-line version sits above every page; this is the full text. */
-  /* ── SETUPS: VISION EOD — RISK-FIRST SELECTION ─────────────────────────
-     Plans are made after each NSE session closes, by an engine that runs on
-     PRIVATE infrastructure, and published as /vision_eod.json. That file is
+  /* ── SETUPS: THE SIGNAL V2 PLAN, CONSUMED HERE ─────────────────────────
+     Signal owns the plans; Vision shows the SAME canonical plan, read from the
+     same file Signal reads (/signal_v2.json), so a stock cannot carry two
+     different entries, stops or targets across the two sites. Plans are made
+     after each NSE session closes, by one engine on PRIVATE infrastructure.
+     That file is
      an allowlist: symbol, session, the entry range and its cap, the stop, the
      three exits, the expiry, the lifecycle state and the audited (simulated)
      outcome. No rule, threshold, feature, score or rank is in it, and none is
@@ -2032,7 +2035,7 @@
   const VE_ACTIVE = new Set(['activated', 'partially_exited']);
   const VE_DONE = new Set(['closed', 'stopped', 'time_exited']);
   F.veod = async () => {
-    const r = await get('/vision_eod.json', 600000);
+    const r = await get('/signal_v2.json', 600000);
     if (r.ok) { mark('Setups', r.data.published_at); S.veod = r.data; }
     else if (absent(r)) { FR.Setups = { ok: true, na: true, naTxt: 'not yet published', naTitle: 'no end-of-day scan has been published yet', t: Date.now() }; paintBadges(); }
     else markFail('Setups', r.error);
@@ -2090,7 +2093,7 @@
         ${p.exits.length ? `<span class="mut">· ${p.exits.map((x) => `${esc(x.reason)}: ${x.qty} sold at ${veMoney(x.price)}`).join(' · ')}</span>` : ''}
         <span>· ${p.remaining_pct}% still held</span><span>· realised ${veR(p.realized_r)}, open ${veR(p.unrealized_r)}</span></div>` : ''}
       ${veFlags(p)}
-      <p class="note" style="margin:0">Published ${esc(istWhen(p.published_at))}${R ? ` · reference size ${p.qty} shares (₹${fmt(R.capital_inr / 1e5, 0)} lakh book, ${R.risk_per_trade_pct}% risk at the cap)` : ''}.</p>
+      <p class="note" style="margin:0"><a href="${SIGNAL_URL}/plan/${encodeURIComponent(p.id)}">Plan ${esc(p.id)} on Signal ↗</a> · Published ${esc(istWhen(p.published_at))}${R ? ` · reference size ${p.qty} shares (₹${fmt(R.capital_inr / 1e5, 0)} lakh book, ${R.risk_per_trade_pct}% risk at the cap)` : ''}.</p>
     </article>`;
   };
   const veClosedTable = (rows) => rows.length ? `<div class="tw"><table class="tbl dense"><thead><tr><th scope="col">Name</th><th scope="col" class="hide-m">Plan of</th>
@@ -2149,7 +2152,7 @@
     await F.heat();
     Object.assign(S.quotes, await F.quotes([...next, ...older, ...active].map((p) => p.symbol).filter((x) => !HEAT_SYMS.has(x))));
     if (!alive()) return;
-    const sm = D.summary || {}, cov = D.coverage || {};
+    const M = D.metrics || {}, cov = D.coverage || {};
     const mode = D.mode === 'paper' ? '<span class="chip up">Paper mode</span>' : '<span class="chip warn" title="No configuration has passed its pre-registered validation">Research mode · not validated</span>';
     const nextEmpty = D.status === 'paused' ? empty('Paused', 'No plans are being made while a replacement method is researched.')
       : D.status === 'market_filter' ? empty('No new plans', 'The market filter was off on this close.')
@@ -2168,7 +2171,7 @@
         <div class="pb">${active.length ? `<div class="vs-grid">${active.map((p) => vePlanCard(p, D)).join('')}</div>` : empty('None open', 'A plan becomes a position only when the next session\'s prices fill it inside its range.')}</div></section>
       <div style="height:var(--s-4)"></div>
       <section class="pn"><div class="ph"><h2>Completed</h2><span class="n">${done.length}</span></div><div class="pb flush">${veClosedTable(done)}</div>
-        <div class="pf">${sm.completed ? `${sm.completed} completed · net ${veR(sm.completed_r_sum)} in total` : 'None completed'}${sm.completed_r_mean != null ? ` · mean ${veR(sm.completed_r_mean)} a trade` : ` · no average is printed until ${sm.min_completed_for_rate || VE_NEED} have completed`}. R is measured on each plan's initial risk, net of assumed costs. Not a probability.</div></section>
+        <div class="pf">${M.closed ? `${M.closed} closed — ${M.wins} win, ${M.losses} loss, ${M.breakevens} breakeven · net ${veR(M.sum_r_closed)} in total${M.mean_r_closed != null ? ` · mean ${veR(M.mean_r_closed)} a trade` : ''}` : 'No completed sample yet'}${M.win_rate == null && M.closed ? ` · rates are withheld until ${M.min_closed_for_rate || VE_NEED} have closed` : ''}. The same figures as <a href="${SIGNAL_URL}/performance">Signal's record</a>, which begins ${esc(dshort(D.forward_record_start || ''))}; previous model results are excluded. Not a probability.</div></section>
       <div style="height:var(--s-4)"></div>
       <section class="pn"><div class="ph"><h2>Never filled</h2><span class="n">${unfilled.length}</span></div><div class="pb">${veNotFilled(unfilled)}</div>
         <div class="pf">Expired and cancelled plans were never trades. They are listed so the record cannot quietly drop them, and they are not counted as results.</div></section>

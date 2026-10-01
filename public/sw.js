@@ -29,7 +29,7 @@
 // v4 (2026-10): the redesign set every route title in Newsreader, so the
 // offline shell now carries it — the reasoning below for leaving it out held
 // while one route used it, and no longer does.
-const CACHE = "signal-shell-v4";
+const CACHE = "signal-shell-v5";   // v5: Signal V2 — no client keeps the V1 shell
 const SHELL = [
   "/", "/index.html", "/signal.css", "/signal.js", "/icon.svg",
   // One variable face, weights 200-800, replacing the five static Manrope and

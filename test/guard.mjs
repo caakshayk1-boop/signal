@@ -19,8 +19,43 @@ const HTML = readFileSync("public/index.html", "utf8");
 const GEMS = readFileSync("public/gems.js", "utf8");
 const IDX = readFileSync("src/index.js", "utf8");
 
-let fails = 0, checks = 0;
+let fails = 0, checks = 0, retired = 0;
+/* SIGNAL V2 (2026-10-01). These checks pinned V1 surfaces that no longer exist
+   — the ledger, the engine floor, the old front page and the old brief. They
+   are retired BY NAME, listed here with the reason, and reported as retired,
+   so a reader of this file can see exactly what stopped being enforced and
+   why. The V2 equivalents are the "Signal V2" block at the end. */
+const RETIRED_WITH_V1 = new Set([
+  "a lane's record is read from the engine's backtest block",
+  "the provenance links moved to the Ledger rather than being dropped",
+  "the winrate figure carries an explanation",
+  "the brief decides on one flag, and every consumer reads it",
+  "the brief's second target comes through lvl(), which treats 0 as absent",
+  "a one-target setup still draws to scale rather than drawing nothing",
+  "reward-to-risk against a target that is not published is null, not a repeat of T1",
+  "the brief has a business section",
+  "it is in document order too, not just in the nav",
+  "the section calls the shared renderer rather than carrying its own copy",
+  "a renderer that did not arrive produces a notice, not a hole",
+  "the caller supplies its own screen link",
+  "the brief declares its sections",
+  "every section has a digit that jumps to it",
+  "the conviction slate reads the screen this route is actually holding",
+  "the engine registry can be counted",
+  "the cleared-for-capital tile counts its denominator",
+  "no copy spells a count its own registry contradicts",
+  "the tile's open count is the bucket's, not a second definition",
+  "the front page leads with the published barometer.json",
+  "wins and losses are not printed as advancing and declining",
+  "the front page requests its heavy feeds before awaiting the first wave",
+  "the ledger offers a Closed filter",
+  "the front page lists recent closes from the ledger, losses included",
+  "toward a verdict draws each engine against the 30-trade rule",
+  "the trailing-window chip says when nothing closed, never a zero",
+  "Brief is in the bar — on a phone it had no entry of its own at all",
+]);
 const ok = (name, cond, detail) => {
+  if (RETIRED_WITH_V1.has(name)) { retired++; return; }
   checks++;
   if (cond) return;
   fails++;
@@ -652,7 +687,9 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("the lite fetch falls back to the full table rather than failing",
      /const getScreen = async \(wantFull\) => \{[\s\S]*?return \{ r: await get\(FULL_URL\), lite: false \};/.test(JS));
   const liteN = (JS.match(/getScreen\(false\)/g) || []).length;
-  ok("every light route goes through it", liteN >= 7, liteN);
+  /* 4 since Signal V2: the old front page, ideas and brief no longer load the
+     screen; Market (radar/heat/map) and the watchlist still do. */
+  ok("every light route goes through it", liteN >= 4, liteN);
   ok("no light route sets the lite flag as a literal true",
      !/setScreen\([^;]*\), true\)/.test(JS));
 }
@@ -681,7 +718,10 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
  * absorb an accidental one. Adding a tab means editing this number and saying
  * why, here. */
 {
-  const nav = [...HTML.matchAll(/<a href="(\/[a-z/]*)" data-route="([^"]+)">[\s\S]*?<span>([^<]+)<\/span>/g)]
+  /* SIGNAL V2: Today | Opportunities | Watchlist | Performance | Market on a
+     desktop; Today | Setups | Watchlist | Record | More on a phone. The label
+     is the DESKTOP one (the first <span>). */
+  const nav = [...HTML.matchAll(/<a href="(\/[a-z/]*)" data-route="([^"]+)"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/g)]
     .map((m) => ({ href: m[1], route: m[2], label: m[3] }));
   /* FIVE, FROM 2026-10. The redesign made each slot one READER GOAL — Today,
      Brief, Screen, Ledger, Markets — and moved the personal utility (Watch)
@@ -689,6 +729,12 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      and the More sheet. Both are still one tap away; neither is a peer of the
      ledger. Exact, not a floor, for the reason above. */
   ok("the bar has five slots", nav.length === 5, nav.map((n) => n.label));
+  ok("the five are the V2 destinations, in order",
+     JSON.stringify(nav.map((n) => n.route)) === JSON.stringify(["/", "/opportunities", "/watch", "/performance", "/markets"]),
+     nav.map((n) => n.route));
+  ok("on a phone they read Setups and Record, and Market gives its slot to More",
+     /<span class="l-m">Setups<\/span>/.test(HTML) && /<span class="l-m">Record<\/span>/.test(HTML)
+     && /class="t-desk"/.test(HTML) && /class="t-mob" data-more/.test(HTML));
   ok("href and data-route agree on every tab",
      nav.every((n) => n.href === n.route), nav.filter((n) => n.href !== n.route));
 
@@ -1331,7 +1377,10 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
 
   /* 4 since 2026-10-01: the retired Vision engines' grading job left the
      watchdog when the site stopped showing or linking their record. */
-  ok("the watchdog watches something", WATCH.length === 4, WATCH.length);
+  /* 3 since the Signal V2 cutover: daily_scan.yml (the V1 engines) left the
+     watchdog with its schedule. */
+  ok("the watchdog watches something", WATCH.length === 3, WATCH.length);
+  ok("the watchdog no longer dispatches the retired V1 scan", !WATCH.some((w) => w.file === "daily_scan.yml"));
   {
     /* Every sync-data cron is a watchdog slot and vice versa — a slot here
        without a cron dispatches daily with nothing to explain why. */
@@ -1358,33 +1407,19 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
    * pass `inputs` to workflow_dispatch; an entry that forgot them dispatched
    * a workflow whose every slot arm fell through to SLOT="" and which then
    * did nothing at all, green. */
-  const scan = WATCH.find((w) => w.file === "daily_scan.yml");
   const brief = WATCH.find((w) => w.file === "scheduled_tasks.yml");
-  ok("the scan and the briefs are both watched", !!scan && !!brief);
-  for (const sl of scan.slots) {
-    ok(`daily_scan ${sl.h}:00Z names the slot it is dispatching`, !!(sl.inputs || {}).slot, sl);
-    /* job is the job_runs key the watchdog asks "did the WORK land?". It is
-     * _scan_job(slot) over there — `scan_` + the slot — and a mismatch makes
-     * the watchdog query a row that is never written, so it concludes the
-     * work never happened and dispatches forever. */
-    ok(`daily_scan ${sl.inputs.slot}: its ledger key matches its slot`,
-       sl.job === "scan_" + sl.inputs.slot, sl.job);
-  }
-  /* AN EXACT SET, NOT A COUNT >= n. The dangerous direction is a slot quietly
-   * disappearing — which is how `midday` came to have a cron in daily_scan.yml
-   * and no watchdog entry, leaving the one scan that runs while the market is
-   * open as the only unwatched one. `>=` would pass through that. Adding or
-   * removing a slot means editing this line, on purpose, in the same commit. */
-  const slotNames = scan.slots.map((x) => x.inputs.slot).sort().join(",");
-  ok("the scan's watched slots are exactly midday, eod and weekend",
-     slotNames === "eod,midday,weekend", slotNames);
+  ok("the briefs are watched", !!brief);
+  for (const sl of (brief && brief.slots) || [])
+    ok(`brief ${sl.h}:00Z names the task it is dispatching`, !!(sl.inputs || {}).task, sl);
 
   /* ── dueSlot, THE ARITHMETIC ─────────────────────────────────────────────
    * Everything above is inventory. This is the function that decides whether
    * a missed slot is noticed, and it had never been executed by a test. */
   const utc = (y, mo, d, h, mi) => new Date(Date.UTC(y, mo, d, h, mi));
   // 2026-09-16 is a Wednesday.
-  const midday = scan.slots.find((x) => x.inputs.slot === "midday");
+  /* Fixed fixtures since the V1 scan left the watchdog: the arithmetic is
+     the same for any weekday slot, and these keep it executed. */
+  const midday = { dow: [1, 2, 3, 4, 5], h: 6, m: 0, inputs: { slot: "midday" } };
   /* dueSlot LOOKS BACK TWO DAYS ON PURPOSE — a Friday-evening slot is still
    * the newest one on a Sunday, and "nothing due" there would hide a real
    * outage. So these assert WHICH INSTANT came back, never that nothing did:
@@ -1404,7 +1439,7 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      iso(dueSlot(utc(2026, 8, 20, 6, 30), [midday])));
   /* THE NEWEST SLOT WINS, and it must be able to reach back across a day —
    * a Friday-evening slot is still the newest one on a Saturday morning. */
-  const eod = scan.slots.find((x) => x.inputs.slot === "eod");
+  const eod = { dow: [1, 2, 3, 4, 5], h: 12, m: 0, inputs: { slot: "eod" } };
   ok("the most recent passed slot is the one returned",
      (dueSlot(utc(2026, 8, 16, 13, 0), [midday, eod]) || {}).inputs?.slot === "eod");
   ok("a slot from yesterday is still reachable this morning",
@@ -2260,16 +2295,17 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   /* Since 2026-10-01 Setups renders the end-of-day plans (/vision_eod.json,
      from a PRIVATE engine) and keeps the retired engines as an archive
      (/vision_signals.json). Both feeds must be mirrored by both paths. */
-  ok("vision's setups read the end-of-day plans",
-     /V\.setups = /.test(VJS) && /get\('\/vision_eod\.json'/.test(VJS));
-  ok("the end-of-day feed is mirrored by the scheduled sync and the deploy",
-     /contents\/feeds\/\$f"/.test(SYNC_V) && /f=vision_eod\.json/.test(SYNC_V)
-     && /vision-eod-public\/1/.test(SYNC_V) && /vision_eod\.json/.test(PULL_V));
+  /* SIGNAL V2: Vision consumes the SAME canonical plan feed Signal reads. */
+  ok("vision's setups read the canonical V2 plan feed",
+     /V\.setups = /.test(VJS) && /get\('\/signal_v2\.json'/.test(VJS));
+  ok("the V2 feed is mirrored by the scheduled sync and the deploy, schema-checked",
+     /contents\/feeds\/\$f"/.test(SYNC_V) && /f=signal_v2\.json/.test(SYNC_V)
+     && /signal-v2-public\/1/.test(SYNC_V) && /signal_v2\.json/.test(PULL_V) && /signal-v2-public\/1/.test(PULL_V));
   /* PRIVATE LOGIC. The engine's rules run server-side; the browser gets an
      allowlisted projection. This file is checked for the shape of a leak —
      indicator names, thresholds, a score or rank, a probability — anywhere in
      the code that renders the plans (comments stripped). */
-  const VE_SRC = (VJS.match(/\/\* ── SETUPS: VISION EOD[\s\S]*?\n  V\.disclaimer = /) || [""])[0].replace(/\/\*[\s\S]*?\*\//g, "");
+  const VE_SRC = (VJS.match(/\/\* ── SETUPS: THE SIGNAL V2 PLAN[\s\S]*?\n  V\.disclaimer = /) || [""])[0].replace(/\/\*[\s\S]*?\*\//g, "");
   const VE_CODE = VE_SRC;
   ok("no Vision EOD selection logic ships to the browser",
      VE_CODE.length > 2000 && !/\b(EMA|SMA|ATR|RSI|MACD)\d*\b|\bRS63\b|pullback_|touch_band|depth_atr|\.score\b|\.rank\b|\.features?\b|probability of|win rate of/i.test(VE_CODE.replace(/Not a probability/g, "")),
@@ -2278,18 +2314,19 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      The deployed feed (pulled at deploy) is held to it key by key; a key the
      engine adds without adding it here fails the deploy, not the reader. */
   const VE_KEYS = {
-    top: ["schema", "engine", "model_version", "mode", "status", "status_detail", "session_date", "published_at", "data_as_of", "coverage",
-      "next_session", "next_scan_due", "calendar_verified", "exit_plan", "entry_expiry_sessions", "time_exit_sessions", "reference_size",
-      "plans", "summary", "fills_are", "notice"],
-    plan: ["id", "symbol", "name", "session_date", "published_at", "state", "entry_low", "entry_high", "stop", "initial_stop", "t1", "t2", "t3",
+    top: ["schema", "product", "model_version", "mode", "status", "status_detail", "session_date", "published_at", "data_as_of", "coverage",
+      "next_session", "next_scan_due", "calendar_verified", "cutover_at", "forward_record_start", "strategies", "exit_plan",
+      "entry_expiry_sessions", "time_exit_sessions", "reference_size", "costs", "plans", "metrics", "fills_are", "notice"],
+    plan: ["id", "strategy_id", "setup", "symbol", "name", "exchange", "currency", "direction", "session_date", "published_at", "state",
+      "outcome", "entry_low", "entry_high", "stop", "initial_stop", "stop_rule", "management", "t1", "t2", "t3", "rr_t1", "rr_t2", "rr_t3",
       "valid_through", "qty", "risk_per_share", "risk_pct", "flags", "fill", "exits", "remaining_qty", "remaining_pct", "realized_r",
-      "unrealized_r", "total_r", "last_close", "last_session", "closed_session"],
+      "unrealized_r", "total_r", "net_pnl_inr", "open_mark_inr", "charges_inr", "last_close", "last_session", "closed_session", "updates"],
   };
   let veFeed = null;
-  try { veFeed = JSON.parse(readFileSync("public/vision_eod.json", "utf8")); } catch { /* not pulled yet: a state */ }
+  try { veFeed = JSON.parse(readFileSync("public/signal_v2.json", "utf8")); } catch { /* not pulled yet: a state */ }
   const veBad = !veFeed ? [] : [...Object.keys(veFeed).filter((k) => !VE_KEYS.top.includes(k)),
     ...(veFeed.plans || []).flatMap((p) => Object.keys(p).filter((k) => !VE_KEYS.plan.includes(k)))];
-  ok("the published end-of-day feed carries only allow-listed keys", veBad.length === 0, veBad.slice(0, 5));
+  ok("the published V2 feed carries only allow-listed keys", veBad.length === 0, veBad.slice(0, 5));
   /* Five distinct scan states, never blurred into one another. */
   ok("setups distinguish no-setup, market filter, data unavailable, stale and error",
      /D\.status === 'error'/.test(VJS) && /veStale\(D\)/.test(VJS) && /D\.status === 'data_unavailable'/.test(VJS)
@@ -2341,8 +2378,8 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      && !/retryMissing/.test(HEATJS) && /url\.pathname === "\/api\/heat"\) return heat\(/.test(IDX));
   /* Vision renders ONE engine's output: the end-of-day plans. A second
      engine arriving by copy-paste is the drift this pins. */
-  ok("vision renders exactly one engine feed: the end-of-day plans",
-     (VJS.match(/get\('\/[a-z_]+_(?:eod|signals)\.json'/g) || []).join() === "get('/vision_eod.json'");
+  ok("vision renders exactly one plan feed: the canonical V2 feed",
+     (VJS.match(/get\('\/[a-z_]+_(?:eod|signals|v2)\.json'/g) || []).join() === "get('/signal_v2.json'");
   /* Today is the morning read folded in from gems: a column that ends, built
      from the same live quotes as the cockpit rather than a second model. */
   const TODAY = (VJS.match(/V\.today = [\s\S]*?\n  \};/) || [""])[0];
@@ -2412,7 +2449,77 @@ ok("no figure counts up", !/countUp/.test(JS));
      && /url\.pathname\.endsWith\("\.json"\)\) return;/.test(readFileSync("public/sw.js", "utf8")));
 }
 
+/* ── SIGNAL V2 (2026-10-01) ───────────────────────────────────────────────────
+ * One canonical plan feed, every view. A V2 view prints the feed's own levels,
+ * R:R and metrics; it never computes a level, a count or a rate itself. The V1
+ * engines, feeds and ledger are retired from the public site, old URLs land on
+ * a plain retired notice, and nothing V1 can reach a V2 figure. */
+{
+  const V2B = (JS.match(/\/\* ══ SIGNAL V2 ═+[\s\S]*?\n  \/\/ The phone tab bar's "More"/) || [""])[0];
+  const V2C = V2B.replace(/\/\*[\s\S]*?\*\//g, "");
+  ok("the V2 block exists and reads one feed", V2B.length > 5000 && /const V2_URL = '\/signal_v2\.json'/.test(V2B)
+     && (V2C.match(/get\('\/[a-z_0-9-]+\.json'\)/g) || []).every((x) => /regime|signal_v2/.test(x)));
+  for (const r of ["/", "/opportunities", "/performance", "/plan/:id", "/brief"])
+    ok(`V2 route ${r} is rendered by the V2 block`, new RegExp(`R\\['${r.replace(/[/:]/g, (c) => "\\" + c)}'\\] = async`).test(V2B));
+  for (const r of ["/signals", "/engines", "/research", "/buoy", "/ideas"])
+    ok(`retired route ${r} shows the retired-version notice`, new RegExp(`R\\['${r.replace(/\//g, "\\/")}'\\] = v2Retired\\(`).test(V2B));
+  ok("a retired page never maps an old call onto a new plan", /No V1 call was turned into a V2 plan/.test(V2B));
+  ok("every R:R printed is the feed's own field", /p\['rr_' \+ k\]/.test(V2C) && !/\(p\.t[123] - p\.entry_high\) \/ \(p\.entry_high - p\.(?:initial_)?stop\)/.test(V2C));
+  ok("counts and rates come from the feed's metrics block, never recounted",
+     /const m = d\.metrics \|\| \{\}/.test(V2C) && !/filter\([^)]*outcome === 'win'\)\.length/.test(V2C) && !/\.filter\([^)]*r_multiple/.test(V2C));
+  ok("Day 1 shows no completed sample, never a 0% rate",
+     /No completed sample yet/.test(V2C) && /m\.win_rate != null \? v2Num\(m\.win_rate, 1\) \+ '%' : '—'/.test(V2C));
+  ok("the disclosure states when the V2 record began and that V1 is excluded",
+     /V2 forward record begins/.test(V2C) && /Previous model results are excluded/.test(V2C));
+  ok("the headline and subheading are the V2 ones",
+     /Indian equities, screened after the close\./.test(V2C) && /Review qualified setups, plan the next session, and track every paper trade\./.test(V2C)
+     && /Indian equities, screened after the close\./.test(readFileSync("scripts/prerender.mjs", "utf8")));
+  ok("no V2 view invents a best-stock pick when nothing qualified",
+     /never substitutes a "best stock of the day"/.test(V2B) && /No plan qualified for the/.test(V2C) && /paused: `No plans for the .*new plans are paused\./.test(V2C));
+  ok("state is a word plus a glyph, never colour alone", /const V2_STATE = \{[\s\S]*?awaiting_entry:\s*\['Awaiting entry'/.test(V2C) && /<i aria-hidden="true">\$\{i\}<\/i>\$\{esc\(w\)\}/.test(V2C));
+  ok("the plan page states stop semantics, management and simulated fills",
+     /p\.stop_rule/.test(V2C) && /p\.management/.test(V2C) && /simulated\)/.test(V2C) && /A stop does not cap a gap loss/.test(V2C));
+  ok("a scan past its due time reads Overdue, never a past time as pending",
+     /const overdue = Number\.isFinite\(due\) && Date\.now\(\) > due/.test(V2C) && /<b>Overdue<\/b>/.test(V2C));
+  ok("a failed or incomplete run is named in the strip, never 'scanned after the close'",
+     /error: 'the last run failed — plans as of the last good run'/.test(V2C) && /data_unavailable: 'not scanned — data incomplete'/.test(V2C));
+  ok("the plan page links the company research into Vision", /v2Vision\(p\.symbol\)/.test(V2C));
+  ok("the plan page renders the shared Business section, or says it did not arrive",
+     /window\.BriefFundamentals\.render\(scrRow, \{/.test(V2C) && /could not load/.test(V2C) && /screenHref:/.test(V2C));
+  ok("no strategy internal ships in the V2 views",
+     !/\b(EMA|SMA|ATR|RSI)\d*\b|\bRS63\b|pullback_|depth_atr|touch_band|\.features?\b|\.score\b|\.rank\b|probability of/i.test(V2C));
+  /* The V1 feeds are gone from the site, not merely unread. */
+  const V1F = ["alerts", "alerts_log", "conviction", "engines", "mandate", "research", "today", "buoy", "vision_eod", "vision_signals"];
+  const shipped = V1F.filter((f) => existsSync(`public/${f}.json`));
+  ok("no V1 call feed is shipped", shipped.length === 0, shipped);
+  const SYNC2 = readFileSync(".github/workflows/sync-data.yml", "utf8"), PULL2 = readFileSync("scripts/pull-feeds.mjs", "utf8");
+  const mirrored = V1F.filter((f) => new RegExp(`["\\s]${f}["\\s]`).test((SYNC2.match(/FEEDS="[^"]*"/) || [""])[0]) || new RegExp(`"${f}"`).test((PULL2.match(/const FEEDS = \[[\s\S]*?\];/) || [""])[0]));
+  ok("no V1 call feed is mirrored", mirrored.length === 0, mirrored);
+  /* engines.js keeps its API for old callers, with an EMPTY roster. */
+  const ENGV2 = readFileSync("public/engines.js", "utf8");
+  const win = {};
+  try { new Function("window", ENGV2)(win); } catch { /* reported below */ }
+  ok("engines.js carries no V1 roster", !!win.ENGINE_BOOK && win.ENGINE_BOOK.keys().length === 0 && win.ENGINE_BOOK.inBook({ signal_type: "breakout" }) === false);
+  /* The V1 ledger answers 410 with a pointer; quotes and closes stay. */
+  const SIGAPI = readFileSync("src/api/signals.js", "utf8"), STAPI = readFileSync("src/api/stats.js", "utf8");
+  ok("the V1 ledger API answers 410 Gone, quotes and series stay",
+     /status\(410\)/.test(SIGAPI) && /successor: "\/signal_v2\.json"/.test(SIGAPI) && /if \(q\.px\)/.test(SIGAPI) && /if \(q\.series\)/.test(SIGAPI)
+     && /return retired\(res\);/.test(STAPI) && /if \(q\.wallet\) return retired\(res\);/.test(SIGAPI));
+  ok("the Worker serves the V2 pages and plan URLs",
+     /"\/opportunities", "\/performance"/.test(IDX) && /\\\/plan\\\/\[\^\/\]\+\$/.test(IDX));
+  const SM = readFileSync("public/sitemap.xml", "utf8");
+  ok("the sitemap lists the V2 pages and no retired one",
+     /\/opportunities</.test(SM) && /\/performance</.test(SM) && !/\/(signals|engines|ideas|research|buoy)</.test(SM));
+  ok("the service worker cache was bumped for V2", /signal-shell-v5/.test(readFileSync("public/sw.js", "utf8")));
+  /* Privacy names what is actually stored, and the watchlist can move. */
+  const PRIV = (JS.match(/R\['\/privacy'\] = async[\s\S]*?\n  \};/) || [""])[0];
+  ok("privacy lists the real local-storage keys",
+     ["sig:watch", "sig:alerts", "sig.sizer.v1", "sig:theme"].every((k) => PRIV.includes(k)) && !/One item in local storage/.test(PRIV));
+  ok("the watchlist exports and imports, merging rather than overwriting",
+     /id="wExport"/.test(JS) && /id="wImport"/.test(JS) && /kind: 'signal-watchlist'/.test(JS) && /new Set\(\[\.\.\.watchAll\(\), \.\.\.clean\]\)/.test(JS));
+}
+
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
-  : `\n${checks}/${checks} guard checks pass`);
+  : `\n${checks}/${checks} guard checks pass (${retired} V1 checks retired by name)`);
 process.exit(fails ? 1 : 0);

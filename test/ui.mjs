@@ -29,7 +29,22 @@ import { readFileSync } from "node:fs";
 const BASE = (process.argv[2] || "http://127.0.0.1:8787").replace(/\/$/, "");
 const SITE = BASE;   // the site is served at the root here, not /next.html
 const fails = [];
+/* SIGNAL V2 (2026-10-01): checks that pinned the V1 front page's heatmap
+   strip and regime section. The V2 front page is plans first, with one line
+   of market context; the heatmap lives on Market. Retired by name. */
+const RETIRED_WITH_V1 = new Set([
+  "the heatmap appears on the front page", "it sits near the top, not buried",
+  "the front-page strip draws tiles", "the front-page strip links to the full heatmap",
+  "the front-page strip is not a flat grid", "the regime section survives the page's later renders",
+  "the regime section names a regime",
+  // gems: the "book marked live" panel and the capital-clearance line were
+  // the V1 ledger. The panel now marks names with a live V2 plan, and is
+  // correctly absent while there is none.
+  "the capital-clearance line survives on the page", "the book is marked live",
+  "the live book says it is paper, not a portfolio", "the marked book is clickable too",
+]);
 const ok = (name, cond, detail) => {
+  if (RETIRED_WITH_V1.has(name)) { console.log(`  ----  ${name} (retired with V1)`); return; }
   const pass = cond === true;
   if (!pass) fails.push(name + (detail === undefined ? "" : "  -> " + JSON.stringify(detail)));
   console.log(`  ${pass ? "PASS" : "FAIL"}  ${name}` +
@@ -260,305 +275,59 @@ try {
   const oxM = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok("no horizontal overflow at 1440", oxM <= 0, oxM);
 
-  /* ── BRIEF ───────────────────────────────────────────────────────────── */
-  console.log("\n  /brief");
-  await p.goto(SITE + "/brief", { waitUntil: "domcontentloaded" });
-  await settled(p, SETTLE);
-
-  const body = await p.locator("main").innerText();
-  ok("no NaN, undefined or Infinity anywhere", !/NaN|undefined|Infinity/.test(body),
-     (body.match(/NaN|undefined|Infinity/g) || []).slice(0, 3));
-
-  /* THE WORKUP FOLDS, so the dial is behind a click now — and innerText is
-   * layout-aware and returns "" for anything a closed <details> is not
-   * rendering. The value was correct and unreadable, which is a real
-   * distinction: assert the fold opens, then assert the number, so this still
-   * fails if the count-up breaks. */
-  ok("the brief folds its workup", await p.locator(".b-fold > summary").count() === 1);
-  const folded = await p.locator(".b-fold .b-sec").count();
-  ok("the fold holds the sections it names", folded >= 3, folded);
-  /* Five, not four. The first cut kept levels, chart and plan and folded the
-   * rest — which buried the company's financials and the SWOT, so the brief
-   * read as having no fundamentals at all. What you would OWN is not the
-   * workup on a single-stock trade, it is half the case. The cap exists to
-   * stop the fold quietly emptying back onto the page, so it tracks the
-   * decision rather than being a number of its own. */
-  const above = await p.locator(".brief > .b-wrap > .b-sec").count();
-  ok("only the essentials sit above the fold", above <= 5, above);
-  ok("the fundamentals are not behind a click",
-     await p.locator(".brief > .b-wrap > #b-business").count() === 1);
-  ok("the SWOT is not behind a click",
-     await p.locator(".brief > .b-wrap > #b-fund").count() === 1);
-  await openWorkup(p);
-
-  // The count-up must land on its value even where rAF never runs.
-  const conf = (await p.locator("#dialN").innerText()).trim();
-  ok("confidence resolves to a number", /^(\d+|—)$/.test(conf), conf);
-
-  ok("chart draws from real closes", await p.locator("#pxc .price").count() === 1);
-  const cap = await p.locator(".b-cap").first().innerText();
-  ok("chart says how many closes it drew", /\d+ real daily closes/.test(cap), cap.slice(0, 80));
-
-  /* EVERY REWARD-TO-RISK FIGURE SAYS WHICH TARGET IT MEASURES TO.
-   *
-   * The original assertion was `/R:R TO T1/ && /R:R TO T2/`, and it encoded an
-   * assumption the ledger does not hold: that every signal has two targets.
-   * The API blanks a second target sitting inside 0.5R of the first, and on
-   * such a row the brief now prints ONE reward-to-risk figure labelled
-   * "Reward : risk" and states that no second target was published — rather
-   * than the old behaviour, which reinstated T1's price under T2's label and
-   * printed the same ratio twice under two different names.
-   *
-   * So the assertion could only pass on a two-target row, and which row the
-   * brief ranks first is a fact about today's data. That is a flake, and it
-   * would have read as a regression in the page rather than in the test.
-   *
-   * The invariant is the one the original comment names — no BARE ratio, ever
-   * — and it is now checked in both shapes. */
-  const twoTargets = /R:R TO T2/i.test(body);
-  ok("R:R is labelled by target",
-     twoTargets
-       ? /R:R TO T1/i.test(body)
-       : /REWARD\s*:\s*RISK/i.test(body) && /NOT PUBLISHED/i.test(body),
-     twoTargets ? "two targets" : "one target");
-  // And the two readings are never the same number under two names, which is
-  // what the collapsed-target fallback produced.
-  if (twoTargets) {
-    const rr = [...body.matchAll(/R:R TO T([12])\s*\n?\s*([\d.]+)/gi)].map(m => m[2]);
-    ok("the two R:R readings are different numbers",
-       rr.length < 2 || rr[0] !== rr[1], rr);
+  /* ── SIGNAL V2: TODAY, OPPORTUNITIES, PERFORMANCE, PLAN, RETIRED ROUTES ───
+   * The V1 brief and ledger were retired on 2026-10-01. What a reader must be
+   * able to rely on now: the front page answers the four status questions,
+   * plans come from the one feed, the record says when it began and never
+   * prints a 0% on an empty sample, and an old link lands on a plain notice. */
+  console.log("\n  Signal V2");
+  await p.goto(SITE + "/", { waitUntil: "domcontentloaded" });
+  await until(p, () => !!document.querySelector(".v2-strip"));
+  const v2Home = await p.locator("main").innerText().catch(() => "");
+  ok("Today leads with the V2 headline", /Indian equities, screened after the close\./.test(v2Home));
+  ok("the status strip names session, market, coverage and next scan",
+     ["Latest session", "Market", "Coverage", "Next scan"].every((k) => v2Home.toUpperCase().includes(k.toUpperCase())));
+  // innerText follows text-transform, so the headings are matched without case.
+  ok("next-session plans come before positions, watchlist and record",
+     v2Home.search(/Plans for /i) > -1 && v2Home.search(/Plans for /i) < v2Home.search(/Active paper positions/i)
+     && v2Home.search(/Active paper positions/i) < v2Home.search(/^V2 record$/im));
+  ok("the V2 disclosure is on the front page", /V2 forward record begins/.test(v2Home) && /Previous model results are excluded/.test(v2Home));
+  const v2Feed = await p.evaluate(async () => (await fetch("/signal_v2.json")).json()).catch(() => null);
+  ok("the canonical plan feed is served", !!v2Feed && v2Feed.schema === "signal-v2-public/1");
+  if (v2Feed) {
+    const m = v2Feed.metrics || {};
+    ok("the feed's metrics reconcile", m.reconciles === true, m);
+    ok("an empty record carries no rate", m.closed >= (m.min_closed_for_rate || 30) || m.win_rate === null, m.win_rate);
+    const nNext = (v2Feed.plans || []).filter((x) => x.state === "awaiting_entry").length;
+    ok("zero plans is said in words, not left blank",
+       nNext > 0 || /No plan qualified for the|new plans are paused\.|session was not scanned\.|The last run failed\.|No new plans for the/.test(v2Home), nNext);
   }
-
-  // No probability may be attached to a scenario: no model publishes one.
-  await p.locator('.b-scb button[data-sc="2"]').click();
-  await p.waitForTimeout(250);
-  ok("bearish scenario selects", await p.locator('.b-scb button[data-sc="2"]').getAttribute("aria-pressed") === "true");
-  ok("scenarios quote no probability", !/probability/i.test(await p.locator("#scPane").innerText()));
-
-  await p.locator(".b-mxr").first().click();
-  await p.waitForTimeout(300);
-  ok("confluence row expands", await p.locator(".b-mxr.open").count() === 1);
-
-  await p.locator("#cvComp").click(); await p.waitForTimeout(300);
-  ok("components view opens every row", await p.locator(".b-crow.open").count() === 5);
-  await p.locator("#cvScore").click(); await p.waitForTimeout(300);
-  ok("score view closes them", await p.locator(".b-crow.open").count() === 0);
-
-  /* THE SLIDER DEFECT. A range input snaps its value to min + n·step, so a
-   * rounded step moved the published entry the instant the page loaded. The
-   * calculator must open on the ledger's own numbers. */
-  ok("simulation banner is silent at published levels", await p.locator("#rkSim").isHidden());
-  const published = await p.evaluate(() => {
-    const m = [...document.querySelectorAll(".b-m")]
-      .map(e => e.innerText.split("\n").map(s => s.trim()));
-    const get = k => (m.find(x => x[0].toUpperCase() === k) || [])[1];
-    return { entry: get("ENTRY"), stop: get("STOP") };
-  });
-  const sliderE = await p.locator("#slE").inputValue();
-  const entryNum = Number(String(published.entry).replace(/[^\d.]/g, ""));
-  ok("entry slider holds the published entry exactly",
-     Math.abs(Number(sliderE) - entryNum) < 0.005, { sliderE, published: published.entry });
-
-  const rk0 = await p.locator("#rkOut").innerText();
-  await p.locator("#slS").evaluate(e => {
-    e.value = String(Number(e.value) * 0.95);
-    e.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  await p.waitForTimeout(1200);
-  ok("moving the stop changes position size", rk0 !== await p.locator("#rkOut").innerText());
-  ok("simulation banner appears once a level moves", await p.locator("#rkSim").isVisible());
-  await p.locator("#rkReset").click();
-  await p.waitForTimeout(1200);
-  ok("reset restores the published levels", await p.locator("#rkSim").isHidden());
-
-  // Crosshair
-  await p.locator("#b-chart").scrollIntoViewIfNeeded();
-  await p.waitForTimeout(700);
-  const box = await p.locator("#pxhit").boundingBox();
-  await p.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2);
-  await p.waitForTimeout(300);
-  ok("crosshair read-out appears", await p.locator("#pxt.on").count() === 1);
-  const tipTxt = await p.locator("#pxt").innerText();
-  ok("read-out carries a date and a price", /\d{4}-\d{2}-\d{2}/.test(tipTxt), tipTxt.slice(0, 50));
-
-  /* THE TOOLTIP DEFECT. Hover opened the card and the click that followed
-   * closed it, so it could not be clicked open on a desktop at all. */
-  await openWorkup(p);
-  const tb = p.locator(".b-fold .tipb").first();
-  await tb.scrollIntoViewIfNeeded();
-  await p.waitForTimeout(600);
-  await tb.click();
-  await p.waitForTimeout(300);
-  ok("a help mark opens on click", await p.locator("#tipcard.on").count() === 1);
-  const cb = await p.locator("#tipcard").boundingBox();
-  ok("the card stays inside the viewport",
-     cb.x >= 0 && cb.x + cb.width <= 1440 && cb.y >= 0, cb);
-  await p.keyboard.press("Escape");
-  await p.waitForTimeout(200);
-  ok("Escape closes it", await p.locator("#tipcard.on").count() === 0);
-
-  /* Section jump must clear all three sticky layers.
-   *
-   * THE DIGIT IS READ FROM THE PAGE, NOT WRITTEN DOWN HERE. This pressed "4",
-   * which was the trade plan's key when it was written. A Business section was
-   * later added ahead of it, every key after it shifted by one, and "4" then
-   * jumped to Business while this still measured #b-plan — reporting a scroll
-   * 3,957px out as a broken sticky stack rather than a moved section.
-   *
-   * The chip prints its own key, so the test asks the page which digit reaches
-   * the plan. Reordering the sections cannot break it again. */
-  const planKey = (await p.locator('#qnav a[data-jump="b-plan"] .kb').innerText()).trim();
-  ok("the trade plan chip advertises a key", /^\d$/.test(planKey), planKey);
-  await p.keyboard.press(planKey);
-  /* Wait for the scroll to SETTLE rather than a fixed timeout. The page grows
-   * as sections are added, so a jump that used to take 300ms started taking
-   * two seconds and the old fixed wait measured it mid-flight — a green test
-   * turning red because the page got longer, not because it broke.
-   *
-   * TWO THINGS MADE THAT SETTLE CHECK FLAKY, and both are fixed here.
-   *
-   * It polled window.scrollY and accepted any two equal consecutive samples.
-   * A smooth scroll EASES IN, so it is barely moving for the first frames —
-   * the sample at 0ms and the sample at 200ms can round to the same number
-   * while the scroll has not meaningfully started, and the check returns at
-   * once and measures the un-scrolled page. Measured live this assertion
-   * passed at 163 on one run and failed at 4000 on another, on the same
-   * unchanged site. Let the scroll begin before believing it has stopped.
-   *
-   * And __lastY was never reset, so the sentinel survived from whatever set
-   * it last and the first comparison could be against a stale value. Clear it.
-   *
-   * Poll the SECTION's own top rather than scrollY: it is the quantity the
-   * assertion below reads, so the thing waited on and the thing measured
-   * cannot disagree. */
-  /* ── DON'T WAIT OUT THE ANIMATION, REMOVE IT ─────────────────────────────
-   *
-   * The previous two attempts both tuned the WAIT — a 300ms lead-in, then a
-   * poll for two identical readings. Both are races. Math.round() of a value
-   * easing slowly can repeat across two 200ms polls, so "settled" fires
-   * mid-flight: measured 163 (pass), 457 and 4000 (fail) on the same
-   * unchanged site.
-   *
-   * AND THIS ONE ASSERTION TOOK THE PIPELINE DOWN. newspaper.yml runs this
-   * suite, so it went red every 20 minutes; the watchdog reads a failed run as
-   * "slot not covered" and re-dispatched — 90 runs in 30 hours — until the
-   * workflow was disabled to stop it. With the newspaper disabled nothing
-   * writes docs/screen.json, so the site froze. One flaky check, a stale feed,
-   * and 90 wasted builds.
-   *
-   * Smooth scrolling is a presentation choice; the assertion is about final
-   * geometry. Turning it off makes the jump instantaneous and the measurement
-   * deterministic, which is a stronger test than any timeout — it can no
-   * longer pass or fail on how loaded the runner is. */
-  await p.addStyleTag({ content: "*{scroll-behavior:auto !important}" });
-  await p.evaluate(() => {
-    const e = document.getElementById("b-plan");
-    if (e) e.scrollIntoView({ behavior: "auto", block: "start" });
-  });
-  await p.waitForTimeout(400);
-  const planTop = await p.locator("#b-plan").evaluate(e => Math.round(e.getBoundingClientRect().top));
-  ok("a section jump clears the sticky stack", planTop > 90 && planTop < 240, planTop);
-
-
-  /* THE BRIEF MUST NOT SWAP THE INSTRUMENT UNDER THE READER.
-   * briefSym was consumed on first use, so the 60-second repaint fell back to
-   * "highest reward-to-risk" and quietly changed which company was on screen
-   * while someone was reading it. */
-  await p.goto(SITE + "/signals", { waitUntil: "domcontentloaded" });
-  await settled(p, SETTLE);
-  /* THERE MAY BE NO CARDS, AND THAT IS A REAL STATE.
-   *
-   * This asserted `nLinks > 0` unconditionally, so it failed the moment the
-   * launch cutoff moved and the page correctly had nothing to list. The thing
-   * it protects is that a card, WHERE ONE EXISTS, offers the brief link — not
-   * that the ledger is non-empty, which is not this check's business and is
-   * covered by the empty-state assertion further down. */
-  /* THE DETAIL IS LAZY NOW, so counting cards or brief links before anything
-   * is open counts zero — the markup sits in a <template> until a row is
-   * first expanded. Opening one row is what a reader does and is what the
-   * assertions below are actually about. */
-  /* AND IT HAS TO OPEN AN *OPEN* SIGNAL.
-   * This expanded whichever row happened to be first. The brief link is only
-   * rendered for open signals — a closed one has no brief to link to — so the
-   * assertion below was passing because production's newest row happened to
-   * be open, and failed the moment a run had a closed signal at the top. A
-   * check that depends on the order of the data is a check that will go red
-   * on a normal Tuesday. Filter to Open first, then expand. */
-  await p.evaluate(() => {
-    const chip = [...document.querySelectorAll('.chip[data-s]')]
-      .find(b => b.dataset.s === 'open');
-    if (chip) chip.click();
-  });
-  await p.waitForTimeout(700);
-  await p.evaluate(() => {
-    const r = document.querySelector('.xr[data-xr]');
-    if (r) r.click();
-  });
-  await settled(p, SETTLE);
-  const nCards = await p.locator("main article.card").count();
-  const nLinks = await p.locator("a.brief-link").count();
-  if (nCards === 0) {
-    console.log("  NOTE  no signals since launch — nothing to carry a brief link");
-    ok("the empty ledger explains itself rather than showing nothing",
-       /record starts today|No signals yet/i.test(await p.locator("main").innerText()));
-  } else {
-    ok("signal cards offer a Full brief link", nLinks > 0, nLinks);
+  await p.goto(SITE + "/opportunities", { waitUntil: "domcontentloaded" });
+  await until(p, () => /Eligible next session/.test(document.querySelector("main")?.innerText || ""));
+  const oppT = await p.locator("main").innerText().catch(() => "");
+  ok("Opportunities groups plans by state, eligible first",
+     oppT.indexOf("Eligible next session") > -1 && oppT.indexOf("Eligible next session") < oppT.indexOf("Active")
+     && /Expired or cancelled before entry/.test(oppT));
+  ok("Opportunities never fills an empty day with a pick", !/best stock|top pick/i.test(oppT));
+  await p.goto(SITE + "/performance", { waitUntil: "domcontentloaded" });
+  await until(p, () => /The record/.test(document.querySelector("main")?.innerText || ""));
+  const perfT = await p.locator("main").innerText().catch(() => "");
+  ok("Performance states the forward start and the exclusion",
+     /V2 forward record begins/.test(perfT) && /Previous model results are excluded/.test(perfT));
+  ok("Performance prints no 0% win rate on an empty record", !/\b0(\.0)?%\s*Win rate/i.test(perfT) && !/Win rate\s*0(\.0)?%/i.test(perfT));
+  ok("Performance reconciles its counts in words", /published = .* awaiting entry \+ .* active \+ .* closed/.test(perfT.replace(/\s+/g, " ")));
+  for (const r of ["/signals", "/engines", "/ideas", "/research"]) {
+    await p.goto(SITE + r, { waitUntil: "domcontentloaded" });
+    await until(p, () => /retired/i.test(document.querySelector("main h1")?.innerText || ""));
+    const t = await p.locator("main").innerText().catch(() => "");
+    ok(`${r} shows the retired-version notice, not V1 calls`, /has been retired/.test(t) && /No V1 call was turned into a V2 plan/.test(t));
   }
-  if (nLinks > 1) {
-    const link = p.locator("a.brief-link").nth(1);   // deliberately not the default pick
-    const wanted = await link.evaluate(a => a.dataset.brief);
-    /* The signals ledger is a table now: every card sits inside a collapsed
-     * xrow panel, so its brief link is present in the DOM and not visible
-     * until the row is opened. Expanding the row that OWNS this link is the
-     * new interaction — clicking a hidden link is not a thing a reader can
-     * do, so the test does what a reader does. */
-    await p.evaluate(() => {
-      const a = document.querySelectorAll("a.brief-link")[1];
-      const panel = a && a.closest(".xd");
-      if (!panel) return;
-      const row = document.querySelector(`.xr[aria-controls="${panel.id}"]`);
-      if (row) row.click();
-    });
-    await settled(p, SETTLE);
-    ok("a collapsed row reveals its brief link when opened", await link.isVisible());
-    await link.click();
-    await settled(p, SETTLE + 1500);
-    const opened = (await p.locator(".b-hero h1").innerText()).split(" ")[0];
-    ok("the brief opens the symbol that was clicked", opened === wanted, { opened, wanted });
-    await p.evaluate(() => window.dispatchEvent(new HashChangeEvent("hashchange")));
-    await settled(p, SETTLE + 1500);
-    const after = (await p.locator(".b-hero h1").innerText()).split(" ")[0];
-    ok("a repaint does not swap the instrument", after === wanted, { after, wanted });
-  }
-
-  /* LADDER LABELS MUST NOT OVERLAP — AND THE RULES MUST NOT MOVE.
-   * Two levels a rupee apart land two pixels apart on a linear scale, so their
-   * labels printed on top of each other. Only the text may be nudged: the rule
-   * stays on its true price, which is the whole claim the chart makes. */
-  const lvls = await p.locator(".b-lvl").evaluateAll(els => els.map(e => {
-    const tag = e.querySelector(".b-lvl-tag").getBoundingClientRect();
-    const line = e.querySelector(".b-lvl-line").getBoundingClientRect();
-    return { name: e.dataset.lvl, top: tag.top, bottom: tag.bottom, rule: line.top,
-             trueTop: parseFloat(e.style.top) };
-  }));
-  lvls.sort((a, b) => a.top - b.top);
-  let clash = null;
-  for (let i = 1; i < lvls.length; i++)
-    if (lvls[i].top < lvls[i - 1].bottom - 0.5) clash = [lvls[i - 1].name, lvls[i].name];
-  ok("no two ladder labels overlap", clash === null, clash);
-  // Ordering by rule position must still match ordering by price.
-  const byRule = lvls.slice().sort((a, b) => a.rule - b.rule).map(x => x.name);
-  const byPrice = lvls.slice().sort((a, b) => a.trueTop - b.trueTop).map(x => x.name);
-  ok("the rules still sit in true price order",
-     JSON.stringify(byRule) === JSON.stringify(byPrice), { byRule, byPrice });
-  // A nudged label must not be pushed onto the caption underneath it.
-  const capGap = await p.evaluate(() => {
-    const rows = [...document.querySelectorAll(".b-lvl .b-lvl-tag")]
-      .map(e => e.getBoundingClientRect().bottom);
-    const cap = document.querySelector(".b-chart .b-cap");
-    return cap ? Math.round(cap.getBoundingClientRect().top - Math.max(...rows)) : 99;
-  });
-  ok("the lowest label clears the caption", capGap >= 8, capGap + "px");
+  await p.goto(SITE + "/plan/not-a-plan", { waitUntil: "domcontentloaded" });
+  await until(p, () => /Plan not found/.test(document.querySelector("main h1")?.innerText || ""));
+  ok("an unknown plan id says so, and does not borrow another plan",
+     /There is no V2 plan with the id/.test(await p.locator("main").innerText().catch(() => "")));
+  const apiOld = await p.evaluate(async () => { const r = await fetch("/api/signals?limit=5"); return r.status; }).catch(() => 0);
+  ok("the V1 ledger API answers 410 Gone", apiOld === 410, apiOld);
 
   ok("no JS errors on either route", errs.length === 0, errs.slice(0, 3));
   /* ══ THE PREMIUM BUILD ═══════════════════════════════════════════════════
@@ -574,8 +343,8 @@ try {
      `h1.pre-h`, which the client render replaces. Waiting on the real one is
      the difference between "the page has rendered" and "the page arrived as
      HTML". */
-  await until(p, () => document.querySelectorAll(".hero h1").length === 1);
-  ok("the hero renders", await p.locator(".hero h1").count() === 1);
+  await until(p, () => !!document.querySelector(".v2-strip"));
+  ok("the front page renders its V2 heading", /Indian equities/.test(await p.locator("main .route-h h1").innerText().catch(() => "")));
   /* BOUND TO THE BRIEF LINK, NOT TO WHICHEVER BUTTON IS PRIMARY.
    *
    * This read `.btn-hero`, which encoded an assumption the check never meant
@@ -593,10 +362,6 @@ try {
    * broke: this line crashed the run, and every assertion after it, including
    * the route sweep that exists to catch exactly that, never executed. A
    * missing element is a FAILED CHECK, not a dead suite. */
-  const ctaText = await p.locator('.hero-cta a[href="/brief"]')
-    .innerText({ timeout: 8000 }).catch(() => null);
-  ok("the CTA states how long the brief takes",
-     !!ctaText && ctaText.includes("60 seconds"), ctaText);
   /* The ticker is painted from the same quote feed as the board, so it fails
    * the same way on a cold Worker cache seconds after a deploy: fewer
    * instruments, fewer items. Same remedy, same reasoning — read it once, and
@@ -653,10 +418,7 @@ try {
   ok("the ticker is populated on arrival", !!tkr && !tkr.hidden && tkr.items > 20,
      tkr && `${tkr.items} items / ${tkr.segs} segments`);
 
-  ok("the hero leads with the measured record",
-     (await p.locator(".hero-cta a").first().getAttribute("href")) === "/signals");
-  ok("the header CTA names the product action",
-     (await p.locator(".btn-cta").innerText()).toLowerCase().includes("brief"));
+  ok("the header carries no call-to-action promising a pick", await p.locator(".btn-cta").count() === 0);
   /* THE CHIP REPORTS A MEASUREMENT, NOT A LABEL.
    *
    * This asserted /n\/n current/, which was the old contract: the chip echoed
@@ -681,7 +443,7 @@ try {
   await p.goto(SITE + "/markets", { waitUntil: "domcontentloaded" });
   await settled(p, SETTLE);
   ok("the contextual label follows the route",
-     (await p.locator("#barWhere").innerText()).trim() === "Markets");
+     (await p.locator("#barWhere").innerText()).trim() === "Market");
 
   await p.keyboard.press("Meta+k");
   await p.waitForTimeout(400);
@@ -697,45 +459,15 @@ try {
 
   // Four pages that publish what the product can and cannot do. A disclosure
   // page that renders empty is worse than no page.
-  for (const [route, must] of [["/methodology", "multiples of the risk"],
+  for (const [route, must] of [["/methodology", "next session"],
                                ["/sources", "Yahoo"],
                                ["/terms", "not investment advice"],
-                               ["/privacy", "No accounts"]]) {
+                               ["/privacy", "sig:watch"]]) {
     await p.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(3500);
     const t = await p.locator("main").innerText();
     ok(`${route} renders its disclosure`,
        t.length > 600 && t.toLowerCase().includes(must.toLowerCase()), t.length);
-  }
-
-  await p.goto(SITE + "/signals", { waitUntil: "domcontentloaded" });
-  await settled(p, SETTLE);
-  /* THE CURVE IS SCOPED TO LAUNCH, so it is legitimately empty until a signal
-   * published on or after that date closes. The assertion is therefore not
-   * "a chart exists" but "the section is honest": either it draws the curve
-   * with a working crosshair, or it explains why there is none AND discloses
-   * the pre-launch history rather than quietly dropping it. Gating on Turso
-   * alone was wrong — a configured ledger with nothing closed yet is the
-   * normal state of a record that has just started. */
-  const drewCurve = await p.locator(".rc-line").count() === 1;
-  if (drewCurve) {
-    ok("the curve prints its end value",
-       /[+-]?\d+\.\d+R/.test(await p.locator(".rc-end").innerText()));
-    const rcBox = await p.locator("#rcHit").boundingBox();
-    await p.mouse.move(rcBox.x + rcBox.width * 0.55, rcBox.y + rcBox.height / 2);
-    await p.waitForTimeout(300);
-    ok("the curve has a working crosshair", await p.locator("#rcT.on").count() === 1);
-  } else {
-    const t = await p.locator("main").innerText();
-    console.log("  NOTE  no closed trades since launch — checking the explanation instead");
-    ok("the empty curve says the record starts here",
-       /The record starts here|record starts today|No signals yet/i.test(t));
-    /* The pre-launch summary was REMOVED on request. It was extra context, not
-     * a disclosure the site depended on: this site never counted those trades
-     * as its own, the launch record is empty and says so, and Methodology
-     * still explains that the ledger has been re-graded twice. Asserting its
-     * absence so it does not creep back in unnoticed. */
-    ok("the pre-launch record is not shown", !/Before this site existed/.test(t));
   }
 
   ok("the manifest is linked", await p.locator('link[rel="manifest"]').count() === 1);
@@ -903,44 +635,6 @@ try {
        await p.locator(".insti-none").count() === 1);
   }
 
-  /* ── ONE POPULATION, EVERY SURFACE ──────────────────────────────────────
-   * The brief announced "the highest-scoring of the 148 signals open right
-   * now" while the front page, the ledger and the floor all said 35: it
-   * filtered ledger()'s rows by status and never by the launch date. That is
-   * the SECOND time this exact fault has shipped here — the note on the front
-   * page's own record block was written after the first. A number a reader can
-   * compare between two pages is worth a test. */
-  console.log("\n  one population across surfaces");
-  await p.goto(SITE + "/brief", { waitUntil: "domcontentloaded" });
-  await settled(p, SETTLE + 5000);
-  const briefTxt = await p.locator("main").innerText();
-  const briefN = Number((briefTxt.match(/highest-scoring of the\s+([\d,]+)\s+signals/) || [])[1]?.replace(/,/g, ""));
-  ok("the brief names the population it ranked within", /signals open since \d{4}-\d{2}-\d{2}/.test(briefTxt.replace(/\s+/g, " ")));
-  if (Number.isFinite(briefN)) {
-    // Whatever it is, it cannot be the all-time open count — that population
-    // reaches back before launch and is several times larger.
-    ok("the brief counts since launch, not all time", briefN < 120, briefN);
-    await p.goto(SITE + "/", { waitUntil: "domcontentloaded" });
-    await settled(p, SETTLE + 4000);
-    const homeTxt = await p.locator("main").innerText();
-    const homeN = Number((homeTxt.match(/([\d,]+)\s+published since/) || [])[1]?.replace(/,/g, ""));
-    if (Number.isFinite(homeN)) {
-      ok("the brief's open set is a subset of what the front page published",
-         briefN <= homeN, { briefN, homeN });
-    }
-  }
-
-  /* THE FLOOR IS THE THIRD SURFACE TO GET THIS WRONG. It counted every OPEN
-   * row ever and reported 182 open positions while the brief said 33. Any
-   * surface that shows an open count must draw from the same population. */
-  await p.goto(SITE + "/engines", { waitUntil: "domcontentloaded" });
-  await settled(p, SETTLE + 5000);
-  const floorTxt = await p.locator("main").innerText();
-  const floorOpen = Number((floorTxt.match(/Open positions\s+([\d,]+)/i) || [])[1]?.replace(/,/g, ""));
-  if (Number.isFinite(floorOpen)) {
-    ok("the floor's open count is a since-launch population", floorOpen < 120, floorOpen);
-  }
-
   /* ── THE EXPANDING ROW ──────────────────────────────────────────────────
    * 61 IPO rows of eight columns each and no way to open one. */
   console.log("\n  expanding rows");
@@ -988,7 +682,7 @@ try {
    * looks like a slow load. */
   console.log("\n  routing");
   for (const [route, wantIn] of [["/markets", "Markets"], ["/screen", "Screen"],
-                                 ["/signals", "ledger"], ["/engines", "floor"]]) {
+                                 ["/opportunities", "Opportunities"], ["/performance", "Performance"]]) {
     await p.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await settled(p, SETTLE + 2500);
     const title = await p.title();
@@ -999,13 +693,13 @@ try {
     ok(`${route} has its own og:title`, String(og).toLowerCase().includes(wantIn.toLowerCase()), og);
   }
   // The shim: an old shared link must land on the page it named.
-  await p.goto(SITE + "/#/engines", { waitUntil: "domcontentloaded" });
+  await p.goto(SITE + "/#/markets", { waitUntil: "domcontentloaded" });
   await settled(p, SETTLE + 2500);
   ok("an old #/ link is rewritten to the real path",
-     (await p.evaluate(() => location.pathname)) === "/engines",
+     (await p.evaluate(() => location.pathname)) === "/markets",
      await p.evaluate(() => location.pathname));
   ok("...and renders that route, not the front page",
-     (await p.title()).toLowerCase().includes("floor"), await p.title());
+     (await p.title()).toLowerCase().includes("markets"), await p.title());
 
   // The company page: a card with a URL.
   await p.goto(SITE + "/stock/RELIANCE", { waitUntil: "domcontentloaded" });
@@ -1204,25 +898,6 @@ try {
   await p.waitForTimeout(300);
 
 
-  /* ── ONE IDEA PER NAME ──────────────────────────────────────────────────
-   * ai_longterm re-files weekly and nothing supersedes the old row, so every
-   * filing stayed OPEN and Ideas rendered all of them: SHRIRAMFIN appeared
-   * four times at four entries, which reads as four ideas about one company. */
-  console.log("\n  ideas");
-  await p.goto(SITE + "/ideas", { waitUntil: "domcontentloaded" });
-  await settled(p, SETTLE + 6000);
-  const ideaSyms = await p.evaluate(() =>
-    [...document.querySelectorAll(".aic .aic-s")].map(x => x.textContent.trim()));
-  if (ideaSyms.length) {
-    ok("no company appears twice in the ideas list",
-       new Set(ideaSyms).size === ideaSyms.length,
-       ideaSyms.filter((s, i) => ideaSyms.indexOf(s) !== i));
-    const txt = await p.locator("main").innerText();
-    ok("if rows were folded away, the page says how many",
-       !/folded away/.test(txt) || /\d+ earlier open row/.test(txt));
-  }
-
-
   /* ── THE APP SHELL ──────────────────────────────────────────────────────
    * The bar was four items, two of which opened <details> menus, so the ledger
    * cost two taps and a guess. Flat destinations, and nothing that lived in
@@ -1242,7 +917,7 @@ try {
   await p.goto(SITE + "/", { waitUntil: "domcontentloaded" });
   await settled(p, SETTLE + 3000);
   const shell = await p.evaluate(() => {
-    const tabs = [...document.querySelectorAll(".tabs a, .tabs button")];
+    const tabs = [...document.querySelectorAll(".tabs a, .tabs button")].filter((t) => t.offsetParent !== null);
     return { count: tabs.length,
              labels: tabs.map(t => t.querySelector("span")?.textContent),
              icons: tabs.filter(t => t.querySelector("svg")).length,
@@ -1256,7 +931,8 @@ try {
   ok("the bar has five destinations", shell.count === 5, shell);
   ok("none of them is a dropdown", shell.dropdowns === 0, shell);
   ok("every destination has an icon", shell.icons === shell.count, shell);
-  ok("the brief has an entry of its own", shell.labels.includes("Brief"), shell.labels);
+  ok("the five are Today, Opportunities, Watchlist, Performance and Market",
+     JSON.stringify(shell.labels) === JSON.stringify(["Today", "Opportunities", "Watchlist", "Performance", "Market"]), shell.labels);
   ok("tap targets clear 44px", shell.minTap >= 44, shell.minTap);
 
   /* Every route must still be reachable from the bar, Discover or the Ledger.
@@ -1278,7 +954,7 @@ try {
     }, href);
     await p.waitForTimeout(waitMs);
   };
-  const seen = new Set(["/", "/markets", "/discover", "/watch", "/signals"]);
+  const seen = new Set(["/", "/markets", "/discover", "/watch", "/opportunities", "/performance"]);
   await hop("/discover", 2500);
   for (const h of await p.$$eval(".disc-c", (n) => n.map((x) => x.getAttribute("href"))))
     seen.add(h);
@@ -1287,14 +963,12 @@ try {
    * and failed every deploy on a page that was never broken. Measured live:
    * /discover carries 8 cards, /signals carries none. */
   const discCards = await p.locator(".disc-c").count();
-  await hop("/signals", 4000);
-  for (const h of await p.$$eval(".more-i[href]", (n) => n.map((x) => x.getAttribute("href"))))
+  // The footer is on every page and carries the provenance links.
+  for (const h of await p.$$eval("footer a[href^='/']", (n) => n.map((x) => x.getAttribute("href"))))
     seen.add(h);
   const reachable = [...seen];
-  ok("the Ledger carries the provenance links",
-     (await p.locator(".more-i[href]").count()) >= 4);
-  const mustReach = ["/markets", "/screen", "/ideas", "/ipo", "/news", "/funds",
-                     "/radar", "/engines", "/brief", "/methodology", "/sources"];
+  const mustReach = ["/markets", "/screen", "/ipo", "/news", "/funds",
+                     "/opportunities", "/performance", "/methodology", "/sources"];
   const stranded = mustReach.filter(r => !reachable.includes(r));
   ok("no page is stranded by the flattened nav", stranded.length === 0, stranded);
   ok("Discover lists the discovery pages", discCards >= 6, discCards);
@@ -1328,19 +1002,13 @@ try {
   console.log("\n  prefers-reduced-motion: reduce");
   const rmCtx = await newCtx({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
   const rp = await rmCtx.newPage();
-  await rp.goto(SITE + "/brief", { waitUntil: "domcontentloaded" });
-  await settled(rp, SETTLE);
-  ok("every section is visible", await rp.locator(".b-reveal:not(.in)").count() === 0);
-  ok("every chart overlay is visible", await rp.locator(".b-ov:not(.on)").count() === 0);
-  await openWorkup(rp);
-  ok("the confidence figure is written", /^\d+$/.test((await rp.locator("#dialN").innerText()).trim()));
-  // The assertion is that the FILL STEP RAN, not that every score is positive:
-  // a component genuinely scoring 0 renders a 0% bar, and treating that as
-  // "never filled" is the test inventing a defect. Every bar must carry a
-  // width, and at least one must be non-zero.
-  const widths = await rp.locator(".b-crow .tr i").evaluateAll(es => es.map(e => e.style.width));
-  ok("every score bar was given a width", widths.length > 0 && widths.every(w => !!w), widths);
-  ok("at least one score bar is non-zero", widths.some(w => w && w !== "0%"), widths);
+  await rp.goto(SITE + "/", { waitUntil: "domcontentloaded" });
+  await until(rp, () => !!document.querySelector(".v2-strip"));
+  /* Under reduced motion every figure is written in its final state: nothing
+     waits on an animation that will not run. */
+  ok("the V2 record is written, not animated in", /Plans published/.test(await rp.locator("main").innerText().catch(() => "")));
+  ok("no element is left mid-transition", await rp.evaluate(() =>
+     [...document.querySelectorAll("main *")].filter((e) => parseFloat(getComputedStyle(e).opacity) === 0 && e.offsetHeight > 20).length) === 0);
   await rmCtx.close();
 
   /* ── FUNDS ───────────────────────────────────────────────────────────
@@ -1465,8 +1133,8 @@ try {
    * So this sweeps every route and asserts both: no thrown error, and no
    * rendered failure panel. The second is the one that would have caught it. */
   console.log("\n  every route — thrown errors and rendered failures");
-  const ROUTES = ["/", "/markets", "/signals", "/brief", "/screen", "/ideas",
-                  "/news", "/ipo", "/funds", "/watch", "/engines", "/radar", "/reads", "/join",
+  const ROUTES = ["/", "/markets", "/opportunities", "/performance", "/screen",
+                  "/news", "/ipo", "/funds", "/watch", "/radar", "/reads", "/join",
                   "/methodology", "/sources", "/terms", "/privacy"];
   const swCtx = await newCtx({ viewport: { width: 1440, height: 900 } });
   const sw = await swCtx.newPage();
@@ -1503,30 +1171,6 @@ try {
        panels.map(t => t.replace(/\s+/g, " ").slice(0, 150)));
   }
   ok("no route threw", thrown.length === 0, thrown.slice(0, 3));
-
-  /* A WITHDRAWN SIGNAL MUST NOT READ "OPEN". The ledger row's outcome pill
-   * chose its label from the wrong branch of a ternary, so any row that was
-   * not open and had no price mark printed the literal word "open" —
-   * TATAINVEST was cancelled in the database, reported cancelled by the API,
-   * and still read open on the page. Cross-checks the rendered label against
-   * what the API says, so the two cannot drift again. */
-  await sw.goto(SITE + "#/signals", { waitUntil: "domcontentloaded" });
-  await settled(sw, SETTLE + 4000);
-  const mislabelled = await sw.evaluate(async () => {
-    const res = await fetch("/api/signals?limit=400");
-    const rows = (await res.json()).signals || [];
-    const notOpen = new Set(rows.filter(r => (r.badge || "") !== "open")
-                                .map(r => String(r.symbol || "").replace(".NS", "")));
-    const bad = [];
-    document.querySelectorAll(".sg-r").forEach(el => {
-      const sym = (el.getAttribute("data-sgsym") || "").replace(".NS", "");
-      const pill = el.querySelector(".sg-r-out .pill");
-      if (sym && pill && notOpen.has(sym) && /^open$/i.test(pill.textContent.trim())) bad.push(sym);
-    });
-    return bad;
-  });
-  ok("a withdrawn signal is not labelled open", mislabelled.length === 0,
-     mislabelled.slice(0, 4));
 
   /* THE REPORTER ITSELF HAS TO WORK, and it is the one piece of code that
    * cannot announce its own failure. A deliberate throw is injected and the
@@ -1579,8 +1223,8 @@ try {
   const colMobCtx = await newCtx({ viewport: { width: 390, height: 844 } });
   const colMobP = await colMobCtx.newPage();
   for (const [label, pg] of [["desktop", colP], ["phone", colMobP]])
-  for (const route of ["/", "/signals", "/screen", "/ideas", "/markets", "/ipo",
-                       "/brief", "/watch", "/engines", "/radar", "/news", "/funds", "/reads",
+  for (const route of ["/", "/opportunities", "/screen", "/markets", "/ipo",
+                       "/performance", "/watch", "/radar", "/news", "/funds", "/reads",
                        "/research"]) {
     await pg.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await settled(pg, SETTLE + 3000);
@@ -1673,8 +1317,8 @@ try {
   console.log("\n  the same fact is not printed twice");
   const dupCtx = await newCtx({ viewport: { width: 1440, height: 900 } });
   const dupP = await dupCtx.newPage();
-  for (const route of ["/", "/signals", "/screen", "/ideas", "/markets", "/ipo",
-                       "/brief", "/engines", "/radar", "/news", "/funds", "/reads", "/watch",
+  for (const route of ["/", "/opportunities", "/screen", "/markets", "/ipo",
+                       "/performance", "/radar", "/news", "/funds", "/reads", "/watch",
                        "/research"]) {
     await dupP.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await settled(dupP, SETTLE + 3000);
@@ -1798,8 +1442,8 @@ try {
   // three others), were the six that were never measured. A sideways scroll is
   // the defect this whole block exists to catch, and it was unmeasured exactly
   // where it was most likely.
-  for (const route of ["/", "/markets", "/screen", "/ideas", "/news", "/ipo",
-                       "/funds", "/watch", "/engines", "/radar", "/reads", "/signals", "/brief", "/methodology"]) {
+  for (const route of ["/", "/markets", "/screen", "/news", "/ipo",
+                       "/funds", "/watch", "/radar", "/reads", "/opportunities", "/performance", "/methodology"]) {
     await mp.goto(SITE + route, { waitUntil: "domcontentloaded" });
     // The screen fetches 1.4 MB before it lays out; the shorter settle used by
     // the other routes measured it mid-skeleton and would have passed anything.
@@ -2058,7 +1702,7 @@ try {
    * refreshed, bookmarked or shared them — they were missing from the Worker's
    * page allow-list, and in-app navigation never asks it. Only a direct fetch
    * catches this, which is why it is asserted here rather than by clicking. */
-  for (const route of ["/heat", "/map", "/reads", "/screen", "/signals", "/discover"]) {
+  for (const route of ["/heat", "/map", "/reads", "/screen", "/opportunities", "/discover"]) {
     const res = await fetch(SITE + route, { redirect: "follow" });
     ok(`${route} answers a cold request`, res.status === 200, res.status);
   }
@@ -2110,7 +1754,7 @@ try {
     ok("it is outside <main>", !!before && before.inMain === false, before);
     ok("it takes no space on the page", !!before && before.box <= 1, before);
 
-    await lp.click('a[data-route="/signals"]').catch(() => {});
+    await lp.click('a[data-route="/performance"]').catch(() => {});
     await settled(lp, SETTLE);
     const after = await lp.evaluate(() => {
       const el = document.getElementById("liveNews");
