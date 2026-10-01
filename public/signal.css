@@ -6685,3 +6685,51 @@ main{min-height:calc(100vh - var(--barh))}
    a down day while Sensex's did not — two answers to one question in one
    table. Only the FII/DII net figures, which ARE signed amounts, are tinted. */
 .hero-t .hero-reg .v:not(.up):not(.dn),.hero-t .hero-q .v:not(.up):not(.dn){color:var(--text)}
+
+/* ════════════════════════════════════════════════════════════════════════
+ * THE RECORD, AS TRADES AND AS DISTANCE — 2026-10-01
+ * The masthead chip (last 30 days), "Toward a verdict" (each engine's
+ * distance to the 30-trade rule) and "Recent closes" (the newest five).
+ * Layout chosen from three side-by-side options: bars and a ruled list, the
+ * site's existing vocabulary, over a ring or a dot plot.
+ * ════════════════════════════════════════════════════════════════════════ */
+.hero-chip{display:inline-flex;flex-wrap:wrap;align-items:baseline;gap:var(--s-1) var(--s-2);margin:var(--s-3) 0 0;
+  padding:var(--s-1) var(--s-3);border:1px solid var(--line);border-radius:var(--r-3);background:var(--surface);
+  font:500 var(--t-4)/1.5 var(--ui);color:var(--muted)}
+.hero-chip b{font:500 var(--t-5)/1.3 var(--mono)}
+.hero-chip b.up{color:var(--up)} .hero-chip b.dn{color:var(--down)}
+.rp,.rc{margin-top:var(--s-5)}
+.rp-h{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-3);margin-bottom:var(--s-2)}
+.rp-h b{font:600 var(--t-5)/1.3 var(--ui);color:var(--text)}
+.rp-h span,.rp-h a{font:500 var(--t-3)/1 var(--mono);color:var(--dim)}
+.rp-h a{font-family:var(--ui);color:var(--accent)}
+.rp-bar{position:relative;display:block;height:6px;border-radius:var(--r-1);background:var(--raised);overflow:hidden}
+.rp-bar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:var(--r-1)}
+.rp > .hint{margin:var(--s-2) 0 0}
+.rp-e{display:grid;gap:var(--s-2);margin-top:var(--s-3);max-width:560px}
+.rp-r{display:grid;grid-template-columns:84px minmax(0,1fr) 108px;gap:var(--s-3);align-items:center;font:500 var(--t-4)/1.2 var(--ui)}
+.rp-r .num{font-size:var(--t-3);color:var(--dim);text-align:right}
+.rc-l{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-4)}
+.rc-l li + li{border-top:1px solid var(--line)}
+.rc-l a{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px var(--s-3);padding:var(--s-3) var(--s-4);color:var(--text)}
+.rc-l b{font:600 var(--t-5)/1.3 var(--ui)}
+.rc-l small{grid-column:1;font:400 var(--t-3)/1.4 var(--ui);color:var(--dim)}
+.rc-l .num{grid-row:1/3;grid-column:2;align-self:center;font:500 var(--t-6)/1 var(--mono)}
+.rc-l .num.up{color:var(--up)} .rc-l .num.dn{color:var(--down)}
+@media (hover:hover) and (pointer:fine){.rc-l a:hover b{color:var(--accent)}}
+/* Since your last visit — one quiet line under the 30-day chip. */
+.since{margin:var(--s-2) 0 0;font:400 var(--t-4)/1.55 var(--ui);color:var(--muted);max-width:64ch}
+.since b{color:var(--text);font-weight:600} .since b.up{color:var(--up)} .since b.dn{color:var(--down)}
+.since a{color:var(--accent)}
+/* The bell's count: a small red disc with the number, never colour alone —
+   the aria-label says how many fired. */
+.bell{position:relative}
+.bell-n{position:absolute;top:3px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:var(--r-pill);
+  background:var(--down);color:#fff;font:600 var(--t-1)/16px var(--ui);font-style:normal;text-align:center;
+  box-shadow:0 0 0 2px var(--bg)}
+/* The active tab's icon is FILLED, not only recoloured: a shape that reads at
+   a glance and without colour. Line icons get a tinted fill and a heavier
+   stroke, so the house and the page read solid and the bars read bolder. */
+@media(max-width:1023px){
+  .tabs a[aria-current="page"] svg{fill:color-mix(in srgb,currentColor 22%,transparent);stroke-width:2.1}
+}

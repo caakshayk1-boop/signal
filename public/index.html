@@ -32,6 +32,7 @@
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="/icon.svg">
 <link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Signal">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -145,8 +146,13 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
       <span class="cmdk-l">Search</span><kbd>⌘K</kbd>
     </button>
-    <a class="icon-btn" href="/watch" aria-label="Watchlist" title="Watchlist">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.8l2.5 5.1 5.6.8-4 3.9 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4-3.9 5.6-.8z"/></svg>
+    <!-- YOUR WATCHLIST AND ALERTS, ONE DOOR. The alerts live on the watchlist
+         page, so a separate star and bell would be two buttons to one place.
+         The bell carries the news: a count of alerts that fired since you last
+         opened that page. Kept in this browser only. -->
+    <a class="icon-btn bell" id="bellBtn" href="/watch" aria-label="Watchlist and price alerts" title="Watchlist and alerts">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>
+      <i class="bell-n" hidden></i>
     </a>
     <button type="button" class="icon-btn" id="moreBtn" aria-label="More: every tool and settings"
             aria-haspopup="dialog" aria-controls="moreDlg" title="More">
