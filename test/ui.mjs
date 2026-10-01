@@ -299,7 +299,14 @@ try {
     ok("the feed's metrics reconcile", m.reconciles === true, m);
     ok("an empty record carries no rate", m.closed >= (m.min_closed_for_rate || 30) || m.win_rate === null, m.win_rate);
     const nNext = (v2Feed.plans || []).filter((x) => x.state === "awaiting_entry").length;
-    ok("zero plans is said in words, not left blank",
+    const homeCards = await p.locator(".v2w h3").allInnerTexts().catch(() => []);
+  ok("the front page carries the four market cards",
+     ["How has the market done this year?", "How did each trading day go?", "Which sectors are moving this week?", "What moved most this week?"]
+       .every((q) => homeCards.includes(q)), homeCards);
+  ok("a market card either draws its chart or says what did not load",
+     (await p.locator(".v2w [data-v2w-mk], .v2w .v2w-hm-g").count()) === 2
+     || /did not load/.test((await p.locator(".v2w").allInnerTexts().catch(() => [])).join(" ")));
+  ok("zero plans is said in words, not left blank",
        nNext > 0 || /No plan qualified for the|new plans are paused\.|session was not scanned\.|The last run failed\.|No new plans for the/.test(v2Home), nNext);
   }
   await p.goto(SITE + "/opportunities", { waitUntil: "domcontentloaded" });

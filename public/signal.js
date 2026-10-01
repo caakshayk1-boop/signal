@@ -12095,6 +12095,18 @@
     return vsec('Over time', which.map((k) => W[k](d, { recordHref: '/performance' })).join(''));
   }
 
+  /* THE MARKET, AS CARDS: the index's own closes and the screen's weekly
+     pulse, drawn by the shared library. They describe the market; the plans
+     below are the product's own output and are drawn separately. */
+  function v2Market(nx, pu) {
+    const W = window.V2W && window.V2W.market;
+    if (!W) return vsec('The market', `<p class="muted">The market charts could not load. Everything else on this page is complete without them.</p>`);
+    const sr = nx && nx.ok ? nx.data : null, pd = pu && pu.ok ? pu.data : null;
+    const why = (x) => (x && (x.error || x.why)) || 'no answer';
+    return vsec('The market', `<div class="v2w-grid2">${W.nifty(sr, { more: '/markets', error: why(nx) })}${W.days(sr, { error: why(nx) })}</div>
+      <div class="v2w-grid2">${W.sectors(pd, { more: '/map', error: why(pu) })}${W.movers(pd, { error: why(pu) })}</div>`);
+  }
+
   /* Day 1 shows the absence of a sample, never a 0% that reads as measured. */
   function v2Record(d, compact) {
     const m = d.metrics || {};
@@ -12150,7 +12162,9 @@
     const H = 'Indian equities, screened after the close.';
     const S = 'Review qualified setups, plan the next session, and track every paper trade.';
     paint(head(H, S, 'Today') + skel('sk-card', 3), true);
-    const [r, rg] = await Promise.all([v2Load(), get('/regime.json').catch(() => ({ ok: false }))]);
+    const [r, rg, nx, pu] = await Promise.all([v2Load(), get('/regime.json').catch(() => ({ ok: false })),
+      get('/api/signals?series=' + encodeURIComponent('^NSEI') + '&range=1y').catch(() => ({ ok: false })),
+      get('/pulse.json').catch(() => ({ ok: false }))]);
     if (!r.ok) { paint(head(H, S, 'Today') + fail('The plan feed', r.why)); return; }
     const d = r.d;
     const plans = d.plans || [];
@@ -12173,6 +12187,7 @@
     paint(head(H, S, 'Today') +
       (r.stale ? staleNote(r.age) : '') +
       v2StatusStrip(d) +
+      v2Market(nx, pu) +
       vsec(`Plans for ${v2Date(d.next_session)}`, next.length ? `<div class="v2-cards">${next.map(p => v2Card(p, d)).join('')}</div>`
         : v2Empty(d, v2NoneWhy(d)), String(next.length), null, { lead: true }) +
       vsec('Active paper positions', active.length ? `<div class="v2-cards">${active.map(p => v2Card(p, d)).join('')}</div>`

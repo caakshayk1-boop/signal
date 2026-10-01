@@ -81,7 +81,59 @@
 .v2w .v2w-steps li.end-dn{color:var(--w-dn)}.v2w .v2w-steps li.end-up{color:var(--w-up)}
 .v2w .v2w-steps li i{font-style:normal}
 @media (max-width:599px){.v2w{padding:14px}.v2w .v2w-k b{font-size:19px}.v2w .v2w-c{min-height:48px}.v2w .v2w-c .s{font-size:9px}}
-@media (prefers-reduced-motion:no-preference){.v2w .v2w-cross,.v2w .v2w-dot,.v2w .v2w-tip{transition:left .06s linear}}`;
+@media (prefers-reduced-motion:no-preference){.v2w .v2w-cross,.v2w .v2w-dot,.v2w .v2w-tip{transition:left .06s linear}}
+/* market cards: same shell, charts from market data (not the record) */
+.v2w-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:0 0 16px}
+.v2w-grid2>.v2w{margin:0}
+@media (max-width:899px){.v2w-grid2{grid-template-columns:minmax(0,1fr)}}
+.v2w .v2w-k b.v2w-big{font-size:26px;letter-spacing:-.01em}
+.v2w-grid2 .v2w .v2w-kpis{grid-template-columns:repeat(auto-fit,minmax(112px,1fr))}
+.v2w-grid2 .v2w .v2w-k b{font-size:21px}.v2w-grid2 .v2w .v2w-k b.v2w-big{font-size:23px}
+.v2w .v2w-mv .v2w-bars{grid-template-columns:minmax(0,1.5fr) minmax(36px,1fr) 52px}
+.v2w .v2w-bars .nm small{white-space:normal}
+.v2w .v2w-mk{position:relative}
+.v2w .v2w-mk .v2w-chart{height:150px}
+.v2w .v2w-mk .v2w-chart.dd{height:64px;margin-top:6px}
+.v2w .v2w-sub{font:600 10px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.08em;text-transform:uppercase;color:var(--w-dim);margin:10px 0 0 40px}
+.v2w .v2w-area{fill:color-mix(in srgb,var(--w-acc) 12%,transparent);stroke:none}
+.v2w .v2w-uw{fill:color-mix(in srgb,var(--w-dn) 22%,transparent);stroke:var(--w-dn);stroke-width:1.5;stroke-linejoin:round}
+.v2w .v2w-mk .v2w-cross{top:0;bottom:0}
+/* daily-move heatmap: weeks are columns, Mon-Fri rows; down days carry a hatch so the sign never rests on hue alone */
+.v2w .v2w-hm{display:grid;grid-template-columns:22px minmax(0,1fr);gap:4px 6px;align-items:start}
+.v2w .v2w-hm-dow{display:grid;grid-template-rows:repeat(5,1fr);gap:3px;font:400 10px/1 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-dim);height:100%}
+.v2w .v2w-hm-dow span{display:flex;align-items:center}
+.v2w .v2w-hm-g{display:grid;grid-auto-flow:column;grid-template-rows:repeat(5,auto);gap:3px}
+.v2w .v2w-hm-m{display:grid;grid-auto-flow:column;gap:3px;font:400 10px/1 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-dim);margin:0 0 4px 28px;min-height:12px}
+.v2w .v2w-hc{display:block;aspect-ratio:1;border-radius:3px;background:var(--w-bg);border:1px solid transparent;min-width:0}
+.v2w .v2w-hc.na{background:transparent;border:1px dashed var(--w-line)}
+.v2w .v2w-hc.u1{background:color-mix(in oklab,var(--w-up) 30%,var(--w-surf))}
+.v2w .v2w-hc.u2{background:color-mix(in oklab,var(--w-up) 60%,var(--w-surf))}
+.v2w .v2w-hc.u3{background:var(--w-up)}
+.v2w .v2w-hc.d1{background:color-mix(in oklab,var(--w-dn) 30%,var(--w-surf))}
+.v2w .v2w-hc.d2{background:color-mix(in oklab,var(--w-dn) 60%,var(--w-surf))}
+.v2w .v2w-hc.d3{background:var(--w-dn)}
+.v2w .v2w-hc.z{background:color-mix(in oklab,var(--w-dim) 22%,var(--w-surf))}
+.v2w .v2w-hc[class*=" d"]{background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.35) 0 1px,transparent 1px 4px)}
+.v2w .v2w-hc[data-i]:hover,.v2w .v2w-hc.on{border-color:var(--w-ink)}
+.v2w .v2w-leg2{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:10px 0 0;font:400 11px/1 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-dim)}
+.v2w .v2w-leg2 .v2w-hc{width:12px;height:12px;aspect-ratio:auto}
+/* diverging bars: zero in the middle, value text in ink */
+.v2w .v2w-bars{display:grid;grid-template-columns:minmax(96px,1.1fr) minmax(0,2fr) 58px;gap:6px 10px;align-items:center;font:400 13px/1.3 var(--ui,var(--f-sans,system-ui,sans-serif))}
+.v2w .v2w-bars .nm{color:var(--w-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v2w .v2w-bars .nm small{display:block;font-size:11px;color:var(--w-dim)}
+.v2w .v2w-bars .val{text-align:right;font-variant-numeric:tabular-nums;color:var(--w-ink)}
+.v2w .v2w-trk{position:relative;height:14px}
+.v2w .v2w-trk::before{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;border-left:1px dashed var(--w-dim)}
+.v2w .v2w-trk i{position:absolute;top:2px;height:10px;border-radius:2px}
+.v2w .v2w-trk i.up{left:50%;background:var(--w-up);border-radius:0 4px 4px 0}
+.v2w .v2w-trk i.dn{right:50%;background:var(--w-dn);border-radius:4px 0 0 4px}
+.v2w .v2w-trk.one::before{left:0}
+.v2w .v2w-trk.one i.up,.v2w .v2w-trk.one i.dn{left:0;right:auto;border-radius:0 4px 4px 0}
+.v2w .v2w-mv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:599px){.v2w .v2w-mv{grid-template-columns:minmax(0,1fr)}.v2w .v2w-bars{grid-template-columns:minmax(84px,1fr) minmax(0,1.4fr) 54px}}
+.v2w .v2w-mv h4{font:600 12px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim);margin:0 0 8px}
+.v2w a.sym{color:var(--w-ink);font-weight:600;text-decoration:none}
+.v2w a.sym:hover{color:var(--w-acc);text-decoration:underline}`;
 
   function injectCss() {
     if (document.getElementById('v2w-css')) return;
@@ -317,17 +369,234 @@
       <p class="v2w-note">Steps come from the plan's own fills and exits. Nothing here estimates what happens next.</p></section>`;
   }
 
+
+  /* ══ MARKET CARDS ═════════════════════════════════════════════════════════
+   * The same card shell, fed by MARKET data rather than the record: the index's
+   * own daily closes (/api/signals?series=^NSEI, prices that happened) and the
+   * screen's weekly pulse. They describe what the market did. None of them is
+   * a call, a score of a stock, or a statement about what comes next.
+   */
+  const sgn = (v, dp = 1) => v == null || !Number.isFinite(v) ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(dp)}%`;
+  const num0 = (v) => v == null ? '—' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  const num2 = (v) => v == null ? '—' : Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const failCard = (q, what, why) => `<section class="v2w" aria-label="${esc(q)}"><h3>${esc(q)}</h3>
+    <p class="v2w-empty"><b>${esc(what)} did not load.</b> ${esc(why || 'No answer from the source.')} Nothing is drawn in its place.</p></section>`;
+  const cleanPts = (series) => ((series && series.points) || []).filter((p) => p && p.t && Number.isFinite(p.c) && p.c > 0);
+
+  /* 1 ── HOW HAS THE MARKET DONE THIS YEAR? (the video's value curve + drawdown) */
+  function nifty(series, opts = {}) {
+    injectCss();
+    const Q = 'How has the market done this year?';
+    const pts = cleanPts(series);
+    if (pts.length < 20) return failCard(Q, 'The Nifty 50 history', opts.error);
+    const n = pts.length, first = pts[0], last = pts[n - 1];
+    let hi = pts[0], lo = pts[0], peak = pts[0].c, worst = 0, worstAt = pts[0].t;
+    const dd = [];
+    for (const p of pts) {
+      if (p.c > hi.c) hi = p;
+      if (p.c < lo.c) lo = p;
+      if (p.c > peak) peak = p.c;
+      const x = 100 * (p.c / peak - 1);
+      dd.push(x);
+      if (x < worst) { worst = x; worstAt = p.t; }
+    }
+    const chg = 100 * (last.c / first.c - 1), fromHi = 100 * (last.c / hi.c - 1);
+    const W = 1000, H = 1000, X = (i) => (i / (n - 1)) * W;
+    const pad = (hi.c - lo.c) * 0.08 || 1, yl = lo.c - pad, yh = hi.c + pad;
+    const Y = (c) => H - ((c - yl) / (yh - yl)) * H;
+    let line = '';
+    pts.forEach((p, i) => { line += `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(p.c).toFixed(1)}`; });
+    const area = `${line}L${W},${H}L0,${H}Z`;
+    const dmin = Math.min(-1, worst * 1.12), YD = (v) => (v / dmin) * H;
+    let uw = `M0,0`;
+    dd.forEach((v, i) => { uw += `L${X(i).toFixed(1)},${YD(v).toFixed(1)}`; });
+    uw += `L${W},0Z`;
+    const pctOf = (y) => (y / H * 100).toFixed(2) + '%';
+    const data = esc(JSON.stringify({ p: pts.map((p, i) => [p.t, p.c, Math.round(dd[i] * 100) / 100]), yl, yh, dmin }));
+    const mid = pts[Math.floor(n / 2)];
+    return `<section class="v2w" aria-label="${esc(Q)}">
+      <h3>${esc(Q)}</h3>
+      <p class="v2w-per">Nifty 50 · daily closes ${esc(day(first.t))} – ${esc(day(last.t))} · price index</p>
+      <div class="v2w-kpis">
+        <div class="v2w-k"><span>Nifty 50</span><b class="v2w-big">${num2(last.c)}</b><em>close on ${esc(dayShort(last.t))}</em></div>
+        <div class="v2w-k"><span>Over the year</span><b class="v2w-big">${sgn(chg)}</b><em>from ${num0(first.c)}</em></div>
+        <div class="v2w-k"><span>Below its high</span><b class="v2w-big">${sgn(fromHi)}</b><em>high ${num0(hi.c)} on ${esc(dayShort(hi.t))}</em></div>
+        <div class="v2w-k"><span>Worst fall in the year</span><b class="v2w-big">${sgn(worst)}</b><em>from a high, on ${esc(dayShort(worstAt))}</em></div>
+      </div>
+      <div class="v2w-mk" data-v2w-mk="${data}" role="img"
+        aria-label="Nifty 50 over the year: ${esc(sgn(chg))}, now ${esc(sgn(fromHi))} below its high of ${esc(num0(hi.c))}. Worst fall from a high ${esc(sgn(worst))}.">
+        <div class="v2w-chart">
+          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+            <line class="v2w-grid" x1="0" x2="${W}" y1="${Y(hi.c).toFixed(1)}" y2="${Y(hi.c).toFixed(1)}" vector-effect="non-scaling-stroke"/>
+            <line class="v2w-grid" x1="0" x2="${W}" y1="${Y(lo.c).toFixed(1)}" y2="${Y(lo.c).toFixed(1)}" vector-effect="non-scaling-stroke"/>
+            <path class="v2w-area" d="${area}"/>
+            <path class="v2w-l-nav" d="${line}" vector-effect="non-scaling-stroke"/>
+          </svg>
+          <span class="v2w-y" style="top:${pctOf(Y(hi.c))}">${num0(hi.c)}</span>
+          <span class="v2w-y" style="top:${pctOf(Y(lo.c))}">${num0(lo.c)}</span>
+        </div>
+        <p class="v2w-sub">Below its running high</p>
+        <div class="v2w-chart dd">
+          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+            <line class="v2w-base" x1="0" x2="${W}" y1="0" y2="0" vector-effect="non-scaling-stroke"/>
+            <path class="v2w-uw" d="${uw}" vector-effect="non-scaling-stroke"/>
+          </svg>
+          <span class="v2w-y" style="top:0%">0%</span>
+          <span class="v2w-y" style="top:${pctOf(YD(worst))}">${sgn(worst, 0)}</span>
+        </div>
+        <div class="v2w-cross" style="left:40px"></div><div class="v2w-tip" role="status"></div>
+      </div>
+      <div class="v2w-x" aria-hidden="true"><span>${esc(dayShort(first.t))}</span><span>${esc(dayShort(mid.t))}</span><span>${esc(dayShort(last.t))}</span></div>
+      <p class="v2w-note">Closing levels from the exchange's index, delayed. The lower chart is how far the index stood below its highest close so far. A price index: dividends are not included. A description of the past, not a forecast.</p>
+      ${opts.more ? `<p class="v2w-more"><a href="${esc(opts.more)}">The full market board →</a></p>` : ''}</section>`;
+  }
+
+  function onMkMove(el, ev) {
+    let D; try { D = JSON.parse(el.getAttribute('data-v2w-mk')); } catch (e) { return; }
+    const box = el.querySelector('.v2w-chart'), r = box.getBoundingClientRect(), wr = el.getBoundingClientRect(), n = D.p.length;
+    const f = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
+    const i = Math.round(f * (n - 1)), p = D.p[i], prev = i ? D.p[i - 1] : null;
+    const x = (r.left - wr.left) + (i / (n - 1)) * r.width;
+    const cross = el.querySelector('.v2w-cross'), tip = el.querySelector('.v2w-tip');
+    cross.style.display = 'block'; cross.style.left = x + 'px';
+    const dchg = prev ? 100 * (p[1] / prev[1] - 1) : null;
+    tip.innerHTML = `<b>${esc(day(p[0]))}</b>Close ${esc(num2(p[1]))}${dchg != null ? ` · ${esc(sgn(dchg, 2))} on the day` : ''}<br>${p[2] < 0 ? esc(sgn(p[2])) + ' below its high so far' : 'At a new high'}`;
+    tip.style.display = 'block';
+    tip.style.left = Math.min(Math.max(0, x + 12), wr.width - tip.offsetWidth) + 'px';
+  }
+
+  /* 2 ── HOW DID EACH TRADING DAY GO? (the video's trading-day heatmap) */
+  const BIN = (v) => v == null ? 'na' : v >= 1.5 ? 'u3' : v >= 0.75 ? 'u2' : v >= 0.25 ? 'u1' : v > -0.25 ? 'z' : v > -0.75 ? 'd1' : v > -1.5 ? 'd2' : 'd3';
+  function days(series, opts = {}) {
+    injectCss();
+    const Q = 'How did each trading day go?';
+    const all = cleanPts(series);
+    if (all.length < 30) return failCard(Q, 'The Nifty 50 daily history', opts.error);
+    const months = opts.months || 6;
+    const lastT = new Date(all[all.length - 1].t + 'T00:00:00Z');
+    const start = new Date(lastT); start.setUTCMonth(start.getUTCMonth() - months);
+    const rows = [];
+    for (let i = 1; i < all.length; i++) {
+      if (new Date(all[i].t + 'T00:00:00Z') < start) continue;
+      rows.push({ t: all[i].t, c: all[i].c, r: 100 * (all[i].c / all[i - 1].c - 1) });
+    }
+    const by = Object.fromEntries(rows.map((x) => [x.t, x]));
+    // Weeks from the Monday on or before the first row, through the last row.
+    const d0 = new Date(rows[0].t + 'T00:00:00Z'); d0.setUTCDate(d0.getUTCDate() - ((d0.getUTCDay() + 6) % 7));
+    const cells = [], mlab = [];
+    let wk = 0, up = 0, dn = 0, best = rows[0], worstD = rows[0];
+    for (const x of rows) { if (x.r > 0) up++; else if (x.r < 0) dn++; if (x.r > best.r) best = x; if (x.r < worstD.r) worstD = x; }
+    let lastMonth = '';
+    for (let t = new Date(d0); t <= lastT; t.setUTCDate(t.getUTCDate() + 7), wk++) {
+      const mk = t.toISOString().slice(0, 7);
+      for (let w = 0; w < 5; w++) {
+        const dt = new Date(t); dt.setUTCDate(dt.getUTCDate() + w);
+        const k = dt.toISOString().slice(0, 10), x = by[k];
+        if (dt > lastT || dt < start) { cells.push(`<span class="v2w-hc" style="visibility:hidden" aria-hidden="true"></span>`); continue; }
+        cells.push(x ? `<span class="v2w-hc ${BIN(x.r)}" data-i="${esc(k)}" title="${esc(day(k))}: ${esc(sgn(x.r, 2))}"></span>`
+                     : `<span class="v2w-hc na" title="${esc(day(k))}: no session"></span>`);
+      }
+      const m = (new Date(t.getTime() + 4 * 864e5)).toISOString().slice(0, 7);
+      mlab.push(m !== lastMonth ? `<span>${MON[Number(m.slice(5)) - 1]}</span>` : '<span></span>');
+      if (m !== lastMonth) lastMonth = m;
+    }
+    const info = esc(JSON.stringify(Object.fromEntries(rows.map((x) => [x.t, `${day(x.t)}: ${sgn(x.r, 2)} · Nifty closed at ${num2(x.c)}`]))));
+    const L = [['d3', '≤ −1.5%'], ['d2', ''], ['d1', ''], ['z', '±0.25%'], ['u1', ''], ['u2', ''], ['u3', '≥ +1.5%']];
+    return `<section class="v2w" aria-label="${esc(Q)}" data-v2w-hm="${info}">
+      <h3>${esc(Q)}</h3>
+      <p class="v2w-per">Nifty 50 close-to-close change · ${esc(day(rows[0].t))} – ${esc(day(rows[rows.length - 1].t))}</p>
+      <div class="v2w-kpis">
+        <div class="v2w-k"><span>Up days</span><b>${up}</b><em>of ${rows.length} sessions</em></div>
+        <div class="v2w-k"><span>Down days</span><b>${dn}</b><em>${rows.length - up - dn ? `${rows.length - up - dn} unchanged` : 'none unchanged'}</em></div>
+        <div class="v2w-k"><span>Best day</span><b>${sgn(best.r, 2)}</b><em>${esc(dayShort(best.t))}</em></div>
+        <div class="v2w-k"><span>Worst day</span><b>${sgn(worstD.r, 2)}</b><em>${esc(dayShort(worstD.t))}</em></div>
+      </div>
+      <div class="v2w-hm-m" style="grid-template-columns:repeat(${wk},minmax(0,1fr))" aria-hidden="true">${mlab.join('')}</div>
+      <div class="v2w-hm">
+        <div class="v2w-hm-dow" aria-hidden="true"><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span></div>
+        <div class="v2w-hm-g" style="grid-template-columns:repeat(${wk},minmax(0,1fr))" role="img"
+          aria-label="${rows.length} sessions: ${up} up, ${dn} down. Best ${esc(sgn(best.r, 2))} on ${esc(day(best.t))}; worst ${esc(sgn(worstD.r, 2))} on ${esc(day(worstD.t))}.">${cells.join('')}</div>
+      </div>
+      <div class="v2w-leg2" aria-hidden="true"><span>Fell</span>${L.map(([c, t]) => `<span class="v2w-hc ${c}"></span>${t ? `<span>${t}</span>` : ''}`).join('')}<span>Rose</span><span class="v2w-hc na"></span><span>no session</span></div>
+      <p class="v2w-day" aria-live="polite">${esc(`${day(rows[rows.length - 1].t)}: ${sgn(rows[rows.length - 1].r, 2)} · Nifty closed at ${num2(rows[rows.length - 1].c)}`)}</p>
+      <p class="v2w-note">Each square is one session, read down Monday to Friday and across week by week. Falls are hatched as well as red, so the sign does not rest on colour. Hover or tap a square for the day.</p></section>`;
+  }
+
+  /* 3 ── WHICH SECTORS ARE MOVING? (the video's allocation ring, as the honest form: diverging bars) */
+  function sectors(pulse, opts = {}) {
+    injectCss();
+    const Q = 'Which sectors are moving this week?';
+    const S = (pulse && pulse.sectors) || [];
+    if (!S.length) return failCard(Q, 'The sector breadth', opts.error);
+    const b = pulse.breadth || {};
+    let mx = 0, upSec = 0;
+    for (const x of S) { mx = Math.max(mx, Math.abs(x.median || 0)); if (x.median > 0) upSec++; }
+    mx = mx || 1;
+    const rows = S.map((x) => {
+      const w = Math.min(50, (Math.abs(x.median) / mx) * 50);
+      return `<span class="nm" title="${esc(x.name)}">${esc(x.name)}<small>${esc(x.up)} of ${esc(x.n)} rose</small></span>
+        <span class="v2w-trk" aria-hidden="true"><i class="${x.median >= 0 ? 'up' : 'dn'}" style="width:${w.toFixed(1)}%"></i></span>
+        <span class="val">${sgn(x.median, 2)}</span>`;
+    }).join('');
+    return `<section class="v2w" aria-label="${esc(Q)}">
+      <h3>${esc(Q)}</h3>
+      <p class="v2w-per">Median 1-week move of the screened names in each sector · built ${esc(pulse.built_on ? day(pulse.built_on) : '—')}</p>
+      <div class="v2w-kpis">
+        <div class="v2w-k"><span>Names that rose</span><b class="v2w-big">${b.up != null ? num0(b.up) : '—'}</b><em>of ${b.counted != null ? num0(b.counted) : '—'} screened, this week</em></div>
+        <div class="v2w-k"><span>Typical stock</span><b class="v2w-big">${sgn(b.median, 1)}</b><em>median 1-week move</em></div>
+        <div class="v2w-k"><span>Sectors up</span><b class="v2w-big">${upSec}</b><em>of ${S.length}</em></div>
+      </div>
+      <div class="v2w-bars" role="list" aria-label="Sectors by median 1-week move">${rows}</div>
+      <p class="v2w-note">Each bar is the middle stock of its sector, not a cap-weighted index, so one large name cannot carry it. The count under each sector says how wide the move was.</p>
+      ${opts.more ? `<p class="v2w-more"><a href="${esc(opts.more)}">Every sector and name on the map →</a></p>` : ''}</section>`;
+  }
+
+  /* 4 ── WHAT MOVED MOST THIS WEEK? (the video's winners and losers) */
+  function movers(pulse, opts = {}) {
+    injectCss();
+    const Q = 'What moved most this week?';
+    const U = ((pulse && pulse.movers_up) || []).slice(0, 5), D = ((pulse && pulse.movers_dn) || []).slice(0, 5);
+    if (!U.length && !D.length) return failCard(Q, 'The weekly movers', opts.error);
+    let mx = 0; for (const x of U.concat(D)) mx = Math.max(mx, Math.abs(x.r1w || 0)); mx = mx || 1;
+    const href = opts.stockHref || ((s) => `/stock/${encodeURIComponent(s)}`);
+    const list = (L) => `<div class="v2w-bars">${L.map((x) => `<span class="nm"><a class="sym" href="${esc(href(x.sym))}">${esc(x.sym)}</a><small>${esc(x.sector || '')}${x.turnover_cr != null ? ` · ₹${esc(num0(x.turnover_cr))} cr a day` : ''}</small></span>
+      <span class="v2w-trk one" aria-hidden="true"><i class="${x.r1w >= 0 ? 'up' : 'dn'}" style="width:${Math.min(100, Math.abs(x.r1w) / mx * 100).toFixed(1)}%"></i></span>
+      <span class="val">${sgn(x.r1w, 1)}</span>`).join('')}</div>`;
+    return `<section class="v2w" aria-label="${esc(Q)}">
+      <h3>${esc(Q)}</h3>
+      <p class="v2w-per">Largest 1-week price changes on the screen · built ${esc(pulse.built_on ? day(pulse.built_on) : '—')}</p>
+      <div class="v2w-mv"><div><h4>Rose most</h4>${list(U)}</div><div><h4>Fell most</h4>${list(D)}</div></div>
+      <p class="v2w-note">Bars share one scale, so a fall and a rise of the same size are the same length. Turnover is the average traded value a day; a big move on thin trading is a different thing from one on heavy trading. A description, not a recommendation.</p></section>`;
+  }
+
+  function onHmOver(cell) {
+    const sec = cell.closest('[data-v2w-hm]'); if (!sec) return;
+    let D = {}; try { D = JSON.parse(sec.getAttribute('data-v2w-hm')); } catch (e) { return; }
+    for (const o of sec.querySelectorAll('.v2w-hc.on')) o.classList.remove('on');
+    cell.classList.add('on');
+    const out = sec.querySelector('.v2w-day'); if (out) out.textContent = D[cell.getAttribute('data-i')] || '';
+  }
+
   /* One set of listeners for every card on either site, bound once. */
   function bind() {
     if (bind.done) return; bind.done = true;
     document.addEventListener('pointermove', (e) => {
-      const el = e.target.closest && e.target.closest('[data-v2w-chart]');
+      if (!e.target.closest) return;
+      const el = e.target.closest('[data-v2w-chart]');
       if (el) onChartMove(el, e);
+      const mk = e.target.closest('[data-v2w-mk]');
+      if (mk) onMkMove(mk, e);
+      const hc = e.target.closest('.v2w-hc[data-i]');
+      if (hc) onHmOver(hc);
     });
     document.addEventListener('pointerleave', (e) => {
-      if (e.target && e.target.matches && e.target.matches('[data-v2w-chart]')) onChartLeave(e.target);
+      if (!e.target || !e.target.matches) return;
+      if (e.target.matches('[data-v2w-chart]')) onChartLeave(e.target);
+      if (e.target.matches('[data-v2w-mk]')) for (const c of e.target.querySelectorAll('.v2w-cross,.v2w-tip')) c.style.display = 'none';
     }, true);
     document.addEventListener('click', (e) => {
+      const hc = e.target.closest && e.target.closest('.v2w-hc[data-i]');
+      if (hc) { onHmOver(hc); return; }
       const b = e.target.closest && e.target.closest('[data-v2w-day]');
       if (!b) return;
       const sec = b.closest('[data-v2w-days]');
@@ -339,5 +608,5 @@
   }
   bind();
 
-  window.V2W = { perf, calendar, lifecycle };
+  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers } };
 })();

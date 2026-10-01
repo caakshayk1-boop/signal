@@ -2468,7 +2468,9 @@ ok("no figure counts up", !/countUp/.test(JS));
   const V2B = (JS.match(/\/\* ══ SIGNAL V2 ═+[\s\S]*?\n  \/\/ The phone tab bar's "More"/) || [""])[0];
   const V2C = V2B.replace(/\/\*[\s\S]*?\*\//g, "");
   ok("the V2 block exists and reads one feed", V2B.length > 5000 && /const V2_URL = '\/signal_v2\.json'/.test(V2B)
-     && (V2C.match(/get\('\/[a-z_0-9-]+\.json'\)/g) || []).every((x) => /regime|signal_v2/.test(x)));
+     && (V2C.match(/get\('\/[a-z_0-9-]+\.json'\)/g) || []).every((x) => /regime|signal_v2|pulse/.test(x)));
+  /* pulse.json is MARKET data for the market cards, never a source of plan
+     figures; those still come from signal_v2.json alone. */
   for (const r of ["/", "/opportunities", "/performance", "/plan/:id", "/brief"])
     ok(`V2 route ${r} is rendered by the V2 block`, new RegExp(`R\\['${r.replace(/[/:]/g, (c) => "\\" + c)}'\\] = async`).test(V2B));
   for (const r of ["/signals", "/engines", "/research", "/buoy", "/ideas"])
@@ -2543,6 +2545,12 @@ ok("no figure counts up", !/countUp/.test(JS));
      && /No sessions recorded yet/.test(W2C) && (W2C.match(/noHistory\(d\)/g) || []).length === 1);
   ok("a missing chart point breaks the line rather than being bridged",
      /if \(p\[key\] == null\) \{ pen = false; continue; \}/.test(W2C));
+  ok("the front pages carry the market cards from real closes and the weekly pulse",
+     /function v2Market\(nx, pu\)/.test(JS) && /series=' \+ encodeURIComponent\('\^NSEI'\)/.test(JS)
+     && /W\.nifty\(/.test(JS) && /W\.days\(/.test(JS) && /W\.sectors\(/.test(JS) && /W\.movers\(/.test(JS)
+     && /id="hMkt"/.test(readFileSync("public/vision.js", "utf8")));
+  ok("a market card that gets no data says so and draws nothing",
+     /did not load\.<\/b>/.test(W2C) && /Nothing is drawn in its place/.test(W2C));
   ok("the cards make no forecast", !/probabilit|expected return|likely to|will (rise|fall)|target price/i.test(W2C));
   ok("both pages name a widget bundle that did not arrive",
      /could not load/.test((JS.match(/function v2Widgets[\s\S]*?\n  \}/) || [""])[0])

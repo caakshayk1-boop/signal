@@ -975,6 +975,7 @@
         <div class="hsearch"><input id="hQ" type="search" role="combobox" aria-expanded="false" aria-controls="hL" aria-autocomplete="list" autocomplete="off" spellcheck="false"
           placeholder="Search a company — Reliance, TCS, HDFC Bank…" aria-label="Search a company"><ul id="hL" role="listbox" aria-label="Matching companies"></ul></div>
         <div id="hRecent" class="row wrap hrec"></div><p id="hSince" class="since" hidden></p></section>
+      <div id="hMkt"></div>
       <div class="grid g-2">${panel('What changed across the screen', skel(6), { bodyId: 'hChg', fb: 'Screen' })}${panel('Unusual today', skel(5), { bodyId: 'hUnu', fb: 'Screen' })}</div>
       <div style="height:var(--s-4)"></div>
       <div class="grid g-2">${panel('Plans for the next session', skel(4), { bodyId: 'hSig', flush: true, fb: 'Setups', more: '#/setups', moreText: 'All setups' })}${panel('Most-traded companies', skel(6), { bodyId: 'hTop', fb: 'Screen' })}</div>`;
@@ -995,8 +996,20 @@
     });
     L.addEventListener('click', (e) => { const li = e.target.closest('[data-go]'); if (li) go(li.dataset.go); });
     if (FINE()) inp.focus();
-    const [sr, site] = await Promise.all([F.screen(), F.site(), F.veod()]);
+    const [sr, site, , nx, pu] = await Promise.all([F.screen(), F.site(), F.veod(),
+      get('/api/signals?series=' + encodeURIComponent('^NSEI') + '&range=1y').catch(() => ({ ok: false })),
+      get('/pulse.json').catch(() => ({ ok: false }))]);
     if (!alive()) return;
+    {
+      /* The market cards, shared with Signal (v2widgets.js). A stock opens here
+         in Vision, not on Signal. */
+      const W = window.V2W && window.V2W.market, m = $('#hMkt');
+      if (m) m.innerHTML = !W ? `<p class="note">The market charts could not load.</p>` : (() => {
+        const s2 = nx && nx.ok ? nx.data : null, p2 = pu && pu.ok ? pu.data : null, o = { stockHref: (x) => '#/asset/' + encodeURIComponent(x) };
+        return `<div class="v2w-grid2" style="margin-top:var(--s-5)">${W.nifty(s2, { more: '#/markets', error: nx && nx.error })}${W.days(s2, { error: nx && nx.error })}</div>
+          <div class="v2w-grid2">${W.sectors(p2, { more: '#/heatmap', error: pu && pu.error })}${W.movers(p2, { ...o, error: pu && pu.error })}</div>`;
+      })();
+    }
     paintL();
     const chip = (x) => `<a class="chip" href="#/asset/${esc(x)}">${esc(x)}</a>`;
     const rec = S.recent.filter((x) => SCR && SCR[x]).slice(0, 6), wl = S.watch.map((w) => w.s).filter((x) => !rec.includes(x)).slice(0, 6);
@@ -2123,7 +2136,7 @@
   const vePlansBrief = (D) => {
     if (!D) return empty('No scan published yet', 'The first end-of-day scan publishes after the next NSE close.');
     const N = veNext(D), ban = veBanner(D);
-    if (!N.length) return (ban ? `<div class="pad">${ban}</div>` : '') + empty(D.status === 'ok' || D.status === 'no_setups' ? 'No name qualified on the last close' : 'No new plans', esc(D.status_detail || ''));
+    if (!N.length) return (ban ? `<div class="pad">${ban}</div>` : '') + empty(D.status === 'ok' || D.status === 'no_setups' ? 'No name qualified on the last close' : 'No new plans', ban ? '' : esc(D.status_detail || ''));
     return `${ban ? `<div class="pad">${ban}</div>` : ''}<div class="tw"><table class="tbl dense"><thead><tr><th scope="col">Name</th><th class="r" scope="col">Buy only</th><th class="r" scope="col">Stop</th>
       <th class="r" scope="col">T1</th><th class="r hide-m" scope="col">T2</th><th class="r hide-m" scope="col">T3</th></tr></thead><tbody>
       ${N.slice(0, 8).map((p) => `<tr><td><a class="sym" href="#/setups">${esc(p.symbol)}</a></td><td class="r">${veMoney(p.entry_low)}–${veMoney(p.entry_high)}</td><td class="r dn">${veMoney(p.stop)}</td>
