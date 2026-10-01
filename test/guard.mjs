@@ -325,7 +325,9 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   /* /404 is the router's FALLBACK, not an address. It must never appear in
    * PAGES — listing it would make /404 a page that returns 200, which is the
    * soft-404 this whole fix exists to remove. */
-  const missing = [...routes].filter((r) => !dynamic(r) && r !== "/404" && !pages.has(r));
+  /* Old addresses answered by the Worker's 301 (MOVED) are not pages. */
+  const moved = new Set([...(IDX.match(/const MOVED = \{([\s\S]*?)\};/) || ["", ""])[1].matchAll(/"(\/[a-z]+)":/g)].map((m) => m[1]));
+  const missing = [...routes].filter((r) => !dynamic(r) && r !== "/404" && !pages.has(r) && !moved.has(r));
   const extra = [...pages].filter((p) => p !== "/gems" && p !== "/vision" && !routes.has(p));
   ok("every app route is in the Worker's PAGES list (else it 404s live)",
      missing.length === 0, missing);
@@ -2488,9 +2490,24 @@ ok("no figure counts up", !/countUp/.test(JS));
      figures; those still come from signal_v2.json alone. */
   for (const r of ["/", "/opportunities", "/performance", "/plan/:id", "/brief"])
     ok(`V2 route ${r} is rendered by the V2 block`, new RegExp(`R\\['${r.replace(/[/:]/g, (c) => "\\" + c)}'\\] = async`).test(V2B));
-  for (const r of ["/signals", "/engines", "/research", "/buoy", "/ideas"])
-    ok(`retired route ${r} shows the retired-version notice`, new RegExp(`R\\['${r.replace(/\//g, "\\/")}'\\] = v2Retired\\(`).test(V2B));
-  ok("a retired page never maps an old call onto a new plan", /No V1 call was turned into a V2 plan/.test(V2B));
+  /* FRESH START (owner decision 2026-10-02). Addresses from before 1 Oct 2026
+     forward to the page that replaced them — a 301 at the Worker, and the
+     same move in the router — and no page names a version or a retired
+     engine. The record states when it began; it does not narrate the past. */
+  const IDXM = (IDX.match(/const MOVED = \{([\s\S]*?)\};/) || ["", ""])[1];
+  for (const [r, to] of [["/signals", "/performance"], ["/engines", "/opportunities"], ["/research", "/opportunities"], ["/buoy", "/opportunities"], ["/ideas", "/opportunities"]])
+    ok(`old address ${r} forwards to ${to}`, IDXM.includes(`"${r}": "${to}"`) && /Response\.redirect\(new URL\(MOVED\[mp\], request\.url\)\.toString\(\), 301\)/.test(IDX)
+       && new RegExp(`R\\['${r.replace(/\//g, "\\/")}'\\] = moved\\('${to.replace(/\//g, "\\/")}'\\)`).test(V2B));
+  {
+    /* Code only: comments stripped (line comments too, wherever they sit),
+       and index.html left out — its pre-rendered block is the feed's own text,
+       held to the same words by the engine, not by this file. */
+    const strip = (f) => readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
+    const SEEN = ["public/signal.js", "public/vision.js", "public/v2widgets.js", "src/seo.js", "src/route-meta.js",
+      "scripts/prerender.mjs", "scripts/company-pages.mjs"].map((f) => [f, strip(f)]);
+    const bad = SEEN.flatMap(([f, t]) => (t.match(/Signal V[12]\b|\bV[12] (?:plan|record|forward|paper|trade)|retired V1|Signal V1|[Pp]revious model results|has been retired|belonged to Signal/g) || []).map((m) => f + ": " + m));
+    ok("no page names a version or narrates the retired engines", bad.length === 0, bad.slice(0, 6));
+  }
   ok("every R:R printed is the feed's own field", /p\['rr_' \+ k\]/.test(V2C) && !/\(p\.t[123] - p\.entry_high\) \/ \(p\.entry_high - p\.(?:initial_)?stop\)/.test(V2C));
   /* PAPER TEST + TECHNICAL READ (owner decision 2026-10-02). Four engines run
      forward on paper and are shown on both sites; a stock's five-part read is
@@ -2520,8 +2537,17 @@ ok("no figure counts up", !/countUp/.test(JS));
      /const m = d\.metrics \|\| \{\}/.test(V2C) && !/filter\([^)]*outcome === 'win'\)\.length/.test(V2C) && !/\.filter\([^)]*r_multiple/.test(V2C));
   ok("Day 1 shows no completed sample, never a 0% rate",
      /No completed sample yet/.test(V2C) && /m\.win_rate != null \? v2Num\(m\.win_rate, 1\) \+ '%' : '—'/.test(V2C));
-  ok("the disclosure states when the V2 record began and that V1 is excluded",
-     /V2 forward record begins/.test(V2C) && /Previous model results are excluded/.test(V2C));
+  {
+    /* 1 Oct 2026: Markets printed Nifty −1.30% while the closes said −0.88%;
+       chartPreviousClose held the 29 Sep close. The day's change is measured
+       from the last daily close before the quote's own session. */
+    const MKT = readFileSync("src/api/markets.js", "utf8");
+    ok("Markets measures the day's change from the close before the quote's session",
+       /export function prevClose\(res0\)/.test(MKT) && /prevClose\(res0\) \?\? num\(meta\?\.chartPreviousClose\)/.test(MKT)
+       && /range=5d&interval=1d/.test(MKT) && /meta\?\.gmtoffset/.test(MKT));
+  }
+  ok("the disclosure states when the record began",
+     /The forward record begins \$\{since \? v2Date\(since\)/.test(V2C) && /The forward record begins 1 October 2026/.test(JS));
   ok("the headline and subheading are the V2 ones",
      /Indian equities, screened after the close\./.test(V2C) && /Review qualified setups, plan the next session, and track every paper trade\./.test(V2C)
      && /Indian equities, screened after the close\./.test(readFileSync("scripts/prerender.mjs", "utf8")));
@@ -2609,7 +2635,7 @@ ok("no figure counts up", !/countUp/.test(JS));
   const VJ = readFileSync("public/vision.js", "utf8");
   ok("Vision separates research levels from the one actionable stop",
      /'Screen ladder level', r\.lad\.s, 'research reference, not a trade stop'/.test(VJ) && !/'Ladder stop'/.test(VJ)
-     && /inside one typical day/.test(VJ) && /The only actionable stop is the Signal V2 plan's/.test(VJ)
+     && /inside one typical day/.test(VJ) && /The only actionable stop is the Signal plan's/.test(VJ)
      && /Levels from the screen's build/.test(VJ));
   ok("the cards make no forecast", !/probabilit|expected return|likely to|will (rise|fall)|target price/i.test(W2C));
   ok("both pages name a widget bundle that did not arrive",

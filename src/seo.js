@@ -114,10 +114,8 @@ function signalFacts(route, site) {
         + (site.above200 != null ? line(`<b>${esc(site.above200)}%</b> of names trade above their 200-day average.`) : "");
     case "/screen": case "/discover":
       return line(`<b>${esc(site.universe)}</b> NSE names screened on price, trend, quality, value and institutional flow${built ? ` — build of ${esc(built)}` : ""}.`);
-    case "/signals": case "/engines": case "/research": case "/buoy": case "/ideas":
-      return line("This page belonged to Signal V1, retired on 1 October 2026. Its calls are excluded from the V2 record and no V1 call became a V2 plan.");
     case "/opportunities": case "/performance": case "/brief":
-      return line("Signal V2: conditional next-session paper plans for NSE equities and a forward record of every one. The live page loads them from the canonical plan feed.");
+      return line("Signal: conditional next-session paper plans for NSE equities and a forward record of every one, from 1 October 2026. The live page loads them from the plan feed.");
     case "/watch":
       return line("Your watchlist is stored in this browser only. Star any name on the site to follow it here.");
     default: return "";

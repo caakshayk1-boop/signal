@@ -450,15 +450,19 @@ export default {
      * visitor a shared link produces. Measured: /map 404, /reads 404,
      * /screen 200. Same shape of fault as a page that only renders after an
      * in-app navigation — it cannot be caught by clicking around. */
+    /* Addresses from before the 1 Oct 2026 start. A bookmark or a shared link
+       lands on the page that replaced it — permanently, so search engines
+       carry the address over — never on a notice about what used to be there. */
+    const MOVED = { "/signals": "/performance", "/engines": "/opportunities", "/research": "/opportunities",
+      "/buoy": "/opportunities", "/ideas": "/opportunities" };
+    const mp = url.pathname.replace(/\/+$/, "") || "/";
+    if (MOVED[mp]) return Response.redirect(new URL(MOVED[mp], request.url).toString(), 301);
     const PAGES = new Set(["/", "/about", "/brief", "/disclaimer", "/disclosures",
-      /* Signal V2 (2026-10-01). /signals, /engines, /research, /buoy and
-         /ideas stay as pages: an old link lands on a plain retired-version
-         notice rather than a 404 or a different trade. */
       "/opportunities", "/performance",
-      "/discover", "/engines", "/funds",
-      "/gems", "/heat", "/ideas", "/ipo", "/join", "/map", "/markets",
+      "/discover", "/funds",
+      "/gems", "/heat", "/ipo", "/join", "/map", "/markets",
       "/methodology", "/news", "/privacy", "/radar", "/reads", "/screen",
-      "/signals", "/sources", "/terms", "/watch", "/buoy", "/research",
+      "/sources", "/terms", "/watch",
       /* The cockpit's shell, reachable on signal.askakshay.com/vision for a
          check before the vision host resolves — and for the post-deploy suite,
          which runs against SIGNAL_URL. */

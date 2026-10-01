@@ -1480,7 +1480,7 @@
         <div class="now"><span>Now</span><em>${lv ? 'live, delayed' : 'at the last close'}</em><span class="num">₹${fmt(px, 1)}</span></div>
         ${lv2.filter((l) => l[1] <= px).map(lrow).join('')}</div>
       ${atrp != null ? `<p class="note" style="margin-top:var(--s-2)">A typical day moves it <b>${atrp.toFixed(1)}%</b>; a level closer than that is inside ordinary noise, so it is a reference, not a test.</p>` : ''}
-      <p class="note" style="margin-top:var(--s-2)">These are research levels. ${v2p ? `The only actionable stop is the Signal V2 plan's: <b>₹${fmt(v2p.stop, 2)}</b> — <a href="#/setups">see the plan</a>.` : 'There is no Signal V2 plan for this company, so there is no actionable stop here.'}</p>` : empty('No levels', 'Not on the screen.');
+      <p class="note" style="margin-top:var(--s-2)">These are research levels. ${v2p ? `The only actionable stop is the Signal plan's: <b>₹${fmt(v2p.stop, 2)}</b> — <a href="#/setups">see the plan</a>.` : 'There is no Signal plan for this company, so there is no actionable stop here.'}</p>` : empty('No levels', 'Not on the screen.');
 
     const de = num(r && r.de), lender = !!(r && isLender(r));
     $('#aFun').innerHTML = r ? `<div class="kv" style="margin-top:0">
@@ -2225,7 +2225,7 @@
       ${window.V2W && window.V2W.paper ? '<div style="height:var(--s-4)"></div>' + window.V2W.paper(D, { stockHref: (x) => '#/asset/' + encodeURIComponent(x) }) : ''}
       <div style="height:var(--s-4)"></div>
       <section class="pn"><div class="ph"><h2>Completed</h2><span class="n">${done.length}</span></div><div class="pb flush">${veClosedTable(done)}</div>
-        <div class="pf">${M.closed ? `${M.closed} closed — ${M.wins} win, ${M.losses} loss, ${M.breakevens} breakeven · net ${veR(M.sum_r_closed)} in total${M.mean_r_closed != null ? ` · mean ${veR(M.mean_r_closed)} a trade` : ''}` : 'No completed sample yet'}${M.win_rate == null && M.closed ? ` · rates are withheld until ${M.min_closed_for_rate || VE_NEED} have closed` : ''}. The same figures as <a href="${SIGNAL_URL}/performance">Signal's record</a>, which begins ${esc(dshort(D.forward_record_start || ''))}; previous model results are excluded. Not a probability.</div></section>
+        <div class="pf">${M.closed ? `${M.closed} closed — ${M.wins} win, ${M.losses} loss, ${M.breakevens} breakeven · net ${veR(M.sum_r_closed)} in total${M.mean_r_closed != null ? ` · mean ${veR(M.mean_r_closed)} a trade` : ''}` : 'No completed sample yet'}${M.win_rate == null && M.closed ? ` · rates are withheld until ${M.min_closed_for_rate || VE_NEED} have closed` : ''}. The same figures as <a href="${SIGNAL_URL}/performance">Signal's record</a>, which begins ${esc(dshort(D.forward_record_start || ''))}. Not a probability.</div></section>
       <div style="height:var(--s-4)"></div>
       ${window.V2W
         ? window.V2W.perf(D, { recordHref: SIGNAL_URL + '/performance' }) + window.V2W.calendar(D, { recordHref: SIGNAL_URL + '/performance' })

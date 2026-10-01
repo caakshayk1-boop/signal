@@ -60,7 +60,7 @@ const veod = read("signal_v2.json") || {};   // the ONE canonical V2 plan feed
 const openSig = {};
 for (const p of veod.plans || []) {
   if (!["awaiting_entry", "activated", "partially_exited"].includes(p.state) || openSig[p.symbol]) continue;
-  openSig[p.symbol] = { name: "Signal V2 plan", plan_id: p.id, fired_at: p.session_date, entry_low: p.entry_low, entry_high: p.entry_high,
+  openSig[p.symbol] = { name: "Signal plan", plan_id: p.id, fired_at: p.session_date, entry_low: p.entry_low, entry_high: p.entry_high,
     sl: p.stop, t1: p.t1, t2: p.t2, t3: p.t3, status: p.state === "awaiting_entry" ? `awaiting entry until ${p.valid_through}` : "paper position" };
 }
 const nextPlans = (veod.plans || []).filter((p) => p.state === "awaiting_entry" && p.session_date === veod.session_date);

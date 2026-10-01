@@ -6,15 +6,15 @@ export const SIGNAL_META = {
   "Review qualified setups, plan the next session, and track every paper trade. NSE equities, long only, with a forward record that starts empty."
  ],
  "/opportunities": [
-  "Opportunities — every V2 plan by state",
+  "Opportunities — every plan by state",
   "Next-session plans for NSE equities, grouped as eligible, extended, active, closed and expired, each with its entry range, stop and three targets."
  ],
  "/performance": [
-  "Performance — the Signal V2 forward record",
-  "Every V2 paper plan, wins and losses alike, with reconciled counts, net P&L after modelled costs and the date the record began."
+  "Performance — the Signal forward record",
+  "Every paper plan, wins and losses alike, with reconciled counts, net P&L after modelled costs and the date the record began."
  ],
  "/plan/:id": [
-  "Plan — Signal V2",
+  "Plan — Signal",
   "One conditional paper plan: entry range, stop, three targets, exit sizes, expiry and every update since publication."
  ],
  "/markets": [
@@ -24,10 +24,6 @@ export const SIGNAL_META = {
  "/screen": [
   "Screen — every NSE name we track, filterable",
   "Every name in the universe on price, trend, quality, value and institutional flow. FII and DII holding quarter on quarter, from the company’s own filings."
- ],
- "/signals": [
-  "Retired — the V1 ledger",
-  "Signal V1 was retired on 1 October 2026. Its calls are excluded from the V2 record."
  ],
  "/heat": [
   "The heatmap — today in each name’s own units",
@@ -49,14 +45,6 @@ export const SIGNAL_META = {
   "Signal radar — the market, and the names carrying it",
   "A breadth-based market score with every term printed, and the eight highest-scoring names ranked on trend, momentum, volume and institutional flow."
  ],
- "/engines": [
-  "Retired — the V1 engine floor",
-  "Signal V1 was retired on 1 October 2026."
- ],
- "/ideas": [
-  "Retired — V1 ideas",
-  "Ideas now live in Opportunities, as next-session plans."
- ],
  "/ipo": [
   "IPO — books open now, and how last year’s listings did",
   "Issues open and upcoming with demand, valuation and peer comparison, plus every recent listing measured against its issue price."
@@ -75,10 +63,10 @@ export const SIGNAL_META = {
  ],
  "/brief": [
   "The brief — the current plan, in full",
-  "The current V2 plan with every level and condition, or a plain statement that nothing qualified."
+  "The current plan with every level and condition, or a plain statement that nothing qualified."
  ],
  "/methodology": [
-  "Methodology — how a V2 plan is built and graded",
+  "Methodology — how a plan is built and graded",
   "Risk-first plans, next-session entry, three targets with fixed exit sizes, simulated fills and how the forward record is counted."
  ],
  "/sources": [
@@ -97,17 +85,9 @@ export const SIGNAL_META = {
   "The morning list",
   "Join the list for the daily email. It is not being sent yet; the brief is on the site every morning."
  ],
- "/research": [
-  "Retired — the V1 research floor",
-  "Signal V1 was retired on 1 October 2026."
- ],
- "/buoy": [
-  "Retired — BUOY",
-  "Signal V1 was retired on 1 October 2026."
- ],
  "/about": [
   "About — who builds Signal",
-  "Signal is built by Akshay Kothari, a Chartered Accountant working in FP&A: what the site is, what it is not, and when its V2 record began."
+  "Signal is built by Akshay Kothari, a Chartered Accountant working in FP&A: what the site is, what it is not, and when its record began."
  ],
  "/disclaimer": [
   "Disclaimer — educational research, not investment advice",

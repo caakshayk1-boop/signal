@@ -77,7 +77,7 @@ function signals(q) {
     return { ok: true, at: new Date().toISOString(), quotes: out };
   }
   return { __status: 410, ok: false, retired: true,
-    error: "Signal V1 was retired on 2026-10-01. Its calls are excluded from the V2 record.", successor: "/signal_v2.json" };
+    error: "This endpoint was removed on 2026-10-01. Plans are published in /signal_v2.json.", successor: "/signal_v2.json" };
 }
 
 /* The ticker: only rows a committed file can actually price. Nifty and India

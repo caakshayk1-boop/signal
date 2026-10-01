@@ -73,7 +73,7 @@ export function retired(res) {
   res.setHeader("Cache-Control", "public, max-age=3600");
   return res.status(410).json({
     ok: false, retired: true,
-    error: "Signal V1 was retired on 2026-10-01. Its calls are excluded from the V2 record.",
+    error: "This endpoint was removed on 2026-10-01. Plans are published in /signal_v2.json.",
     successor: "/signal_v2.json",
   });
 }

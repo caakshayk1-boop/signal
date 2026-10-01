@@ -151,21 +151,41 @@ export default async function handler(req, res) {
   }
 }
 
+/* The last daily close strictly before the session of the quote, in the
+   exchange's own calendar day. null when the series cannot place it. */
+export function prevClose(res0) {
+  const meta = res0?.meta, ts = res0?.timestamp || [], cl = res0?.indicators?.quote?.[0]?.close || [];
+  const off = Number(meta?.gmtoffset) || 0, at = Number(meta?.regularMarketTime);
+  if (!Number.isFinite(at) || !ts.length) return null;
+  const dayOf = (sec) => new Date((sec + off) * 1000).toISOString().slice(0, 10);
+  const qd = dayOf(at);
+  let pc = null;
+  for (let i = 0; i < ts.length; i++) {
+    const c = num(cl[i]);
+    if (c != null && c > 0 && dayOf(ts[i]) < qd) pc = c;
+  }
+  return pc;
+}
+
 async function quote(t) {
   const base = { name: t.name, symbol: t.symbol, prefix: t.prefix };
   try {
+    /* The day's change is measured from the last DAILY CLOSE BEFORE THE
+       QUOTE'S OWN SESSION, read off a short daily series — not from
+       chartPreviousClose. On 1 Oct 2026 that field held the 29 Sep close, so
+       this board printed Nifty −1.30% while the closes said −0.88%
+       (22,620.45 → 22,421.95). The ticker had the same fault and the same fix.
+       The session date is the exchange's own (meta.gmtoffset), so London and
+       New York quotes are placed in their own day, not India's. */
     const r = await fetch(
-      // range=1d, not 5d: chartPreviousClose is the close before the requested
-      // window, so a 5d range returned a five-day move labelled as the day's.
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(t.symbol)}?range=1d&interval=1d`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(t.symbol)}?range=5d&interval=1d`,
       { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(6000) }
     );
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const meta = (await r.json())?.chart?.result?.[0]?.meta;
+    const res0 = (await r.json())?.chart?.result?.[0];
+    const meta = res0?.meta;
     let price = num(meta?.regularMarketPrice);
-    // chartPreviousClose is the prior session's close, which is what makes the
-    // percentage match what every other quote screen shows.
-    const prev = num(meta?.chartPreviousClose) ?? num(meta?.previousClose) ?? price;
+    const prev = prevClose(res0) ?? num(meta?.chartPreviousClose) ?? num(meta?.previousClose) ?? price;
 
     let spot = false;
     if (t.metal) {

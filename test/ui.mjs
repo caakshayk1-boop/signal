@@ -290,8 +290,9 @@ try {
   // innerText follows text-transform, so the headings are matched without case.
   ok("next-session plans come before positions, watchlist and record",
      v2Home.search(/Plans for /i) > -1 && v2Home.search(/Plans for /i) < v2Home.search(/Active paper positions/i)
-     && v2Home.search(/Active paper positions/i) < v2Home.search(/^V2 record$/im));
-  ok("the V2 disclosure is on the front page", /V2 forward record begins/.test(v2Home) && /Previous model results are excluded/.test(v2Home));
+     && v2Home.search(/Active paper positions/i) < v2Home.search(/^Record$/im));
+  ok("the front page states when the record began", /The forward record begins/.test(v2Home));
+  ok("no page names a version or a retired engine", !/Signal V[12]\b|\bV[12] (?:plan|record)|retired V1|[Pp]revious model results/.test(v2Home));
   const v2Feed = await p.evaluate(async () => (await fetch("/signal_v2.json")).json()).catch(() => null);
   ok("the canonical plan feed is served", !!v2Feed && v2Feed.schema === "signal-v2-public/1");
   if (v2Feed) {
@@ -319,8 +320,8 @@ try {
   await p.goto(SITE + "/performance", { waitUntil: "domcontentloaded" });
   await until(p, () => /The record/.test(document.querySelector("main")?.innerText || ""));
   const perfT = await p.locator("main").innerText().catch(() => "");
-  ok("Performance states the forward start and the exclusion",
-     /V2 forward record begins/.test(perfT) && /Previous model results are excluded/.test(perfT));
+  ok("Performance states when the record began, and names no version",
+     /The forward record begins/.test(perfT) && !/Signal V[12]\b|\bV[12] (?:plan|record)|retired V1|[Pp]revious model results/.test(perfT));
   ok("Performance prints no 0% win rate on an empty record", !/\b0(\.0)?%\s*Win rate/i.test(perfT) && !/Win rate\s*0(\.0)?%/i.test(perfT));
   ok("Performance reconciles its counts in words", /published = .* awaiting entry \+ .* active \+ .* closed/.test(perfT.replace(/\s+/g, " ")));
   /* The shared cards: present, honest about an empty or missing history, and
@@ -332,23 +333,22 @@ try {
   ok("the cards print no NaN, undefined or null", !/\bNaN\b|undefined|\bnull\b/.test(cardT));
   ok("an unexposed book shows no return or drawdown figure",
      (v2Feed && v2Feed.history && v2Feed.history.exposed) || !/Worst drawdown/i.test(cardT));
-  for (const r of ["/signals", "/engines", "/ideas", "/research"]) {
-    await p.goto(SITE + r, { waitUntil: "domcontentloaded" });
-    /* Wait for the HYDRATED notice. The server pre-render's h1 already says
-       "Retired — …", so waiting on /retired/ in the h1 returned before the
-       client view existed and read the pre-render. */
-    await until(p, () => /No V1 call was turned into a V2 plan/.test(document.querySelector("main")?.innerText || ""));
-    const t = await p.locator("main").innerText().catch(() => "");
-    ok(`${r} shows the retired-version notice, not V1 calls`, /has been retired/.test(t) && /No V1 call was turned into a V2 plan/.test(t));
+  /* Addresses from before 1 Oct 2026 forward permanently to the page that
+     replaced them. Asked from Node with redirects off, so the 301 itself is
+     what is checked, not wherever a browser ends up. */
+  for (const [r, to] of [["/signals", "/performance"], ["/engines", "/opportunities"], ["/ideas", "/opportunities"], ["/research", "/opportunities"], ["/buoy", "/opportunities"]]) {
+    const res = await fetch(SITE + r, { redirect: "manual" }).catch(() => null);
+    const loc = res ? new URL(res.headers.get("location") || "/", SITE).pathname : "";
+    ok(`${r} forwards to ${to}`, !!res && res.status === 301 && loc === to, res && [res.status, loc]);
   }
   await p.goto(SITE + "/plan/not-a-plan", { waitUntil: "domcontentloaded" });
   await until(p, () => /Plan not found/.test(document.querySelector("main h1")?.innerText || ""));
   ok("an unknown plan id says so, and does not borrow another plan",
-     /There is no V2 plan with the id/.test(await p.locator("main").innerText().catch(() => "")));
+     /There is no plan with the id/.test(await p.locator("main").innerText().catch(() => "")));
   /* From Node, not the page: an in-page 410 is logged to the console as a
      failed resource and would fail the no-errors check below on purpose. */
   const apiOld = await fetch(SITE + "/api/signals?limit=5").then((r) => r.status).catch(() => 0);
-  ok("the V1 ledger API answers 410 Gone", apiOld === 410, apiOld);
+  ok("the old ledger API answers 410 Gone", apiOld === 410, apiOld);
 
   ok("no JS errors on either route", errs.length === 0, errs.slice(0, 3));
   /* ══ THE PREMIUM BUILD ═══════════════════════════════════════════════════
