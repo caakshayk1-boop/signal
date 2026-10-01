@@ -136,7 +136,7 @@
   const CADENCE_H = {
     'Live prices': 0.5, 'Ledger': 2, 'Screen': 72, 'Pulse': 72,
     'Barometer': 72, 'Regime': 72, 'Wire': 3, 'Flows': 72,
-    'Institutional': 24 * 120, 'Quotes': 0.5, 'Data health': 36, 'Signals': 72, 'Setups': 36,
+    'Institutional': 24 * 120, 'Quotes': 0.5, 'Data health': 36, 'Setups': 36,
   };
   const mark = (name, at, extra) => { FR[name] = Object.assign({ at, ok: true, t: Date.now() }, extra || {}); paintBadges(); };
   const markFail = (name, error) => { FR[name] = { ok: false, error, t: Date.now() }; paintBadges(); };
@@ -305,7 +305,7 @@
 
   /* ── SHELL STATE ──────────────────────────────────────────────────────── */
   const S = {
-    ledger: null, ticker: null, pulse: null, wire: null, vsig: null, veod: null,
+    ledger: null, ticker: null, pulse: null, wire: null, veod: null,
     quotes: {}, prevPx: {},
     watch: store.get('vis:watch', []),
     alerts: store.get('vis:alerts', []),
@@ -2016,8 +2016,8 @@
      expired or cancelled plan are never results. No rate is printed until
      VE_NEED have completed, and none of it is a probability.
 
-     The two retired engines (bottom reversal, 4H breakout) stay below as the
-     Legacy Archive, from /vision_signals.json, graded under their own rules. */
+     The retired engines (bottom reversal, 4H breakout) are not shown or linked
+     anywhere on this site; their record is kept upstream only. */
   const VE_NEED = 30;
   const VE_STATE = {
     awaiting_entry: ['Awaiting entry', ''], activated: ['Active · paper', 'up'], partially_exited: ['Partly exited · paper', 'up'],
@@ -2038,14 +2038,6 @@
     else markFail('Setups', r.error);
     return r;
   };
-  /* Legacy archive feed: retired engines, still graded until each closes. */
-  F.vsig = async () => {
-    const r = await get('/vision_signals.json', 600000);
-    if (r.ok) { mark('Signals', r.data.generated_at); S.vsig = r.data; }
-    else if (absent(r)) { FR.Signals = { ok: true, na: true, naTxt: 'not published', naTitle: 'the legacy archive is not published', t: Date.now() }; paintBadges(); }
-    else markFail('Signals', r.error);
-    return r;
-  };
   const istWhen = (iso) => { const t = Date.parse(iso); return Number.isFinite(t) ? new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) + ' IST' : '—'; };
   const veStale = (D) => !!(D && D.next_scan_due && Date.now() > Date.parse(D.next_scan_due));
   /* The plans the LAST scan made — what a reader acts on tomorrow. */
@@ -2061,7 +2053,7 @@
     if (veStale(D)) return `<div class="callout"><b>Stale scan.</b> This is the scan for the session of ${esc(sess)}. The scan for ${esc(dshort(D.next_session))} was due by ${esc(istWhen(D.next_scan_due))} and has not arrived — do not read these plans as today's.</div>`;
     if (D.status === 'data_unavailable') return `<div class="callout"><b>No scan for ${esc(sess)}.</b> The session's data did not arrive complete by the final attempt, so nothing new was made. Open plans are shown as of ${esc(dshort(D.data_as_of || D.session_date))}.</div>`;
     if (D.status === 'market_filter') return `<div class="callout info"><b>Market filter off for ${esc(sess)}.</b> The broad market was not in an uptrend on the close, so no new plans were made. Open plans are still tracked.</div>`;
-    if (D.status === 'paused') return `<div class="callout info"><b>New plans are paused.</b> Open plans are still tracked.</div>`;
+    if (D.status === 'paused') return `<div class="callout info"><b>New plans are paused.</b> ${esc(String(D.status_detail || '').replace(/^New plans are paused\.\s*/, ''))}</div>`;
     return '';
   };
   /* Plan levels are order prices: printed to the paisa, never rounded for looks. */
@@ -2125,13 +2117,6 @@
       <div class="pb note" style="padding-top:var(--s-2)">For ${esc(dshort(D.next_session))}, valid ${D.entry_expiry_sessions || 3} sessions. ${D.mode === 'paper' ? 'Paper mode' : 'Research mode — not validated'}; fills simulated.</div>`;
   };
 
-  /* ── Legacy archive: the retired engines, as filed and graded ───────── */
-  const VS_WORD = { bottom: 'Bottom reversal', brk4h: '4H breakout' };
-  const VS_STATUS = {
-    open: ['Open — still graded', ''], t3: ['Reached T3', 'up'], expired: ['Expired', 'warn'], stopped: ['Stopped', 'dn'],
-    stopped_after_t1: ['Stopped after T1', 'warn'], stopped_after_t2: ['Stopped after T2', 'warn'],
-  };
-  const vsFired = (s) => s.engine === 'brk4h' ? (s.candle || s.fired_at) : `close of ${dshort(s.fired_at)}`;
   /* The ladder: stop, entry and three targets on one scale, with the live mark
      on it when there is one. Positions are the prices themselves, not bands. */
   const vsLadder = (s, px) => {
@@ -2143,34 +2128,18 @@
       ${[['sl', s.sl], ['en', s.entry], ['t', s.t1], ['t', s.t2], ['t', s.t3]].map(([k, v]) => `<b class="${k}" style="left:${at(v)}%"></b>`).join('')}
       ${px != null ? `<em style="left:${at(px)}%" title="Live ₹${fmt(px, 2)}"></em>` : ''}</div>`;
   };
-  const vsArchive = (L) => {
-    if (!L) return empty('Not published', 'The legacy archive feed did not arrive.');
-    const hist = L.history || [], c = L.counts || {};
-    const row = (k) => { const x = c[k] || {}; return `<div><em>${esc(VS_WORD[k])}</em><b>${x.filed || 0}</b><small>${x.open || 0} open · ${x.stopped || 0} stopped · ${x.t3 || 0} T3 · ${x.expired || 0} expired</small></div>`; };
-    return `<div class="kv" style="margin-top:0">${row('bottom')}${row('brk4h')}</div>
-      <p class="note">Retired on 1 Oct 2026: no new filings. Filings open at retirement are graded to their stop, T3 or horizon under the rules they were filed with. <b>Entries were recorded at the signal close, but every filing was published after the session had ended</b> — not a price a reader could have paid — and most stops were clamped to 6%. Kept as filed, losses included; nothing here is rewritten into the new method.</p>
-      <div class="tw"><table class="tbl dense"><thead><tr><th scope="col">Name</th><th scope="col">Engine</th><th scope="col" class="hide-m">Fired</th>
-        <th class="r" scope="col">Entry as filed</th><th class="r" scope="col">Stop</th><th class="r" scope="col">Exit</th><th scope="col">Result</th><th class="r hide-m" scope="col">Bars</th></tr></thead><tbody>
-        ${hist.map((s) => { const g = s.grade || { status: 'open' }, [w, k] = VS_STATUS[g.status] || [g.status, ''];
-          return `<tr><td><a class="sym lnk" href="#/asset/${esc(s.sym)}" data-sym="${esc(s.sym)}">${esc(s.sym)}</a></td><td>${esc(VS_WORD[s.engine] || s.engine)}</td><td class="hide-m">${esc(vsFired(s))}</td>
-            <td class="r">${inr(s.entry)}</td><td class="r">${inr(s.sl)}</td><td class="r">${g.exit != null ? inr(g.exit) : '—'}</td>
-            <td><span class="chip ${k}">${esc(w)}</span>${g.status === 'open' && g.targets_hit ? ` <span class="mut">T${g.targets_hit} reached</span>` : ''}${g.ambiguous ? ' <span class="chip warn" title="Booked as the stop: one bar touched both.">ambiguous</span>' : ''}</td>
-            <td class="r hide-m num">${g.bars != null ? g.bars : '—'}</td></tr>`; }).join('')}</tbody></table></div>`;
-  };
 
   V.setups = async (el, arg, alive) => {
     el.innerHTML = vhead('Setups', 'Plans for the next session, made after the close',
       'After each NSE session closes, one end-of-day method looks for a controlled pullback in an established uptrend and works backwards from where the idea is wrong to a price worth paying. What it publishes is a conditional plan for the next session — a range, a stop and three exits — not a trade. Fills are simulated. Research, not advice.', fb('Setups'))
       + `<div id="veBody">${skel(10)}</div>`;
-    const [r, L] = await Promise.all([F.veod(), F.vsig(), F.screen()]);
+    const [r] = await Promise.all([F.veod(), F.screen()]);
     if (!alive()) return;
     const B = $('#veBody');
-    const archive = `<details class="pn ve-arch"><summary class="ph"><h2>Legacy archive — bottom reversal and 4H breakout</h2><span class="n">${L.ok ? (L.data.history || []).length : ''}</span></summary>
-      <div class="pb">${vsArchive(L.ok ? L.data : null)}</div></details>`;
     if (!r.ok) {
       B.innerHTML = `<div class="pn">${absent(r) ? empty('No scan published yet',
         'The first end-of-day scan publishes after the next NSE session closes (from about 19:05 IST). Until then there is nothing to show, and nothing is shown in its place.')
-        : failBox('The end-of-day plans feed', r.error)}</div><div style="height:var(--s-4)"></div>${archive}`;
+        : failBox('The end-of-day plans feed', r.error)}</div>`;
       return;
     }
     const D = r.data, P = D.plans || [];
@@ -2182,7 +2151,8 @@
     if (!alive()) return;
     const sm = D.summary || {}, cov = D.coverage || {};
     const mode = D.mode === 'paper' ? '<span class="chip up">Paper mode</span>' : '<span class="chip warn" title="No configuration has passed its pre-registered validation">Research mode · not validated</span>';
-    const nextEmpty = D.status === 'market_filter' ? empty('No new plans', 'The market filter was off on this close.')
+    const nextEmpty = D.status === 'paused' ? empty('Paused', 'No plans are being made while a replacement method is researched.')
+      : D.status === 'market_filter' ? empty('No new plans', 'The market filter was off on this close.')
       : D.status === 'data_unavailable' ? empty('No scan for this session', 'The data did not arrive complete.')
       : D.status === 'error' ? empty('No new plans', 'The last run failed.')
       : empty('No name qualified on this close', 'That is a valid result. The thresholds are not lowered to fill this page.');
@@ -2210,9 +2180,7 @@
         <li><b>Expiry.</b> Unfilled after ${D.entry_expiry_sessions || 3} sessions, the plan expires.</li>
         <li><b>Three exits.</b> ${D.exit_plan ? `${D.exit_plan.t1_pct}% / ${D.exit_plan.t2_pct}% / ${D.exit_plan.t3_pct}%` : '40% / 35% / 25%'} of the original quantity at T1, T2 and T3; whatever is left exits at the open after ${D.time_exit_sessions || 20} sessions. A stop that is raised is never lowered.</li>
         <li><b>How fills are simulated.</b> From daily bars, conservatively: a gap through the stop exits at the open, not at the stop; a bar that touches both the stop and a target is booked as the stop; a locked circuit delays an exit. Costs are an assumed delivery schedule. No order is placed anywhere.</li></ul>
-        <p class="note" style="margin-bottom:0">The selection rules, thresholds and diagnostics are kept private and run on the server; only the plans and their outcomes are published. That does not make the method impossible to infer from its output over time, and nothing here claims it is. ${esc(D.notice || '')}</p>`, {})}
-      <div style="height:var(--s-4)"></div>
-      ${archive}`;
+        <p class="note" style="margin-bottom:0">The selection rules, thresholds and diagnostics are kept private and run on the server; only the plans and their outcomes are published. That does not make the method impossible to infer from its output over time, and nothing here claims it is. ${esc(D.notice || '')}</p>`, {})}`;
     el.addEventListener('click', (e) => {
       const a = e.target.closest('a.sym.lnk[data-sym]'); if (a && !(e.metaKey || e.ctrlKey || e.shiftKey) && SCR && SCR[a.dataset.sym]) { e.preventDefault(); stockCard(a.dataset.sym); }
     });
