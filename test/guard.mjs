@@ -123,7 +123,10 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
    * nothing, and /buoy is a legacy address kept working for links shared
    * before /research existed. Linking to either would be linking to a
    * redirect. */
-  const ALIAS = new Set(["/404", "/buoy"]);
+  /* Since Signal V2 (2026-10-01) the V1 routes are in the same position:
+   * they exist so an old bookmark lands on a retired notice, and nothing in
+   * the site should send a reader there. */
+  const ALIAS = new Set(["/404", "/buoy", "/signals", "/engines", "/research", "/ideas"]);
   const orphans = routes.filter(r => !linked.has(r) && !r.includes(":") && !ALIAS.has(r));
   ok("no route is unreachable from any link", orphans.length === 0, orphans);
 }
@@ -2505,6 +2508,14 @@ ok("no figure counts up", !/countUp/.test(JS));
   ok("the V1 ledger API answers 410 Gone, quotes and series stay",
      /status\(410\)/.test(SIGAPI) && /successor: "\/signal_v2\.json"/.test(SIGAPI) && /if \(q\.px\)/.test(SIGAPI) && /if \(q\.series\)/.test(SIGAPI)
      && /return retired\(res\);/.test(STAPI) && /if \(q\.wallet\) return retired\(res\);/.test(SIGAPI));
+  const NAVS = [/const CMD_ROUTES = \[[\s\S]*?\n  \];/, /const DISCOVER = \[[\s\S]*?\n  \];/, /const MORE = \[[\s\S]*?\n  \];/,
+                /const PRIMARY = new Set[\s\S]*?body\.innerHTML/, /R\['\/404'\] = async[\s\S]*?\n  \};/]
+    .map((re) => (JS.match(re) || [""])[0]);
+  const stale = NAVS.flatMap((b) => [...b.matchAll(/['"](\/(?:signals|engines|research|ideas|buoy))['"]/g)].map((x) => x[1]));
+  ok("no menu, palette, tool list or 404 page sends a reader to a retired route",
+     NAVS.every((b) => b.length > 50) && stale.length === 0, stale);
+  const TICK = readFileSync("src/api/ticker.js", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  ok("the header rail carries no V1 picks", !/seg\("multibagger"/.test(TICK) && !/multibaggers\(\)\s*[,\]]/.test(TICK));
   ok("the Worker serves the V2 pages and plan URLs",
      /"\/opportunities", "\/performance"/.test(IDX) && /\\\/plan\\\/\[\^\/\]\+\$/.test(IDX));
   const SM = readFileSync("public/sitemap.xml", "utf8");

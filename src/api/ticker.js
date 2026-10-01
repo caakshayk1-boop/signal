@@ -9,7 +9,6 @@
 //   12:30  Europe opens            →  🇪🇺 EUROPE
 //   19:00  US opens                →  🇺🇸 US and the ten biggest names in it
 //   ——     round the clock         →  🛢 COMMODITIES · 💱 FX · ₿ CRYPTO
-//   ——     from the ledger         →  💎 MULTIBAGGERS
 //
 // Quotes come from Yahoo's spark endpoint, which takes up to 20 symbols per
 // request — about 110 symbols here, so six parallel calls instead of 110. The
@@ -128,8 +127,11 @@ export default async function handler(req, res) {
     // Both Turso reads in parallel. Sequential awaits put two round trips on
     // the critical path of a cold invocation for no reason — neither query
     // depends on the other.
-    const [mb, ledgerSyms] = await Promise.all([multibaggers(), openLedgerSymbols()]);
-    for (const m of mb) defs.push([m.symbol, `${m.symbol}.NS`, "₹", 2]);
+    /* SIGNAL V2 (2026-10-01): the multibagger segment is retired. It printed
+       a V1 engine's picks, with targets, on every page of the site — a call,
+       not market data — and V1 calls are no longer published anywhere. The
+       reader stays below for a deliberate V1 restore; nothing calls it. */
+    const ledgerSyms = await openLedgerSymbols();
     const movers = NIFTY50.map((s) => [s, `${s}.NS`, "₹", 2]);
 
     // Open ledger symbols ride the SAME batch. The signal log showed an entry
@@ -181,20 +183,6 @@ export default async function handler(req, res) {
     const gainers = nifty.filter((s) => s.change_pct > 0).slice(0, 5);
     const losers = nifty.filter((s) => s.change_pct < 0).slice(-5).reverse();
 
-    const mbItems = pick(mb.map((m) => [m.symbol, `${m.symbol}.NS`, "₹", 2]))
-      .map((it) => {
-        const m = mb.find((x) => x.symbol === it.name);
-        if (!m) return it;
-        // Everything the scan recorded, so the row can be audited: when it was
-        // picked, at what price, its score, and the target it was given.
-        return { ...it,
-          note: m.target ? `T ₹${fmtNum(m.target, 0)}` : null,
-          pick_score: m.score ?? null,
-          pick_entry: m.entry ?? null,
-          pick_date: m.picked ?? null,
-          pick_target: m.target ?? null };
-      });
-
     /* ORDER IS AN EDITORIAL CLAIM, NOT AN ARRAY LITERAL.
      *
      * The board opened on ASIA — so the first thing an Indian reader saw on a
@@ -214,7 +202,6 @@ export default async function handler(req, res) {
       // prices beside them are live, which makes a stalled-looking list of
       // names look like a bug rather than the design. Every other weekly
       // artefact on this site prints its vintage; this one did not.
-      seg("multibagger", "MULTIBAGGER IDEAS · WEEKLY", "💎", mbItems),
       seg("asia", "ASIA", "🌏", pick(ASIA)),
       seg("europe", "EUROPE", "🇪🇺", pick(EUROPE)),
       seg("us", "US", "🇺🇸", pick(US_INDICES)),
