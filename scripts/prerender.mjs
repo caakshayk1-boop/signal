@@ -31,15 +31,14 @@ const next = ok ? (v2.plans || []).filter((p) => p.state === "awaiting_entry") :
 
 const block = `${OPEN}
 <section class="pre">
-  <p class="pre-k">Signal V2${ok ? ` · latest session ${esc(day(v2.session_date))}` : ""}</p>
+  <p class="pre-k">Signal${ok ? ` · latest session ${esc(day(v2.session_date))}` : ""}</p>
   <h1 class="pre-h">Indian equities, screened after the close.</h1>
   <p class="pre-s">Review qualified setups, plan the next session, and track every paper trade.</p>
   ${ok ? `<p class="pre-m">${next.length
       ? `<b>${next.length}</b> plan${next.length === 1 ? "" : "s"} for the ${esc(day(v2.next_session))} session.`
       : `No plan for the ${esc(day(v2.next_session))} session. ${esc(v2.status_detail || "")}`}</p>
-  <p class="pre-m">V2 forward record${v2.forward_record_start ? ` since ${esc(day(v2.forward_record_start))}` : ""}:
-    <b>${m.published ?? 0}</b> published, <b>${m.closed ?? 0}</b> closed${m.closed ? "" : " — no completed sample yet"}.
-    Previous model results are excluded.</p>` :
+  <p class="pre-m">Forward record${v2.forward_record_start ? ` since ${esc(day(v2.forward_record_start))}` : ""}:
+    <b>${m.published ?? 0}</b> published, <b>${m.closed ?? 0}</b> closed${m.closed ? "" : " — no completed sample yet"}.</p>` :
   `<p class="pre-m">The plan feed was not available at build time; the live page loads it.</p>`}
   ${wire.length ? `<ul class="pre-l">${wire.slice(0, 4).map((x) =>
     `<li><b>${esc(x.source || "wire")}</b> — ${esc(x.title || "")}</li>`).join("")}</ul>` : ""}
@@ -57,4 +56,4 @@ if (html.includes(OPEN) && html.includes(CLOSE)) {
   html = html.replace(mm[0], `${mm[0]}\n${block}\n`);
 }
 writeFileSync(path, html);
-console.log(`prerender: ${block.length} bytes into <main>${ok ? ` (V2, session ${v2.session_date})` : " (no V2 feed)"}`);
+console.log(`prerender: ${block.length} bytes into <main>${ok ? ` (plans, session ${v2.session_date})` : " (no plan feed)"}`);

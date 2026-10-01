@@ -274,9 +274,9 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
     };
     const ticks = [hi - pad, 100, lo + pad].filter((v, i, a) => a.findIndex((u) => Math.abs(u - v) < (hi - lo) * 0.08) === i);
     const data = esc(JSON.stringify({ bname, p: pts.map((p) => [p.k, p.n, p.b, p.nav, p.bc]), lo, hi }));
-    return `<div class="v2w-leg" aria-hidden="true"><span><i></i>V2 paper NAV</span><span><i class="bm"></i>${esc(bname)}</span><span>both rebased to 100 at the start</span></div>
+    return `<div class="v2w-leg" aria-hidden="true"><span><i></i>Paper NAV</span><span><i class="bm"></i>${esc(bname)}</span><span>both rebased to 100 at the start</span></div>
       <div class="v2w-chart" data-v2w-chart="${data}" role="img"
-        aria-label="V2 paper NAV against ${esc(bname)}, rebased to 100, ${n} sessions. Latest: NAV ${pts[n - 1].n ?? 'not recorded'}, ${esc(bname)} ${pts[n - 1].b ?? 'not recorded'}.">
+        aria-label="Paper NAV against ${esc(bname)}, rebased to 100, ${n} sessions. Latest: NAV ${pts[n - 1].n ?? 'not recorded'}, ${esc(bname)} ${pts[n - 1].b ?? 'not recorded'}.">
         <svg viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" aria-hidden="true">
           ${ticks.map((t) => `<line class="${Math.abs(t - 100) < 1e-9 ? 'v2w-base' : 'v2w-grid'}" x1="0" x2="${W}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}" vector-effect="non-scaling-stroke"/>`).join('')}
           <path class="v2w-l-bm" d="${path('b')}" vector-effect="non-scaling-stroke"/>
@@ -301,7 +301,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
     cross.style.display = 'block'; cross.style.left = px + 'px';
     dn.style.display = p[1] == null ? 'none' : 'block'; if (p[1] != null) { dn.style.left = px + 'px'; dn.style.top = py(p[1]) + 'px'; }
     db.style.display = p[2] == null ? 'none' : 'block'; if (p[2] != null) { db.style.left = px + 'px'; db.style.top = py(p[2]) + 'px'; }
-    tip.innerHTML = `<b>${esc(day(p[0]))}</b>V2 paper NAV ${p[1] == null ? 'not recorded' : esc(p[1].toFixed(2)) + (p[3] != null ? ` · ${esc(inr(p[3]))}` : '')}<br>${esc(D.bname)} ${p[2] == null ? 'not recorded' : esc(p[2].toFixed(2)) + (p[4] != null ? ` · ${esc(Number(p[4]).toLocaleString('en-IN'))}` : '')}`;
+    tip.innerHTML = `<b>${esc(day(p[0]))}</b>Paper NAV ${p[1] == null ? 'not recorded' : esc(p[1].toFixed(2)) + (p[3] != null ? ` · ${esc(inr(p[3]))}` : '')}<br>${esc(D.bname)} ${p[2] == null ? 'not recorded' : esc(p[2].toFixed(2)) + (p[4] != null ? ` · ${esc(Number(p[4]).toLocaleString('en-IN'))}` : '')}`;
     tip.style.display = 'block';
     const tw = tip.offsetWidth;
     tip.style.left = Math.min(Math.max(0, px + 12), r.width - tw) + 'px';
@@ -403,10 +403,9 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
     // Only the last "now" is current.
     let seen = false;
     for (let i = steps.length - 1; i >= 0; i--) { if (/\bnow\b/.test(steps[i].cls)) { if (seen) steps[i].cls = steps[i].cls.replace(/\bnow\b/, 'done'); seen = true; } }
-    const ver = d && d.model_version ? `Model ${esc(d.model_version)}` : '';
     return `<section class="v2w" aria-label="Where this plan is">
       <h3>Where is this plan in its life?</h3>
-      <p class="v2w-per">${ver}${ver ? ' · ' : ''}published ${esc(when(p.published_at || p.session_date))}</p>
+      <p class="v2w-per">Published ${esc(when(p.published_at || p.session_date))}</p>
       <ol class="v2w-steps">${steps.map((s) => `<li class="${esc(s.cls)}"${/\bnow\b/.test(s.cls) ? ' aria-current="step"' : ''}>
         <i aria-hidden="true">${/\bnow\b/.test(s.cls) ? '●' : '✓'}</i>${esc(s.label)}${s.when ? ` <span>· ${esc(s.when)}</span>` : ''}</li>`).join('')}</ol>
       <p class="v2w-note">Steps come from the plan's own fills and exits. Nothing here estimates what happens next.</p></section>`;
@@ -647,7 +646,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
    * nothing is said about what happens next.
    */
   const STATUS_WORD = { research: 'research, not publishing', shadow: 'paper test',
-                        forward_paper: 'forward paper', validated: 'validated', retired: 'retired' };
+                        forward_paper: 'forward paper', validated: 'validated' };
   function explain(ctx = {}) {
     injectCss();
     const Q = 'Explain this dashboard';
@@ -675,10 +674,10 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
       const m = F.metrics || {};
       const plans = m.awaiting_entry || 0;
       add(plans
-        ? `${plans} Signal V2 plan${plans === 1 ? '' : 's'} ${plans === 1 ? 'is' : 'are'} set for the next session.`
-        : `There is no Signal V2 plan for the next session: ${(() => { const t = String(F.status_detail || 'none qualified').split('. ')[0].replace(/\.$/, ''); return t.charAt(0).toLowerCase() + t.slice(1); })()}.`,
+        ? `${plans} Signal plan${plans === 1 ? '' : 's'} ${plans === 1 ? 'is' : 'are'} set for the next session.`
+        : `There is no Signal plan for the next session: ${(() => { const t = String(F.status_detail || 'none qualified').split('. ')[0].replace(/\.$/, ''); return t.charAt(0).toLowerCase() + t.slice(1); })()}.`,
         ctx.plansRef || null, 'Plans');
-      add(`The V2 forward record, which began ${F.forward_record_start ? day(F.forward_record_start) : 'at the cutover'}, has ${m.published ?? 0} published plan${m.published === 1 ? '' : 's'} and ${m.closed ?? 0} closed; no win rate is shown until ${m.min_closed_for_rate || 30} have closed.`,
+      add(`The forward record, which began ${F.forward_record_start ? day(F.forward_record_start) : 'with the first session scanned'}, has ${m.published ?? 0} published plan${m.published === 1 ? '' : 's'} and ${m.closed ?? 0} closed; no win rate is shown until ${m.min_closed_for_rate || 30} have closed.`,
         ctx.recordRef || null, 'Record');
       const st = F.strategies || [];
       if (st.length) {
@@ -754,13 +753,12 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
     const intraHtml = intra.length ? `<h4 class="v2w-h">Intraday, graded after the close</h4><ul class="v2w-rl">${intra.map((p) =>
       `<li><span><a class="sym" href="${esc(stock(p.symbol))}">${esc(p.symbol)}</a> · ${esc(dayShort(p.session))} · bought ${px(p.entry)}, stop ${px(p.stop)}</span>
        <span class="r ${p.total_r > 0 ? 'up' : p.total_r < 0 ? 'dn' : ''}">${rR(p.total_r)}</span></li>`).join('')}</ul>` : '';
-    const ret = (P.retired || []).length ? ` Retired: ${P.retired.map((r) => `${esc(r.name)} (${esc(r.why)})`).join('; ')}.` : '';
     return `<section class="v2w" id="paper" aria-label="${Q}">
       <h3>${opts.title ? esc(opts.title) : 'Paper test: four engines, tracked forward'} <span class="v2w-tag pp">paper</span></h3>
       <p class="v2w-per">As of the ${esc(day(P.as_of))} close · simulated fills · no order is placed · not the published record</p>
       ${opts.compact ? '' : eng}
       <h4 class="v2w-h">Paper setups</h4>${liveHtml}${opts.compact ? '' : doneHtml + intraHtml}
-      <p class="v2w-note">${esc(P.basis || '')}${opts.compact ? '' : ret}</p>
+      <p class="v2w-note">${esc(P.basis || '')}</p>
       ${opts.moreHref ? `<p class="v2w-more"><a href="${esc(opts.moreHref)}">Every paper engine and result →</a></p>` : ''}</section>`;
   }
 

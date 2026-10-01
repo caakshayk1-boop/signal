@@ -161,7 +161,7 @@
    * this exists. A feed added next year gets one line here and is covered
    * everywhere at once. */
   const FEED_NAMES = {
-    '/pulse.json': 'Market pulse', '/signal_v2.json': 'V2 plans',
+    '/pulse.json': 'Market pulse', '/signal_v2.json': 'Plans',
     '/screen.json': 'Screen', '/screen-lite.json': 'Screen',
 
     '/ipo.json': 'IPO book', '/funds.json': 'Fund screen',
@@ -6407,7 +6407,7 @@
       ${sec('The call, and the company behind it', bibleHtml(r), null,
             'What it does, what it earns, what it costs, and where the price sits — '
           + 'assembled from this company’s own row.')}
-      ${sec('Signal V2 plan', v2StockBlock(r.sym), null,
+      ${sec('Signal plan', v2StockBlock(r.sym), null,
             'The one canonical plan for this stock, if there is one — the same plan every page and Vision show.')}
       ${sec('Technical read', treadBlock(r.sym), null,
             'Trend, levels, momentum and volume as rules computed after the close, scored out of ten. '
@@ -8148,9 +8148,9 @@
    * ends up unreachable by keyboard.
    */
   const CMD_ROUTES = [
-    ['/', 'Today', 'The latest session, the next one, and the V2 plans'],
-    ['/opportunities', 'Opportunities', 'Every V2 plan by state, eligible first'],
-    ['/performance', 'Performance', 'The V2 forward record, from 1 Oct 2026'],
+    ['/', 'Today', 'The latest session, the next one, and the plans'],
+    ['/opportunities', 'Opportunities', 'Every plan by state, eligible first'],
+    ['/performance', 'Performance', 'The forward record, from 1 Oct 2026'],
     ['/markets', 'Markets', 'The board: 71 instruments with a year of context'],
     ['/ipo', 'IPO', 'Books open now, and how last year’s listings did'],
     ['/screen', 'Screen', 'All names, searchable'],
@@ -8368,7 +8368,7 @@
   const FEED_AGE = [
     ['Stock screen',   screenAgeUrl,       30],
     ['Market pulse',   '/pulse.json',      30],
-    ['V2 plans',       '/signal_v2.json',  30],
+    ['Plans',          '/signal_v2.json',  30],
     /* WAS 8, BECAUSE THE SUBSCRIPTION FIGURE IN THIS FILE WENT STALE INSIDE A
      * SESSION — it showed green at 19 hours while the book it described had
      * moved from 27x to 104x.
@@ -10355,7 +10355,7 @@
   const MORE = [
     ['Track', [
       ['/brief',       'The brief',   'The current plan, in full'],
-      ['/performance', 'Performance', 'The V2 forward record'],
+      ['/performance', 'Performance', 'The forward record'],
     ]],
     ['How this works', [
       ['/methodology', 'Methodology', 'How every number here is made'],
@@ -10699,210 +10699,6 @@
      and nothing else — every tile still renders. */
   let WIRE_CACHE = null;
 
-  /* ══ THE REGIME ═══════════════════════════════════════════════════════════
-   *
-   * What kind of market this is, and — the part that matters — what this
-   * book's own closed trades did in it.
-   *
-   * THE REFERENCE THIS CAME FROM ASSERTS ITS MAPPING. Calm 1.0, trending 0.7,
-   * crisis 3.0, with no sample behind any of it. regime.py measures instead,
-   * and this renders what it measured including when that is nothing: a cell
-   * under eight closed trades prints no figure at all, and the site's actual
-   * bar for believing one is thirty closed at t ≥ 2.
-   *
-   * THE HEADLINE IS THE HONEST NUMBER, NOT THE FLATTERING ONE. Before the
-   * population was restricted to NSE equities this read +0.163R at t=2.52 and
-   * looked like a discovery; 355 of those 617 trades were gold, crude and
-   * currency pairs, labelled by Indian equity volatility. On the 239 trades
-   * the label actually describes it reads −0.008R. That is what goes on the
-   * page.
-   */
-  const regimeSec = (d, liveRec) => {
-    const t = d && d.today;
-    if (!t || !t.regime) return '';
-    const cell = ((d.measured || {}).cells || {})[t.regime];
-    const yr = d.last_year || {};
-    const tot = Object.values(yr).reduce((a, b) => a + b, 0) || 1;
-    const order = Object.entries(yr).sort((a, b) => b[1] - a[1]);
-    const NAMES = d.regimes || {};
-
-    const verdict = !cell ? `<p class="said"><b>This book has never closed a trade in this
-        regime.</b> Not a judgement about it — the dated ledger starts in June and this
-        market has not been in this state since. There is nothing to report and nothing is
-        invented to fill the space.</p>`
-      : !cell.readable ? `<p class="said">Only <b>${cell.n}</b> closed
-        ${cell.n === 1 ? 'trade' : 'trades'} in this regime, which is below the
-        ${(d.thresholds || {}).min_cell || 8} this page will read anything into. The figure
-        exists and is deliberately not shown: a handful of trades produces a confident
-        number and no evidence.</p>`
-      : `<div class="rgm-n">
-          <span><i>Closed here</i><b>${cell.n}</b></span>
-          <span><i>Per trade</i><b class="${cell.avg_r > 0 ? 'up' : cell.avg_r < 0 ? 'dn' : ''}">${
-            cell.avg_r > 0 ? '+' : ''}${cell.avg_r.toFixed(3)}R</b></span>
-          <span><i>Win rate</i><b>${cell.win_rate}%</b></span>
-          <span><i>t-statistic</i><b>${cell.t == null ? '—' : cell.t.toFixed(2)}</b></span>
-        </div>
-        ${/* A SIGNIFICANT LOSS IS NOT A BAR CLEARED. This tested Math.abs(t),
-             so a t of -2.32 on -0.768R would have read "that clears the
-             significance bar" — congratulating the page on losing money
-             reliably. Significance and direction are two facts and the
-             sentence has to carry both. */''}
-        <p class="said">${(cell.t || 0) >= 2
-          ? `<b>That clears the significance bar</b>, on ${cell.n} trades — the only cell on
-             this page that does.`
-          : (cell.t || 0) <= -2
-          ? `<b>Significantly negative.</b> A t of ${cell.t.toFixed(2)} over ${cell.n} trades
-             says the losses are not bad luck. That is a harder result than "no edge" and it
-             is the one this book has in this market.`
-          : `<b>Not significant.</b> A t of ${cell.t == null ? '—' : cell.t.toFixed(2)} over
-             ${cell.n} trades is indistinguishable from chance, which is the honest reading
-             of this book in this market and not a placeholder for a better one.`}</p>`;
-
-    /* ── TWO CLOCKS, NOT TWO POPULATIONS ──────────────────────────────────
-     *
-     * The record above this panel is computed in the browser from the live
-     * ledger. This panel is a SNAPSHOT: regime.py writes regime.json on a
-     * schedule, because labelling every past session by trend and trailing
-     * volatility is not work a page can do on load.
-     *
-     * Since 2026-09-19 both use the identical population rule, so they agree
-     * the moment they are computed together — verified at 11 closed, 9.1%,
-     * -0.723R from two different stores in two different languages. What they
-     * cannot do is agree CONTINUOUSLY: two KEEL trades closed at -1R in the
-     * two hours after one particular snapshot, and the page went straight back
-     * to showing 13 closed at 7.7% above 11 closed at 9.1% — which is exactly
-     * the pair of numbers that started this, with the cause moved rather than
-     * removed.
-     *
-     * A reader cannot be expected to infer a stale timestamp from a figure. So
-     * the panel says when it was measured, and when the live count has since
-     * moved it says that too, with both numbers. The gap is a fact about the
-     * clock and it is printed as one. */
-    const liveN = liveRec && Number.isFinite(Number(liveRec.trades)) ? Number(liveRec.trades) : null;
-    /* The SNAPSHOT'S WHOLE POPULATION, summed across every regime cell — not
-       `cell.n`, which is only the trades that fall in TODAY'S regime. The two
-       are equal today because every closed trade since launch happens to sit
-       in calm_range, and comparing the record's all-regime total against one
-       cell would start lying the moment that stops being true. */
-    const snapN = (() => {
-      const cells = (d.measured || {}).cells;
-      if (!cells) return null;
-      const tot = Object.values(cells)
-        .reduce((a, c) => a + (Number.isFinite(Number(c && c.n)) ? Number(c.n) : 0), 0);
-      return tot || null;
-    })();
-    /* ageHours, not Date.parse: a stamp with no offset parses as LOCAL time,
-       which is the bug that once added 8 hours to every feed age on this site
-       in MYT. regime.json carries +00:00, and the helper handles both. */
-    /* The field is `generated_at`. Written as `computed_at` first, which is
-       falsy and silently degraded the sentence to "at the last run" — a stamp
-       that reads as deliberate vagueness rather than as a missing field. */
-    const stampAge = d.generated_at ? ageWord(ageHours(d.generated_at)) : null;
-    /* ── ONE LINE, NOT A PARAGRAPH ────────────────────────────────────────
-     * This said the same thing three times: that the panel is a snapshot, that
-     * the record is live, and why the labels are rebuilt on a schedule. The
-     * reader needs the first two and can be told the third if they ask. Four
-     * consecutive paragraphs of justification under four numbers is the shape
-     * that makes a page feel defensive rather than measured. */
-    const drift = (liveN != null && snapN != null && liveN !== snapN)
-      ? `<p class="hint">Measured ${stampAge ? esc(stampAge) : 'at the last run'}, on
-          <b>${snapN}</b> closed. The record above reads <b>${liveN}</b> —
-          ${liveN > snapN ? `${liveN - snapN} more ${liveN - snapN === 1 ? 'has' : 'have'} closed since`
-                          : `this panel is the older count`}.
-          Same engines, same rule, <a href="/methodology">different clock</a>.</p>`
-      : (stampAge && snapN ? `<p class="hint">Measured ${esc(stampAge)}, on ${snapN} closed
-          ${snapN === 1 ? 'trade' : 'trades'} — the same engines and the same rule the record
-          above uses.</p>` : '');
-    /* `stampAge && snapN`, not `stampAge` alone. With an empty or broken feed
-       snapN is null and this read "Measured 2h old, on the closed trades",
-       printed directly under a verdict that had just said this book has never
-       closed a trade in this regime. A sentence with no number in it is not
-       worth the line. */
-
-    return sec('What kind of market this is', `
-      <div class="rgm">
-        <div class="rgm-h">
-          <span class="rgm-k">${esc(t.t || t.regime)}</span>
-          <span class="rgm-d">day ${d.run_days} of it</span>
-        </div>
-        <p class="rgm-w">${esc(t.d || '')}</p>
-        <div class="rgm-n">
-          <span><i>Volatility</i><b>${t.vol_ann_pct == null ? '—' : t.vol_ann_pct + '%'}</b>
-            <em>${t.vol_pctile == null ? '' : Math.round(t.vol_pctile) + 'th percentile of its own two years'}</em></span>
-          <span><i>Off the year's high</i><b>${t.drawdown_pct == null ? '—' : t.drawdown_pct.toFixed(1) + '%'}</b></span>
-          <span><i>Above its 200-day</i><b>${t.above_200dma == null ? '—' : t.above_200dma ? 'Yes' : 'No'}</b></span>
-        </div>
-      </div>
-      <h3 class="sub">What this book has done in it</h3>
-      ${verdict}
-      ${drift}
-      ${/* `.inds/.ind-r`, not `.rank/.rank-r`: the rank row is two columns and
-           these are three — name, figure, working — so the engine name and its
-           R multiple overlapped. The company page's indicator grid already
-           solves this exact shape. */
-        (cell && cell.readable && cell.engines || []).filter(e => e.readable).length
-        ? `<div class="inds">${cell.engines.filter(e => e.readable).map(e => `<div class="ind-r">
-            <span class="ind-k">${esc(engName(e.engine))}</span>
-            <span class="ind-v ${e.avg_r > 0 ? 'up' : e.avg_r < 0 ? 'dn' : ''}">${
-              e.avg_r > 0 ? '+' : ''}${e.avg_r.toFixed(3)}R</span>
-            <span class="ind-w">${e.n} closed · ${e.win_rate}% won · t ${
-              e.t == null ? '—' : e.t.toFixed(2)}${e.trusted
-                ? ' · <b>clears the bar</b>' : ''}${e.retired
-                ? ` · <b class="rgm-off">${esc(e.retired)}</b>` : ''}</span></div>`).join('')}</div>
-          ${(cell.engines || []).some(e => e.readable && e.retired && e.avg_r > 0)
-            ? `<p class="said">The engine with the best record here is <b>switched off</b>.
-               That is shown rather than tidied away: an earlier version of this table
-               dropped retired engines and, in doing so, hid the only one that made money
-               while leaving three that lost it — which is survivorship bias pointed
-               backwards. Whether it should be switched back on is a question the numbers
-               raise and do not answer: it cleared the significance bar on
-               <b>seventeen</b> trades, and this site's own rule is thirty.</p>` : ''}`
-        : ''}
-      ${/* ── THE ONE THING THE LAUNCH FILTER CANNOT SHOW ────────────────────
-           * Akshay asked for both: count only this site's record, AND keep
-           * GUST's 17 closed at +1.472R. Those cannot be one number — those 17
-           * trades are from June and July, before this site's record began, so
-           * the launch filter is exactly what removes them.
-           *
-           * They are two different claims and both are true, so both are
-           * printed and labelled. The cell above is what THIS SITE has done.
-           * The line below is the measured record the ENGINE was brought back
-           * on, which is a fact about the engine and not a figure this site
-           * takes credit for. Collapsing them into one average is how the
-           * +0.163R that started this whole thread happened. */''}
-      ${/* SHORTENED, NOT DROPPED. The point survives — GUST's record is real,
-           it predates this site, and the two are never added — but it was
-           four sentences to make it, directly under three other paragraphs of
-           reasoning. The engine floor carries the full basis. */''}
-      <p class="hint">GUST's <b>+1.472R over 17 closed</b> (t=3.69) is not in the figure
-        above: those trades predate ${esc(LAUNCH)}.
-        <a href="/engines">The engine's basis</a>, not this site's record.</p>
-
-      <h3 class="sub">The last year, by regime</h3>
-      <div class="rgm-bar" role="img" aria-label="${order.map(([k, n]) =>
-        `${(NAMES[k] || {}).t || k} ${Math.round(n / tot * 100)}%`).join(', ')}">
-        ${order.map(([k, n]) => `<span class="rgm-s rgm-${esc(k)}${k === t.regime ? ' is-now' : ''}"
-          style="width:${(n / tot * 100).toFixed(1)}%" title="${esc((NAMES[k] || {}).t || k)}: ${n} sessions"></span>`).join('')}
-      </div>
-      <div class="rgm-key">${order.map(([k, n]) => `<span><i class="rgm-${esc(k)}"></i>${
-        esc((NAMES[k] || {}).t || k)} <b>${Math.round(n / tot * 100)}%</b></span>`).join('')}</div>
-      ${/* THE METHOD GOES BEHIND A FOLD, AND THE FOLD SAYS WHAT IS IN IT.
-           This was the fourth consecutive paragraph of reasoning in one
-           section. It is all true and none of it is what a reader came for —
-           they came for the regime and what the book did in it. A reader who
-           wants to know how the label is derived will open a summary that
-           says so; one who does not is no longer reading past four
-           justifications to reach the chart. */''}
-      ${foldBody('How this label is derived', `
-        <p class="hint">Trend and trailing realised volatility only — the two things
-          computable for every past session. Breadth is not an input: it has no history, and
-          a regime that cannot be backfilled cannot be measured against the ledger. Every
-          window is trailing, so a label cannot change when later prices arrive.
-          <b>Only NSE equity trades are counted</b> — ${(d.measured || {}).excluded_non_nse || 0}
-          closed trades are COMEX commodities or FX pairs, which an Indian equity regime says
-          nothing about.</p>`)}`,
-      `day ${d.run_days}`);
-  };
 
   /* ── THE STRIP THAT SITS BELOW THE HERO ──────────────────────────────────
    *
@@ -11213,7 +11009,7 @@
   };
 
   R['/methodology'] = async () => {
-    paint(prose('How Signal V2 works', 'How a plan is made, followed and counted.',
+    paint(prose('How Signal works', 'How a plan is made, followed and counted.',
       'One end-of-day process, one plan per stock, and a record that counts every plan it publishes.', `
       <h3>What a plan is</h3>
       <p>A plan is a conditional paper instruction for the <b>next session</b>, published after the NSE close.
@@ -11251,9 +11047,8 @@
         <li>R is measured against the risk fixed at entry. Mean R per trade is a diagnostic, not a portfolio return.</li>
         <li>No win rate is shown until enough trades have closed. A record with nothing closed says so; it never shows 0%.</li>
       </ul>
-      <p><b>V2 forward record begins 1 October 2026. Previous model results are excluded.</b> The engines that ran
-        before that date were retired. Their calls are not counted, compared or carried into V2 plans. Backtests are
-        never imported into the forward record.</p>
+      <p><b>The forward record begins 1 October 2026.</b> Every plan from that date is counted. Backtests are
+        never imported into it.</p>
 
       <h3>Strategy status</h3>
       <p>A rule's status is published beside it on Opportunities and Performance. <i>Research</i> means it has not
@@ -11409,7 +11204,7 @@
       <p>Every rule here was written by the author, tested by the author's code, and graded against
         conditions the author set. That is a conflict no disclosure removes. The mitigations are that the
         grading conditions are published, every plan is counted including the losses, failed tests are
-        recorded, and the V2 record starts empty rather than borrowing an earlier one. See
+        recorded, and the record started empty on 1 October 2026 rather than borrowing results from anywhere. See
         <a href="/methodology">how a plan is built and counted</a>.</p>
 
       <h3>What changes if this ever charges</h3>
@@ -11436,9 +11231,8 @@
         explains how a plan is built and counted, and <a href="/performance">Performance</a> shows every
         result.</p>
 
-      <h3>Signal V2</h3>
-      <p>V2 forward record begins 1 October 2026. Previous model results are excluded. The earlier engines
-        were retired, and none of their calls became a V2 plan. A rule that has not shown a reliable edge
+      <h3>The record</h3>
+      <p>The forward record begins 1 October 2026. A rule that has not shown a reliable edge
         publishes nothing, so there may be days, or longer, with no plan at all. That is the system
         working as intended.</p>
 
@@ -12161,18 +11955,18 @@
     const rec = `${m.published ?? 0} published = ${m.awaiting_entry ?? 0} awaiting entry + ${m.active ?? 0} active + ${m.closed ?? 0} closed + ${m.expired_unfilled ?? 0} expired unfilled + ${m.cancelled_before_entry ?? 0} cancelled before entry`;
     return `<div class="grid v2-rec">${tiles.join('')}</div>
       <p class="v2-recon">${esc(rec)}${m.reconciles === false ? ' — <b>does not reconcile; reported as an error</b>' : ''}.</p>
-      <p class="v2-disc">V2 forward record begins ${since ? v2Date(since) : 'when the first V2 session is scanned'}. Previous model results are excluded.</p>`;
+      <p class="v2-disc">The forward record begins ${since ? v2Date(since) : 'with the first session scanned'}.</p>`;
   }
 
   function v2Shell(title, sub, body) {
-    paint(head(title, sub, 'Signal V2') + body);
+    paint(head(title, sub, 'Signal') + body);
   }
 
   async function v2Need(title, sub) {
-    paint(head(title, sub, 'Signal V2') + skel('sk-card', 3), true);
+    paint(head(title, sub, 'Signal') + skel('sk-card', 3), true);
     const r = await v2Load();
     if (!r.ok) {
-      paint(head(title, sub, 'Signal V2') + fail('The plan feed', r.why));
+      paint(head(title, sub, 'Signal') + fail('The plan feed', r.why));
       return null;
     }
     return r;
@@ -12181,13 +11975,13 @@
   /* The stock page's plan section. V2 is loaded by R['/stock/:id'] before
      paint; if it is not, the section says so rather than implying no plan. */
   const v2StockBlock = (sym) => {
-    if (!V2) return `<p class="muted">The plan feed did not load, so this page cannot say whether ${esc(sym)} has a V2 plan. <a href="/opportunities">Opportunities</a> lists every plan.</p>`;
+    if (!V2) return `<p class="muted">The plan feed did not load, so this page cannot say whether ${esc(sym)} has a plan. <a href="/opportunities">Opportunities</a> lists every plan.</p>`;
     const mine = (V2.plans || []).filter(p => p.symbol === sym);
     const live = mine.filter(p => p.state === 'awaiting_entry' || V2_OPEN.has(p.state));
     const done = mine.filter(p => !live.includes(p));
     return (live.length ? `<div class="v2-cards">${live.map(p => v2Card(p, V2)).join('')}</div>`
-      : `<p>No Signal V2 plan for ${esc(sym)} right now. The research on this page describes the company; it is not a plan and sets no levels.</p>`)
-      + (done.length ? `<p class="muted">Earlier V2 plans: ${done.map(p => `<a href="${v2PlanUrl(p)}">${esc(p.session_date)} · ${esc((V2_STATE[p.state] || [p.state])[0])}</a>`).join(' · ')}</p>` : '');
+      : `<p>No Signal plan for ${esc(sym)} right now. The research on this page describes the company; it is not a plan and sets no levels.</p>`)
+      + (done.length ? `<p class="muted">Earlier plans: ${done.map(p => `<a href="${v2PlanUrl(p)}">${esc(p.session_date)} · ${esc((V2_STATE[p.state] || [p.state])[0])}</a>`).join(' · ')}</p>` : '');
   };
 
   // ── TODAY ─────────────────────────────────────────────────────────────
@@ -12210,7 +12004,7 @@
       : `<ul class="v2-wl">${watch.slice(0, 12).map(w => {
           const s = String(w.sym || w).toUpperCase();
           const p = bySym[s];
-          return `<li><a href="/stock/${encodeURIComponent(s)}">${esc(s)}</a> <span>${p ? `${v2Badge(p.state)} <a href="${v2PlanUrl(p)}">plan</a>` : 'no V2 plan'}</span></li>`;
+          return `<li><a href="/stock/${encodeURIComponent(s)}">${esc(s)}</a> <span>${p ? `${v2Badge(p.state)} <a href="${v2PlanUrl(p)}">plan</a>` : 'no plan'}</span></li>`;
         }).join('')}</ul>`;
     const reg = rg && rg.ok && rg.data && rg.data.today ? rg.data.today : null;
     const ctx = reg ? `<p class="v2-ctx"><b>Market regime: ${esc(String(reg.regime || '').replace(/_/g, ' '))}.</b>
@@ -12227,14 +12021,14 @@
       vsec('Active paper positions', active.length ? `<div class="v2-cards">${active.map(p => v2Card(p, d)).join('')}</div>`
         : `<p class="muted">No open paper position.</p>`, String(active.length)) +
       vsec('Your watchlist', watchHtml, watch.length ? String(watch.length) : '') +
-      vsec('V2 record', v2Record(d, true) + `<p><a href="/performance">Full record →</a></p>`) +
+      vsec('Record', v2Record(d, true) + `<p><a href="/performance">Full record →</a></p>`) +
       (ctx ? vsec('Market context', ctx) : '') +
       `<p class="v2-note">${esc(d.notice || '')}</p>`);
   };
 
   // ── OPPORTUNITIES ─────────────────────────────────────────────────────
   R['/opportunities'] = async () => {
-    const T = 'Opportunities', S = 'Every V2 plan by state. Eligible plans come first.';
+    const T = 'Opportunities', S = 'Every plan by state. Eligible plans come first.';
     const r = await v2Need(T, S);
     if (!r) return;
     const d = r.d, plans = d.plans || [];
@@ -12247,7 +12041,7 @@
     const block = (label, list, empty, lead) => vsec(label, list.length
       ? `<div class="v2-cards">${list.map(p => v2Card(p, d)).join('')}</div>` : `<p class="muted">${esc(empty)}</p>`,
       String(list.length), null, lead ? { lead: true } : undefined);
-    paint(head(T, S, 'Signal V2') + v2StatusStrip(d) +
+    paint(head(T, S, 'Signal') + v2StatusStrip(d) +
       (eligible.length ? '' : v2Empty(d, 'Nothing is eligible for the next session.')) +
       block('Eligible next session', eligible, 'No plan is waiting for entry.', true) +
       v2Paper(d, {}) +
@@ -12277,9 +12071,9 @@
     const d = r.d;
     const p = (d.plans || []).find(x => x.id === id);
     if (!p) {
-      v2Shell('Plan not found', '', `<div class="empty"><b>There is no V2 plan with the id ${esc(id)}.</b>
-        <p>V2 plan ids look like <code>2026-10-05:SYMBOL:version</code>. Calls from the retired V1 engines were not carried into V2 and have no plan page.</p>
-        <p><a href="/opportunities">All V2 plans →</a></p></div>`);
+      v2Shell('Plan not found', '', `<div class="empty"><b>There is no plan with the id ${esc(id)}.</b>
+        <p>Plan ids look like <code>2026-10-05:SYMBOL:version</code>.</p>
+        <p><a href="/opportunities">All plans →</a></p></div>`);
       return;
     }
     const q = await quotes([p.symbol]).catch(() => ({}));
@@ -12341,7 +12135,7 @@
 
   // ── PERFORMANCE ───────────────────────────────────────────────────────
   R['/performance'] = async () => {
-    const T = 'Performance', S = 'The Signal V2 forward record: every paper plan, wins and losses alike.';
+    const T = 'Performance', S = 'The forward record: every paper plan, wins and losses alike.';
     const r = await v2Need(T, S);
     if (!r) return;
     const d = r.d, plans = d.plans || [];
@@ -12350,11 +12144,11 @@
       <td class="cnum hm">${price(p.fill && p.fill.price)}</td><td class="hm">${esc((V2_STATE[p.state] || [p.state])[0])}</td>
       <td class="${V2_OUTCOME[p.outcome][1]}">${V2_OUTCOME[p.outcome][0]}</td><td class="cnum">${v2R(p.total_r)}</td><td class="cnum">${v2Inr(p.net_pnl_inr)}</td></tr>`).join('');
     const c = d.costs || {};
-    paint(head(T, S, 'Signal V2') +
+    paint(head(T, S, 'Signal') +
       vsec('The record', v2Record(d, false), null, null, { lead: true }) +
       v2Widgets(d, 'perf', 'calendar') +
       vsec('Closed trades', closed.length ? `<table class="v2-tbl"><thead><tr><th scope="col">Symbol</th><th scope="col" class="hm">Signal</th><th scope="col" class="hm">Fill</th><th scope="col" class="hm">Exit</th><th scope="col">Outcome</th><th scope="col">Net R</th><th scope="col">Net ₹</th></tr></thead><tbody>${rows}</tbody></table>`
-        : `<p class="muted">No V2 trade has closed. A win rate needs closed trades, so none is shown.</p>`, String(closed.length)) +
+        : `<p class="muted">No trade has closed. A win rate needs closed trades, so none is shown.</p>`, String(closed.length)) +
       vsec('How it is counted', `<ul class="v2-list">
         <li>Fills and exits are simulated from daily bars. No order is placed anywhere.</li>
         <li>Win, loss or breakeven comes from final net P&amp;L after charges, never from which level was touched. Breakeven means within ±${(d.metrics || {}).breakeven_band_r ?? '—'}R. A target touch alone is not a win.</li>
@@ -12363,26 +12157,18 @@
         <li>Paper NAV starts from ${v2Inr((d.reference_size || {}).capital_inr)} of reference capital at ${(d.reference_size || {}).risk_per_trade_pct ?? '—'}% risk a trade. Mean R per trade is a diagnostic, not a portfolio return.</li>
       </ul>`) +
       vsec('Strategies', v2Strategies(d)) +
-      vsec('Model', `<p>Model version <code>${esc(d.model_version)}</code> · mode ${esc(d.mode)} · last scan ${v2Date(d.session_date)} · published ${v2Time(d.published_at)}${d.cutover_at ? ` · V2 activated ${v2Time(d.cutover_at)}` : ''}.</p>
-        <p class="muted">Results of the retired V1 engines are excluded and were not carried into this record. They cannot be removed from third-party caches, emails or screenshots.</p>`));
+      vsec('Model', `<p>Mode ${esc(d.mode)} · last scan ${v2Date(d.session_date)} · published ${v2Time(d.published_at)}${d.forward_record_start ? ` · record began ${v2Date(d.forward_record_start)}` : ''}.</p>`));
   };
 
-  // ── RETIRED V1 ROUTES ─────────────────────────────────────────────────
-  /* An old link lands on a plain statement, never on a different trade that
-     happens to share the symbol. */
-  const v2Retired = (what) => async () => {
-    await v2Load().catch(() => null);
-    const since = V2 && V2.forward_record_start;
-    v2Shell('This page has been retired', '',
-      `<div class="empty v2-retired"><b>${esc(what)} belonged to Signal V1, which was retired on 1 October 2026.</b>
-        <p>Signal V2 publishes conditional plans from one end-of-day process and tracks every one in a new forward record${since ? ` that begins ${v2Date(since)}` : ''}. Previous calls and their results are excluded. No V1 call was turned into a V2 plan.</p>
-        <p><a class="btn" href="/opportunities">Opportunities</a> <a class="btn" href="/performance">Performance</a></p></div>`);
-  };
-  R['/signals'] = v2Retired('The ledger');
-  R['/engines'] = v2Retired('The engine floor');
-  R['/research'] = v2Retired('The research floor');
-  R['/buoy'] = v2Retired('BUOY');
-  R['/ideas'] = v2Retired('Ideas');
+  // ── OLD ADDRESSES ─────────────────────────────────────────────────────
+  /* Pages from before the 1 Oct 2026 start. The Worker answers them with a
+     301 to the page that replaced them; these cover an in-app navigation. */
+  const moved = (to) => async () => go(to, { replace: true });
+  R['/signals'] = moved('/performance');
+  R['/engines'] = moved('/opportunities');
+  R['/research'] = moved('/opportunities');
+  R['/buoy'] = moved('/opportunities');
+  R['/ideas'] = moved('/opportunities');
 
   // ── THE BRIEF: the most recent eligible or active plan, in full ──────
   R['/brief'] = async () => {
@@ -12485,11 +12271,11 @@
   const META = {
     '/':            ['Signal — Indian equities, screened after the close',
                      'Review qualified setups, plan the next session, and track every paper trade. NSE equities, long only, with a forward record that starts empty.'],
-    '/opportunities': ['Opportunities — every V2 plan by state',
+    '/opportunities': ['Opportunities — every plan by state',
                      'Next-session plans for NSE equities, grouped as eligible, extended, active, closed and expired, each with its entry range, stop and three targets.'],
-    '/performance': ['Performance — the Signal V2 forward record',
-                     'Every V2 paper plan, wins and losses alike, with reconciled counts, net P&L after modelled costs and the date the record began.'],
-    '/plan/:id':    ['Plan — Signal V2',
+    '/performance': ['Performance — the Signal forward record',
+                     'Every paper plan, wins and losses alike, with reconciled counts, net P&L after modelled costs and the date the record began.'],
+    '/plan/:id':    ['Plan — Signal',
                      'One conditional paper plan: entry range, stop, three targets, exit sizes, expiry and every update since publication.'],
     '/markets':     ['Markets — the board, 71 instruments with a year of context',
                      'Indices, sectors, commodities and currencies on one board, each against its own 52-week range. Sector heat, breadth and what moved today.'],
@@ -12502,7 +12288,6 @@
        universe, sourced. */
     '/screen':      ['Screen — every NSE name we track, filterable',
                      'Every name in the universe on price, trend, quality, value and institutional flow. FII and DII holding quarter on quarter, from the company’s own filings.'],
-    '/signals':     ['Retired — the V1 ledger', 'Signal V1 was retired on 1 October 2026. Its calls are excluded from the V2 record.'],
     '/heat':        ['The heatmap — today in each name’s own units',
                      'The market coloured by how far each name moved against its own average range rather than in percent, outlined by the screen’s standing call, and marked where a name is in today’s wire.'],
     '/map':         ['The map — every NSE name on one screen',
@@ -12519,8 +12304,6 @@
                      'Each section of this site, what question it answers, and which of the same screened names it is looking at.'],
     '/radar':       ['Signal radar — the market, and the names carrying it',
                      'A breadth-based market score with every term printed, and the eight highest-scoring names ranked on trend, momentum, volume and institutional flow.'],
-    '/engines':     ['Retired — the V1 engine floor', 'Signal V1 was retired on 1 October 2026.'],
-    '/ideas':       ['Retired — V1 ideas', 'Ideas now live in Opportunities, as next-session plans.'],
     '/ipo':         ['IPO — books open now, and how last year’s listings did',
                      'Issues open and upcoming with demand, valuation and peer comparison, plus every recent listing measured against its issue price.'],
     '/news':        ['News — the wire, and the screened names each story touches',
@@ -12530,22 +12313,20 @@
     '/watch':       ['Watchlist — your names, sorted by what needs attention',
                      'The names you follow, ranked by what changed rather than alphabetically.'],
     '/brief':       ['The brief — the current plan, in full',
-                     'The current V2 plan with every level and condition, or a plain statement that nothing qualified.'],
-    '/methodology': ['Methodology — how a V2 plan is built and graded',
+                     'The current plan with every level and condition, or a plain statement that nothing qualified.'],
+    '/methodology': ['Methodology — how a plan is built and graded',
                      'Risk-first plans, next-session entry, three targets with fixed exit sizes, simulated fills and how the forward record is counted.'],
     '/sources':     ['Data sources — where each number comes from',
                      'The feed behind every figure on this site, and how fresh each one is.'],
     '/terms':       ['Terms', 'Terms of use for signal.askakshay.com.'],
     '/privacy':     ['Privacy', 'What this site stores, and what it does not.'],
     '/join':        ['The morning list', 'Join the list for the daily email. It is not being sent yet; the brief is on the site every morning.'],
-    '/research':    ['Retired — the V1 research floor', 'Signal V1 was retired on 1 October 2026.'],
-    '/buoy':        ['Retired — BUOY', 'Signal V1 was retired on 1 October 2026.'],
     /* THESE THREE HAD NO ROW, so each fell through to META['/'] and told a
        crawler, a link preview and the tab bar that it was the front page —
        same title, same description, same canonical. An external audit read it
        as "/about returns the home page". It did, in the head. */
     '/about':       ['About — who builds Signal',
-                     'Signal is built by Akshay Kothari, a Chartered Accountant working in FP&A: what the site is, what it is not, and when its V2 record began.'],
+                     'Signal is built by Akshay Kothari, a Chartered Accountant working in FP&A: what the site is, what it is not, and when its record began.'],
     '/disclaimer':  ['Disclaimer — educational research, not investment advice',
                      'Signal is not registered with SEBI as a Research Analyst or Investment Adviser. Nothing on it is a recommendation or personalised advice.'],
     '/disclosures': ['Disclosures — conflicts, incentives and who pays for this',
@@ -12625,10 +12406,10 @@
 
   /* The route's own name, shown beside the brand. Empty on Today, because a
    * breadcrumb reading "Today" while you are looking at Today is noise. */
-  const WHERE = { '/': '', '/markets': 'Market', '/ideas': 'Retired', '/ipo': 'IPO',
+  const WHERE = { '/': '', '/markets': 'Market', '/ipo': 'IPO',
                   '/opportunities': 'Opportunities', '/performance': 'Performance', '/plan/:id': 'Plan',
-                  '/screen': 'Screen', '/signals': 'Retired', '/brief': 'Brief', '/watch': 'Watchlist',
-                  '/engines': 'Retired', '/radar': 'Market · Radar', '/discover': 'All tools', '/buoy': 'Retired', '/research': 'Retired',
+                  '/screen': 'Screen', '/brief': 'Brief', '/watch': 'Watchlist',
+                  '/radar': 'Market · Radar', '/discover': 'All tools',
                   '/map': 'Market · Map', '/reads': 'Weekly reads', '/heat': 'Market · Heatmap',
                   '/join': 'The brief', '/methodology': 'Methodology',
                   '/sources': 'Data sources', '/terms': 'Terms', '/privacy': 'Privacy' };
