@@ -316,6 +316,15 @@ try {
      /V2 forward record begins/.test(perfT) && /Previous model results are excluded/.test(perfT));
   ok("Performance prints no 0% win rate on an empty record", !/\b0(\.0)?%\s*Win rate/i.test(perfT) && !/Win rate\s*0(\.0)?%/i.test(perfT));
   ok("Performance reconciles its counts in words", /published = .* awaiting entry \+ .* active \+ .* closed/.test(perfT.replace(/\s+/g, " ")));
+  /* The shared cards: present, honest about an empty or missing history, and
+     never printing an unformatted value. */
+  const cards = await p.locator(".v2w").allInnerTexts().catch(() => []);
+  const cardT = cards.join("\n");
+  ok("Performance carries the market comparison and the session calendar",
+     /How has the paper book done against the market\?/.test(cardT) && /What happened each session\?/.test(cardT), cards.length);
+  ok("the cards print no NaN, undefined or null", !/\bNaN\b|undefined|\bnull\b/.test(cardT));
+  ok("an unexposed book shows no return or drawdown figure",
+     (v2Feed && v2Feed.history && v2Feed.history.exposed) || !/Worst drawdown/i.test(cardT));
   for (const r of ["/signals", "/engines", "/ideas", "/research"]) {
     await p.goto(SITE + r, { waitUntil: "domcontentloaded" });
     /* Wait for the HYDRATED notice. The server pre-render's h1 already says

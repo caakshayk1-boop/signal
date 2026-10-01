@@ -2184,6 +2184,9 @@
       <section class="pn"><div class="ph"><h2>Completed</h2><span class="n">${done.length}</span></div><div class="pb flush">${veClosedTable(done)}</div>
         <div class="pf">${M.closed ? `${M.closed} closed — ${M.wins} win, ${M.losses} loss, ${M.breakevens} breakeven · net ${veR(M.sum_r_closed)} in total${M.mean_r_closed != null ? ` · mean ${veR(M.mean_r_closed)} a trade` : ''}` : 'No completed sample yet'}${M.win_rate == null && M.closed ? ` · rates are withheld until ${M.min_closed_for_rate || VE_NEED} have closed` : ''}. The same figures as <a href="${SIGNAL_URL}/performance">Signal's record</a>, which begins ${esc(dshort(D.forward_record_start || ''))}; previous model results are excluded. Not a probability.</div></section>
       <div style="height:var(--s-4)"></div>
+      ${window.V2W
+        ? window.V2W.perf(D, { recordHref: SIGNAL_URL + '/performance' }) + window.V2W.calendar(D, { recordHref: SIGNAL_URL + '/performance' })
+        : `<p class="note">The record's charts could not load. The figures above are complete without them.</p>`}
       <section class="pn"><div class="ph"><h2>Never filled</h2><span class="n">${unfilled.length}</span></div><div class="pb">${veNotFilled(unfilled)}</div>
         <div class="pf">Expired and cancelled plans were never trades. They are listed so the record cannot quietly drop them, and they are not counted as results.</div></section>
       <div style="height:var(--s-4)"></div>
