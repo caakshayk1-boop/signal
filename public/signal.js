@@ -3240,6 +3240,10 @@
   let NSE_HOLIDAYS = Object.create(null);
   const setHolidays = (rows) => {
     for (const r of rows || []) if (r && r.date) NSE_HOLIDAYS[r.date] = r.why || 'Exchange holiday';
+    /* Repaint the masthead clock now, not at its next minute: until then it
+       read the eve of a holiday as "opens tomorrow". Before the clock exists
+       this throws in its temporal dead zone, which is fine — it paints itself. */
+    try { tickClock(); } catch (e) { /* clock not set up yet */ }
   };
   // Today's date in a zone, as YYYY-MM-DD — the key the calendar feed uses.
   const zoneDay = (tz) => new Intl.DateTimeFormat('en-CA', { timeZone: tz,
