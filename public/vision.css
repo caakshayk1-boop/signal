@@ -466,7 +466,7 @@ select.inp{padding-right:var(--s-5)}
 .ret i.up{background:rgba(var(--up-rgb),.75)} .ret i.dn{background:rgba(var(--dn-rgb),.75);border-radius:0 0 2px 2px}
 .ret b{font:500 var(--t-xs)/1 var(--f-mono)}
 .lvl{display:flex;flex-direction:column}
-.lvl div{display:grid;grid-template-columns:70px 1fr auto;gap:var(--s-3);align-items:center;padding:7px 0;border-bottom:1px dashed var(--line);font-size:var(--t-sm)}
+.lvl div{display:grid;grid-template-columns:minmax(70px,auto) 1fr auto;gap:var(--s-3);align-items:center;padding:7px 0;border-bottom:1px dashed var(--line);font-size:var(--t-sm)}
 .lvl div:last-child{border-bottom:0}
 .lvl .now{color:var(--accent);font-weight:600}
 .lvl em{font-style:normal;color:var(--ink-3)}
@@ -878,3 +878,4 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 .ve-rules{margin:0;padding-left:18px;font-size:var(--t-sm);color:var(--ink-2);line-height:1.55}
 .ve-rules li+li{margin-top:var(--s-1)}
 .ve-card .vs-lv>div:first-child b{white-space:normal}
+.lvl div.near em{color:var(--warn)}

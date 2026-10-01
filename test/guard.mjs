@@ -2546,11 +2546,27 @@ ok("no figure counts up", !/countUp/.test(JS));
   ok("a missing chart point breaks the line rather than being bridged",
      /if \(p\[key\] == null\) \{ pen = false; continue; \}/.test(W2C));
   ok("the front pages carry the market cards from real closes and the weekly pulse",
-     /function v2Market\(nx, pu\)/.test(JS) && /series=' \+ encodeURIComponent\('\^NSEI'\)/.test(JS)
+     /function v2Market\(nx, pu, d\)/.test(JS) && /series=' \+ encodeURIComponent\('\^NSEI'\)/.test(JS)
      && /W\.nifty\(/.test(JS) && /W\.days\(/.test(JS) && /W\.sectors\(/.test(JS) && /W\.movers\(/.test(JS)
      && /id="hMkt"/.test(readFileSync("public/vision.js", "utf8")));
   ok("a market card that gets no data says so and draws nothing",
      /did not load\.<\/b>/.test(W2C) && /Nothing is drawn in its place/.test(W2C));
+  /* The analyst: assembled from the same computed values the cards draw, each
+     sentence naming its source card; no model call, no free text. */
+  const EXP = (W2C.match(/function explain\(ctx = \{\}\) \{[\s\S]*?\n  \}/) || [""])[0];
+  ok("the analyst reads the cards' own computations and names a source for every sentence",
+     EXP.length > 500 && /niftyStats\(ctx\.series\)/.test(EXP) && /dayStats\(ctx\.series\)/.test(EXP)
+     && (EXP.match(/add\(/g) || []).length >= 6 && !/fetch\(|XMLHttpRequest|api\.anthropic|openai/i.test(EXP)
+     && /S0 = niftyStats\(series\)/.test(W2C) && /DS = dayStats\(series/.test(W2C));
+  ok("both front pages carry the analyst", /window\.V2W\.explain\(/.test(JS) && /window\.V2W\.explain\(/.test(readFileSync("public/vision.js", "utf8")));
+  const TK = readFileSync("src/api/ticker.js", "utf8");
+  ok("the rail checks Yahoo's previous close against the daily closes it already holds",
+     /const before = pairs\.filter\(\(\[t\]\) => t && istDay\(t\) < qd\)/.test(TK) && /prev_basis: "daily close before this session"/.test(TK));
+  const VJ = readFileSync("public/vision.js", "utf8");
+  ok("Vision separates research levels from the one actionable stop",
+     /'Screen ladder level', r\.lad\.s, 'research reference, not a trade stop'/.test(VJ) && !/'Ladder stop'/.test(VJ)
+     && /inside one typical day/.test(VJ) && /The only actionable stop is the Signal V2 plan's/.test(VJ)
+     && /Levels from the screen's build/.test(VJ));
   ok("the cards make no forecast", !/probabilit|expected return|likely to|will (rise|fall)|target price/i.test(W2C));
   ok("both pages name a widget bundle that did not arrive",
      /could not load/.test((JS.match(/function v2Widgets[\s\S]*?\n  \}/) || [""])[0])

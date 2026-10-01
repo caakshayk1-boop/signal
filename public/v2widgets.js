@@ -133,7 +133,12 @@
 @media (max-width:599px){.v2w .v2w-mv{grid-template-columns:minmax(0,1fr)}.v2w .v2w-bars{grid-template-columns:minmax(84px,1fr) minmax(0,1.4fr) 54px}}
 .v2w .v2w-mv h4{font:600 12px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim);margin:0 0 8px}
 .v2w a.sym{color:var(--w-ink);font-weight:600;text-decoration:none}
-.v2w a.sym:hover{color:var(--w-acc);text-decoration:underline}`;
+.v2w a.sym:hover{color:var(--w-acc);text-decoration:underline}
+.v2w-ai{border-color:color-mix(in srgb,var(--w-acc) 35%,var(--w-line))}
+.v2w .v2w-ex{margin:0;padding:0 0 0 20px;display:grid;gap:10px;font:400 14px/1.55 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink)}
+.v2w .v2w-ex li::marker{color:var(--w-dim);font-variant-numeric:tabular-nums}
+.v2w .v2w-src{display:inline-block;margin-left:4px;padding:1px 7px;border:1px solid var(--w-line);border-radius:999px;font:500 11px/1.5 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut);text-decoration:none;white-space:nowrap}
+a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}`;
 
   function injectCss() {
     if (document.getElementById('v2w-css')) return;
@@ -383,12 +388,11 @@
     <p class="v2w-empty"><b>${esc(what)} did not load.</b> ${esc(why || 'No answer from the source.')} Nothing is drawn in its place.</p></section>`;
   const cleanPts = (series) => ((series && series.points) || []).filter((p) => p && p.t && Number.isFinite(p.c) && p.c > 0);
 
-  /* 1 ── HOW HAS THE MARKET DONE THIS YEAR? (the video's value curve + drawdown) */
-  function nifty(series, opts = {}) {
-    injectCss();
-    const Q = 'How has the market done this year?';
+  /* ONE place computes the market figures; the cards and the explanation both
+     call it, so a sentence can never quote a number its card does not show. */
+  function niftyStats(series) {
     const pts = cleanPts(series);
-    if (pts.length < 20) return failCard(Q, 'The Nifty 50 history', opts.error);
+    if (pts.length < 20) return null;
     const n = pts.length, first = pts[0], last = pts[n - 1];
     let hi = pts[0], lo = pts[0], peak = pts[0].c, worst = 0, worstAt = pts[0].t;
     const dd = [];
@@ -400,7 +404,32 @@
       dd.push(x);
       if (x < worst) { worst = x; worstAt = p.t; }
     }
-    const chg = 100 * (last.c / first.c - 1), fromHi = 100 * (last.c / hi.c - 1);
+    return { pts, n, first, last, hi, lo, dd, worst, worstAt,
+             chg: 100 * (last.c / first.c - 1), fromHi: 100 * (last.c / hi.c - 1) };
+  }
+  function dayStats(series, months = 6) {
+    const all = cleanPts(series);
+    if (all.length < 30) return null;
+    const lastT = new Date(all[all.length - 1].t + 'T00:00:00Z');
+    const start = new Date(lastT); start.setUTCMonth(start.getUTCMonth() - months);
+    const rows = [];
+    for (let i = 1; i < all.length; i++) {
+      if (new Date(all[i].t + 'T00:00:00Z') < start) continue;
+      rows.push({ t: all[i].t, c: all[i].c, r: 100 * (all[i].c / all[i - 1].c - 1) });
+    }
+    if (!rows.length) return null;
+    let up = 0, dn = 0, best = rows[0], worst = rows[0];
+    for (const x of rows) { if (x.r > 0) up++; else if (x.r < 0) dn++; if (x.r > best.r) best = x; if (x.r < worst.r) worst = x; }
+    return { rows, lastT, start, up, dn, best, worst, latest: rows[rows.length - 1] };
+  }
+
+  /* 1 ── HOW HAS THE MARKET DONE THIS YEAR? (the video's value curve + drawdown) */
+  function nifty(series, opts = {}) {
+    injectCss();
+    const Q = 'How has the market done this year?';
+    const S0 = niftyStats(series);
+    if (!S0) return failCard(Q, 'The Nifty 50 history', opts.error);
+    const { pts, n, first, last, hi, lo, dd, worst, worstAt, chg, fromHi } = S0;
     const W = 1000, H = 1000, X = (i) => (i / (n - 1)) * W;
     const pad = (hi.c - lo.c) * 0.08 || 1, yl = lo.c - pad, yh = hi.c + pad;
     const Y = (c) => H - ((c - yl) / (yh - yl)) * H;
@@ -414,7 +443,7 @@
     const pctOf = (y) => (y / H * 100).toFixed(2) + '%';
     const data = esc(JSON.stringify({ p: pts.map((p, i) => [p.t, p.c, Math.round(dd[i] * 100) / 100]), yl, yh, dmin }));
     const mid = pts[Math.floor(n / 2)];
-    return `<section class="v2w" aria-label="${esc(Q)}">
+    return `<section class="v2w" id="w-nifty" aria-label="${esc(Q)}">
       <h3>${esc(Q)}</h3>
       <p class="v2w-per">Nifty 50 · daily closes ${esc(day(first.t))} – ${esc(day(last.t))} · price index</p>
       <div class="v2w-kpis">
@@ -470,22 +499,15 @@
   function days(series, opts = {}) {
     injectCss();
     const Q = 'How did each trading day go?';
-    const all = cleanPts(series);
-    if (all.length < 30) return failCard(Q, 'The Nifty 50 daily history', opts.error);
-    const months = opts.months || 6;
-    const lastT = new Date(all[all.length - 1].t + 'T00:00:00Z');
-    const start = new Date(lastT); start.setUTCMonth(start.getUTCMonth() - months);
-    const rows = [];
-    for (let i = 1; i < all.length; i++) {
-      if (new Date(all[i].t + 'T00:00:00Z') < start) continue;
-      rows.push({ t: all[i].t, c: all[i].c, r: 100 * (all[i].c / all[i - 1].c - 1) });
-    }
+    const DS = dayStats(series, opts.months || 6);
+    if (!DS) return failCard(Q, 'The Nifty 50 daily history', opts.error);
+    const { rows, lastT, start } = DS;
     const by = Object.fromEntries(rows.map((x) => [x.t, x]));
     // Weeks from the Monday on or before the first row, through the last row.
     const d0 = new Date(rows[0].t + 'T00:00:00Z'); d0.setUTCDate(d0.getUTCDate() - ((d0.getUTCDay() + 6) % 7));
     const cells = [], mlab = [];
-    let wk = 0, up = 0, dn = 0, best = rows[0], worstD = rows[0];
-    for (const x of rows) { if (x.r > 0) up++; else if (x.r < 0) dn++; if (x.r > best.r) best = x; if (x.r < worstD.r) worstD = x; }
+    let wk = 0;
+    const { up, dn, best } = DS, worstD = DS.worst;
     let lastMonth = '';
     for (let t = new Date(d0); t <= lastT; t.setUTCDate(t.getUTCDate() + 7), wk++) {
       const mk = t.toISOString().slice(0, 7);
@@ -502,7 +524,7 @@
     }
     const info = esc(JSON.stringify(Object.fromEntries(rows.map((x) => [x.t, `${day(x.t)}: ${sgn(x.r, 2)} · Nifty closed at ${num2(x.c)}`]))));
     const L = [['d3', '≤ −1.5%'], ['d2', ''], ['d1', ''], ['z', '±0.25%'], ['u1', ''], ['u2', ''], ['u3', '≥ +1.5%']];
-    return `<section class="v2w" aria-label="${esc(Q)}" data-v2w-hm="${info}">
+    return `<section class="v2w" id="w-days" aria-label="${esc(Q)}" data-v2w-hm="${info}">
       <h3>${esc(Q)}</h3>
       <p class="v2w-per">Nifty 50 close-to-close change · ${esc(day(rows[0].t))} – ${esc(day(rows[rows.length - 1].t))}</p>
       <div class="v2w-kpis">
@@ -538,7 +560,7 @@
         <span class="v2w-trk" aria-hidden="true"><i class="${x.median >= 0 ? 'up' : 'dn'}" style="width:${w.toFixed(1)}%"></i></span>
         <span class="val">${sgn(x.median, 2)}</span>`;
     }).join('');
-    return `<section class="v2w" aria-label="${esc(Q)}">
+    return `<section class="v2w" id="w-sectors" aria-label="${esc(Q)}">
       <h3>${esc(Q)}</h3>
       <p class="v2w-per">Median 1-week move of the screened names in each sector · built ${esc(pulse.built_on ? day(pulse.built_on) : '—')}</p>
       <div class="v2w-kpis">
@@ -562,7 +584,7 @@
     const list = (L) => `<div class="v2w-bars">${L.map((x) => `<span class="nm"><a class="sym" href="${esc(href(x.sym))}">${esc(x.sym)}</a><small>${esc(x.sector || '')}${x.turnover_cr != null ? ` · ₹${esc(num0(x.turnover_cr))} cr a day` : ''}</small></span>
       <span class="v2w-trk one" aria-hidden="true"><i class="${x.r1w >= 0 ? 'up' : 'dn'}" style="width:${Math.min(100, Math.abs(x.r1w) / mx * 100).toFixed(1)}%"></i></span>
       <span class="val">${sgn(x.r1w, 1)}</span>`).join('')}</div>`;
-    return `<section class="v2w" aria-label="${esc(Q)}">
+    return `<section class="v2w" id="w-movers" aria-label="${esc(Q)}">
       <h3>${esc(Q)}</h3>
       <p class="v2w-per">Largest 1-week price changes on the screen · built ${esc(pulse.built_on ? day(pulse.built_on) : '—')}</p>
       <div class="v2w-mv"><div><h4>Rose most</h4>${list(U)}</div><div><h4>Fell most</h4>${list(D)}</div></div>
@@ -575,6 +597,66 @@
     for (const o of sec.querySelectorAll('.v2w-hc.on')) o.classList.remove('on');
     cell.classList.add('on');
     const out = sec.querySelector('.v2w-day'); if (out) out.textContent = D[cell.getAttribute('data-i')] || '';
+  }
+
+
+  /* ══ EXPLAIN THIS DASHBOARD ═══════════════════════════════════════════════
+   * The video's "AI analyst", built so it cannot invent a figure: every
+   * sentence is assembled from the same computed values the cards draw
+   * (niftyStats, dayStats, the pulse, the V2 feed's own metrics and registry),
+   * and every sentence names the card it came from. There is no model and no
+   * free text, so nothing here can quote a number that is not on the page, and
+   * nothing is said about what happens next.
+   */
+  const STATUS_WORD = { research: 'research, not publishing', shadow: 'tracked privately',
+                        forward_paper: 'forward paper', validated: 'validated', retired: 'retired' };
+  function explain(ctx = {}) {
+    injectCss();
+    const Q = 'Explain this dashboard';
+    const S = [];
+    const add = (text, ref, label) => S.push({ text, ref, label });
+    const N = niftyStats(ctx.series), D = dayStats(ctx.series), P = ctx.pulse, F = ctx.feed;
+    if (N) {
+      add(`The Nifty 50 closed at ${num2(N.last.c)} on ${day(N.last.t)}: ${sgn(N.chg)} over the year and ${sgn(N.fromHi)} below its high of ${num0(N.hi.c)} (${dayShort(N.hi.t)}). Its worst fall from a high in the year was ${sgn(N.worst)}, on ${dayShort(N.worstAt)}.`,
+          'w-nifty', 'The year');
+    }
+    if (D) {
+      add(`Over the last six months it rose on ${D.up} sessions and fell on ${D.dn}. The latest session moved ${sgn(D.latest.r, 2)}; the best day was ${sgn(D.best.r, 2)} (${dayShort(D.best.t)}) and the worst ${sgn(D.worst.r, 2)} (${dayShort(D.worst.t)}).`,
+          'w-days', 'Each day');
+    }
+    if (P && P.sectors && P.sectors.length) {
+      const b = P.breadth || {}, sec = P.sectors;
+      let up = 0; for (const x of sec) if (x.median > 0) up++;
+      const top = sec[0], bot = sec[sec.length - 1];
+      add(`This week ${b.up != null ? num0(b.up) : '—'} of ${b.counted != null ? num0(b.counted) : '—'} screened stocks rose and the typical stock moved ${sgn(b.median)}. ${up} of ${sec.length} sectors were up; the best was ${top.name} (${sgn(top.median, 2)}) and the worst ${bot.name} (${sgn(bot.median, 2)}).`,
+          'w-sectors', 'Sectors');
+      const U = (P.movers_up || [])[0], Dn = (P.movers_dn || [])[0];
+      if (U && Dn) add(`The largest weekly rise was ${U.sym} (${sgn(U.r1w)}) and the largest fall ${Dn.sym} (${sgn(Dn.r1w)}).`, 'w-movers', 'Movers');
+    }
+    if (F) {
+      const m = F.metrics || {};
+      const plans = m.awaiting_entry || 0;
+      add(plans
+        ? `${plans} Signal V2 plan${plans === 1 ? '' : 's'} ${plans === 1 ? 'is' : 'are'} set for the next session.`
+        : `There is no Signal V2 plan for the next session: ${(() => { const t = String(F.status_detail || 'none qualified').split('. ')[0].replace(/\.$/, ''); return t.charAt(0).toLowerCase() + t.slice(1); })()}.`,
+        ctx.plansRef || null, 'Plans');
+      add(`The V2 forward record, which began ${F.forward_record_start ? day(F.forward_record_start) : 'at the cutover'}, has ${m.published ?? 0} published plan${m.published === 1 ? '' : 's'} and ${m.closed ?? 0} closed; no win rate is shown until ${m.min_closed_for_rate || 30} have closed.`,
+        ctx.recordRef || null, 'Record');
+      const st = F.strategies || [];
+      if (st.length) {
+        const pub = st.filter((e) => e.publishes).length;
+        add(`${st.length} engines are registered and ${pub} publish: ${st.map((e) => `${e.name} (${STATUS_WORD[e.status] || e.status})`).join(', ')}.`,
+          ctx.enginesRef || null, 'Engines');
+      }
+    }
+    if (!S.length) return failCard(Q, 'The figures this explanation is written from', ctx.error);
+    return `<section class="v2w v2w-ai" aria-label="${esc(Q)}">
+      <h3>${esc(Q)}</h3>
+      <p class="v2w-per">Written from the figures on this page · every sentence names its source · no model, no forecast</p>
+      <ol class="v2w-ex">${S.map((x) => `<li><span>${esc(x.text)}</span>${x.ref
+        ? ` <a class="v2w-src" href="${esc(x.ref.startsWith('/') || x.ref.startsWith('#/') || /^https?:/.test(x.ref) ? x.ref : '#' + x.ref)}"${x.ref.startsWith('/') || x.ref.startsWith('#/') || /^https?:/.test(x.ref) ? '' : ` data-v2w-jump="${esc(x.ref)}"`}>${esc(x.label)} ↗</a>`
+        : ` <span class="v2w-src">${esc(x.label)}</span>`}</li>`).join('')}</ol>
+      <p class="v2w-note">This describes what has already happened and what the record holds. It does not predict, rank or recommend anything.</p></section>`;
   }
 
   /* One set of listeners for every card on either site, bound once. */
@@ -595,6 +677,8 @@
       if (e.target.matches('[data-v2w-mk]')) for (const c of e.target.querySelectorAll('.v2w-cross,.v2w-tip')) c.style.display = 'none';
     }, true);
     document.addEventListener('click', (e) => {
+      const j = e.target.closest && e.target.closest('[data-v2w-jump]');
+      if (j) { const t = document.getElementById(j.getAttribute('data-v2w-jump')); if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } return; }
       const hc = e.target.closest && e.target.closest('.v2w-hc[data-i]');
       if (hc) { onHmOver(hc); return; }
       const b = e.target.closest && e.target.closest('[data-v2w-day]');
@@ -608,5 +692,5 @@
   }
   bind();
 
-  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers } };
+  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers }, explain };
 })();
