@@ -143,7 +143,7 @@
       const days = Math.round((Date.parse(String(ne).slice(0, 10)) - today) / 86400000);
       if (days >= 0 && days <= T.earnDays) put('events', `Results due ${String(ne).slice(0, 10)}`, `in ${days} day${days === 1 ? '' : 's'}`, SRC.cal());
     }
-    if (c.vsig) put('events', `${c.vsig.name} setup filed ${String(c.vsig.fired_at).slice(0, 10)}`, `entry ₹${c.vsig.entry} · stop ₹${c.vsig.sl} · status ${c.vsig.status}`, 'Vision signals feed');
+    if (c.vsig) put('events', `${c.vsig.name} from the close of ${String(c.vsig.fired_at).slice(0, 10)}`, `${c.vsig.entry_low != null ? `entry range ₹${c.vsig.entry_low}–₹${c.vsig.entry_high}` : `entry ₹${c.vsig.entry}`} · stop ₹${c.vsig.sl} · ${c.vsig.status}`, 'Vision end-of-day plans');
     return o;
   }
 

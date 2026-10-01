@@ -2538,19 +2538,22 @@ try {
     const st = await v.evaluate((s2) => { const el = document.querySelector(s2); return el ? { sk: !!el.querySelector(".sk"), txt: el.innerText.slice(0, 80) } : null; }, sel);
     ok(`vision ${hash} finished loading`, st && !st.sk, st);
   }
-  /* The two setups. Before the first upstream scan the feed 404s and the page
-     must say so in words; after it, every card carries a stop and three
-     targets. Never a skeleton left spinning, never a NaN in a level. */
+  /* Setups: the end-of-day plans. Before the first private scan the feed
+     404s and the page must say so in words; after it, every plan card carries
+     an entry range, a stop and three exits. The legacy archive is always
+     there, collapsed. Never a skeleton left spinning, never a NaN. */
   await v.evaluate(() => { location.hash = "#/setups"; });
   await settled(v, SETTLE + 3000);
-  const vSig = await v.evaluate(() => { const b = document.getElementById("vsBody"); if (!b) return null;
-    const cards = [...b.querySelectorAll(".vs-card")];
-    return { sk: !!b.querySelector(".sk"), cards: cards.length, pending: /Not published yet/.test(b.innerText),
-      failed: !!b.querySelector(".st.err"), levels: cards.every((c) => /Stop/i.test(c.innerText) && /T1/.test(c.innerText) && /T3/.test(c.innerText)),
-      bad: /\bNaN\b|\bundefined\b|\bnull\b/.test(b.innerText), rules: b.querySelectorAll(".vs-rule").length }; });
+  const vSig = await v.evaluate(() => { const b = document.getElementById("veBody"); if (!b) return null;
+    const cards = [...b.querySelectorAll(".ve-card")];
+    return { sk: !!b.querySelector(".sk"), cards: cards.length, pending: /No scan published yet/.test(b.innerText),
+      scanned: /Scan of the session of/.test(b.innerText), failed: !!b.querySelector(".st.err"),
+      levels: cards.every((c) => /Entry range/i.test(c.innerText) && /Stop/i.test(c.innerText) && /T1/.test(c.innerText) && /T3/.test(c.innerText)),
+      bad: /\bNaN\b|\bundefined\b|\bnull\b/.test(b.innerText), archive: !!b.querySelector(".ve-arch") }; });
   ok("vision #/setups finished loading", vSig && !vSig.sk, vSig);
-  ok("...shows the setups or says they are not published yet", vSig && (vSig.pending || (vSig.rules === 2 && !vSig.failed)), vSig);
-  ok("...every signal carries its stop and three targets", vSig && vSig.levels && !vSig.bad, vSig);
+  ok("...shows the latest scan or says none is published yet", vSig && (vSig.pending || (vSig.scanned && !vSig.failed)), vSig);
+  ok("...every plan carries its entry range, stop and three exits", vSig && vSig.levels && !vSig.bad, vSig);
+  ok("...and keeps the retired engines as an archive", vSig && vSig.archive, vSig);
   /* Today: the morning read. Against production it must finish, carry its six
      sections, end, and count breadth from live quotes. */
   await v.evaluate(() => { location.hash = "#/today"; });

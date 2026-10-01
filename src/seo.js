@@ -199,15 +199,15 @@ const vPage = (inner) => `<div class="ssr">${inner}
 export async function visionHome(request, env) {
   const shell = await visionShell(env, request);
   const site = await asset(env, request, "/c/_site.json");
-  const sig = (site && site.vsig && site.vsig.today) || [];
+  const ve = (site && site.veod) || null, sig = (ve && ve.plans) || [];
   const top = (site && site.top) || [];
   const body = vPage(`<p class="ssr-k"><a href="${SIGNAL}/">← Signal</a> · Vision</p>
     <h1>Understand any Indian company in minutes.</h1>
     <p class="ssr-s">Price, financials, ownership, events, technical structure and market context — one research workspace for ${esc(site ? site.universe : "~1,000")} NSE companies. Signal finds what deserves attention; Vision shows why.</p>
     ${site && site.barometer ? `<p>Market barometer <b>${esc(site.barometer.score)}/100</b> (${esc(site.barometer.band || "")}). Past week: ${esc(site.week ? site.week.up : "—")} names rose, ${esc(site.week ? site.week.down : "—")} fell.</p>` : ""}
-    ${sig.length ? `<h2>Signals on the last scan</h2><table><thead><tr><th>Company</th><th>Setup</th><th>Entry</th><th>Stop</th><th>T1</th><th>T2</th><th>T3</th></tr></thead><tbody>
-      ${sig.slice(0, 12).map((s) => `<tr><td><a href="/company/${keyOf(s.sym)}">${esc(s.sym)}</a></td><td>${s.engine === "bottom" ? "Bottom reversal" : "4H breakout"}</td><td>${inr(s.entry)}</td><td>${inr(s.sl)}</td><td>${inr(s.t1)}</td><td>${inr(s.t2)}</td><td>${inr(s.t3)}</td></tr>`).join("")}</tbody></table>
-      <p class="ssr-m">Two rules, filed with their levels and graded in the open. New and untested: no win rate is published until 30 have closed.</p>` : ""}
+    ${sig.length ? `<h2>Plans for ${esc(ve.next_session || "the next session")}</h2><table><thead><tr><th>Company</th><th>Buy only</th><th>Stop</th><th>T1</th><th>T2</th><th>T3</th></tr></thead><tbody>
+      ${sig.slice(0, 12).map((s) => `<tr><td><a href="/company/${keyOf(s.sym)}">${esc(s.sym)}</a></td><td>₹${Number(s.entry_low).toFixed(2)}–₹${Number(s.entry_high).toFixed(2)}</td><td>₹${Number(s.stop).toFixed(2)}</td><td>₹${Number(s.t1).toFixed(2)}</td><td>₹${Number(s.t2).toFixed(2)}</td><td>₹${Number(s.t3).toFixed(2)}</td></tr>`).join("")}</tbody></table>
+      <p class="ssr-m">Conditional plans made after the close of ${esc(ve.session_date || "")}: never buy above the top of the range; fills are simulated. ${ve.mode === "paper" ? "Paper mode." : "Research mode — not validated."}</p>` : ""}
     ${top.length ? `<h2>Most-traded companies</h2><ul class="ssr-dir">${top.map((c) => `<li><a href="/company/${keyOf(c.sym)}">${esc(c.sym)}</a> <span>${esc(c.name || "")}</span></li>`).join("")}</ul>` : ""}`);
   const rw = headRewriter({ title: V_TITLE, desc: V_DESC, canonical: VISION + "/", site: "Vision", robots: "index,follow,max-image-preview:large",
     ld: { "@context": "https://schema.org", "@graph": [

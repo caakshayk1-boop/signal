@@ -44,14 +44,16 @@ on:
     - cron: "30 1 * * *"
     - cron: "40 6 * * *"
     - cron: "40 12 * * *"
-    # Vision's two setups are scanned upstream at 13:28 and 15:45 IST on
-    # trading days (vision_scan.yml, 07:58 and 10:15 UTC). These collect each
-    # run ~40 minutes later — late enough to follow a scan the Cloudflare
-    # watchdog had to dispatch because GitHub's own cron did not fire (it has
-    # started that scan 5-8 hours late). The watchdog carries these two slots
-    # too (src/watchdog_schedule.js); move one, move both.
-    - cron: "40 8 * * 1-5"
+    # Vision. The end-of-day plans (feeds/vision_eod.json) are published by
+    # the private engine after each session: 19:05 IST first attempt, 21:05
+    # and 23:05 retries (13:35 / 15:35 / 17:35 UTC). 14:10 collects the first
+    # attempt, 18:15 anything a retry produced. 10:55 still collects the
+    # retired engines' legacy grading (vision_scan.yml, 10:15 UTC) until the
+    # last legacy filing closes. The watchdog carries the same slots
+    # (src/watchdog_schedule.js); move one, move both.
     - cron: "55 10 * * 1-5"
+    - cron: "10 14 * * 1-5"
+    - cron: "15 18 * * 1-5"
   workflow_dispatch:
   push:
     # ON MAIN ONLY. The branch filter was missing and the trigger fires on a
@@ -219,6 +221,28 @@ jobs:
           if gh api "repos/$UPSTREAM/contents/feeds/$f" \
                -H "Accept: application/vnd.github.raw" > ".incoming/$f" 2>/dev/null \
              && python3 -c "import json,sys; d=json.load(open('.incoming/$f')); sys.exit(0 if d.get('ok') and 'history' in d else 1)" 2>/dev/null; then
+            printf '  ok    %-18s %s\n' "$f" "$(du -h ".incoming/$f" | cut -f1)"
+          else
+            printf '  MISS  %-18s not published upstream yet, or not a valid feed — keeping the copy in this repo\n' "$f"
+            rm -f ".incoming/$f"
+          fi
+
+      # ── VISION EOD PLANS, FROM feeds/ NOT docs/ ──────────────────────────
+      #
+      # Written upstream by the PRIVATE engine (caakshayk1-boop/vision-engine)
+      # through the contents API, from an allowlist. Only a file that parses,
+      # declares the public schema and says what status it is replaces the
+      # copy here; before the first scan it 404s and Vision says "no scan
+      # published yet". A malformed file is refused, never half-applied.
+      - name: Fetch Vision's end-of-day plans
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          f=vision_eod.json
+          if gh api "repos/$UPSTREAM/contents/feeds/$f" \
+               -H "Accept: application/vnd.github.raw" > ".incoming/$f" 2>/dev/null \
+             && python3 -c "import json,sys; d=json.load(open('.incoming/$f')); sys.exit(0 if d.get('schema')=='vision-eod-public/1' and d.get('status') and isinstance(d.get('plans'), list) else 1)" 2>/dev/null; then
             printf '  ok    %-18s %s\n' "$f" "$(du -h ".incoming/$f" | cut -f1)"
           else
             printf '  MISS  %-18s not published upstream yet, or not a valid feed — keeping the copy in this repo\n' "$f"
