@@ -221,7 +221,10 @@
     const h = H(d), more = opts.recordHref || '/performance';
     const head = `<h3>What happened each session?</h3>
       <p class="v2w-per">Every NSE session since ${esc(since(d))} · ${esc(asOf(d))}</p>`;
-    if (!h) return `<section class="v2w" aria-label="Session calendar">${head}${noHistory(d)}</section>`;
+    // Its own sentence, not noHistory(): both cards sit on one page, and a
+    // page that says the same thing twice reads as a rendering fault.
+    if (!h) return `<section class="v2w" aria-label="Session calendar">${head}<p class="v2w-empty"><b>No sessions recorded yet.</b>
+      Each NSE session is added to this calendar the evening it closes, with what was published, filled and closed that day.</p></section>`;
     const rows = h.sessions;
     if (!rows.length) return `<section class="v2w" aria-label="Session calendar">${head}<p class="v2w-empty"><b>No session has closed since the record began.</b></p></section>`;
     const by = Object.fromEntries(rows.map((r) => [r.session, r]));
