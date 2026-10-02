@@ -2552,6 +2552,8 @@ ok("no figure counts up", !/countUp/.test(JS));
        /Nothing was bought, so there is no gain or loss/.test(REPLAY_FN) && /no fill/.test(FIN_FN));
     ok("the finished list counts from the record's own counts and computes no average",
        /c\.finished/.test(FIN_FN) && !/reduce\(|\/ T\.length|avg/.test(FIN_FN));
+    ok("the NSE holiday table loads at boot on every route, not only where a page asked",
+       /CALENDAR = get\('\/api\/calendar'\)/.test(JS) && /CALENDAR\.then\(r => \{\s*if \(r && r\.ok && r\.data && r\.data\.ok && r\.data\.holidays\) setHolidays/.test(JS));
     ok("a finished setup's page shows its replay, from the record",
        /precLoad\(\)/.test(V2B) && /window\.V2W\.replay\(t, rec, \{ noSymbol: true \}\)/.test(V2B) && /window\.V2W\.finished\(rec, \{ href: setupHref/.test(V2B));
   }

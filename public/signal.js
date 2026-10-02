@@ -3238,6 +3238,7 @@
      then, and an empty table simply means no holiday is known — never that a
      market is open. */
   let NSE_HOLIDAYS = Object.create(null);
+  let CALENDAR = null;   // the one /api/calendar request, started at boot and shared
   const setHolidays = (rows) => {
     for (const r of rows || []) if (r && r.date) NSE_HOLIDAYS[r.date] = r.why || 'Exchange holiday';
     /* Repaint the masthead clock now, not at its next minute: until then it
@@ -11866,7 +11867,7 @@
     /* The strip says when NSE next opens, and that is wrong on a holiday eve
        unless the holiday table is filled. Every V2 view draws the strip, so the
        calendar loads here, beside the feed, not only on the routes that remembered. */
-    const [r, cal] = await Promise.all([get(V2_URL), get('/api/calendar').catch(() => ({ ok: false }))]);
+    const [r, cal] = await Promise.all([get(V2_URL), CALENDAR || get('/api/calendar').catch(() => ({ ok: false }))]);
     if (cal && cal.ok && cal.data && cal.data.ok && cal.data.holidays) setHolidays(cal.data.holidays.rows);
     if (!r.ok || !r.data || r.data.schema !== 'signal-v2-public/1') {
       V2 = null;
@@ -13516,6 +13517,17 @@
   /* On the minute, not every second. The first tick lands on the next
      minute boundary so the displayed time is never up to 59 s stale. */
   setTimeout(() => { tickClock(); setInterval(tickClock, 60000); }, 60000 - (Date.now() % 60000) + 50);
+
+  /* NSE's holiday table, on EVERY route. It used to arrive only with the
+     routes that happened to fetch /api/calendar (Markets and the plan views),
+     so on 2 Oct 2026 — Gandhi Jayanti, NSE shut — /screen and every other
+     page read "NSE Open · 4h 28m to close" all morning. One request, shared
+     with the plan views; a failure leaves the table empty, which the clock reads as
+     "no holiday known", never as a claim that the market is open. */
+  CALENDAR = get('/api/calendar').catch(() => ({ ok: false }));
+  CALENDAR.then(r => {
+    if (r && r.ok && r.data && r.data.ok && r.data.holidays) setHolidays(r.data.holidays.rows);
+  });
 
   /* ── edition stamp and data health ─────────────────────────────────────── */
   paintFreshness();
