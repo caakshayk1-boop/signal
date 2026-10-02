@@ -346,6 +346,25 @@ try {
   ok("Performance carries the market comparison and the session calendar",
      /How has the paper book done against the market\?/.test(cardT) && /What happened each session\?/.test(cardT), cards.length);
   ok("the cards print no NaN, undefined or null", !/\bNaN\b|undefined|\bnull\b/.test(cardT));
+  /* FINISHED PAPER SETUPS. Every one is listed, from paper_record.json, each
+     linking to its replay; before the first ends, the list says so. A record
+     that has not been mirrored yet says that too, never an empty table. */
+  await until(p, () => !document.querySelector("#pFin .sk-card"));
+  const finT = await p.locator("#finished").innerText().catch(() => "");
+  ok("Performance lists the finished paper setups, kept apart from the record",
+     /Finished paper setups/.test(finT) && /kept apart from the record/.test(finT)
+     && (/No paper setup has finished yet/.test(finT) || /\d+ finished · \d+ filled/.test(finT) || /did not load/.test(finT)), finT.slice(0, 160));
+  ok("...and prints no NaN, undefined or null", !/\bNaN\b|undefined|\bnull\b/.test(finT));
+  const firstFin = await p.locator("#finished a.v2w-fr").first().getAttribute("href").catch(() => null);
+  if (firstFin) {
+    await p.goto(SITE + firstFin, { waitUntil: "domcontentloaded" });
+    await until(p, () => !!document.querySelector(".v2w-rp"));
+    const rpT = await p.locator("main").innerText().catch(() => "");
+    ok("a finished setup opens its replay: what happened, the result net of charges, paper",
+       /What happened/.test(rpT) && /Recorded/.test(rpT) && /no order was placed/.test(rpT)
+       && (/[+−]\d+\.\d{2}R/.test(rpT) || /no result/.test(rpT)) && !/\bNaN\b|undefined|\bnull\b/.test(rpT), rpT.slice(0, 160));
+    await p.goto(SITE + "/performance", { waitUntil: "domcontentloaded" });
+  }
   ok("an unexposed book shows no return or drawdown figure",
      (v2Feed && v2Feed.history && v2Feed.history.exposed) || !/Worst drawdown/i.test(cardT));
   /* Addresses from before 1 Oct 2026 forward permanently to the page that

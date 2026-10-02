@@ -11886,6 +11886,18 @@
     else TREAD_WHY = (r && r.error) || 'technical_read.json did not load';
     return TREAD;
   }
+  /* Every finished paper setup, kept for good (paper_record.json): the
+     replay on a finished setup's page and the list on the Record page. The
+     paper block in signal_v2.json forgets a setup ten sessions after it
+     ends; this does not. It is paper, and never a figure in the record. */
+  let PREC = null, PREC_WHY = '';
+  async function precLoad() {
+    if (PREC) return PREC;
+    const r = await get('/paper_record.json').catch(() => ({ ok: false }));
+    if (r && r.ok && r.data && r.data.schema === 'paper-record/1' && Array.isArray(r.data.trades)) PREC = r.data;
+    else PREC_WHY = (r && r.error) || 'paper_record.json did not load';
+    return PREC;
+  }
   const treadBlock = (sym) => window.V2W && window.V2W.read
     ? window.V2W.read(TREAD, sym, { error: TREAD_WHY })
     : `<p class="muted">The read could not load (v2widgets.js did not arrive).</p>`;
@@ -12233,6 +12245,7 @@
      basis is named: a delayed quote inside the session, the last close outside
      it. Nothing here selects a setup; it reads the feed's levels back. */
   const setupHref = (p) => '/setup/' + encodeURIComponent(p.id);
+  const PAPER_LIVE_STATES = new Set(['awaiting_entry', 'activated', 'partially_exited']);
   async function paperEntry(list) {
     const W = window.V2W;
     if (!W || !W.entry || !list.length) return {};
@@ -12251,11 +12264,26 @@
     const d = r.d, P = d.paper || {}, list = P.plans || [];
     /* An id, or a bare symbol for a hand-typed address: the newest setup on
        that symbol. A setup the feed no longer carries says so plainly. */
-    const p = list.find(x => x.id === id) || list.filter(x => x.symbol === id.toUpperCase())
+    const newest = (xs) => xs.find(x => x.id === id) || xs.filter(x => x.symbol === id.toUpperCase())
       .sort((a, b) => String(b.filed_session).localeCompare(String(a.filed_session)))[0];
+    const p = newest(list);
+    /* A finished setup is shown as its replay, from the permanent record;
+       a live one as its Passport. One that left the live feed is still found. */
+    if (!p || p.ended_session || !PAPER_LIVE_STATES.has(p.state)) {
+      const rec = await precLoad();
+      const t = rec && newest(rec.trades);
+      if (t && window.V2W && window.V2W.replay) {
+        const nm0 = Object.fromEntries((rec.engines || []).map(e => [e.id, e.name]));
+        v2Shell(t.symbol, `Paper setup · ${nm0[t.engine] || t.engine} · finished ${v2Date(t.ended_session || t.filed_session)}`,
+          window.V2W.replay(t, rec, { noSymbol: true }) +
+          `<p class="v2-pp-links"><a href="${VISION_URL}/#/brief/${encodeURIComponent(t.symbol)}">${esc(t.symbol)} in Vision ↗</a>
+            · <a href="/stock/${encodeURIComponent(t.symbol)}">Screen card</a> · <a href="/performance#finished">Every finished setup</a></p>`);
+        return;
+      }
+    }
     if (!p || !window.V2W || !window.V2W.passport) {
-      v2Shell('Setup not found', '', `<div class="empty"><b>There is no paper setup ${esc(id)} in the current feed.</b>
-        <p>Setup ids look like <code>2026-10-01:SYMBOL:engine</code>. A finished setup leaves the feed ten sessions after it ends.</p>
+      v2Shell('Setup not found', '', `<div class="empty"><b>There is no paper setup ${esc(id)} in the current feed or the record of finished setups.</b>
+        <p>Setup ids look like <code>2026-10-01:SYMBOL:engine</code>.${PREC_WHY ? ` The record of finished setups did not load (${esc(PREC_WHY)}), so a finished one cannot be shown.` : ''}</p>
         <p><a href="/opportunities">Every setup →</a></p></div>`);
       return;
     }
@@ -12285,6 +12313,7 @@
       v2Widgets(d, 'perf', 'calendar') +
       vsec('Closed trades', closed.length ? `<table class="v2-tbl"><thead><tr><th scope="col">Symbol</th><th scope="col" class="hm">Signal</th><th scope="col" class="hm">Fill</th><th scope="col" class="hm">Exit</th><th scope="col">Outcome</th><th scope="col">Net R</th><th scope="col">Net ₹</th></tr></thead><tbody>${rows}</tbody></table>`
         : `<p class="muted">No trade has closed. A win rate needs closed trades, so none is shown.</p>`, String(closed.length)) +
+      `<div id="finished">${vsec('Finished paper setups', `<p class="muted">Paper test: the four engines tracked forward, kept apart from the record above. Each line opens a replay.</p><div id="pFin">${skel('sk-card', 1)}</div>`)}</div>` +
       `<div class="v2-duo">` +
       vsec('How it is counted', `<ul class="v2-list">
         <li>Fills and exits are simulated from daily bars. No order is placed anywhere.</li>
@@ -12296,6 +12325,11 @@
       vsec('Strategies', v2Strategies(d) +
         `<p class="muted v2-model">Mode ${esc(d.mode)} · last scan ${v2Date(d.session_date)} · published ${v2Time(d.published_at)}${d.forward_record_start ? ` · record began ${v2Date(d.forward_record_start)}` : ''}.</p>`) +
       `</div>`);
+    const rec = await precLoad();
+    const box = routeOf() === '/performance' && document.getElementById('pFin');
+    if (box) box.innerHTML = window.V2W && window.V2W.finished
+      ? window.V2W.finished(rec, { href: setupHref, error: PREC_WHY })
+      : `<p class="muted">The list could not load (v2widgets.js did not arrive).</p>`;
   };
 
   // ── OLD ADDRESSES ─────────────────────────────────────────────────────

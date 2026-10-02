@@ -2487,7 +2487,10 @@ ok("no figure counts up", !/countUp/.test(JS));
   const V2B = (JS.match(/\/\* ══ SIGNAL V2 ═+[\s\S]*?\n  \/\/ The phone tab bar's "More"/) || [""])[0];
   const V2C = V2B.replace(/\/\*[\s\S]*?\*\//g, "");
   ok("the V2 block exists and reads one feed", V2B.length > 5000 && /const V2_URL = '\/signal_v2\.json'/.test(V2B)
-     && (V2C.match(/get\('\/[a-z_0-9-]+\.json'\)/g) || []).every((x) => /regime|signal_v2|pulse|technical_read/.test(x)));
+     && (V2C.match(/get\('\/[a-z_0-9-]+\.json'\)/g) || []).every((x) => /regime|signal_v2|pulse|technical_read|paper_record/.test(x)));
+  /* paper_record.json is every FINISHED paper setup, kept for good: the replay
+     on its setup page and the list on the Record page. Paper, never a figure
+     in the record. */
   /* technical_read.json is the Technical Confluence READ of each stock, shown
      on the stock page only; it is never a plan and never a figure in the record. */
   /* pulse.json is MARKET data for the market cards, never a source of plan
@@ -2536,6 +2539,21 @@ ok("no figure counts up", !/countUp/.test(JS));
     const SYNC_T = readFileSync(".github/workflows/sync-data.yml", "utf8"), PULL_T = readFileSync("scripts/pull-feeds.mjs", "utf8");
     ok("the technical reads are mirrored, schema-checked, in both feed paths",
        /f=technical_read\.json/.test(SYNC_T) && /technical-read\/1/.test(SYNC_T) && /technical_read/.test(PULL_T) && /technical-read\/1/.test(PULL_T));
+    ok("the paper record is mirrored, schema-checked, in both feed paths",
+       /f=paper_record\.json/.test(SYNC_T) && /paper-record\/1/.test(SYNC_T) && /paper_record/.test(PULL_T) && /paper-record\/1/.test(PULL_T));
+    /* The replay prints the engine's own result and computes no rate: the only
+       arithmetic is an exit price less the fill, for the shares sold there. */
+    const REPLAY_FN = (W2.match(/function replay\(t, rec, opts = \{\}\) \{[\s\S]*?\n  \}\n/) || [""])[0];
+    const FIN_FN = (W2.match(/function finished\(rec, opts = \{\}\) \{[\s\S]*?\n  \}\n/) || [""])[0];
+    ok("the replay is labelled paper, prints the engine's net R and says no order was placed",
+       REPLAY_FN.length > 2000 && /v2w-tag pp">paper</.test(REPLAY_FN) && /rR\(t\.total_r\)/.test(REPLAY_FN)
+       && /no order was placed/.test(REPLAY_FN) && /not an order of events/.test(REPLAY_FN) && /stop was booked first/.test(W2));
+    ok("an unfilled setup has no result in the replay, never a zero",
+       /Nothing was bought, so there is no gain or loss/.test(REPLAY_FN) && /no fill/.test(FIN_FN));
+    ok("the finished list counts from the record's own counts and computes no average",
+       /c\.finished/.test(FIN_FN) && !/reduce\(|\/ T\.length|avg/.test(FIN_FN));
+    ok("a finished setup's page shows its replay, from the record",
+       /precLoad\(\)/.test(V2B) && /window\.V2W\.replay\(t, rec, \{ noSymbol: true \}\)/.test(V2B) && /window\.V2W\.finished\(rec, \{ href: setupHref/.test(V2B));
   }
   ok("counts and rates come from the feed's metrics block, never recounted",
      /const m = d\.metrics \|\| \{\}/.test(V2C) && !/filter\([^)]*outcome === 'win'\)\.length/.test(V2C) && !/\.filter\([^)]*r_multiple/.test(V2C));
