@@ -12314,7 +12314,7 @@
       v2Widgets(d, 'perf', 'calendar') +
       vsec('Closed trades', closed.length ? `<table class="v2-tbl"><thead><tr><th scope="col">Symbol</th><th scope="col" class="hm">Signal</th><th scope="col" class="hm">Fill</th><th scope="col" class="hm">Exit</th><th scope="col">Outcome</th><th scope="col">Net R</th><th scope="col">Net ₹</th></tr></thead><tbody>${rows}</tbody></table>`
         : `<p class="muted">No trade has closed. A win rate needs closed trades, so none is shown.</p>`, String(closed.length)) +
-      `<div id="finished">${vsec('Finished paper setups', `<p class="muted">Paper test: the four engines tracked forward, kept apart from the record above. Each line opens a replay.</p><div id="pFin">${skel('sk-card', 1)}</div>`)}</div>` +
+      `<div id="finished">${vsec('Finished paper setups', `<p class="muted">Paper test: the three daily engines, tracked forward and kept apart from the record above. Each line opens a replay. Opening Demand Continuation trades inside one session and is graded on the Setups page.</p><div id="pFin">${skel('sk-card', 1)}</div>`)}</div>` +
       `<div class="v2-duo">` +
       vsec('How it is counted', `<ul class="v2-list">
         <li>Fills and exits are simulated from daily bars. No order is placed anywhere.</li>
