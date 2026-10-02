@@ -6,12 +6,16 @@ export const SIGNAL_META = {
   "Review qualified setups, plan the next session, and track every paper trade. NSE equities, long only, with a forward record that starts empty."
  ],
  "/opportunities": [
-  "Opportunities — every plan by state",
+  "Setups — every paper setup and plan by state",
   "Next-session plans for NSE equities, grouped as eligible, extended, active, closed and expired, each with its entry range, stop and three targets."
  ],
  "/performance": [
-  "Performance — the Signal forward record",
+  "Record — the Signal forward record",
   "Every paper plan, wins and losses alike, with reconciled counts, net P&L after modelled costs and the date the record began."
+ ],
+ "/setup/:id": [
+  "Setup — a Signal paper setup",
+  "One paper setup: buy range, stop, three sells, the exit ladder in shares and rupees, whether its entry still holds against a delayed quote, and everything that happened to it."
  ],
  "/plan/:id": [
   "Plan — Signal",

@@ -726,9 +726,10 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
  * absorb an accidental one. Adding a tab means editing this number and saying
  * why, here. */
 {
-  /* SIGNAL V2: Today | Opportunities | Watchlist | Performance | Market on a
-     desktop; Today | Setups | Watchlist | Record | More on a phone. The label
-     is the DESKTOP one (the first <span>). */
+  /* SIGNAL V2: Today | Setups | Watchlist | Record | Market on a desktop;
+     Today | Setups | Watchlist | Record | More on a phone. One name per page
+     on both (2 Oct 2026): the desktop said Opportunities and Performance
+     while the phone said Setups and Record. The paths did not change. */
   const nav = [...HTML.matchAll(/<a href="(\/[a-z/]*)" data-route="([^"]+)"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/g)]
     .map((m) => ({ href: m[1], route: m[2], label: m[3] }));
   /* FIVE, FROM 2026-10. The redesign made each slot one READER GOAL — Today,
@@ -743,6 +744,9 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("on a phone they read Setups and Record, and Market gives its slot to More",
      /<span class="l-m">Setups<\/span>/.test(HTML) && /<span class="l-m">Record<\/span>/.test(HTML)
      && /class="t-desk"/.test(HTML) && /class="t-mob" data-more/.test(HTML));
+  ok("the desktop names the same two pages the same way",
+     nav.find((n) => n.route === "/opportunities")?.label === "Setups" && nav.find((n) => n.route === "/performance")?.label === "Record",
+     nav.map((n) => n.label));
   ok("href and data-route agree on every tab",
      nav.every((n) => n.href === n.route), nav.filter((n) => n.href !== n.route));
 
@@ -2329,7 +2333,7 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
     paper: ["basis", "as_of", "engines", "plans", "intraday", "retired", "min_closed_for_avg"],
     paperEngine: ["id", "name", "module", "kind", "what", "since", "last_session", "filed", "open", "closed", "wins", "losses", "avg_r"],
     paperPlan: ["id", "engine", "symbol", "filed_session", "for_session", "valid_through", "entry_low", "entry_high", "stop", "t1", "t2",
-      "t3", "sell_pct", "qty", "state", "fill_price", "fill_session", "exits", "total_r", "why", "trailing", "risk_pct"],
+      "t3", "sell_pct", "qty", "state", "fill_price", "fill_session", "exits", "total_r", "why", "trailing", "risk_pct", "tranches", "initial_stop", "ended_session"],
     paperIntra: ["id", "engine", "symbol", "session", "decided_at", "entry", "stop", "t1", "t2", "t3", "qty", "exits", "total_r"],
     history: ["basis", "benchmark", "exposed", "sessions", "drawdown", "nav_change_pct", "benchmark_change_pct"],
     session: ["session", "status", "published", "filled", "closed", "wins", "losses", "breakevens", "nav_inr", "nav_index",
@@ -2526,7 +2530,7 @@ ok("no figure counts up", !/countUp/.test(JS));
     ok("the analyst counts paper setups from the engines' own fields",
        /PP\.engines\.reduce\(\(a, e\) => a \+ \(e\.open \|\| 0\)/.test(W2) && /not counted in the record/.test(W2));
     ok("both sites show the paper board and the read",
-       /v2Paper\(d, \{\}\)/.test(V2B) && /v2Paper\(d, \{ compact: true/.test(V2B) && /sec\('Technical read', treadBlock\(r\.sym\)/.test(JS)
+       /v2Paper\(d, \{ cardHref: setupHref \}\)/.test(V2B) && /v2Paper\(d, \{ compact: true/.test(V2B) && /sec\('Technical read', treadBlock\(r\.sym\)/.test(JS)
        && /window\.V2W\.paper\(D, \{ stockHref/.test(readFileSync("public/vision.js", "utf8"))
        && /window\.V2W\.read\(ok \? tr\.data : null, s/.test(readFileSync("public/vision.js", "utf8")));
     const SYNC_T = readFileSync(".github/workflows/sync-data.yml", "utf8"), PULL_T = readFileSync("scripts/pull-feeds.mjs", "utf8");

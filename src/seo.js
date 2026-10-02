@@ -99,8 +99,8 @@ const crumbs = (items) => ({ "@type": "BreadcrumbList", itemListElement: items.m
 
 /* ─────────────────────────────── SIGNAL ─────────────────────────────── */
 
-const SIGNAL_LINKS = [["/", "Today"], ["/opportunities", "Opportunities"], ["/watch", "Watchlist"],
-  ["/performance", "Performance"], ["/markets", "Market"], ["/screen", "Screen"], ["/methodology", "Methodology"], ["/about", "About"]];
+const SIGNAL_LINKS = [["/", "Today"], ["/opportunities", "Setups"], ["/watch", "Watchlist"],
+  ["/performance", "Record"], ["/markets", "Market"], ["/screen", "Screen"], ["/methodology", "Methodology"], ["/about", "About"]];
 
 function signalFacts(route, site) {
   if (!site) return "";
@@ -131,7 +131,7 @@ export async function signalPage(request, env, path) {
   if (path.startsWith("/stock/")) return signalStock(request, env, shell, decodeURIComponent(path.slice(7)), site);
   // A plan page is one row of the live feed; the generic plan head is
   // accurate for every id, and the app fills in the plan itself.
-  const key = path.startsWith("/plan/") ? "/plan/:id" : path;
+  const key = path.startsWith("/plan/") ? "/plan/:id" : path.startsWith("/setup/") ? "/setup/:id" : path;
 
   const [title, desc] = SIGNAL_META[key] || SIGNAL_META["/404"];
   const h1 = title.split(" — ")[0];

@@ -6463,7 +6463,7 @@
             'The card the screen opens, unchanged — so the summary above can be checked '
           + 'against the figures it was built from.')}
       <p class="hint stock-back"><a href="/screen">← All names</a> ·
-        <a href="/map">The map</a> · <a href="/opportunities">Opportunities</a> ·
+        <a href="/map">The map</a> · <a href="/opportunities">Setups</a> ·
         <a href="/methodology">How a plan is made</a></p>`;
   };
   /* The sheet wires its own chart on open; the page has to do the same. */
@@ -7177,11 +7177,11 @@
         <p style="margin:14px 0 0">Where you probably meant to go:</p>
         <div class="chips" style="margin-top:10px">
           <a class="chip" href="/">Today</a>
-          <a class="chip" href="/opportunities">Opportunities</a>
+          <a class="chip" href="/opportunities">Setups</a>
           <a class="chip" href="/screen">The NSE screen</a>
           <a class="chip" href="/radar">Radar</a>
           <a class="chip" href="/ipo">IPO</a>
-          <a class="chip" href="/performance">Performance</a>
+          <a class="chip" href="/performance">Record</a>
         </div>
       </div>`);
   };
@@ -8193,8 +8193,8 @@
    */
   const CMD_ROUTES = [
     ['/', 'Today', 'The latest session, the next one, and the plans'],
-    ['/opportunities', 'Opportunities', 'Every plan by state, eligible first'],
-    ['/performance', 'Performance', 'The forward record, from 1 Oct 2026'],
+    ['/opportunities', 'Setups', 'Every setup and plan by state, eligible first'],
+    ['/performance', 'Record', 'The forward record, from 1 Oct 2026'],
     ['/markets', 'Markets', 'The board: 71 instruments with a year of context'],
     ['/ipo', 'IPO', 'Books open now, and how last year’s listings did'],
     ['/screen', 'Screen', 'All names, searchable'],
@@ -10399,7 +10399,7 @@
   const MORE = [
     ['Track', [
       ['/brief',       'The brief',   'The current plan, in full'],
-      ['/performance', 'Performance', 'The forward record'],
+      ['/performance', 'Record', 'The forward record'],
     ]],
     ['How this works', [
       ['/methodology', 'Methodology', 'How every number here is made'],
@@ -11192,7 +11192,7 @@
 
       <h3>What the numbers are</h3>
       <p>Each paper plan here states an entry range, a stop and three targets. Every plan is tracked
-        to its end and kept, losses included. The record is on <a href="/performance">Performance</a>
+        to its end and kept, losses included. The record is on <a href="/performance">Record</a>
         and the method on <a href="/methodology">the methodology page</a>. None of it is a forecast.
         Fills are simulated; a published record describes what happened, not what will.</p>
 
@@ -11272,7 +11272,7 @@
       <p>Screens liquid NSE equities after each session closes. When a setup qualifies, it publishes a
         conditional paper plan for the next session, with an entry range, a stop and three targets. Every
         plan is then tracked to its end, losses included. The <a href="/methodology">methodology</a>
-        explains how a plan is built and counted, and <a href="/performance">Performance</a> shows every
+        explains how a plan is built and counted, and <a href="/performance">Record</a> shows every
         result.</p>
 
       <h3>The record</h3>
@@ -12030,7 +12030,7 @@
   /* The stock page's plan section. V2 is loaded by R['/stock/:id'] before
      paint; if it is not, the section says so rather than implying no plan. */
   const v2StockBlock = (sym) => {
-    if (!V2) return `<p class="muted">The plan feed did not load, so this page cannot say whether ${esc(sym)} has a plan. <a href="/opportunities">Opportunities</a> lists every plan.</p>`;
+    if (!V2) return `<p class="muted">The plan feed did not load, so this page cannot say whether ${esc(sym)} has a plan. <a href="/opportunities">Setups</a> lists every plan.</p>`;
     const mine = (V2.plans || []).filter(p => p.symbol === sym);
     const live = mine.filter(p => p.state === 'awaiting_entry' || V2_OPEN.has(p.state));
     const done = mine.filter(p => !live.includes(p));
@@ -12078,6 +12078,7 @@
     paint(hh() +
       (r.stale ? staleNote(r.age) : '') +
       v2StatusStrip(d) +
+      (window.V2W && window.V2W.changes ? window.V2W.changes(d, { href: setupHref }) : '') +
       vsec(`Plans for ${v2Date(d.next_session)}`, next.length ? `<div class="v2-cards">${next.map(p => v2Card(p, d)).join('')}</div>`
         : noPlans, String(next.length), null, { lead: true }) +
       /* A DIGEST, NOT A COPY. The front page listed the same twelve full cards
@@ -12085,7 +12086,7 @@
          window, state — linking to its full card over there, where the sells,
          the reason and the engine rules live. */
       v2Paper(d, { compact: true, digest: true, title: 'Paper setups — a test, not plans', moreHref: '/opportunities#paper',
-                   cardHref: (p) => '/opportunities#pp-' + encodeURIComponent(p.symbol) }) +
+                   cardHref: setupHref }) +
       `<div class="v2-duo">` +
       vsec('Active paper positions', active.length ? `<div class="v2-cards">${active.map(p => v2Card(p, d)).join('')}</div>`
         : `<p class="muted">No open paper position. A setup becomes one when its buy range trades.</p>`, String(active.length)) +
@@ -12094,11 +12095,21 @@
       v2Market(nx, pu, d, ctx) +
       vsec('Record', v2Record(d, true) + `<p><a href="/performance">Full record →</a></p>`) +
       `<p class="v2-note">${esc(d.notice || '')}</p>`);
+    /* The digest's State column becomes the entry check once quotes arrive:
+       "Inside the buy range", "Above the most to pay", and so on. */
+    const live = ((d.paper || {}).plans || []).filter(p => p.state === 'awaiting_entry' || p.fill_price != null);
+    paperEntry(live).then(chk => {
+      if (routeOf() !== '/') return;
+      for (const p of live) {
+        const c = chk[p.id], cell = document.querySelector(`.v2w-dr[data-sym="${CSS.escape(p.symbol)}"] .s`);
+        if (c && cell && c.k !== 'done') { cell.textContent = c.word; cell.title = c.line; cell.dataset.k = c.k; }
+      }
+    });
   };
 
   // ── OPPORTUNITIES ─────────────────────────────────────────────────────
   R['/opportunities'] = async () => {
-    const T = 'Opportunities', S = 'Every plan by state. Eligible plans come first.';
+    const T = 'Setups', S = 'Every setup and plan by state. Eligible ones come first.';
     const r = await v2Need(T, S);
     if (!r) return;
     const d = r.d, plans = d.plans || [];
@@ -12128,7 +12139,7 @@
       vsec('Eligible next session', eligible.length ? cards(eligible)
         : `<p class="v2-none"><b>Nothing is eligible for the next session.</b> ${esc(d.status_detail || '')}</p>`,
         String(eligible.length), null, { lead: true }) +
-      v2Paper(d, {}) +
+      v2Paper(d, { cardHref: setupHref }) +
       vsec('Every plan by state', tally + states.filter(([, list]) => list.length)
         .map(([l, list]) => `<h3 class="v2-st-h">${esc(l)} <span>${list.length}</span></h3>${cards(list)}`).join('')) +
       `<p class="v2-note">Candidates that failed a rule are not published, and neither are their reasons — the rules stay private. ${esc(d.notice || '')}</p>`);
@@ -12216,9 +12227,51 @@
       `<p class="v2-note">${esc(d.notice || '')}</p>`);
   };
 
+  /* ── THE ENTRY CHECK ───────────────────────────────────────────────────
+     One quote request for the live paper setups on screen, then the shared
+     V2W.entry() says where each price sits against its published range. The
+     basis is named: a delayed quote inside the session, the last close outside
+     it. Nothing here selects a setup; it reads the feed's levels back. */
+  const setupHref = (p) => '/setup/' + encodeURIComponent(p.id);
+  async function paperEntry(list) {
+    const W = window.V2W;
+    if (!W || !W.entry || !list.length) return {};
+    const q = await quotes(list.map(p => p.symbol)).catch(() => ({}));
+    const nse = exchangeState('Asia/Kolkata', 9.25, 15.5, 'NSE');
+    const ist = new Date(Date.now() + 330 * 60000).toISOString();
+    const ctx = { open: !!nse.open, at: ist.slice(11, 16), today: ist.slice(0, 10) };
+    return Object.fromEntries(list.map(p => [p.id, W.entry(p, q && q[p.symbol], ctx)]));
+  }
+
+  // ── ONE SETUP: THE PASSPORT ───────────────────────────────────────────
+  R['/setup/:id'] = async () => {
+    const id = routeParam();
+    const r = await v2Need('Setup', id);
+    if (!r) return;
+    const d = r.d, P = d.paper || {}, list = P.plans || [];
+    /* An id, or a bare symbol for a hand-typed address: the newest setup on
+       that symbol. A setup the feed no longer carries says so plainly. */
+    const p = list.find(x => x.id === id) || list.filter(x => x.symbol === id.toUpperCase())
+      .sort((a, b) => String(b.filed_session).localeCompare(String(a.filed_session)))[0];
+    if (!p || !window.V2W || !window.V2W.passport) {
+      v2Shell('Setup not found', '', `<div class="empty"><b>There is no paper setup ${esc(id)} in the current feed.</b>
+        <p>Setup ids look like <code>2026-10-01:SYMBOL:engine</code>. A finished setup leaves the feed ten sessions after it ends.</p>
+        <p><a href="/opportunities">Every setup →</a></p></div>`);
+      return;
+    }
+    const nm = Object.fromEntries((P.engines || []).map(e => [e.id, e.name]));
+    v2Shell(p.symbol, `Paper setup · ${nm[p.engine] || p.engine} · for the ${v2Date(p.for_session)} session`,
+      window.V2W.passport(p, d, { noSymbol: true }) +
+      `<p class="v2-pp-links"><a href="${VISION_URL}/#/brief/${encodeURIComponent(p.symbol)}">${esc(p.symbol)} in Vision: chart, technical read and the business ↗</a>
+        · <a href="/stock/${encodeURIComponent(p.symbol)}">Screen card</a> · <a href="/opportunities">Every setup</a></p>`);
+    const e = (await paperEntry([p]))[p.id];
+    const slot = document.querySelector('[data-v2w-entry]');
+    if (slot && e && routeOf() === '/setup/:id') slot.innerHTML = window.V2W.entryHtml(e);
+  };
+
   // ── PERFORMANCE ───────────────────────────────────────────────────────
   R['/performance'] = async () => {
-    const T = 'Performance', S = 'The forward record: every paper plan, wins and losses alike.';
+    const T = 'Record', S = 'The forward record: every paper plan, wins and losses alike.';
     const r = await v2Need(T, S);
     if (!r) return;
     const d = r.d, plans = d.plans || [];
@@ -12356,10 +12409,12 @@
   const META = {
     '/':            ['Signal — Indian equities, screened after the close',
                      'Review qualified setups, plan the next session, and track every paper trade. NSE equities, long only, with a forward record that starts empty.'],
-    '/opportunities': ['Opportunities — every plan by state',
+    '/opportunities': ['Setups — every paper setup and plan by state',
                      'Next-session plans for NSE equities, grouped as eligible, extended, active, closed and expired, each with its entry range, stop and three targets.'],
-    '/performance': ['Performance — the Signal forward record',
+    '/performance': ['Record — the Signal forward record',
                      'Every paper plan, wins and losses alike, with reconciled counts, net P&L after modelled costs and the date the record began.'],
+    '/setup/:id':   ['Setup — a Signal paper setup',
+                     'One paper setup: buy range, stop, three sells, the exit ladder in shares and rupees, whether its entry still holds against a delayed quote, and everything that happened to it.'],
     '/plan/:id':    ['Plan — Signal',
                      'One conditional paper plan: entry range, stop, three targets, exit sizes, expiry and every update since publication.'],
     '/markets':     ['Markets — the board, 71 instruments with a year of context',
@@ -12492,7 +12547,7 @@
   /* The route's own name, shown beside the brand. Empty on Today, because a
    * breadcrumb reading "Today" while you are looking at Today is noise. */
   const WHERE = { '/': '', '/markets': 'Market', '/ipo': 'IPO',
-                  '/opportunities': 'Opportunities', '/performance': 'Performance', '/plan/:id': 'Plan',
+                  '/opportunities': 'Setups', '/performance': 'Record', '/plan/:id': 'Plan', '/setup/:id': 'Setup',
                   '/screen': 'Screen', '/brief': 'Brief', '/watch': 'Watchlist',
                   '/radar': 'Market · Radar', '/discover': 'All tools',
                   '/map': 'Market · Map', '/reads': 'Weekly reads', '/heat': 'Market · Heatmap',

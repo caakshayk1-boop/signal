@@ -180,7 +180,7 @@ http.createServer(async (req, res) => {
   }
   if (SITE === "vision" && (p === "/" || p === "/vision")) p = "/vision.html";
   /* The signal site routes by PATH: anything that is not a file is its shell. */
-  if (SITE === "signal" && (!/\.[a-z0-9]+$/i.test(p) || p.startsWith("/plan/") || p.startsWith("/stock/"))) p = p === "/vision" ? "/vision.html" : p === "/gems" ? "/gems.html" : "/index.html";
+  if (SITE === "signal" && (!/\.[a-z0-9]+$/i.test(p) || p.startsWith("/plan/") || p.startsWith("/setup/") || p.startsWith("/stock/"))) p = p === "/vision" ? "/vision.html" : p === "/gems" ? "/gems.html" : "/index.html";
   const f = join(ROOT, p);
   if (!f.startsWith(ROOT) || !existsSync(f)) {
     if (/\.json$/i.test(p)) return noFile(res, p);
