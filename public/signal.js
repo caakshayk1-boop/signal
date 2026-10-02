@@ -4776,6 +4776,12 @@
      * nothing here, and the empty state says the filter found none. */
     ahimsa:     ['Nifty500 Ahimsa', r => r.ahimsa === true],
   };
+  const SCR_GROUPS = [
+    ['The call', ['buy_lt', 'buy_pos', 'buy_swing', 'waiting', 'avoid']],
+    ['Chart', ['breakout', 'rsleader', 'volume', 'oversold']],
+    ['Business', ['quality', 'value', 'debtfree', 'compounder']],
+    ['Index', ['ahimsa']],
+  ];
   const SORTS = { comp: 'Composite', q: 'Quality', g: 'Growth', v: 'Value',
                   tech: 'Technical', r1m: '1M return', roce: 'ROCE', mcap_cr: 'Size',
                   // The columns the headings sort by, listed here too so the
@@ -5207,12 +5213,29 @@
               `<option value="${k}"${scrSort === k ? ' selected' : ''}>Rank by ${esc(l)}</option>`).join('')}
           </select>
         </div>
-        <div class="chips" role="group" aria-label="Screen filters">${
-          Object.entries(PRESETS).map(([k, [l]]) => {
-            const on = k === 'all' ? scrPresets.size === 0 : scrPresets.has(k);
-            return `<button type="button" class="chip${on ? ' on' : ''}" data-p="${k}"
-                     aria-pressed="${on}">${esc(l)}</button>`;
-          }).join('')}
+        ${/* GROUPED BY THE QUESTION EACH ONE ASKS. Fourteen chips in one wrap
+            * mixed the screen's call with chart states and balance-sheet tests,
+            * so a reader could not see which kind of filter they had on. Every
+            * preset is still here, in the same order, under a label. */''}
+        <div class="chips scr-fg" role="group" aria-label="Screen filters">${
+          (() => {
+            const chip = k => {
+              const on = k === 'all' ? scrPresets.size === 0 : scrPresets.has(k);
+              return `<button type="button" class="chip${on ? ' on' : ''}" data-p="${k}"
+                       aria-pressed="${on}">${esc(k === 'all' && scrPresets.size ? 'Clear filters' : PRESETS[k][0])}</button>`;
+            };
+            const seen = new Set(['all']);
+            const rowsOf = SCR_GROUPS.map(([label, keys]) => {
+              keys.forEach(k => seen.add(k));
+              return `<div class="scr-fr"><span class="scr-fl">${esc(label)}</span>${keys.filter(k => PRESETS[k]).map(chip).join('')}</div>`;
+            });
+            /* A preset added later and not yet given a group still renders. */
+            const rest = Object.keys(PRESETS).filter(k => !seen.has(k));
+            if (rest.length) rowsOf.push(`<div class="scr-fr"><span class="scr-fl">More</span>${rest.map(chip).join('')}</div>`);
+            /* "Everything" leads the first row: it is the reset for all of them. */
+            rowsOf[0] = rowsOf[0].replace('</span>', `</span>${chip('all')}`);
+            return rowsOf.join('');
+          })()}
         </div>
         <div class="t5tools" style="margin:2px 0 12px">
           ${/* PER PAGE, NOT PER UNIVERSE. A divergence needs a daily series,
@@ -5737,12 +5760,31 @@
         on ? `<i class="scr-ar">${scrDir === 'asc' ? '▲' : '▼'}</i>` : ''}</span>`;
   };
 
-  const screenTable = (rows, offset) => `<div class="rank">
+  /* ── THE SCREEN IS A TABLE AGAIN (2 Oct 2026) ───────────────────────────
+   * Each row had grown to 130px on a desk — name, company, a flow chip and a
+   * full-width 52-week line with its two labels on lines of their own — so a
+   * page ranked by Composite showed eight names and never showed the
+   * composite. One line per name now: identity, the call, the score it is
+   * ranked by with its four parts, the price and its moves, and the 52-week
+   * line as a column of its own. The line, its marks and its two ends are the
+   * same elements; only where they sit changed. */
+  const qgvt = r => {
+    const c = (k, v) => `<i class="qg${v == null ? ' na' : v >= 70 ? ' hi' : v < 35 ? ' lo' : ''}" title="${
+      { Q: 'Quality', G: 'Growth', V: 'Value', T: 'Technical' }[k]} ${v == null ? 'not scored' : Math.round(v)}">${k}<b>${v == null ? '—' : Math.round(v)}</b></i>`;
+    return c('Q', r.q) + c('G', r.g) + c('V', r.v) + c('T', r.tech);
+  };
+  const scoreCell = r => r.comp == null
+    ? `<span class="sc-n" title="No statements, so no composite: unranked">—</span>`
+    : `<span class="sc-n">${Math.round(r.comp)}</span><span class="sc-b" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, r.comp)).toFixed(0)}%"></i></span>`;
+
+  const screenTable = (rows, offset) => `<div class="rank scr-t">
     <div class="rank-r rank-head scr-r scr-call">
       <span class="i">#</span>${hCol('sym', 'Name', 's')}
       <span class="x">Call ${tip('call')}</span>
+      ${hCol('comp', 'Score', 'x sc')}<span class="x qgvt-h" title="Quality · Growth · Value · Technical, each 0–100">Q · G · V · T</span>
       ${hCol('price', 'Price')}${hCol('r1d', 'Today')}${hCol('v50', 'vs 50D')}
-      ${hCol('v200', 'vs 200D')}${hCol('rsi', 'RSI 14D')}${hCol('r1m', '1M', 'm')}
+      ${hCol('v200', 'vs 200D')}${hCol('rsi', 'RSI')}${hCol('r1m', '1M', 'm')}
+      <span class="x pl-h">52-week range</span>
     </div>
     ${rows.map((r, i) => {
       const v50 = r.sma50 ? (r.price - r.sma50) / r.sma50 * 100 : null;
@@ -5753,10 +5795,12 @@
        * is reachable and shareable rather than existing only behind a tap. */
       return `<div class="rank-r scr-r scr-call" data-sym="${esc(r.sym)}" data-href="/stock/${encodeURIComponent(r.sym)}" role="button" tabindex="0">
         <span class="i">${(offset || 0) + i + 1}</span>
-        <span class="s">${watchBtn(r.sym)}<b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span>${instiBadge(r.sym)}</span>
+        <span class="s">${watchBtn(r.sym)}<b>${esc(r.sym)}</b><span>${esc(r.name || '')}${r.sector ? ` · <em>${esc(r.sector)}</em>` : ''}</span>${instiBadge(r.sym)}</span>
         <span class="x" data-l="Call">${vc
           ? `<span class="vtag v-${esc(vc.toLowerCase())}" title="${esc((r.vd.o || '') + (r.vd.l ? ' · ' + r.vd.l : ''))}">${esc(VD_WORD[vc] || vc)}</span>`
           : '—'}</span>
+        <span class="x sc" data-l="Score">${scoreCell(r)}</span>
+        <span class="x qgvt" data-l="Q·G·V·T">${qgvt(r)}</span>
         <span class="x" data-l="Price" data-px>₹${esc(r.price ?? '—')}</span>
         <!-- Filled by the live quote call below. An em dash, not a bullet: a
              cell that never fills should read as "not measured" like every
@@ -11923,15 +11967,21 @@
   /* THE MARKET, AS CARDS: the index's own closes and the screen's weekly
      pulse, drawn by the shared library. They describe the market; the plans
      below are the product's own output and are drawn separately. */
-  function v2Market(nx, pu, d) {
+  /* The regime sentence leads the section instead of being a section of its
+     own at the foot of the page, and the explainer is a disclosure: eight
+     sentences of prose were the first thing under the status strip, above the
+     charts they describe and the setups a reader came for. It is the same
+     text, one tap away, at the end of what it explains. */
+  function v2Market(nx, pu, d, ctx = '') {
     const W = window.V2W && window.V2W.market;
     if (!W) return vsec('The market', `<p class="muted">The market charts could not load. Everything else on this page is complete without them.</p>`);
     const sr = nx && nx.ok ? nx.data : null, pd = pu && pu.ok ? pu.data : null;
     const why = (x) => (x && (x.error || x.why)) || 'no answer';
     const ex = window.V2W.explain ? window.V2W.explain({ series: sr, pulse: pd, feed: d, plansRef: '/opportunities',
       recordRef: '/performance', enginesRef: '/performance', paperRef: '/opportunities#paper', error: why(nx) }) : '';
-    return vsec('The market', `${ex}<div class="v2w-grid2">${W.nifty(sr, { more: '/markets', error: why(nx) })}${W.days(sr, { error: why(nx) })}</div>
-      <div class="v2w-grid2">${W.sectors(pd, { more: '/map', error: why(pu) })}${W.movers(pd, { error: why(pu) })}</div>`);
+    return vsec('The market', `${ctx}<div class="v2w-grid2">${W.nifty(sr, { more: '/markets', error: why(nx) })}${W.days(sr, { error: why(nx) })}</div>
+      <div class="v2w-grid2">${W.sectors(pd, { more: '/map', error: why(pu) })}${W.movers(pd, { error: why(pu) })}</div>
+      ${ex ? `<details class="v2-exp"><summary>Read this page in plain words <span>every sentence names its source</span></summary>${ex}</details>` : ''}`);
   }
 
   /* Day 1 shows the absence of a sample, never a 0% that reads as measured. */
@@ -12011,18 +12061,26 @@
         Nifty ${reg.close != null ? Number(reg.close).toLocaleString('en-IN') + ' points' : '—'},
         ${reg.drawdown_pct != null ? v2Num(reg.drawdown_pct, 1) + '% below its high' : ''}${reg.above_200dma != null ? `, ${reg.above_200dma ? 'above' : 'below'} its 200-day average` : ''}.
         One regime, defined on <a href="/markets">Market</a>.</p>` : '';
+    /* WHAT A READER CAME FOR, FIRST. The order was status, eight sentences
+       of explanation, four market charts, and only then the setups — 1,900px
+       down on a desk and 3,400px on a phone — followed by four sections that
+       were mostly empty states. Now: the session's plans (or one line saying
+       why there are none) and the paper setups; your positions and watchlist
+       side by side; the market with its regime as the first line; the record. */
+    const noPlans = `<p class="v2-none"><b>${esc(v2NoneWhy(d))}</b> ${esc(d.status_detail || '')}</p>`;
     paint(head(H, S, 'Today') +
       (r.stale ? staleNote(r.age) : '') +
       v2StatusStrip(d) +
-      v2Market(nx, pu, d) +
       vsec(`Plans for ${v2Date(d.next_session)}`, next.length ? `<div class="v2-cards">${next.map(p => v2Card(p, d)).join('')}</div>`
-        : v2Empty(d, v2NoneWhy(d)), String(next.length), null, { lead: true }) +
+        : noPlans, String(next.length), null, { lead: true }) +
       v2Paper(d, { compact: true, title: 'Paper setups — a test, not plans', moreHref: '/opportunities#paper' }) +
+      `<div class="v2-duo">` +
       vsec('Active paper positions', active.length ? `<div class="v2-cards">${active.map(p => v2Card(p, d)).join('')}</div>`
-        : `<p class="muted">No open paper position.</p>`, String(active.length)) +
+        : `<p class="muted">No open paper position. A setup becomes one when its buy range trades.</p>`, String(active.length)) +
       vsec('Your watchlist', watchHtml, watch.length ? String(watch.length) : '') +
+      `</div>` +
+      v2Market(nx, pu, d, ctx) +
       vsec('Record', v2Record(d, true) + `<p><a href="/performance">Full record →</a></p>`) +
-      (ctx ? vsec('Market context', ctx) : '') +
       `<p class="v2-note">${esc(d.notice || '')}</p>`);
   };
 
