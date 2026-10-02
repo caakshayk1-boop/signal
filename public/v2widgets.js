@@ -159,6 +159,27 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 .v2w .v2w-pc dt{color:var(--w-mut)}
 .v2w .v2w-pc dd{margin:0;color:var(--w-ink);font-variant-numeric:tabular-nums}
 .v2w .v2w-pc dd.v2w-sells span{display:block}
+.v2w .v2w-pc:target{outline:2px solid var(--w-accent,var(--accent,#2b50d8));outline-offset:2px}
+.v2w .v2w-dg{border:1px solid var(--w-line,var(--line,#e5e2db));border-radius:10px;overflow:hidden}
+.v2w .v2w-dr{display:grid;grid-template-columns:minmax(96px,1.1fr) minmax(0,1.5fr) minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);
+  gap:4px 14px;align-items:baseline;padding:9px 14px;border-top:1px solid var(--w-line,var(--line,#e5e2db));
+  color:var(--w-ink,inherit);text-decoration:none;font:400 13px/1.35 var(--ui,var(--f-sans,system-ui,sans-serif));font-variant-numeric:tabular-nums}
+.v2w .v2w-dr:first-child{border-top:0}
+.v2w a.v2w-dr:hover{background:var(--w-raised,var(--raised,rgba(0,0,0,.03)))}
+.v2w .v2w-dr b{font-weight:600;letter-spacing:.01em}
+.v2w .v2w-dr .e,.v2w .v2w-dr .w,.v2w .v2w-dr .s{color:var(--w-dim,var(--dim,#6b6b6b));font-size:12px}
+.v2w .v2w-dr i{font-style:normal;color:var(--w-dim,var(--dim,#6b6b6b));font-size:12px}
+.v2w .v2w-dh{background:var(--w-raised,var(--raised,rgba(0,0,0,.03)));font:500 10.5px/1 var(--mono,ui-monospace,monospace);letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim,var(--dim,#6b6b6b))}
+.v2w .v2w-dh b,.v2w .v2w-dh span{font:inherit;color:inherit}
+@media(max-width:760px){
+  .v2w .v2w-dh{display:none}
+  .v2w .v2w-dr{grid-template-columns:1fr auto;grid-template-areas:"sym buy" "eng stop" "win st";padding:10px 12px}
+  .v2w .v2w-dr b{grid-area:sym} .v2w .v2w-dr .e{grid-area:eng}
+  .v2w .v2w-dr .n:nth-of-type(2){grid-area:buy;text-align:right} .v2w .v2w-dr .n:nth-of-type(3){grid-area:stop;text-align:right}
+  .v2w .v2w-dr .w{grid-area:win} .v2w .v2w-dr .s{grid-area:st;text-align:right}
+  .v2w .v2w-dr .n:nth-of-type(2)::before{content:'Buy ';color:var(--w-dim,var(--dim,#6b6b6b));font-size:11px}
+  .v2w .v2w-dr .n:nth-of-type(3)::before{content:'Stop ';color:var(--w-dim,var(--dim,#6b6b6b));font-size:11px}
+}
 .v2w .v2w-pc p{margin:0;font:400 12px/1.45 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut)}
 .v2w .v2w-rl{list-style:none;margin:0;padding:0;display:grid;gap:4px;font:400 13px/1.45 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink)}
 .v2w .v2w-rl li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--w-line);padding:4px 0}
@@ -750,7 +771,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
     const done = (P.plans || []).filter((p) => !PAPER_LIVE.has(p.state));
     const card = (p) => {
       const sp = p.sell_pct || [40, 35, 25];
-      return `<article class="v2w-pc"><header><a href="${esc(stock(p.symbol))}">${esc(p.symbol)}</a>
+      return `<article class="v2w-pc" id="pp-${esc(p.symbol)}"><header><a href="${esc(stock(p.symbol))}">${esc(p.symbol)}</a>
           <small>${esc(names[p.engine] || p.engine)}<br>${esc(PSTATE[p.state] || p.state)}</small></header>
         <dl><dt>Buy</dt><dd>${px(p.entry_low)} – ${px(p.entry_high)}</dd>
           <dt>Window</dt><dd>${esc(dayShort(p.for_session))} – ${esc(dayShort(p.valid_through))}</dd>
@@ -759,7 +780,20 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
           ${p.fill_price != null ? `<dt>Filled</dt><dd>${px(p.fill_price)}${p.fill_session ? ' on ' + esc(dayShort(p.fill_session)) : ''} · ${rR(p.total_r)} so far</dd>` : ''}</dl>
         ${p.why ? `<p>Why: ${esc(p.symbol)} ${esc(p.why)}</p>` : ''}</article>`;
     };
-    const liveHtml = live.length ? `<div class="v2w-pcs">${live.map(card).join('')}</div>`
+    /* THE DIGEST: one line a setup, for a page that points at the full cards
+       rather than repeating them. The same levels the card leads with — the
+       buy range, the stop and its distance, the window, the state — and a
+       link to that card, where the three sells and the reason live. */
+    const row = (p) => `<a class="v2w-dr" href="${esc(opts.cardHref ? opts.cardHref(p) : stock(p.symbol))}">
+        <b>${esc(p.symbol)}</b><span class="e">${esc(names[p.engine] || p.engine)}</span>
+        <span class="n">${px(p.entry_low)} – ${px(p.entry_high)}</span>
+        <span class="n">${px(p.stop)}${p.risk_pct != null ? ` <i>${Number(p.risk_pct).toFixed(1)}%</i>` : ''}</span>
+        <span class="w">${esc(dayShort(p.for_session))} – ${esc(dayShort(p.valid_through))}</span>
+        <span class="s">${esc(PSTATE[p.state] || p.state)}${p.fill_price != null ? ' · ' + rR(p.total_r) : ''}</span></a>`;
+    const digestHtml = `<div class="v2w-dg" role="list"><div class="v2w-dr v2w-dh" aria-hidden="true"><b>Name</b><span class="e">Engine</span>
+        <span class="n">Buy between</span><span class="n">Stop · risk</span><span class="w">Window</span><span class="s">State</span></div>
+        ${live.map(row).join('')}</div>`;
+    const liveHtml = live.length ? (opts.digest ? digestHtml : `<div class="v2w-pcs">${live.map(card).join('')}</div>`)
       : `<p class="v2w-empty"><b>No paper setup is open or waiting.</b>The engines found nothing that met their rules on the ${esc(day(P.as_of))} close. They are not loosened to fill this space.</p>`;
     const doneHtml = done.length ? `<h4 class="v2w-h">Closed recently</h4><ul class="v2w-rl">${done.map((p) =>
       `<li><span><a class="sym" href="${esc(stock(p.symbol))}">${esc(p.symbol)}</a> · ${esc(names[p.engine] || '')} · ${esc(PSTATE[p.state] || p.state)}</span>
@@ -773,8 +807,8 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
       <p class="v2w-per">As of the ${esc(day(P.as_of))} close · simulated fills · no order is placed · not the published record</p>
       ${opts.compact ? '' : eng}
       ${opts.compact ? '' : '<h4 class="v2w-h">Paper setups</h4>'}${liveHtml}${opts.compact ? '' : doneHtml + intraHtml}
-      <p class="v2w-note">${esc(P.basis || '')}</p>
-      ${opts.moreHref ? `<p class="v2w-more"><a href="${esc(opts.moreHref)}">Every paper engine and result →</a></p>` : ''}</section>`;
+      ${opts.digest ? '' : `<p class="v2w-note">${esc(P.basis || '')}</p>`}
+      ${opts.moreHref ? `<p class="v2w-more"><a href="${esc(opts.moreHref)}">${opts.digest ? 'Every setup with its sells and reason, and every engine →' : 'Every paper engine and result →'}</a></p>` : ''}</section>`;
   }
 
   /* ══ TECHNICAL READ ════════════════════════════════════════════════════════

@@ -12080,7 +12080,12 @@
       v2StatusStrip(d) +
       vsec(`Plans for ${v2Date(d.next_session)}`, next.length ? `<div class="v2-cards">${next.map(p => v2Card(p, d)).join('')}</div>`
         : noPlans, String(next.length), null, { lead: true }) +
-      v2Paper(d, { compact: true, title: 'Paper setups — a test, not plans', moreHref: '/opportunities#paper' }) +
+      /* A DIGEST, NOT A COPY. The front page listed the same twelve full cards
+         the Setups page does. Here each setup is one line — buy range, stop,
+         window, state — linking to its full card over there, where the sells,
+         the reason and the engine rules live. */
+      v2Paper(d, { compact: true, digest: true, title: 'Paper setups — a test, not plans', moreHref: '/opportunities#paper',
+                   cardHref: (p) => '/opportunities#pp-' + encodeURIComponent(p.symbol) }) +
       `<div class="v2-duo">` +
       vsec('Active paper positions', active.length ? `<div class="v2-cards">${active.map(p => v2Card(p, d)).join('')}</div>`
         : `<p class="muted">No open paper position. A setup becomes one when its buy range trades.</p>`, String(active.length)) +
@@ -12115,14 +12120,21 @@
                     ['Expired or cancelled before entry', lapsed]];
     const tally = `<div class="v2-tally">${states.map(([l, list]) =>
       `<div><b>${list.length}</b><span>${esc(l)}</span></div>`).join('')}</div>`;
-    paint(head(T, S, 'Signal') + v2StatusStrip(d) +
+    /* The four-part status strip lives on the front page; here one line says
+       which scan this is and when the next one lands. */
+    const nse = exchangeState('Asia/Kolkata', 9.25, 15.5, 'NSE');
+    const statusLine = `<p class="v2-sline">Scan of the <b>${v2Date(d.session_date)}</b> close · next scan ${v2Date(d.next_session)}, after the close · NSE ${nse.open ? 'open' : 'closed'} · prices delayed</p>`;
+    paint(head(T, S, 'Signal') + statusLine +
       vsec('Eligible next session', eligible.length ? cards(eligible)
         : `<p class="v2-none"><b>Nothing is eligible for the next session.</b> ${esc(d.status_detail || '')}</p>`,
         String(eligible.length), null, { lead: true }) +
       v2Paper(d, {}) +
       vsec('Every plan by state', tally + states.filter(([, list]) => list.length)
         .map(([l, list]) => `<h3 class="v2-st-h">${esc(l)} <span>${list.length}</span></h3>${cards(list)}`).join('')) +
-      `<p class="v2-note">Candidates that failed a rule are not published, and neither are their reasons — the rules stay private. The count of names scanned is under Coverage above. ${esc(d.notice || '')}</p>`);
+      `<p class="v2-note">Candidates that failed a rule are not published, and neither are their reasons — the rules stay private. ${esc(d.notice || '')}</p>`);
+    /* Arriving from a digest row on the front page: land on that setup's card. */
+    const tgt = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if (tgt) requestAnimationFrame(() => tgt.scrollIntoView({ block: 'center', behavior: REDUCED ? 'auto' : 'smooth' }));
   };
 
   function v2Strategies(d) {

@@ -6672,3 +6672,6 @@ main{min-height:calc(100vh - var(--barh))}
 .v2-rec-h ~ .v2-rec-h{margin-top:14px}
 @media(min-width:900px){.grid.v2-rec4{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .v2-model{margin-top:14px;font-size:var(--t-2)}
+/* Setups: one status line instead of the front page's four-part strip. */
+.v2-sline{margin:0 0 var(--s-5);font-size:var(--t-3);color:var(--muted)}
+.v2-sline b{color:var(--text);font-weight:600}
