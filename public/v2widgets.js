@@ -184,6 +184,19 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 .v2w .v2w-chk.k-in{border-color:color-mix(in srgb,var(--w-up,var(--up,#0b7a4b)) 45%,transparent)}
 .v2w .v2w-chk.k-above,.v2w .v2w-chk.k-below{border-color:color-mix(in srgb,var(--w-warn,var(--warn,#b7791f)) 50%,transparent)}
 .v2w .v2w-chk.k-void{border-color:color-mix(in srgb,var(--w-down,var(--down,#c0392b)) 50%,transparent)}
+.v2w .v2w-chk.k-gap{border-color:color-mix(in srgb,var(--w-warn,var(--warn,#b7791f)) 50%,transparent);border-style:dashed}
+p.v2w-key{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin:8px 0 10px;font:400 12px/1.4 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--muted,var(--ink-3,#5f6068))}
+p.v2w-key>span{display:inline-flex;align-items:center;gap:6px}
+p.v2w-key .t{color:var(--text,var(--ink,#1b1b1f));font-weight:600}
+p.v2w-key .n{flex-basis:100%;margin-top:2px}
+p.v2w-key .v2w-sw{display:inline-block;flex:none;position:static;margin:0;padding:0;min-width:0;max-width:16px;width:10px;height:10px;animation:none;border-radius:2px;background:var(--c,currentColor)}
+p.v2w-key .v2w-sw.bar{width:5px;height:12px;border-radius:1px}
+p.v2w-key .v2w-sw.edge{width:3px;height:14px;border-radius:1px}
+p.v2w-key .v2w-sw.dot{border-radius:50%}
+p.v2w-key .v2w-sw.ring{background:none;border-radius:50%;box-shadow:inset 0 0 0 2px var(--c,currentColor)}
+p.v2w-key .v2w-sw.out{background:none;box-shadow:inset 0 0 0 2px var(--c,currentColor)}
+p.v2w-key .v2w-sw.hatch{background:repeating-linear-gradient(135deg,var(--c,currentColor) 0 2px,transparent 2px 4px)}
+p.v2w-key .v2w-sw.text{width:auto;max-width:none;height:auto;background:none;color:var(--c,currentColor);font:600 12px/1 var(--mono,ui-monospace,monospace)}
 .v2w .v2w-chk span{color:var(--w-dim,var(--dim,#6b6b6b));font-size:13px}
 .v2w .v2w-plan{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0;margin:0 0 12px;border:1px solid var(--w-line,var(--line,#e5e2db));border-radius:10px;overflow:hidden}
 .v2w .v2w-plan > div{padding:10px 12px;box-shadow:inset -1px -1px 0 var(--w-line,var(--line,#e5e2db))}
@@ -1039,6 +1052,10 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
       : ctx.open ? `delayed quote${ctx.at ? ' at ' + ctx.at + ' IST' : ''}` : 'last close';
     const at = x == null ? '' : `${px(x)} (${basis})`;
     if (!PAPER_LIVE.has(p.state)) return { k: 'done', word: PSTATE[p.state] || p.state, line: '' };
+    /* Held by the grader at a missing session: the engine says from when and
+       why. Nothing after that day has been graded, so no live comparison is
+       offered as though it were current. */
+    if (p.grading_gap) return { k: 'gap', word: 'Not graded', line: `Not graded from ${dayShort(p.grading_gap.from)}: ${p.grading_gap.why}. Held there, nothing guessed; it is graded from that day once the data arrives.` };
     if (p.state !== 'awaiting_entry') {
       if (x == null || p.fill_price == null) return { k: 'held', word: PSTATE[p.state] || 'Filled', line: `Filled at ${px(p.fill_price)}. No quote right now.` };
       return { k: 'held', word: PSTATE[p.state] || 'Filled',
@@ -1114,6 +1131,19 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 
   /* The whole Passport for one setup. `slot` is where the caller writes the
      entry check once its quote arrives; until then it says it is checking. */
+  /* A COLOUR KEY, the same on both sites. Any colour that carries a
+   * meaning a reader cannot see from the number beside it (a threshold, a
+   * severity, a band) is keyed where it is drawn, above the marks it explains.
+   * A colour is never the only carrier: each swatch has its words. items:
+   * [{ c: css colour, label, shape?: box|bar|edge|dot|ring|out|hatch|text, sample? }] */
+  function key(items, opts = {}) {
+    injectCss();
+    const sw = (it) => it.shape === 'text'
+      ? `<b class="v2w-sw text" style="--c:${it.c}" aria-hidden="true">${esc(it.sample || 'Aa')}</b>`
+      : `<i class="v2w-sw ${esc(it.shape || 'box')}" style="--c:${it.c}" aria-hidden="true"></i>`;
+    return `<p class="v2w-key${opts.cls ? ' ' + esc(opts.cls) : ''}" role="note">${opts.title ? `<span class="t">${esc(opts.title)}</span>` : ''}${
+      items.map((it) => `<span>${sw(it)}${esc(it.label)}</span>`).join('')}${opts.note ? `<span class="n">${esc(opts.note)}</span>` : ''}</p>`;
+  }
   const entryHtml = (e) => `<div class="v2w-chk k-${esc(e.k)}" role="status"><b>${esc(e.word)}</b><span>${esc(e.line)}</span></div>`;
   function passport(p, d, opts = {}) {
     injectCss();
@@ -1125,7 +1155,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
       .concat(p.ended_session && !(p.exits || []).length ? [`<li><time>${esc(dayShort(p.ended_session))}</time> ${esc(PSTATE[p.state] || p.state)}.</li>`] : []);
     return `<section class="v2w v2w-pp" aria-label="Setup ${esc(p.symbol)}">
       <h3>${opts.noSymbol ? 'The setup' : esc(p.symbol)} <span class="v2w-tag pp">paper</span> <span class="v2w-st">${esc(PSTATE[p.state] || p.state)}</span></h3>
-      <p class="v2w-per">${esc(names[p.engine] || p.engine)} · long · NSE cash · recorded after the ${esc(day(p.filed_session))} close · simulated fills, no order is placed</p>
+      <p class="v2w-per">${esc(names[p.engine] || p.engine)} · long · NSE cash · recorded after the ${esc(day(p.filed_session))} close · simulated fills, no order is placed${p.rules ? ` · rules ${esc(p.rules)}` : ''}</p>
       <div class="v2w-ent" data-v2w-entry>${opts.entryHtml || '<p class="v2w-note">Checking the price against the range…</p>'}</div>
       <dl class="v2w-plan">
         <div><dt>Buy between</dt><dd>${px(p.entry_low)} – ${px(p.entry_high)}</dd></div>
@@ -1209,7 +1239,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
     const notes = (t.flags || []).filter((f) => FLAG_NOTE[f]).map((f) => `<li>${FLAG_NOTE[f]}</li>`).join('');
     return `<section class="v2w v2w-rp" aria-label="Replay ${esc(t.symbol)}">
       <h3>${opts.noSymbol ? 'Replay' : esc(t.symbol)} <span class="v2w-tag pp">paper</span> <span class="v2w-st">finished${t.ended_session ? ' ' + esc(day(t.ended_session)) : ''}</span></h3>
-      <p class="v2w-per">${esc(names[t.engine] || t.engine)} · long · NSE cash · simulated fills on daily bars, no order was placed</p>
+      <p class="v2w-per">${esc(names[t.engine] || t.engine)} · long · NSE cash · simulated fills on daily bars, no order was placed${t.rules ? ` · rules ${esc(t.rules)}` : ''}</p>
       ${head}${map}
       <h4 class="v2w-h">What happened</h4><ol class="v2w-hist v2w-rp-tl">${steps.join('')}</ol>
       ${notes ? `<h4 class="v2w-h">How it was booked</h4><ul class="v2w-rp-n">${notes}</ul>` : ''}
@@ -1236,5 +1266,5 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
       <div class="v2w-fl">${rows}</div></div>`;
   }
 
-  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers }, explain, paper, read, levels, entry, entryHtml, ladder, changes, passport, replay, finished };
+  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers }, explain, paper, read, levels, entry, entryHtml, ladder, changes, passport, replay, finished, key };
 })();

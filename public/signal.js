@@ -437,6 +437,13 @@
     return (r > 0 ? '+' : '') + (r === 0 ? '0.00' : r.toFixed(2)) + '%';
   };
   const dir = v => Number(v) > 0 ? 'up' : Number(v) < 0 ? 'dn' : '';
+  /* COLOUR KEYS. Wherever a colour carries a meaning the number beside it
+     does not (a threshold, a band, a severity), the key sits ABOVE the marks
+     it explains, drawn by V2W.key so Signal and Vision key colour the same
+     way. Every swatch has its words; the colour is never the only carrier. */
+  const CK = { up: 'var(--up,#0b7a55)', dn: 'var(--down,#c4372c)', wn: 'var(--warn,#8f5e00)', ac: 'var(--accent,#2743c8)',
+               dim: 'var(--dim,#8a8b93)', ln: 'var(--line2,#d8d6d0)', tx: 'var(--text,#1b1b1f)' };
+  const ckey = (items, opts) => window.V2W && window.V2W.key ? window.V2W.key(items, opts) : '';
   /* LENDERS ARE READ DIFFERENTLY — the screen's rule, word for word
      (stock_screen.py::_is_financial). A bank or NBFC borrows to lend, so debt/
      equity of 4 is its business model and operating cash flow swings with its
@@ -3808,7 +3815,8 @@
                 components${pct != null ? ` — <b>${pct}%</b> of the score's weight` : ''}.
                 ${miss.length ? esc(miss.join(' and ')) + ' did not answer, so this'
                   : 'This'} is not comparable with a full reading.</p>`;
-            })()}${B.parts.map(pt => `
+            })()}${ckey([{ c: CK.up, shape: 'bar', label: '55 or more' }, { c: CK.ac, shape: 'bar', label: '31–54' }, { c: CK.dn, shape: 'bar', label: '30 or less' }],
+              { title: 'Each part, scored 0–100:' })}${B.parts.map(pt => `
               <div class="baro-i">
                 <span class="baro-k">${esc(pt.label)}<i>${pt.weight}%</i></span>
                 ${meter(pt.score, pt.score >= 55 ? 'up' : pt.score <= 30 ? 'dn' : '')}
@@ -5297,7 +5305,7 @@
           if (Object.values(instiAdv).some(v => v !== '')) parts.push('custom ranges');
           const title = parts.length ? parts.join(' + ') : PRESETS.all[0];
           return sec(title, rows.length
-              ? key + heatKey(20, 'Distance from the moving averages') + screenTable(page, from) + nav
+              ? key + heatKey(20, 'Distance from the moving averages') + SCRKEY() + screenTable(page, from) + nav
             : `<div class="empty">Nothing matches. Try a different preset or clear the search.</div>`,
             `${rows.length} of ${SCREEN.length}`);
         })());
@@ -5528,6 +5536,13 @@
     <span><i class="k200"></i>200-day</span>
     <span><i class="k50"></i>50-day</span>
     <span><i class="k20"></i>20-day</span></p>`;
+  /* The other colours on a screen row. The Q·G·V·T shading, the RSI tint and
+     the institution tag each encode a threshold the number does not print. */
+  const SCRKEY = () => ckey([
+    { c: CK.up, label: 'Q·G·V·T part 70 or more' }, { c: CK.dim, shape: 'text', sample: '30', label: 'part under 35' },
+    { c: CK.ac, shape: 'text', sample: '29', label: 'RSI under 35' }, { c: CK.wn, shape: 'text', sample: '78', label: 'RSI over 70' },
+    { c: CK.up, label: 'institutions added' }, { c: CK.dn, label: 'cut' }, { c: CK.wn, label: 'rotated (one bought, one sold)' }],
+    { title: 'Row colours:', cls: 'scr-key' });
 
   const priceLine = r => {
     const n = v => Number.isFinite(Number(v)) ? Number(v) : null;
@@ -6143,7 +6158,9 @@
     }
     const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const now = new Date().getMonth();
-    return `<div class="seas">${d.m.map((m, i) => {
+    return `${ckey([{ c: CK.up, label: 'rose in 67% of years or more' }, { c: CK.ac, label: '50–66%' },
+        { c: CK.dn, label: 'under half' }, { c: CK.ln, label: 'not enough history' }, { c: CK.ac, shape: 'out', label: 'this month' }],
+        { title: 'Bar colour · how often it rose:' })}<div class="seas">${d.m.map((m, i) => {
       const hit = m ? m[0] : null;
       const cls = hit == null ? 'sx-na' : hit >= 67 ? 'sx-hi' : hit >= 50 ? 'sx-mid' : 'sx-lo';
       return `<div class="sx ${cls}${i === now ? ' sx-now' : ''}" title="${esc(names[i])}: ${
@@ -6355,6 +6372,8 @@
     const flags = ((r.risk && r.risk.flags) || []).filter(f => f && f.t);
     if (flags.length) {
       P.push(`<p><b>What the screen holds against it.</b></p>
+        ${ckey([{ c: CK.dn, shape: 'edge', label: 'serious' }, { c: CK.dim, shape: 'edge', label: 'moderate' }, { c: CK.ln, shape: 'edge', label: 'minor' }],
+          { title: 'Edge colour · how much each objection weighs in the risk grade:' })}
         <ul class="bible-f">${flags.map(f => `<li class="rf-${esc(f.s || 'med')}">
           ${esc(f.t)}${f.k ? ` <em>${esc(f.k)}</em>` : ''}</li>`).join('')}</ul>`);
     }
@@ -6686,7 +6705,7 @@
       <h4 class="sh">Where price sits</h4>
       <div class="yoy">${yoy('vs 50-day', r.sma50 ? (r.price - r.sma50) / r.sma50 * 100 : null)}
         ${yoy('vs 200-day', r.sma200 ? (r.price - r.sma200) / r.sma200 * 100 : null)}
-        ${yoy('From 52w high', r.from_high)}${yoy('RSI', r.rsi, '')}</div>
+        ${yoy('From 52w high', r.from_high)}${lvl('RSI (14)', r.rsi, '', 0)}</div>
       <div class="card-foot" style="margin-top:14px">${symLinks(r.sym)}</div>`;
     return { title, body };
   }
@@ -9790,6 +9809,9 @@
             and it is a <b>model</b> — every term and weight is above.</p>
         </div>
       </section>` : '') +
+      ckey([{ c: CK.up, shape: 'text', sample: '▲', label: 'institutions added last quarter' }, { c: CK.dn, shape: 'text', sample: '▼', label: 'cut' },
+        { c: CK.dn, shape: 'text', sample: '72', label: 'RSI 70 or more (stretched)' }, { c: CK.up, shape: 'text', sample: '33', label: 'RSI 35 or less' },
+        { c: CK.up, shape: 'bar', label: 'line rose over the window' }, { c: CK.dn, shape: 'bar', label: 'fell' }], { title: 'Colours on this page:' }) +
       `<div class="rd-stage" id="rdStage">${radarSvg(nodes)}
          <button type="button" class="rd-full" id="rdFull" aria-label="Expand the radar">Expand ⤢</button>
        </div>` +
@@ -9907,7 +9929,7 @@
                   <path class="rdc-spa" d="${sp.area}"/><path class="rdc-spl" d="${sp.d}"/></svg>`
              : `<em class="rdc-nosp">no series</em>`}
         ${x && x.quality === 'complete' && x.insti_pp != null
-          ? `<em class="rdc-fii ${dir(x.insti_pp)}">${x.insti_pp > 0 ? '▲' : x.insti_pp < 0 ? '▼' : '·'}</em>` : ''}
+          ? `<em class="rdc-fii ${dir(x.insti_pp)}" title="Institutions (FII + DII) ${x.insti_pp > 0 ? 'added' : x.insti_pp < 0 ? 'cut' : 'held'} ${sign1(x.insti_pp)} pp last quarter">${x.insti_pp > 0 ? '▲' : x.insti_pp < 0 ? '▼' : '·'}</em>` : ''}
       </span>`;
   };
 

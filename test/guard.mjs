@@ -2333,7 +2333,7 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
     paper: ["basis", "as_of", "engines", "plans", "intraday", "retired", "min_closed_for_avg"],
     paperEngine: ["id", "name", "module", "kind", "what", "since", "last_session", "filed", "open", "closed", "wins", "losses", "avg_r"],
     paperPlan: ["id", "engine", "symbol", "filed_session", "for_session", "valid_through", "entry_low", "entry_high", "stop", "t1", "t2",
-      "t3", "sell_pct", "qty", "state", "fill_price", "fill_session", "exits", "total_r", "why", "trailing", "risk_pct", "tranches", "initial_stop", "ended_session"],
+      "t3", "sell_pct", "qty", "state", "fill_price", "fill_session", "exits", "total_r", "why", "trailing", "risk_pct", "tranches", "initial_stop", "ended_session", "rules", "grading_gap"],
     paperIntra: ["id", "engine", "symbol", "session", "decided_at", "entry", "stop", "t1", "t2", "t3", "qty", "exits", "total_r"],
     history: ["basis", "benchmark", "exposed", "sessions", "drawdown", "nav_change_pct", "benchmark_change_pct"],
     session: ["session", "status", "published", "filled", "closed", "wins", "losses", "breakevens", "nav_inr", "nav_index",
@@ -2554,6 +2554,20 @@ ok("no figure counts up", !/countUp/.test(JS));
        /c\.finished/.test(FIN_FN) && !/reduce\(|\/ T\.length|avg/.test(FIN_FN));
     ok("the NSE holiday table loads at boot on every route, not only where a page asked",
        /CALENDAR = get\('\/api\/calendar'\)/.test(JS) && /CALENDAR\.then\(r => \{\s*if \(r && r\.ok && r\.data && r\.data\.ok && r\.data\.holidays\) setHolidays/.test(JS));
+    ok("a setup the grader holds at a missing session says so, and offers no live comparison",
+       /if \(p\.grading_gap\) return \{ k: 'gap', word: 'Not graded'/.test(W2) && /nothing guessed/.test(W2)
+       && W2.indexOf("if (p.grading_gap)") < W2.indexOf("if (p.state !== 'awaiting_entry')"));
+    /* COLOUR KEYS. A colour that encodes a threshold, band or severity the
+       number does not print is keyed above the marks, by the one shared
+       component, with words beside every swatch. */
+    const VJS = readFileSync("public/vision.js", "utf8");
+    ok("colour keys: one shared component, and every threshold colour keyed where it is drawn",
+       /function key\(items, opts = \{\}\)/.test(W2) && /finished, key \}/.test(W2)
+       && ["Bar colour · how often it rose:", "Edge colour · how much each objection weighs", "Row colours:", "Each part, scored 0–100:", "Colours on this page:"]
+            .every((t) => JS.includes(t))
+       && VJS.includes("A value is coloured by the change written under it:"));
+    ok("RSI is printed as a level on the stock card, never as a signed, coloured change",
+       /lvl\('RSI \(14\)', r\.rsi, '', 0\)/.test(JS) && !/yoy\('RSI', r\.rsi/.test(JS));
     ok("a finished setup's page shows its replay, from the record",
        /precLoad\(\)/.test(V2B) && /window\.V2W\.replay\(t, rec, \{ noSymbol: true \}\)/.test(V2B) && /window\.V2W\.finished\(rec, \{ href: setupHref/.test(V2B));
   }

@@ -6678,13 +6678,14 @@ main{min-height:calc(100vh - var(--barh))}
 /* The Passport page's onward links, and the digest's entry word by state. */
 .v2-pp-links{margin:var(--s-4) 0 0;font-size:var(--t-3);color:var(--muted)}
 .v2w .v2w-dr .s[data-k="in"]{color:var(--up)} .v2w .v2w-dr .s[data-k="above"],.v2w .v2w-dr .s[data-k="below"]{color:var(--warn)}
-.v2w .v2w-dr .s[data-k="void"]{color:var(--down)}
+.v2w .v2w-dr .s[data-k="void"]{color:var(--down)} .v2w .v2w-dr .s[data-k="gap"]{color:var(--warn)}
 /* The brief over paper setups: the Passport and its chart beside the read, the
    business full width under both (its ratio tables need it). One column on a phone. */
 .v2-bpick{margin:var(--s-4) 0}
 .v2-bpick .chip[data-k="in"]{border-color:color-mix(in srgb,var(--up) 55%,transparent)}
 .v2-bpick .chip[data-k="above"],.v2-bpick .chip[data-k="below"]{border-color:color-mix(in srgb,var(--warn) 55%,transparent)}
 .v2-bpick .chip[data-k="void"]{border-color:color-mix(in srgb,var(--down) 55%,transparent)}
+.v2-bpick .chip[data-k="gap"]{border-color:color-mix(in srgb,var(--warn) 55%,transparent);border-style:dashed}
 .v2-brief{display:grid;gap:var(--s-5)}
 @media(min-width:1000px){.v2-brief{grid-template-columns:minmax(0,7fr) minmax(0,5fr);align-items:start}}
 .v2-brief-a,.v2-brief-b{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--s-5);min-width:0}
