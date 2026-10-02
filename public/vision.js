@@ -950,7 +950,15 @@
   const srcNote = (items) => { const u = [...new Set(items.map((i) => i.src).filter(Boolean))];
     return u.length ? `<p class="note src">Sources: ${u.map(esc).join(' · ')}.</p>` : ''; };
   const MT_DEF = { ROCE: 'ROCE', Valuation: 'PE percentile', 'Cash conversion': 'Cash conversion', 'Price, 1 month': 'Relative strength' };
-  const mattersHtml = (mt) => mt.length ? `<div class="kv intel-kv" style="margin-top:0">${mt.map((m) => `<div title="${esc(m.src)}"><em>${esc(m.k)} ${defn(MT_DEF[m.k])}</em><b class="${m.tone}">${esc(m.v)}</b><small>${esc(m.sub || '')}</small></div>`).join('')}</div>${srcNote(mt)}`
+  /* The colour on a What-matters value is the DIRECTION of the change written
+     under it (EBIT margin 7.1% reads red because it fell 0.3 pp), not a
+     verdict on the level. Without this key a red 7.1% reads as "bad margin". */
+  const MT_KEY = () => window.V2W && window.V2W.key ? window.V2W.key([
+    { c: 'var(--up,#0b7a55)', shape: 'text', sample: '1.36×', label: 'the line beneath moved the right way' },
+    { c: 'var(--dn,#c4372c)', shape: 'text', sample: '7.1%', label: 'it moved the wrong way' },
+    { c: 'var(--text,#1b1b1f)', shape: 'text', sample: '13.1%', label: 'a level, no direction' }],
+    { title: 'A value is coloured by the change written under it:' }) : '';
+  const mattersHtml = (mt) => mt.length ? `${MT_KEY()}<div class="kv intel-kv" style="margin-top:0">${mt.map((m) => `<div title="${esc(m.src)}"><em>${esc(m.k)} ${defn(MT_DEF[m.k])}</em><b class="${m.tone}">${esc(m.v)}</b><small>${esc(m.sub || '')}</small></div>`).join('')}</div>${srcNote(mt)}`
     : empty('Nothing measured', 'The screen carries no statements for this company.');
   const changesHtml = (ch, T) => {
     const grp = (k, h, cls) => ch[k].length ? `<div class="wc ${cls}"><h3>${h}</h3><ul>${ch[k].map((i) => `<li><b>${esc(i.t)}</b><span>${esc(i.basis)}</span><small>${esc(i.src)}</small></li>`).join('')}</ul></div>` : '';

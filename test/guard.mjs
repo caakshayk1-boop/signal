@@ -2557,6 +2557,17 @@ ok("no figure counts up", !/countUp/.test(JS));
     ok("a setup the grader holds at a missing session says so, and offers no live comparison",
        /if \(p\.grading_gap\) return \{ k: 'gap', word: 'Not graded'/.test(W2) && /nothing guessed/.test(W2)
        && W2.indexOf("if (p.grading_gap)") < W2.indexOf("if (p.state !== 'awaiting_entry')"));
+    /* COLOUR KEYS. A colour that encodes a threshold, band or severity the
+       number does not print is keyed above the marks, by the one shared
+       component, with words beside every swatch. */
+    const VJS = readFileSync("public/vision.js", "utf8");
+    ok("colour keys: one shared component, and every threshold colour keyed where it is drawn",
+       /function key\(items, opts = \{\}\)/.test(W2) && /finished, key \}/.test(W2)
+       && ["Bar colour · how often it rose:", "Edge colour · how much each objection weighs", "Row colours:", "Each part, scored 0–100:", "Colours on this page:"]
+            .every((t) => JS.includes(t))
+       && VJS.includes("A value is coloured by the change written under it:"));
+    ok("RSI is printed as a level on the stock card, never as a signed, coloured change",
+       /lvl\('RSI \(14\)', r\.rsi, '', 0\)/.test(JS) && !/yoy\('RSI', r\.rsi/.test(JS));
     ok("a finished setup's page shows its replay, from the record",
        /precLoad\(\)/.test(V2B) && /window\.V2W\.replay\(t, rec, \{ noSymbol: true \}\)/.test(V2B) && /window\.V2W\.finished\(rec, \{ href: setupHref/.test(V2B));
   }

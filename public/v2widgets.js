@@ -185,6 +185,18 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 .v2w .v2w-chk.k-above,.v2w .v2w-chk.k-below{border-color:color-mix(in srgb,var(--w-warn,var(--warn,#b7791f)) 50%,transparent)}
 .v2w .v2w-chk.k-void{border-color:color-mix(in srgb,var(--w-down,var(--down,#c0392b)) 50%,transparent)}
 .v2w .v2w-chk.k-gap{border-color:color-mix(in srgb,var(--w-warn,var(--warn,#b7791f)) 50%,transparent);border-style:dashed}
+p.v2w-key{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin:8px 0 10px;font:400 12px/1.4 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--muted,var(--ink-3,#5f6068))}
+p.v2w-key>span{display:inline-flex;align-items:center;gap:6px}
+p.v2w-key .t{color:var(--text,var(--ink,#1b1b1f));font-weight:600}
+p.v2w-key .n{flex-basis:100%;margin-top:2px}
+p.v2w-key .v2w-sw{display:inline-block;flex:none;position:static;margin:0;padding:0;min-width:0;max-width:16px;width:10px;height:10px;animation:none;border-radius:2px;background:var(--c,currentColor)}
+p.v2w-key .v2w-sw.bar{width:5px;height:12px;border-radius:1px}
+p.v2w-key .v2w-sw.edge{width:3px;height:14px;border-radius:1px}
+p.v2w-key .v2w-sw.dot{border-radius:50%}
+p.v2w-key .v2w-sw.ring{background:none;border-radius:50%;box-shadow:inset 0 0 0 2px var(--c,currentColor)}
+p.v2w-key .v2w-sw.out{background:none;box-shadow:inset 0 0 0 2px var(--c,currentColor)}
+p.v2w-key .v2w-sw.hatch{background:repeating-linear-gradient(135deg,var(--c,currentColor) 0 2px,transparent 2px 4px)}
+p.v2w-key .v2w-sw.text{width:auto;max-width:none;height:auto;background:none;color:var(--c,currentColor);font:600 12px/1 var(--mono,ui-monospace,monospace)}
 .v2w .v2w-chk span{color:var(--w-dim,var(--dim,#6b6b6b));font-size:13px}
 .v2w .v2w-plan{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0;margin:0 0 12px;border:1px solid var(--w-line,var(--line,#e5e2db));border-radius:10px;overflow:hidden}
 .v2w .v2w-plan > div{padding:10px 12px;box-shadow:inset -1px -1px 0 var(--w-line,var(--line,#e5e2db))}
@@ -1119,6 +1131,19 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 
   /* The whole Passport for one setup. `slot` is where the caller writes the
      entry check once its quote arrives; until then it says it is checking. */
+  /* A COLOUR KEY, the same on both sites. Any colour that carries a
+   * meaning a reader cannot see from the number beside it (a threshold, a
+   * severity, a band) is keyed where it is drawn, above the marks it explains.
+   * A colour is never the only carrier: each swatch has its words. items:
+   * [{ c: css colour, label, shape?: box|bar|edge|dot|ring|out|hatch|text, sample? }] */
+  function key(items, opts = {}) {
+    injectCss();
+    const sw = (it) => it.shape === 'text'
+      ? `<b class="v2w-sw text" style="--c:${it.c}" aria-hidden="true">${esc(it.sample || 'Aa')}</b>`
+      : `<i class="v2w-sw ${esc(it.shape || 'box')}" style="--c:${it.c}" aria-hidden="true"></i>`;
+    return `<p class="v2w-key${opts.cls ? ' ' + esc(opts.cls) : ''}" role="note">${opts.title ? `<span class="t">${esc(opts.title)}</span>` : ''}${
+      items.map((it) => `<span>${sw(it)}${esc(it.label)}</span>`).join('')}${opts.note ? `<span class="n">${esc(opts.note)}</span>` : ''}</p>`;
+  }
   const entryHtml = (e) => `<div class="v2w-chk k-${esc(e.k)}" role="status"><b>${esc(e.word)}</b><span>${esc(e.line)}</span></div>`;
   function passport(p, d, opts = {}) {
     injectCss();
@@ -1241,5 +1266,5 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
       <div class="v2w-fl">${rows}</div></div>`;
   }
 
-  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers }, explain, paper, read, levels, entry, entryHtml, ladder, changes, passport, replay, finished };
+  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers }, explain, paper, read, levels, entry, entryHtml, ladder, changes, passport, replay, finished, key };
 })();
