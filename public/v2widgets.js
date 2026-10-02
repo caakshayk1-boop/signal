@@ -177,7 +177,20 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 .v2w .v2w-rdg h4{display:flex;justify-content:space-between;font:600 11px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim);margin:0 0 6px}
 .v2w .v2w-rdg h4 em{font-style:normal;letter-spacing:0;color:var(--w-ink);font-variant-numeric:tabular-nums}
 .v2w .v2w-rdg p{margin:0;font:400 13px/1.5 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink)}
-.v2w .v2w-rdg p small{color:var(--w-mut);font-size:12px}`;
+.v2w .v2w-rdg p small{color:var(--w-mut);font-size:12px}
+/* price + plan levels */
+.v2w .v2w-pl{position:relative;height:240px;margin:4px 92px 0 44px;touch-action:pan-y}
+.v2w .v2w-pl svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.v2w .v2w-pl .px{fill:none;stroke:var(--w-ink);stroke-width:1.75;stroke-linejoin:round;stroke-linecap:round}
+.v2w .v2w-pl .band{fill:color-mix(in srgb,var(--w-acc) 14%,transparent)}
+.v2w .v2w-pl .lv{stroke-width:1.25;stroke-dasharray:5 4}
+.v2w .v2w-pl .lv.stop{stroke:var(--w-dn)}.v2w .v2w-pl .lv.tgt{stroke:var(--w-up)}
+.v2w .v2w-pl .lv.ref{stroke:var(--w-dim);stroke-dasharray:2 4}
+.v2w .v2w-pl .lab{position:absolute;right:-92px;width:88px;transform:translateY(-50%);font:500 11px/1.15 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut);font-variant-numeric:tabular-nums;white-space:nowrap}
+.v2w .v2w-pl .lab b{font-weight:600}
+.v2w .v2w-pl .lab.stop b{color:var(--w-dn)}.v2w .v2w-pl .lab.tgt b{color:var(--w-up)}.v2w .v2w-pl .lab.buy b{color:var(--w-acc)}
+.v2w .v2w-pl .v2w-y{left:-44px}
+@media (max-width:599px){.v2w .v2w-pl{height:200px;margin-right:78px}.v2w .v2w-pl .lab{right:-78px;width:74px;font-size:10px}}`;
 
   function injectCss() {
     if (document.getElementById('v2w-css')) return;
@@ -809,6 +822,70 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
       <p class="v2w-note">${esc(feed.basis || '')} Technicals alone never make a holding thesis. Not advice.</p></section>`;
   }
 
+
+  /* ══ PRICE WITH THE PLAN'S LEVELS ══════════════════════════════════════════
+   * Six months of daily closes on ONE price axis, with the levels a reader
+   * acts on drawn across it: the buy range (a band), the stop, three targets,
+   * and the read's support and resistance. Every level is an upstream field;
+   * the chart places them and computes nothing about them. Labels are nudged
+   * apart so two close levels never print on top of each other.
+   */
+  function levels(series, lv = {}, opts = {}) {
+    injectCss();
+    const Q = 'Price and levels';
+    const pts = cleanPts(series).slice(-130);
+    if (pts.length < 10) return failCard(Q, 'The price history', opts.error || 'fewer than ten daily closes');
+    const L = [];
+    const add = (v, cls, label) => { if (Number.isFinite(Number(v)) && Number(v) > 0) L.push({ v: Number(v), cls, label }); };
+    add(lv.stop, 'stop', 'Stop');
+    (lv.t || []).forEach((v, i) => add(v, 'tgt', 'T' + (i + 1)));
+    add(lv.sup, 'ref', 'Support');
+    add(lv.res, 'ref', 'Resistance');
+    const band = Array.isArray(lv.entry) && lv.entry.every((v) => Number(v) > 0) ? lv.entry.map(Number) : null;
+    const all = pts.map((p) => p.c).concat(L.map((x) => x.v), band || []);
+    let lo = Math.min(...all), hi = Math.max(...all);
+    const pad = (hi - lo) * 0.06 || hi * 0.02;
+    lo -= pad; hi += pad;
+    const W = 1000, H = 1000, n = pts.length;
+    const x = (i) => (i / (n - 1)) * W, y = (v) => H - ((v - lo) / (hi - lo)) * H;
+    const d = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.c).toFixed(1)}`).join('');
+    // Label placement: sorted top to bottom, then pushed apart by a minimum gap.
+    const labs = L.map((x2) => ({ ...x2, top: y(x2.v) / H * 100 }));
+    if (band) labs.push({ v: band[1], cls: 'buy', label: 'Buy', top: y((band[0] + band[1]) / 2) / H * 100, range: band });
+    labs.sort((a, b) => a.top - b.top);
+    for (let i = 1; i < labs.length; i++) if (labs[i].top - labs[i - 1].top < 7.5) labs[i].top = labs[i - 1].top + 7.5;
+    const money = (v) => '₹' + Number(v).toLocaleString('en-IN', { maximumFractionDigits: v < 100 ? 2 : 0 });
+    const last = pts[n - 1];
+    const data = esc(JSON.stringify({ p: pts.map((p) => [p.t, p.c]), lo, hi }));
+    return `<section class="v2w" aria-label="${Q}"><h3>${esc(opts.title || Q)}</h3>
+      <p class="v2w-per">${esc(opts.sym || '')} · ${n} daily closes to ${esc(day(last.t))} · last close ${money(last.c)}</p>
+      <div class="v2w-pl" data-v2w-lv="${data}" role="img" aria-label="${esc(opts.sym || 'Price')}: ${n} daily closes, last ${money(last.c)}. ${labs.map((l) => l.range ? `buy ${money(l.range[0])} to ${money(l.range[1])}` : `${l.label} ${money(l.v)}`).join(', ')}.">
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+          ${band ? `<rect class="band" x="0" width="${W}" y="${y(band[1]).toFixed(1)}" height="${Math.max(2, y(band[0]) - y(band[1])).toFixed(1)}"/>` : ''}
+          ${L.map((l) => `<line class="lv ${l.cls}" x1="0" x2="${W}" y1="${y(l.v).toFixed(1)}" y2="${y(l.v).toFixed(1)}" vector-effect="non-scaling-stroke"/>`).join('')}
+          <path class="px" d="${d}" vector-effect="non-scaling-stroke"/>
+        </svg>
+        <span class="v2w-y" style="top:0%">${money(hi - pad)}</span><span class="v2w-y" style="top:100%">${money(lo + pad)}</span>
+        ${labs.map((l) => `<span class="lab ${l.cls}" style="top:${Math.min(100, l.top).toFixed(2)}%"><b>${esc(l.label)}</b> ${l.range ? `${money(l.range[0])}–${money(l.range[1])}` : money(l.v)}</span>`).join('')}
+        <div class="v2w-cross"></div><div class="v2w-dot nav"></div><div class="v2w-tip" role="status"></div>
+      </div>
+      <div class="v2w-x" aria-hidden="true" style="margin-right:92px"><span>${esc(dayShort(pts[0].t))}</span><span>${esc(dayShort(last.t))}</span></div>
+      ${opts.note ? `<p class="v2w-note">${esc(opts.note)}</p>` : ''}</section>`;
+  }
+  function onLvMove(el, ev) {
+    let D;
+    try { D = JSON.parse(el.getAttribute('data-v2w-lv')); } catch (e) { return; }
+    const r = el.getBoundingClientRect(), n = D.p.length;
+    const i = Math.round(Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)) * (n - 1)), p = D.p[i];
+    const px = (i / (n - 1)) * r.width, py = (1 - (p[1] - D.lo) / (D.hi - D.lo)) * r.height;
+    const cross = el.querySelector('.v2w-cross'), dot = el.querySelector('.v2w-dot'), tip = el.querySelector('.v2w-tip');
+    cross.style.display = 'block'; cross.style.left = px + 'px';
+    dot.style.display = 'block'; dot.style.left = px + 'px'; dot.style.top = py + 'px';
+    tip.innerHTML = `<b>${esc(day(p[0]))}</b>Close ₹${esc(Number(p[1]).toLocaleString('en-IN', { maximumFractionDigits: 2 }))}`;
+    tip.style.display = 'block';
+    tip.style.left = Math.min(Math.max(0, px + 12), r.width - tip.offsetWidth) + 'px';
+  }
+
   /* One set of listeners for every card on either site, bound once. */
   function bind() {
     if (bind.done) return; bind.done = true;
@@ -818,6 +895,8 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
       if (el) onChartMove(el, e);
       const mk = e.target.closest('[data-v2w-mk]');
       if (mk) onMkMove(mk, e);
+      const lvc = e.target.closest('[data-v2w-lv]');
+      if (lvc) onLvMove(lvc, e);
       const hc = e.target.closest('.v2w-hc[data-i]');
       if (hc) onHmOver(hc);
     });
@@ -825,6 +904,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
       if (!e.target || !e.target.matches) return;
       if (e.target.matches('[data-v2w-chart]')) onChartLeave(e.target);
       if (e.target.matches('[data-v2w-mk]')) for (const c of e.target.querySelectorAll('.v2w-cross,.v2w-tip')) c.style.display = 'none';
+      if (e.target.matches('[data-v2w-lv]')) for (const c of e.target.querySelectorAll('.v2w-cross,.v2w-dot,.v2w-tip')) c.style.display = 'none';
     }, true);
     document.addEventListener('click', (e) => {
       const j = e.target.closest && e.target.closest('[data-v2w-jump]');
@@ -842,5 +922,5 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
   }
   bind();
 
-  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers }, explain, paper, read };
+  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers }, explain, paper, read, levels };
 })();

@@ -397,7 +397,7 @@
   const NAV = [
     ['home', 'Companies', '#/'], ['compare', 'Compare', '#/compare'], ['setups', 'Setups', '#/setups'],
     ['screener', 'Screener', '#/screener'], ['heatmap', 'Heatmap', '#/heatmap'], ['today', 'Today', '#/today'],
-    ['cockpit', 'Cockpit', '#/cockpit'], ['markets', 'Markets', '#/markets'], ['news', 'News', '#/news'],
+    ['brief', 'Brief', '#/brief'], ['cockpit', 'Cockpit', '#/cockpit'], ['markets', 'Markets', '#/markets'], ['news', 'News', '#/news'],
     ['watchlist', 'Watchlist', '#/watchlist'], ['alerts', 'Alerts', '#/alerts'],
   ];
   /* FIVE DESTINATIONS, as on Signal: the company search, compare, the two
@@ -411,6 +411,7 @@
     setups: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
     compare: '<path d="M5 20V9M12 20V4M19 20v-7"/>',
     today: '<path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/>',
+    brief: '<path d="M6 3h9l3 3v15H6zM9 10h6M9 14h6M9 18h4"/>',
     cockpit: '<path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z"/>',
     screener: '<path d="M4 6h16M4 12h16M4 18h10"/>',
     heatmap: '<path d="M4 4h9v9H4zM15 4h5v5h-5zM15 11h5v9h-5zM4 15h9v5H4z"/>',
@@ -971,12 +972,15 @@
     el.innerHTML = `<section class="hero2">
         <p class="up"><a href="${SIGNAL_URL}/">← Signal</a> finds what deserves attention. Vision shows why.</p>
         <h1>Understand any Indian company in minutes.</h1>
-        <p class="sub">Price, financials, ownership, events, technical structure and market context — one research workspace for the ~1,000 NSE names on the screen. Every figure carries its source and its age.</p>
+        <p class="sub">Price, financials, ownership, technical structure and market context for ~1,000 NSE names. Every figure carries its source and its age.</p>
         <div class="hsearch"><input id="hQ" type="search" role="combobox" aria-expanded="false" aria-controls="hL" aria-autocomplete="list" autocomplete="off" spellcheck="false"
           placeholder="Search a company — Reliance, TCS, HDFC Bank…" aria-label="Search a company"><ul id="hL" role="listbox" aria-label="Matching companies"></ul></div>
         <div id="hRecent" class="row wrap hrec"></div><p id="hSince" class="since" hidden></p></section>
-      <div id="hMkt"></div>
+      <div id="hGlance" class="glance">${skel(2)}</div>
+      <div class="grid g-2">${panel('Paper setups for the next session', skel(5), { bodyId: 'hPaper', flush: true, more: '#/brief', moreText: 'Open the brief' })}${panel('Strongest technical reads', skel(5), { bodyId: 'hReads', flush: true, more: '#/screener', moreText: 'Screener' })}</div>
+      <div style="height:var(--s-4)"></div>
       <div class="grid g-2">${panel('What changed across the screen', skel(6), { bodyId: 'hChg', fb: 'Screen' })}${panel('Unusual today', skel(5), { bodyId: 'hUnu', fb: 'Screen' })}</div>
+      <div id="hMkt"></div>
       <div style="height:var(--s-4)"></div>
       <div class="grid g-2">${panel('Plans for the next session', skel(4), { bodyId: 'hSig', flush: true, fb: 'Setups', more: '#/setups', moreText: 'All setups' })}${panel('Most-traded companies', skel(6), { bodyId: 'hTop', fb: 'Screen' })}</div>`;
     const inp = $('#hQ'), L = $('#hL');
@@ -996,10 +1000,11 @@
     });
     L.addEventListener('click', (e) => { const li = e.target.closest('[data-go]'); if (li) go(li.dataset.go); });
     if (FINE()) inp.focus();
-    const [sr, site, , nx, pu] = await Promise.all([F.screen(), F.site(), F.veod(),
+    const [sr, site, , nx, pu, rd] = await Promise.all([F.screen(), F.site(), F.veod(),
       get('/api/signals?series=' + encodeURIComponent('^NSEI') + '&range=1y').catch(() => ({ ok: false })),
-      get('/pulse.json').catch(() => ({ ok: false }))]);
+      get('/pulse.json').catch(() => ({ ok: false })), F.reads().catch(() => ({ ok: false }))]);
     if (!alive()) return;
+    homeLead(S.veod, rd && rd.ok ? S.reads : null, pu && pu.ok ? pu.data : null, site && site.ok ? site.data : null);
     {
       /* The market cards, shared with Signal (v2widgets.js). A stock opens here
          in Vision, not on Signal. */
@@ -1049,7 +1054,109 @@
         ${C.results.length ? `<p class="note" style="margin:var(--s-3) 0 4px"><b>Results due</b></p><div class="row wrap">${C.results.map((x) => `<a class="chip" href="#/asset/${esc(x.sym)}">${esc(x.sym)} · ${esc(dshort(x.on))}</a>`).join('')}</div>` : ''}
         <p class="note src">From the screen's last close. Results dates as listed on the screen — confirm on the exchange.</p>`;
     $('#hSig').innerHTML = vePlansBrief(S.veod);
+    // Nothing published: the panel would only repeat what the paper panel above
+    // already says, so it goes rather than printing an empty box.
+    if (!veOpen(S.veod).length) { const pn = $('#hSig') && $('#hSig').closest('.pn'); if (pn) pn.remove(); }
     $('#hTop').innerHTML = d && d.top ? `<div class="dir">${d.top.slice(0, 30).map((x) => `<a href="#/asset/${esc(x.sym)}"><b>${esc(x.sym)}</b><span>${esc(x.name || '')}</span></a>`).join('')}</div>` : failBox('The screen summary', site.error);
+  };
+
+  /* ── HOME: THE LEAD ───────────────────────────────────────────────────
+     Four facts first (setups, the market's breadth, the strongest reads,
+     results due), then the two lists a visitor came for: the paper setups for
+     the next session and the strongest technical reads. Everything here is a
+     field of an upstream file; nothing is ranked by this page except the
+     reads, which are ordered by the engine's own published score. */
+  const PHASE_WORD = { markup: 'Uptrend', distribution: 'Losing its uptrend', markdown: 'Downtrend', accumulation: 'Recovering' };
+  const ACTION_WORD = { enter: 'Setup', wait: 'Wait', avoid: 'Avoid' };
+  function homeLead(D, R, P, site) {
+    const live = paperLive(D), reads = R && R.reads ? R.reads : null;
+    const strong = reads ? Object.entries(reads).filter(([k, r]) => SCR && SCR[k] && r.score >= 8)
+      .sort((a, b) => (b[1].score - a[1].score) || ((b[1].action === 'enter') - (a[1].action === 'enter')) || a[0].localeCompare(b[0])) : [];
+    const br = P && P.breadth, C = site && site.changed;
+    const tile = (k, v, s2, href) => `<a class="gl" href="${href}"><span>${k}</span><b>${v}</b><em>${s2}</em></a>`;
+    const nx = D && D.next_session ? dshort(D.next_session) : 'the next session';
+    $('#hGlance').innerHTML = [
+      tile('Paper setups', live.length ? String(live.length) : '0', live.length ? `open or waiting · for ${esc(nx)}` : 'none met their rules', '#/brief'),
+      tile('Strongest reads', reads ? String(strong.length) : '—', reads ? 'score 8+ of 10, conditions met' : 'reads did not load', '#/brief'),
+      tile('Breadth, this week', br && br.counted ? `${br.up}/${br.counted}` : '—', br && br.counted ? 'screened names that rose' : 'pulse did not load', '#/heatmap'),
+      tile('Results in 7 days', C ? String(C.results_n) : '—', C ? 'companies reporting' : 'screen summary did not load', '#/today'),
+    ].join('');
+    const money = (v) => v == null ? '—' : '₹' + fmt(v, v < 100 ? 2 : 1);
+    $('#hPaper').innerHTML = !D || !D.paper ? empty('The paper test has not published yet', 'Setups appear after the next session closes.')
+      : !live.length ? empty('No paper setup is open or waiting', 'The engines found nothing that met their rules on the last close. They are not loosened to fill this space.')
+      : `<ul class="hl">${live.slice(0, 8).map((p) => `<li><a href="#/brief/${esc(p.symbol)}"><b>${esc(p.symbol)}</b>
+          <span>${esc(paperName(D, p.engine))}</span>
+          <em>buy ${money(p.entry_low)}–${money(p.entry_high)} · stop ${money(p.stop)}</em></a></li>`).join('')}</ul>
+        <p class="note src" style="padding:0 var(--s-4) var(--s-3)">Paper test: recorded after the close, graded forward, simulated fills. Not the published record and not advice. ${live.length > 8 ? `${live.length - 8} more in the brief.` : ''}</p>`;
+    $('#hReads').innerHTML = !reads ? failBox('The technical reads', 'technical_read.json did not load')
+      : !strong.length ? empty('No name scores 8 or more today', 'The reads are recomputed after every close.')
+      : `<ul class="hl">${strong.slice(0, 8).map(([k, r]) => `<li><a href="#/brief/${esc(k)}"><b>${esc(k)}</b>
+          <span>${esc(PHASE_WORD[r.phase] || r.phase)} · <strong>${r.score}/10</strong></span>
+          <em>${r.action === 'wait' && r.wait_for ? 'Wait for ' + esc(r.wait_for) : r.action === 'enter' && r.why && r.why[1] ? 'Meets the setup rules: ' + esc(r.why[1]) : esc(ACTION_WORD[r.action] || r.action)}</em></a></li>`).join('')}</ul>
+        <p class="note src" style="padding:0 var(--s-4) var(--s-3)">Ordered by the engine's score: conditions met out of 10 on the ${esc(dshort(R.session_date))} close. A count, not a forecast.</p>`;
+  }
+
+  /* ── BRIEF ────────────────────────────────────────────────────────────
+     One page for one name. The paper setup if there is one (buy range, stop,
+     what to sell where, until when, why), the price with those levels drawn
+     on it, the five-part technical read, and the business underneath. With
+     no name it opens on the first paper setup; any company can be opened
+     from the box. Every number is an upstream field. Paper; not advice. */
+  V.brief = async (el, arg, alive) => {
+    el.innerHTML = vhead('Brief', 'The brief', 'One page for one name: the paper setup if there is one, the price with its levels, the technical read and the business. Paper only — not advice.')
+      + `<div class="row wrap" id="bPick" style="gap:6px;margin:0 0 var(--s-3)">${skel(1)}</div><div id="bBody">${skel(8)}</div>`;
+    const [, , rd] = await Promise.all([F.screen(), F.veod(), F.reads().catch(() => ({ ok: false }))]);
+    if (!alive()) return;
+    const D = S.veod, live = paperLive(D), R = rd && rd.ok ? S.reads : null;
+    let sym = arg ? resolveSym(arg) : (live[0] && live[0].symbol) || null;
+    const pick = $('#bPick');
+    pick.innerHTML = (live.length ? `<span class="mut">Paper setups</span>${live.map((p) => `<a class="chip${p.symbol === sym ? ' on' : ''}" href="#/brief/${esc(p.symbol)}"${p.symbol === sym ? ' aria-current="page"' : ''}>${esc(p.symbol)}</a>`).join('')}` : '<span class="mut">No paper setup is open.</span>')
+      + `<form id="bF" class="row" autocomplete="off" style="margin-left:auto"><input class="inp" id="bQ" list="bDL" placeholder="Brief any company" aria-label="Brief any company" style="width:180px;text-transform:uppercase"><datalist id="bDL"></datalist><button class="btn sm" type="submit">Open</button></form>`;
+    $('#bDL').innerHTML = Object.keys(SCR || {}).slice(0, 1200).map((x) => `<option value="${esc(x)}">${esc(SCR[x].name || '')}</option>`).join('');
+    $('#bF').addEventListener('submit', (e) => { e.preventDefault(); const x = resolveSym($('#bQ').value);
+      if (!SCR || !SCR[x]) { toast(`${x || 'That'} is not on the screen`); return; } location.hash = '#/brief/' + x; });
+    const body = $('#bBody');
+    if (!sym) { body.innerHTML = empty('Pick a company', 'There is no paper setup to open by default. Type any company above for its brief.'); return; }
+    if (!SCR || !SCR[sym]) { body.innerHTML = empty(`${sym} is not on the screen`, 'Check the symbol, or pick a company from the box above.'); return; }
+    setTitle(`Brief · ${sym}`);
+    const row = SCR[sym], p = live.find((x) => x.symbol === sym) || null, r = R && R.reads ? R.reads[sym] : null;
+    const money = (v) => v == null ? '—' : '₹' + fmt(v, 2);
+    const sp = (p && p.sell_pct) || [40, 35, 25];
+    const plan = p ? `<dl class="bplan">
+        <div><dt>Buy between</dt><dd><b>${money(p.entry_low)} – ${money(p.entry_high)}</b><span>${esc(dshort(p.for_session))} to ${esc(dshort(p.valid_through))}</span></dd></div>
+        <div><dt>Most to pay</dt><dd><b>${money(p.entry_high)}</b><span>an open above it does not fill</span></dd></div>
+        <div><dt>Stop</dt><dd><b class="dn">${money(p.stop)}</b><span>${p.risk_pct != null ? fmt(p.risk_pct, 1) + '% under the top of the range' : ''}${p.trailing ? ' · raised' : ''}</span></dd></div>
+        <div><dt>Sell</dt><dd><b>${sp[0]}% at ${money(p.t1)}</b><span>${sp[1]}% at ${money(p.t2)} · ${sp[2]}% at ${money(p.t3)}</span></dd></div>
+        ${p.fill_price != null ? `<div><dt>Filled</dt><dd><b>${money(p.fill_price)}</b><span>${p.total_r != null ? (p.total_r > 0 ? '+' : '') + p.total_r.toFixed(2) + 'R so far' : ''}</span></dd></div>` : ''}</dl>
+      <p class="note" style="margin:var(--s-3) 0 0"><b>Why:</b> ${esc(sym)} ${esc(p.why || '')}</p>
+      <p class="note" style="margin:var(--s-2) 0 0">${esc(paperName(D, p.engine))} · paper test, not proven. A trade at or below the stop before any fill cancels it; not filled by ${esc(dshort(p.valid_through))}, it lapses. After target 2 the stop is raised under each new swing low, never lowered.</p>`
+      : r ? `<p style="margin:0"><b>No paper setup for ${esc(sym)}.</b> The read says <b>${esc(r.action === 'wait' && r.wait_for ? 'wait for ' + r.wait_for + (r.wait_at != null ? ' (' + money(r.wait_at) + ')' : '') : ACTION_WORD[r.action] || r.action)}</b> — see the read beside this. A read is not a plan and sets no levels to act on.</p>`
+      : `<p style="margin:0"><b>No paper setup and no technical read for ${esc(sym)}.</b> A read needs about a year of completed daily bars.</p>`;
+    const lender = isLender(row), de = num(row.de);
+    const biz = `<div class="kv" style="margin-top:0">
+        <div><em>ROCE</em><b>${lender ? 'n/a' : row.roce != null ? fmt(row.roce, 1) + '%' : '—'}</b><small>${lender ? 'not meaningful for a lender' : ''}</small></div>
+        <div><em>Debt / equity</em><b class="${de != null && de < 0 ? 'dn' : ''}">${lender ? 'n/a' : de == null ? '—' : de < 0 ? 'Negative equity' : fmt(de, 2)}</b><small>${lender ? 'a lender borrows to lend' : ''}</small></div>
+        <div><em>PE</em><b>${row.pe != null ? fmt(row.pe, 1) : '—'}</b><small>${row.pe_pctile != null ? Math.round(row.pe_pctile) + 'th pct of its own history' : ''}</small></div>
+        <div><em>Revenue CAGR</em><b>${row.rev_cagr != null ? signed(row.rev_cagr, 1) : '—'}</b></div>
+        <div><em>EPS CAGR</em><b>${row.eps_cagr != null ? signed(row.eps_cagr, 1) : '—'}</b><small>${row.eps_cagr == null ? 'withheld or not reported' : ''}</small></div>
+        <div><em>ROE</em><b>${row.roe != null ? fmt(row.roe, 1) + '%' : '—'}</b></div>
+        <div><em>Traded a day</em><b>${row.turnover_cr != null ? '₹' + fmt(row.turnover_cr, 0) + ' cr' : '—'}</b></div>
+        <div><em>Risk grade</em><b class="${row.risk && row.risk.level === 'HIGH' ? 'dn' : ''}">${row.risk && row.risk.level ? esc(row.risk.level) : '—'}</b><small>the screen's own</small></div></div>`;
+    body.innerHTML = `<div class="grid g-7-5"><div class="stack">
+        ${panel(p ? 'The paper setup' : 'Is there a setup?', plan, { right: p ? '<span class="chip warn">paper</span>' : '' })}
+        <div id="bChart">${skel(5)}</div>
+      </div><div class="stack">
+        <div id="bRead">${window.V2W && window.V2W.read ? window.V2W.read(R, sym, { error: R ? '' : 'technical_read.json did not load' }) : ''}</div>
+        ${panel('The business', biz, { more: '#/asset/' + encodeURIComponent(sym), moreText: 'Company page' })}
+      </div></div>`;
+    const ser = await get('/api/signals?series=' + encodeURIComponent(sym) + '&range=6mo').catch(() => ({ ok: false }));
+    if (!alive()) return;
+    const lv = { entry: p ? [p.entry_low, p.entry_high] : null, stop: p ? p.stop : null, t: p ? [p.t1, p.t2, p.t3] : [],
+      sup: r ? r.sup : null, res: r ? r.res : null };
+    $('#bChart').innerHTML = window.V2W && window.V2W.levels
+      ? window.V2W.levels(ser && ser.ok ? ser.data : null, lv, { sym, error: ser && ser.error,
+          note: p ? 'The band is the buy range; dashed lines are the stop (red) and the three targets (green); dotted grey lines are the read’s support and resistance.' : 'Dotted grey lines are the read’s support and resistance. No plan levels: there is no paper setup for this name.' })
+      : '';
   };
 
   /* ── COMPARE ──────────────────────────────────────────────────────────
@@ -1422,6 +1529,7 @@
       <div class="ah-px"><div class="px">${px != null ? '₹' + fmt(px, 2) : '—'}</div>
         <div class="px-s">${lv ? chg(lv.change_pct) + ' <span class="mut">live</span>' : r ? chg(r.r1d) + ` <span class="mut">close of ${esc(r.last_date || r.price_date || 'the last build')}</span>` : ''}</div>
         <div class="row ah-act" style="margin-top:var(--s-2);gap:6px">
+          <a class="btn sm" href="#/brief/${encodeURIComponent(s)}">Brief</a>
           <a class="btn sm" href="#/compare?s=${[s].concat(peersOf(s)).map(encodeURIComponent).join(',')}">Compare</a>
           <a class="btn sm" href="${SIGNAL_URL}/stock/${encodeURIComponent(s)}">On Signal ↗</a>
           <button class="btn sm" type="button" data-copy="${VISION_URL}/company/${keyOf(s)}">Copy link</button>
@@ -2093,6 +2201,17 @@
     else markFail('Setups', r.error);
     return r;
   };
+  /* The Technical Confluence reads and the paper setups, shared by the home
+     page and the brief. Both are upstream outputs: printed, never re-derived. */
+  F.reads = async () => {
+    if (S.reads) return { ok: true, data: S.reads };
+    const r = await get('/technical_read.json', 600000);
+    if (r.ok && r.data && r.data.schema === 'technical-read/1') S.reads = r.data;
+    return r;
+  };
+  const PAPER_LIVE = new Set(['awaiting_entry', 'activated', 'partially_exited']);
+  const paperLive = (D) => ((D && D.paper && D.paper.plans) || []).filter((p) => PAPER_LIVE.has(p.state));
+  const paperName = (D, id) => (((D && D.paper && D.paper.engines) || []).find((e) => e.id === id) || {}).name || '';
   const istWhen = (iso) => { const t = Date.parse(iso); return Number.isFinite(t) ? new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) + ' IST' : '—'; };
   const veStale = (D) => !!(D && D.next_scan_due && Date.now() > Date.parse(D.next_scan_due));
   /* The plans the LAST scan made — what a reader acts on tomorrow. */
@@ -2222,7 +2341,7 @@
       <section class="pn"><div class="ph"><h2>Active paper positions</h2><span class="n">${active.length}</span></div>
         <div class="pb">${active.length ? `<div class="vs-grid">${active.map((p) => vePlanCard(p, D)).join('')}</div>` : empty('None open', 'A plan becomes a position only when the next session\'s prices fill it inside its range.')}</div></section>
       <div style="height:var(--s-4)"></div>
-      ${window.V2W && window.V2W.paper ? '<div style="height:var(--s-4)"></div>' + window.V2W.paper(D, { stockHref: (x) => '#/asset/' + encodeURIComponent(x) }) : ''}
+      ${window.V2W && window.V2W.paper ? '<div style="height:var(--s-4)"></div>' + window.V2W.paper(D, { stockHref: (x) => '#/brief/' + encodeURIComponent(x) }) : ''}
       <div style="height:var(--s-4)"></div>
       <section class="pn"><div class="ph"><h2>Completed</h2><span class="n">${done.length}</span></div><div class="pb flush">${veClosedTable(done)}</div>
         <div class="pf">${M.closed ? `${M.closed} closed — ${M.wins} win, ${M.losses} loss, ${M.breakevens} breakeven · net ${veR(M.sum_r_closed)} in total${M.mean_r_closed != null ? ` · mean ${veR(M.mean_r_closed)} a trade` : ''}` : 'No completed sample yet'}${M.win_rate == null && M.closed ? ` · rates are withheld until ${M.min_closed_for_rate || VE_NEED} have closed` : ''}. The same figures as <a href="${SIGNAL_URL}/performance">Signal's record</a>, which begins ${esc(dshort(D.forward_record_start || ''))}. Not a probability.</div></section>
