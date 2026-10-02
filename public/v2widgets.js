@@ -160,6 +160,39 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 .v2w .v2w-pc dd{margin:0;color:var(--w-ink);font-variant-numeric:tabular-nums}
 .v2w .v2w-pc dd.v2w-sells span{display:block}
 .v2w .v2w-pc:target{outline:2px solid var(--w-accent,var(--accent,#2b50d8));outline-offset:2px}
+.v2w .v2w-ladw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.v2w .v2w-lad{width:100%;border-collapse:collapse;font:400 13px/1.4 var(--ui,var(--f-sans,system-ui,sans-serif));font-variant-numeric:tabular-nums;margin:4px 0 6px}
+.v2w .v2w-lad caption{text-align:left;font-size:12px;color:var(--w-dim,var(--dim,#6b6b6b));padding-bottom:6px}
+.v2w .v2w-lad th,.v2w .v2w-lad td{padding:7px 8px;border-top:1px solid var(--w-line,var(--line,#e5e2db));text-align:right;white-space:nowrap}
+.v2w .v2w-lad th:first-child{text-align:left}
+@media(max-width:600px){.v2w .v2w-lad th,.v2w .v2w-lad td{padding:6px 4px;font-size:12px}}
+.v2w .v2w-lad thead th{font:500 10.5px/1 var(--mono,ui-monospace,monospace);letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim,var(--dim,#6b6b6b));border-top:0}
+.v2w .v2w-lad .up{color:var(--w-up,var(--up,#0b7a4b))}
+.v2w .v2w-ch{list-style:none;margin:0;padding:0;border:1px solid var(--w-line,var(--line,#e5e2db));border-radius:10px;overflow:hidden}
+.v2w .v2w-ch li{display:grid;grid-template-columns:92px 120px minmax(0,1fr);gap:4px 12px;align-items:baseline;padding:9px 14px;border-top:1px solid var(--w-line,var(--line,#e5e2db));font-size:13px}
+.v2w .v2w-ch li:first-child{border-top:0}
+.v2w .v2w-ch li.r4{grid-template-columns:92px minmax(0,1fr)}
+.v2w .v2w-ch .t{font:600 10.5px/1.4 var(--mono,ui-monospace,monospace);letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim,var(--dim,#6b6b6b))}
+.v2w .v2w-ch li.r0 .t{color:var(--w-down,var(--down,#c0392b))} .v2w .v2w-ch li.r2 .t,.v2w .v2w-ch li.r3 .t{color:var(--w-up,var(--up,#0b7a4b))}
+.v2w .v2w-ch .w i{font-style:normal;color:var(--w-dim,var(--dim,#6b6b6b));font-size:12px;margin-left:4px}
+.v2w .v2w-ch a{color:inherit}
+@media(max-width:600px){.v2w .v2w-ch li{grid-template-columns:auto minmax(0,1fr)}.v2w .v2w-ch li .w{grid-column:1/-1}}
+.v2w .v2w-st{font:500 12px/1 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-dim,var(--dim,#6b6b6b));margin-left:6px}
+.v2w .v2w-ent{margin:10px 0 12px}
+.v2w .v2w-ent .v2w-chk{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:10px 12px;border-radius:8px;border:1px solid var(--w-line,var(--line,#e5e2db))}
+.v2w .v2w-chk b{font-weight:600}
+.v2w .v2w-chk.k-in{border-color:color-mix(in srgb,var(--w-up,var(--up,#0b7a4b)) 45%,transparent)}
+.v2w .v2w-chk.k-above,.v2w .v2w-chk.k-below{border-color:color-mix(in srgb,var(--w-warn,var(--warn,#b7791f)) 50%,transparent)}
+.v2w .v2w-chk.k-void{border-color:color-mix(in srgb,var(--w-down,var(--down,#c0392b)) 50%,transparent)}
+.v2w .v2w-chk span{color:var(--w-dim,var(--dim,#6b6b6b));font-size:13px}
+.v2w .v2w-plan{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0;margin:0 0 12px;border:1px solid var(--w-line,var(--line,#e5e2db));border-radius:10px;overflow:hidden}
+.v2w .v2w-plan > div{padding:10px 12px;box-shadow:inset -1px -1px 0 var(--w-line,var(--line,#e5e2db))}
+.v2w .v2w-plan dt{font:500 10.5px/1 var(--mono,ui-monospace,monospace);letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim,var(--dim,#6b6b6b));margin-bottom:6px}
+.v2w .v2w-plan dd{margin:0;font-variant-numeric:tabular-nums;font-size:14px}
+.v2w .v2w-plan dd span{display:block;font-size:12px;color:var(--w-dim,var(--dim,#6b6b6b));margin-top:2px}
+.v2w .v2w-why{font-size:13px;margin:0 0 6px}
+.v2w .v2w-hist{margin:0 0 8px;padding-left:18px;font-size:13px}
+.v2w .v2w-hist time{font-variant-numeric:tabular-nums;color:var(--w-dim,var(--dim,#6b6b6b));margin-right:6px}
 .v2w .v2w-dg{border:1px solid var(--w-line,var(--line,#e5e2db));border-radius:10px;overflow:hidden}
 .v2w .v2w-dr{display:grid;grid-template-columns:minmax(96px,1.1fr) minmax(0,1.5fr) minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);
   gap:4px 14px;align-items:baseline;padding:9px 14px;border-top:1px solid var(--w-line,var(--line,#e5e2db));
@@ -771,7 +804,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
     const done = (P.plans || []).filter((p) => !PAPER_LIVE.has(p.state));
     const card = (p) => {
       const sp = p.sell_pct || [40, 35, 25];
-      return `<article class="v2w-pc" id="pp-${esc(p.symbol)}"><header><a href="${esc(stock(p.symbol))}">${esc(p.symbol)}</a>
+      return `<article class="v2w-pc" id="pp-${esc(p.symbol)}"><header><a href="${esc(opts.cardHref ? opts.cardHref(p) : stock(p.symbol))}">${esc(p.symbol)}</a>
           <small>${esc(names[p.engine] || p.engine)}<br>${esc(PSTATE[p.state] || p.state)}</small></header>
         <dl><dt>Buy</dt><dd>${px(p.entry_low)} – ${px(p.entry_high)}</dd>
           <dt>Window</dt><dd>${esc(dayShort(p.for_session))} – ${esc(dayShort(p.valid_through))}</dd>
@@ -784,7 +817,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
        rather than repeating them. The same levels the card leads with — the
        buy range, the stop and its distance, the window, the state — and a
        link to that card, where the three sells and the reason live. */
-    const row = (p) => `<a class="v2w-dr" href="${esc(opts.cardHref ? opts.cardHref(p) : stock(p.symbol))}">
+    const row = (p) => `<a class="v2w-dr" data-sym="${esc(p.symbol)}" href="${esc(opts.cardHref ? opts.cardHref(p) : stock(p.symbol))}">
         <b>${esc(p.symbol)}</b><span class="e">${esc(names[p.engine] || p.engine)}</span>
         <span class="n">${px(p.entry_low)} – ${px(p.entry_high)}</span>
         <span class="n">${px(p.stop)}${p.risk_pct != null ? ` <i>${Number(p.risk_pct).toFixed(1)}%</i>` : ''}</span>
@@ -820,7 +853,11 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
                   distribution: ['Distribution', 'uptrend structure, price has lost the 50 EMA'],
                   markdown: ['Markdown', 'downtrend: 50 EMA below the 200, price below the 50'],
                   accumulation: ['Accumulation', 'downtrend structure, price has reclaimed the 50 EMA'] };
-  const VERDICT = { enter: 'Setup favours entry now', wait: 'Wait', avoid: 'Avoid for now' };
+  /* "Conditions favour a long", not "favours entry now": the read scores the
+     chart, it sets no price. Beside a paper setup whose range sat below the
+     close, "entry now" contradicted the setup's own "above the most to pay".
+     The price to pay is always the setup's range, never this read's close. */
+  const VERDICT = { enter: 'Conditions favour a long', wait: 'Wait', avoid: 'Avoid for now' };
   function read(feed, sym, opts = {}) {
     injectCss();
     const Q = 'Technical read';
@@ -957,5 +994,119 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
   }
   bind();
 
-  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers }, explain, paper, read, levels };
+  /* ══ TRADE PASSPORT ════════════════════════════════════════════════════════
+   * One paper setup, the same on both sites: its plan, whether its entry still
+   * holds against a delayed quote, its exit ladder in shares and rupees, and
+   * what happened to it. Every level comes from the feed; nothing here selects
+   * or scores. The entry check compares a quote with the published range and
+   * says which side of it the price is on, with the quote's basis named — a
+   * delayed quote in the session, the last close outside it, never "live". */
+  const pct1 = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)}%`;
+  function entry(p, q, ctx = {}) {
+    const x = q && Number.isFinite(Number(q.price)) ? Number(q.price) : null;
+    const basis = ctx.open ? `Delayed quote${ctx.at ? ' at ' + ctx.at + ' IST' : ''}` : 'Last close';
+    if (!PAPER_LIVE.has(p.state)) return { k: 'done', word: PSTATE[p.state] || p.state, line: '' };
+    if (p.state !== 'awaiting_entry') {
+      if (x == null || p.fill_price == null) return { k: 'held', word: PSTATE[p.state] || 'Filled', line: `Filled at ${px(p.fill_price)}. No quote right now.` };
+      return { k: 'held', word: PSTATE[p.state] || 'Filled',
+        line: `Filled at ${px(p.fill_price)}. ${basis} ${px(x)}, ${pct1((x / p.fill_price - 1) * 100)} from the fill; the stop is ${px(p.stop)}.` };
+    }
+    if (x == null) return { k: 'na', word: 'Entry check unavailable', line: `No quote for ${p.symbol} right now, so this page cannot say where the price sits against the range.` };
+    const opens = ctx.today && p.for_session > ctx.today ? ` The window opens ${dayShort(p.for_session)}.` : '';
+    if (x <= p.stop) return { k: 'void', word: 'At or below the stop',
+      line: `${basis} ${px(x)} is at or below the ${px(p.stop)} stop. A setup is cancelled if its stop trades before it fills.${opens}` };
+    if (x > p.entry_high) return { k: 'above', word: 'Above the most to pay',
+      line: `${basis} ${px(x)} is ${pct1((x / p.entry_high - 1) * 100)} above ${px(p.entry_high)}. It fills only if price comes back into the range by ${dayShort(p.valid_through)}; it is never chased.${opens}` };
+    if (x < p.entry_low) return { k: 'below', word: 'Under the buy range',
+      line: `${basis} ${px(x)} is under ${px(p.entry_low)} and above the stop.${opens}` };
+    return { k: 'in', word: 'Inside the buy range', line: `${basis} ${px(x)} is between ${px(p.entry_low)} and ${px(p.entry_high)}.${opens}` };
+  }
+
+  /* The exit plan in shares and rupees, measured from the fill — or, before a
+     fill, from the most it pays, and labelled so. Cash back is shown apart from
+     profit, because the first includes the money that went in. The downside is
+     the initial stop on the whole position, before costs, and says a gap can
+     open through it. */
+  function ladder(p) {
+    const tr = Array.isArray(p.tranches) && p.tranches.length === 3 && p.qty ? p.tranches : null;
+    const sp = p.sell_pct || [40, 35, 25];
+    if (!tr) {
+      return `<p class="v2w-empty"><b>Sells ${sp[0]}%, ${sp[1]}% and ${sp[2]}% at ${px(p.t1)}, ${px(p.t2)} and ${px(p.t3)}.</b>Share counts appear with the next scan.</p>`;
+    }
+    const ref = p.fill_price != null ? p.fill_price : p.entry_high;
+    const refWord = p.fill_price != null ? `the ${px(p.fill_price)} fill` : `${px(p.entry_high)}, the most it pays`;
+    const istop = p.initial_stop != null ? p.initial_stop : p.stop;
+    let left = p.qty, back = 0, gain = 0;
+    const rows = [p.t1, p.t2, p.t3].map((t, k) => {
+      left -= tr[k]; back += tr[k] * t; gain += tr[k] * (t - ref);
+      return `<tr><th scope="row">T${k + 1}</th><td>${px(t)}</td><td>${tr[k]}</td><td>${left}</td><td>${inr(back)}</td><td class="up">${inr(gain)}</td></tr>`;
+    }).join('');
+    const loss = (ref - istop) * p.qty;
+    return `<div class="v2w-ladw"><table class="v2w-lad"><caption>Paper position: ${p.qty} shares, ${inr(p.qty * ref)} at ${esc(refWord)}</caption>
+      <thead><tr><th scope="col">Exit</th><th scope="col">Price</th><th scope="col">Sell</th><th scope="col">Left</th><th scope="col">Cash back</th><th scope="col">Profit</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+      <p class="v2w-note">If the ${px(istop)} stop trades before T1, the whole position is sold: about ${inr(-loss)} on ${p.qty} shares, before costs. A gap can open through a stop, so a real loss can be larger. Both money columns are running totals. Cash back includes the money paid in; only Profit is gain, before costs.</p>`;
+  }
+
+  /* SINCE THE LAST SCAN. Built from dated fields the feed already carries —
+     fills, exits and the day a setup ended — so it lists what happened on the
+     latest close and nothing older. Problems first: a stop or a cancellation
+     outranks a target, a target outranks a fill, a fill outranks a new setup. */
+  function changes(d, opts = {}) {
+    injectCss();
+    const P = d && d.paper;
+    if (!P || !Array.isArray(P.plans)) return '';
+    const s = P.as_of, href = opts.href || ((p) => '#'), names = Object.fromEntries((P.engines || []).map((e) => [e.id, e.name]));
+    const items = [];
+    for (const p of P.plans) {
+      for (const x of p.exits || []) {
+        if (x.session !== s) continue;
+        const stop = /stop/.test(x.reason || ''), time = /time/.test(x.reason || '');
+        items.push({ r: stop ? 0 : time ? 1 : 2, p, tag: stop ? 'Stopped' : time ? 'Time exit' : 'Target',
+          text: `${stop ? 'Stop' : time ? 'Time exit' : esc(x.reason)} at ${px(x.price)}: ${x.qty} shares sold` });
+      }
+      if (p.ended_session === s && p.state === 'cancelled') items.push({ r: 0, p, tag: 'Cancelled', text: 'Cancelled before it filled: the stop traded first' });
+      if (p.ended_session === s && p.state === 'expired_unfilled') items.push({ r: 1, p, tag: 'Lapsed', text: 'Lapsed: the buy range never traded in its window' });
+      if (p.fill_session === s) items.push({ r: 3, p, tag: 'Filled', text: `Filled at ${px(p.fill_price)}` });
+    }
+    const fresh = P.plans.filter((p) => p.filed_session === s && p.state === 'awaiting_entry');
+    items.sort((a, b) => a.r - b.r || a.p.symbol.localeCompare(b.p.symbol));
+    const li = items.map((x) => `<li class="r${x.r}"><span class="t">${esc(x.tag)}</span><a href="${esc(href(x.p))}"><b>${esc(x.p.symbol)}</b></a>
+      <span class="w">${x.text} <i>${esc(names[x.p.engine] || '')}</i></span></li>`);
+    if (fresh.length) li.push(`<li class="r4"><span class="t">New</span><span class="w">${fresh.length} new paper setup${fresh.length > 1 ? 's' : ''} for the ${esc(dayShort(fresh[0].for_session))} session: ${fresh.map((p) => `<a href="${esc(href(p))}">${esc(p.symbol)}</a>`).join(', ')}</span></li>`);
+    return `<section class="v2w v2w-chs" aria-label="Since the last scan">
+      <h3>Since the last scan <span class="v2w-per">${esc(day(s))} close · paper</span></h3>
+      ${li.length ? `<ul class="v2w-ch">${li.join('')}</ul>` : `<p class="v2w-empty"><b>Nothing changed on the ${esc(day(s))} close.</b>No setup was filed, filled, sold, stopped or lapsed.</p>`}</section>`;
+  }
+
+  /* The whole Passport for one setup. `slot` is where the caller writes the
+     entry check once its quote arrives; until then it says it is checking. */
+  const entryHtml = (e) => `<div class="v2w-chk k-${esc(e.k)}" role="status"><b>${esc(e.word)}</b><span>${esc(e.line)}</span></div>`;
+  function passport(p, d, opts = {}) {
+    injectCss();
+    const P = (d && d.paper) || {}, names = Object.fromEntries((P.engines || []).map((e) => [e.id, e.name]));
+    const sp = p.sell_pct || [40, 35, 25];
+    const hist = [`<li><time>${esc(dayShort(p.filed_session))}</time> Recorded after the close by ${esc(names[p.engine] || p.engine)}, for the ${esc(dayShort(p.for_session))}–${esc(dayShort(p.valid_through))} window.</li>`]
+      .concat(p.fill_price != null ? [`<li><time>${esc(dayShort(p.fill_session))}</time> Filled at ${px(p.fill_price)} (simulated).</li>`] : [])
+      .concat((p.exits || []).map((x) => `<li><time>${esc(dayShort(x.session))}</time> ${esc(x.reason)} at ${px(x.price)}: ${x.qty} shares sold.</li>`))
+      .concat(p.ended_session && !(p.exits || []).length ? [`<li><time>${esc(dayShort(p.ended_session))}</time> ${esc(PSTATE[p.state] || p.state)}.</li>`] : []);
+    return `<section class="v2w v2w-pp" aria-label="Setup ${esc(p.symbol)}">
+      <h3>${opts.noSymbol ? 'The setup' : esc(p.symbol)} <span class="v2w-tag pp">paper</span> <span class="v2w-st">${esc(PSTATE[p.state] || p.state)}</span></h3>
+      <p class="v2w-per">${esc(names[p.engine] || p.engine)} · long · NSE cash · recorded after the ${esc(day(p.filed_session))} close · simulated fills, no order is placed</p>
+      <div class="v2w-ent" data-v2w-entry>${opts.entryHtml || '<p class="v2w-note">Checking the price against the range…</p>'}</div>
+      <dl class="v2w-plan">
+        <div><dt>Buy between</dt><dd>${px(p.entry_low)} – ${px(p.entry_high)}</dd></div>
+        <div><dt>Most to pay</dt><dd>${px(p.entry_high)} <span>an open above it does not fill</span></dd></div>
+        <div><dt>Window</dt><dd>${esc(dayShort(p.for_session))} – ${esc(dayShort(p.valid_through))}</dd></div>
+        <div><dt>Stop</dt><dd>${px(p.stop)}${p.initial_stop != null && p.stop !== p.initial_stop ? ` <span>raised from ${px(p.initial_stop)}</span>` : p.risk_pct != null ? ` <span>${Number(p.risk_pct).toFixed(1)}% under the top of the range</span>` : ''}</dd></div>
+        <div><dt>Sell</dt><dd>${sp[0]}% at ${px(p.t1)} · ${sp[1]}% at ${px(p.t2)} · ${sp[2]}% at ${px(p.t3)}</dd></div>
+      </dl>
+      ${p.why ? `<p class="v2w-why"><b>Why it was recorded:</b> ${esc(p.symbol)} ${esc(p.why)}</p>` : ''}
+      <h4 class="v2w-h">Exit ladder</h4>${ladder(p)}
+      <h4 class="v2w-h">History</h4><ol class="v2w-hist">${hist.join('')}</ol>
+      <p class="v2w-note">A trade at or below the stop before any fill cancels the setup; not filled by ${esc(dayShort(p.valid_through))}, it lapses. After target 2 the stop is raised under each new swing low, never lowered. Paper test, not proven, not advice.</p>
+    </section>`;
+  }
+
+  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers }, explain, paper, read, levels, entry, entryHtml, ladder, changes, passport };
 })();

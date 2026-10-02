@@ -1147,12 +1147,26 @@
         <div><em>Traded a day</em><b>${row.turnover_cr != null ? '₹' + fmt(row.turnover_cr, 0) + ' cr' : '—'}</b></div>
         <div><em>Risk grade</em><b class="${row.risk && row.risk.level === 'HIGH' ? 'dn' : ''}">${row.risk && row.risk.level ? esc(row.risk.level) : '—'}</b><small>the screen's own</small></div></div>`;
     body.innerHTML = `<div class="grid g-7-5"><div class="stack">
-        ${panel(p ? 'The paper setup' : 'Is there a setup?', plan, { right: p ? '<span class="chip warn">paper</span>' : '' })}
+        ${/* THE SAME PASSPORT AS SIGNAL'S /setup PAGE: one renderer, so the two
+            sites cannot show different levels for the same setup. */''}
+        ${p && window.V2W && window.V2W.passport
+          ? window.V2W.passport(p, D) + `<p class="note" style="margin:var(--s-2) 0 0"><a href="${SIGNAL_URL}/setup/${encodeURIComponent(p.id)}">This setup on Signal ↗</a></p>`
+          : panel(p ? 'The paper setup' : 'Is there a setup?', plan, { right: p ? '<span class="chip warn">paper</span>' : '' })}
         <div id="bChart">${skel(5)}</div>
       </div><div class="stack">
         <div id="bRead">${window.V2W && window.V2W.read ? window.V2W.read(R, sym, { error: R ? '' : 'technical_read.json did not load' }) : ''}</div>
         ${panel('The business', biz, { more: '#/asset/' + encodeURIComponent(sym), moreText: 'Company page' })}
       </div></div>`;
+    /* The entry check, from a delayed quote and the shared rule. */
+    if (p && window.V2W && window.V2W.entry) {
+      get('/api/signals?px=' + encodeURIComponent(sym), 45000).then((qr) => {
+        const slot = alive() && document.querySelector('[data-v2w-entry]');
+        if (!slot) return;
+        const q = qr && qr.ok && qr.data && qr.data.quotes ? qr.data.quotes[sym] : null;
+        const ist = new Date(Date.now() + 330 * 60000).toISOString();
+        slot.innerHTML = window.V2W.entryHtml(window.V2W.entry(p, q, { open: marketState().k === 'open', at: ist.slice(11, 16), today: ist.slice(0, 10) }));
+      }).catch(() => {});
+    }
     const ser = await get('/api/signals?series=' + encodeURIComponent(sym) + '&range=6mo').catch(() => ({ ok: false }));
     if (!alive()) return;
     const lv = { entry: p ? [p.entry_low, p.entry_high] : null, stop: p ? p.stop : null, t: p ? [p.t1, p.t2, p.t3] : [],

@@ -468,7 +468,7 @@ export default {
          which runs against SIGNAL_URL. */
       "/vision"]);
     const p = url.pathname.replace(/\/+$/, "") || "/";
-    const isPage = PAGES.has(p) || p.startsWith("/stock/") || /^\/plan\/[^/]+$/.test(p);
+    const isPage = PAGES.has(p) || p.startsWith("/stock/") || /^\/plan\/[^/]+$/.test(p) || /^\/setup\/[^/]+$/.test(p);
     // A request for a real file (/signal.js, /screen.json, /fonts/...) has an
     // extension and is left entirely alone — the assets binding answers it,
     // and a 404 from there is already a real 404.

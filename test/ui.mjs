@@ -317,6 +317,21 @@ try {
      oppT.indexOf("Eligible next session") > -1 && oppT.indexOf("Eligible next session") < oppT.indexOf("Active")
      && /Expired or cancelled before entry/.test(oppT));
   ok("Opportunities never fills an empty day with a pick", !/best stock|top pick/i.test(oppT));
+  /* THE PASSPORT. Every paper setup has one page; the front page's digest
+     links to it, and it carries the plan, an entry check that names its quote
+     basis (never "live"), the exit ladder and the history. */
+  if (v2Feed && v2Feed.paper && (v2Feed.paper.plans || []).length) {
+    const sp = v2Feed.paper.plans[0];
+    await p.goto(SITE + "/setup/" + encodeURIComponent(sp.id), { waitUntil: "domcontentloaded" });
+    await until(p, () => !!document.querySelector(".v2w-pp"));
+    await p.waitForTimeout(3000);
+    const ppT = await p.locator("main").innerText().catch(() => "");
+    ok("a setup has its own page with the plan, ladder and history",
+       ppT.includes(sp.symbol) && /buy between/i.test(ppT) && /exit ladder/i.test(ppT) && /history/i.test(ppT), ppT.slice(0, 160));
+    ok("...and its entry check names its basis, never 'live'",
+       /Delayed quote|Last close|Entry check unavailable|Filled at|Closed|Stopped|Never filled|Cancelled|Time exit/.test(ppT) && !/\blive price\b/i.test(ppT));
+    ok("...and prints no NaN, undefined or null", !/\bNaN\b|undefined|\bnull\b/.test(ppT));
+  }
   await p.goto(SITE + "/performance", { waitUntil: "domcontentloaded" });
   await until(p, () => /The record/.test(document.querySelector("main")?.innerText || ""));
   const perfT = await p.locator("main").innerText().catch(() => "");
@@ -703,7 +718,7 @@ try {
    * looks like a slow load. */
   console.log("\n  routing");
   for (const [route, wantIn] of [["/markets", "Markets"], ["/screen", "Screen"],
-                                 ["/opportunities", "Opportunities"], ["/performance", "Performance"]]) {
+                                 ["/opportunities", "Setups"], ["/performance", "Record"]]) {
     await p.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await settled(p, SETTLE + 2500);
     const title = await p.title();
@@ -952,8 +967,8 @@ try {
   ok("the bar has five destinations", shell.count === 5, shell);
   ok("none of them is a dropdown", shell.dropdowns === 0, shell);
   ok("every destination has an icon", shell.icons === shell.count, shell);
-  ok("the five are Today, Opportunities, Watchlist, Performance and Market",
-     JSON.stringify(shell.labels) === JSON.stringify(["Today", "Opportunities", "Watchlist", "Performance", "Market"]), shell.labels);
+  ok("the five are Today, Setups, Watchlist, Record and Market — one name each on desktop and phone",
+     JSON.stringify(shell.labels) === JSON.stringify(["Today", "Setups", "Watchlist", "Record", "Market"]), shell.labels);
   ok("tap targets clear 44px", shell.minTap >= 44, shell.minTap);
 
   /* Every route must still be reachable from the bar, Discover or the Ledger.

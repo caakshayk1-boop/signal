@@ -125,7 +125,7 @@ try {
   const { SIGNAL_META } = await import(new URL("../src/route-meta.js", import.meta.url));
   /* Signal V2: retired V1 routes and the plan pattern are not listed. A plan
      is a short-lived page; the retired ones only exist so old links land. */
-  const skip = new Set(["/404", "/buoy", "/signals", "/engines", "/ideas", "/research", "/plan/:id"]);
+  const skip = new Set(["/404", "/buoy", "/signals", "/engines", "/ideas", "/research", "/plan/:id", "/setup/:id"]);
   const pri = { "/": "1.0", "/opportunities": "0.9", "/performance": "0.9", "/screen": "0.8", "/markets": "0.8" };
   const su = Object.keys(SIGNAL_META).filter((k) => !skip.has(k)).map((k) =>
     `  <url><loc>https://signal.askakshay.com${k}</loc><lastmod>${day}</lastmod><changefreq>daily</changefreq><priority>${pri[k] || "0.6"}</priority></url>`);

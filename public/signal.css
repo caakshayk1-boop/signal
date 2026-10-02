@@ -6675,3 +6675,7 @@ main{min-height:calc(100vh - var(--barh))}
 /* Setups: one status line instead of the front page's four-part strip. */
 .v2-sline{margin:0 0 var(--s-5);font-size:var(--t-3);color:var(--muted)}
 .v2-sline b{color:var(--text);font-weight:600}
+/* The Passport page's onward links, and the digest's entry word by state. */
+.v2-pp-links{margin:var(--s-4) 0 0;font-size:var(--t-3);color:var(--muted)}
+.v2w .v2w-dr .s[data-k="in"]{color:var(--up)} .v2w .v2w-dr .s[data-k="above"],.v2w .v2w-dr .s[data-k="below"]{color:var(--warn)}
+.v2w .v2w-dr .s[data-k="void"]{color:var(--down)}
