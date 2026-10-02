@@ -193,6 +193,34 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 .v2w .v2w-why{font-size:13px;margin:0 0 6px}
 .v2w .v2w-hist{margin:0 0 8px;padding-left:18px;font-size:13px}
 .v2w .v2w-hist time{font-variant-numeric:tabular-nums;color:var(--w-dim,var(--dim,#6b6b6b));margin-right:6px}
+.v2w .v2w-rp-out{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:6px 0 2px;font:400 15px/1.3 var(--ui,var(--f-sans,system-ui,sans-serif))}
+.v2w .v2w-rp-out .r{font:600 24px/1 var(--mono,ui-monospace,monospace);font-variant-numeric:tabular-nums;color:var(--w-ink)}
+.v2w .v2w-rp-out.up .r{color:var(--w-up)} .v2w .v2w-rp-out.dn .r{color:var(--w-dn)}
+.v2w .v2w-rp-sub{font-size:13px;color:var(--w-mut);margin:0 0 12px}
+.v2w .v2w-rp-map{margin:14px 0 4px}
+.v2w .v2w-rp-map .bar{position:relative;height:30px;margin:0 8px;border-bottom:1px solid var(--w-line,var(--line,#e5e2db))}
+.v2w .v2w-rp-map .bar span,.v2w .v2w-rp-map .bar i{position:absolute;display:block}
+.v2w .v2w-rp-map .seen{bottom:4px;height:8px;border-radius:4px;background:color-mix(in srgb,var(--w-acc) 28%,transparent)}
+.v2w .v2w-rp-map .zone{bottom:14px;height:6px;border-radius:3px;background:color-mix(in srgb,var(--w-mut,#6b6b6b) 30%,transparent)}
+.v2w .v2w-rp-map .bar i{bottom:0;width:2px;height:26px;margin-left:-1px;border-radius:1px}
+.v2w .v2w-rp-map i.st{background:var(--w-dn)} .v2w .v2w-rp-map i.st2{background:var(--w-dn);opacity:.55}
+.v2w .v2w-rp-map i.tg{background:var(--w-up)} .v2w .v2w-rp-map i.fl{background:var(--w-ink);height:30px}
+.v2w .v2w-rp-map .bar i.xt{width:8px;height:8px;margin-left:-4px;bottom:22px;border-radius:50%;background:var(--w-surf,#fff);box-shadow:0 0 0 2px var(--w-ink)}
+.v2w .v2w-rp-map .ax{display:flex;justify-content:space-between;margin:4px 0 0;font:400 11px/1 var(--mono,ui-monospace,monospace);color:var(--w-dim,var(--dim,#6b6b6b));font-variant-numeric:tabular-nums}
+.v2w .v2w-rp-map figcaption{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:12px;color:var(--w-mut)}
+.v2w .v2w-rp-map figcaption .k{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;position:static}
+.v2w .v2w-rp-map figcaption .k.seen{background:color-mix(in srgb,var(--w-acc) 28%,transparent)} .v2w .v2w-rp-map figcaption .k.zone{background:color-mix(in srgb,var(--w-mut,#6b6b6b) 30%,transparent)}
+.v2w .v2w-rp-map figcaption .k.st{background:var(--w-dn);width:3px} .v2w .v2w-rp-map figcaption .k.tg{background:var(--w-up);width:3px}
+.v2w .v2w-rp-map figcaption .k.fl{background:var(--w-ink);width:3px} .v2w .v2w-rp-map figcaption .k.xt{border-radius:50%;box-shadow:inset 0 0 0 2px var(--w-ink)}
+.v2w .v2w-rp-tl li{margin:0 0 6px}
+.v2w .v2w-rp-n{margin:0 0 8px;padding-left:18px;font-size:13px}
+.v2w .v2w-fl{border:1px solid var(--w-line,var(--line,#e5e2db));border-radius:10px;overflow:hidden}
+.v2w .v2w-fr{display:grid;grid-template-columns:minmax(90px,1fr) minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1.5fr) minmax(64px,.8fr);gap:4px 14px;align-items:baseline;
+  padding:9px 14px;border-top:1px solid var(--w-line,var(--line,#e5e2db));color:var(--w-ink,inherit);text-decoration:none;font:400 13px/1.35 var(--ui,var(--f-sans,system-ui,sans-serif));font-variant-numeric:tabular-nums}
+.v2w .v2w-fr:first-child{border-top:0} .v2w .v2w-fr:hover{background:color-mix(in srgb,var(--w-acc) 6%,transparent)}
+.v2w .v2w-fr .s{font-weight:600} .v2w .v2w-fr .e,.v2w .v2w-fr .d{color:var(--w-mut)} .v2w .v2w-fr .r{text-align:right;font-family:var(--mono,ui-monospace,monospace)}
+.v2w .v2w-fr .r.up{color:var(--w-up)} .v2w .v2w-fr .r.dn{color:var(--w-dn)}
+@media(max-width:600px){.v2w .v2w-fr{grid-template-columns:minmax(0,1fr) auto}.v2w .v2w-fr .e,.v2w .v2w-fr .d{grid-column:1}.v2w .v2w-fr .o{grid-column:1}}
 .v2w .v2w-dg{border:1px solid var(--w-line,var(--line,#e5e2db));border-radius:10px;overflow:hidden}
 .v2w .v2w-dr{display:grid;grid-template-columns:minmax(96px,1.1fr) minmax(0,1.5fr) minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);
   gap:4px 14px;align-items:baseline;padding:9px 14px;border-top:1px solid var(--w-line,var(--line,#e5e2db));
@@ -1113,5 +1141,100 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
     </section>`;
   }
 
-  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers }, explain, paper, read, levels, entry, entryHtml, ladder, changes, passport };
+  /* REPLAY OF A FINISHED PAPER SETUP (paper_record.json, paper-record/1).
+   * What happened, in order, from the engine's own record: the levels as
+   * recorded, the simulated fill, each stop raise and the session it took
+   * effect after, each exit, the end. Every figure is a field; the browser
+   * subtracts a fill from an exit price to say what those shares made before
+   * costs, and nothing else. The result is the engine's net R and net rupees,
+   * after its estimated charges. There is no intraday path: daily bars say
+   * where a session traded, not in what order, and the page says so. */
+  const FLAG_NOTE = {
+    ambiguous: 'On one session a single daily bar reached both a target and the stop. A daily bar does not say which came first, so the stop was booked first: the worse of the two.',
+    gap_through_stop: 'It opened below the stop, so it was sold at the open, lower than the stop.',
+    same_day_stop_after_limit_fill: 'It filled and traded through the stop in the same session.',
+    circuit_blocked: 'A lower circuit stopped any sale on at least one session; it was sold when trading allowed.',
+  };
+  const ENDED = { closed: 'Sold at its last target', stopped: 'Stopped out', time_exited: 'Sold on the clock (time exit)',
+                  expired_unfilled: 'Lapsed: never filled', cancelled: 'Cancelled before a fill' };
+  function replay(t, rec, opts = {}) {
+    injectCss();
+    if (!t) return `<section class="v2w v2w-rp"><h3>Replay</h3><p class="v2w-empty">${esc(opts.error || 'A replay is shown once a setup has finished.')}</p></section>`;
+    const names = Object.fromEntries(((rec && rec.engines) || []).map((e) => [e.id, e.name]));
+    const filled = t.fill_price != null, fp = t.fill_price;
+    const sp = t.sell_pct || [40, 35, 25];
+    const stop0 = t.initial_stop != null ? t.initial_stop : t.stop;
+    const ex = t.exits || [], stops = t.stops || [];
+    /* The outcome first, in words, then the number. */
+    const sign = t.total_r == null ? '' : t.total_r > 0.02 ? 'up' : t.total_r < -0.02 ? 'dn' : '';
+    const money = t.net_inr == null ? '' : t.net_inr < 0 ? `a net loss of ${inr(-t.net_inr)}` : `a net gain of ${inr(t.net_inr)}`;
+    const head = filled
+      ? `<p class="v2w-rp-out ${sign}"><b>${esc(ENDED[t.state] || PSTATE[t.state] || t.state)}</b> <span class="r">${rR(t.total_r)}</span></p>
+         <p class="v2w-rp-sub">${money ? esc(money) + ' on the paper position' : ''}${t.charges_inr != null ? `, after ${inr(t.charges_inr)} of estimated charges` : ''}${t.held_sessions != null ? ` · held ${t.held_sessions} session${t.held_sessions === 1 ? '' : 's'}` : ''}. R is the net result over the risk at the fill.</p>`
+      : `<p class="v2w-rp-out"><b>${esc(ENDED[t.state] || PSTATE[t.state] || t.state)}</b> <span class="r">no result</span></p>
+         <p class="v2w-rp-sub">Nothing was bought, so there is no gain or loss to report. It stays in the record as ${t.state === 'cancelled' ? 'cancelled' : 'unfilled'}, counted, and in no win rate.</p>`;
+    /* The level map: where the setup's levels sat, and the range it traded
+       over while held. Levels only, no time axis, because there is no path. */
+    let map = '';
+    if (filled && t.high_seen != null && t.low_seen != null) {
+      const pts = [stop0, t.stop, t.entry_low, t.entry_high, t.t1, t.t2, t.t3, t.high_seen, t.low_seen, fp, ...ex.map((x) => x.price)].filter((v) => v != null && isFinite(v));
+      const lo = Math.min(...pts), hi = Math.max(...pts), w = hi - lo || 1;
+      const at = (v) => ((v - lo) / w * 100).toFixed(2) + '%';
+      const tick = (v, cls, label) => v == null ? '' : `<i class="${cls}" style="left:${at(v)}" title="${esc(label)} ${px(v)}"></i>`;
+      map = `<figure class="v2w-rp-map" aria-label="Levels and the range traded while held">
+        <div class="bar"><span class="seen" style="left:${at(t.low_seen)};width:calc(${at(t.high_seen)} - ${at(t.low_seen)})"></span>
+          <span class="zone" style="left:${at(t.entry_low)};width:calc(${at(t.entry_high)} - ${at(t.entry_low)})"></span>
+          ${tick(stop0, 'st', 'Stop as recorded')}${t.stop !== stop0 ? tick(t.stop, 'st2', 'Stop at the end') : ''}
+          ${tick(t.t1, 'tg', 'T1')}${tick(t.t2, 'tg', 'T2')}${tick(t.t3, 'tg', 'T3')}${tick(fp, 'fl', 'Fill')}
+          ${ex.map((x) => tick(x.price, 'xt', 'Exit ' + x.reason)).join('')}</div>
+        <div class="ax"><span>${px(lo)}</span><span>${px(hi)}</span></div>
+        <figcaption><span><i class="k seen"></i>traded while held ${px(t.low_seen)} – ${px(t.high_seen)}</span>
+          <span><i class="k zone"></i>entry range</span><span><i class="k st"></i>stop</span><span><i class="k tg"></i>targets</span>
+          <span><i class="k fl"></i>fill</span><span><i class="k xt"></i>exits</span></figcaption>
+      </figure>
+      <p class="v2w-note">${t.high_seen >= t.t1 ? `At best it traded ${px(t.high_seen)}, at or above T1 (${px(t.t1)}).`
+        : `At best it traded ${px(t.high_seen)}, ${px(t.t1 - t.high_seen)} short of T1 (${px(t.t1)}).`}
+        At worst ${px(t.low_seen)}. These are the highest high and lowest low of the daily bars while it was held, not an order of events.</p>`;
+    }
+    const steps = [`<li><time>${esc(dayShort(t.filed_session))}</time> <b>Recorded</b> after the close by ${esc(names[t.engine] || t.engine)}: buy ${px(t.entry_low)} – ${px(t.entry_high)} from ${esc(dayShort(t.for_session))} to ${esc(dayShort(t.valid_through))}, stop ${px(stop0)}, sell ${sp[0]}% at ${px(t.t1)}, ${sp[1]}% at ${px(t.t2)}, ${sp[2]}% at ${px(t.t3)}. Fixed from here on.</li>`];
+    if (filled) steps.push(`<li><time>${esc(dayShort(t.fill_session))}</time> <b>Filled</b> at ${px(fp)}${t.qty ? `, ${t.qty} shares` : ''} (simulated).</li>`);
+    const evs = stops.map((x) => ({ k: x.effective_after, o: 0, h: `<li><time>${esc(dayShort(x.effective_after))}</time> <b>Stop raised</b> from ${px(x.from)} to ${px(x.to)}, under a new swing low; it applies from the next session.</li>` }))
+      .concat(ex.map((x, i) => {
+        const per = filled ? x.price - fp : null;
+        return { k: x.session, o: 1 + i, h: `<li><time>${esc(dayShort(x.session))}</time> <b>Sold ${x.qty} at ${px(x.price)}</b>, ${esc(x.reason)}${per != null ? `: ${per >= 0 ? '+' : '−'}${inr(Math.abs(per * x.qty))} on these shares before costs` : ''}.</li>` };
+      }))
+      .sort((a, b) => String(a.k).localeCompare(String(b.k)) || a.o - b.o);
+    steps.push(...evs.map((x) => x.h));
+    if (t.ended_session) steps.push(`<li><time>${esc(dayShort(t.ended_session))}</time> <b>Ended:</b> ${esc((ENDED[t.state] || t.state).toLowerCase())}.</li>`);
+    const notes = (t.flags || []).filter((f) => FLAG_NOTE[f]).map((f) => `<li>${FLAG_NOTE[f]}</li>`).join('');
+    return `<section class="v2w v2w-rp" aria-label="Replay ${esc(t.symbol)}">
+      <h3>${opts.noSymbol ? 'Replay' : esc(t.symbol)} <span class="v2w-tag pp">paper</span> <span class="v2w-st">finished${t.ended_session ? ' ' + esc(day(t.ended_session)) : ''}</span></h3>
+      <p class="v2w-per">${esc(names[t.engine] || t.engine)} · long · NSE cash · simulated fills on daily bars, no order was placed</p>
+      ${head}${map}
+      <h4 class="v2w-h">What happened</h4><ol class="v2w-hist v2w-rp-tl">${steps.join('')}</ol>
+      ${notes ? `<h4 class="v2w-h">How it was booked</h4><ul class="v2w-rp-n">${notes}</ul>` : ''}
+      ${t.why ? `<p class="v2w-why"><b>Why it was recorded:</b> ${esc(t.symbol)} ${esc(t.why)}</p>` : ''}
+      <p class="v2w-note">Paper test: recorded in public before the session and graded under the same rules. Not proven, not advice, and no reader's own trade is reported here.</p>
+    </section>`;
+  }
+
+  /* Every finished paper setup, newest first, each linking to its replay.
+   * Counts are the record's own; no average or rate is computed here. */
+  function finished(rec, opts = {}) {
+    injectCss();
+    if (!rec) return failCard('Finished paper setups', 'The record of finished setups', opts.error || 'paper_record.json did not load');
+    const T = rec.trades || [], c = rec.counts || {};
+    const names = Object.fromEntries((rec.engines || []).map((e) => [e.id, e.name]));
+    const href = opts.href || ((t) => '#');
+    if (!T.length) return `<div class="v2w v2w-fin"><p class="v2w-empty"><b>No paper setup has finished yet.</b> Each one appears here on the day it ends, stopped, sold at its last target, exited on the clock or lapsed, with a replay of what happened. None is removed.</p></div>`;
+    const rows = T.map((t) => `<a class="v2w-fr" href="${esc(href(t))}"><span class="s">${esc(t.symbol)}</span>
+      <span class="e">${esc(names[t.engine] || t.engine)}</span><span class="d">${esc(dayShort(t.filed_session))} → ${esc(t.ended_session ? dayShort(t.ended_session) : '—')}</span>
+      <span class="o">${esc(ENDED[t.state] || PSTATE[t.state] || t.state)}</span>
+      <span class="r ${t.total_r == null ? '' : t.total_r > 0.02 ? 'up' : t.total_r < -0.02 ? 'dn' : ''}">${t.total_r == null ? 'no fill' : rR(t.total_r)}</span></a>`).join('');
+    return `<div class="v2w v2w-fin">
+      <p class="v2w-per">${c.finished ?? T.length} finished · ${c.filled ?? '—'} filled · ${c.unfilled ?? '—'} never filled. Net of estimated charges, in R of the risk at the fill.</p>
+      <div class="v2w-fl">${rows}</div></div>`;
+  }
+
+  window.V2W = { perf, calendar, lifecycle, market: { nifty, days, sectors, movers }, explain, paper, read, levels, entry, entryHtml, ladder, changes, passport, replay, finished };
 })();

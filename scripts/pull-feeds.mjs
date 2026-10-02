@@ -116,6 +116,8 @@ const EXTRA = [
   ["signal_v2", FEEDS_RAW + "signal_v2.json", (d) => d && d.schema === "signal-v2-public/1" && !!d.status && Array.isArray(d.plans) && d.metrics && typeof d.metrics === "object", "Signal V2 plan feed", "published_at"],
   /* One stock's Technical Confluence read, shown on both stock pages. */
   ["technical_read", FEEDS_RAW + "technical_read.json", (d) => d && d.schema === "technical-read/1" && d.reads && typeof d.reads === "object" && !!d.session_date, "technical reads", "published_at"],
+  /* Every finished paper setup, kept permanently: the replay's source. */
+  ["paper_record", FEEDS_RAW + "paper_record.json", (d) => d && d.schema === "paper-record/1" && Array.isArray(d.trades) && !!d.as_of, "paper record", "as_of"],
 ];
 for (const [f, url, valid, what, stampKey] of EXTRA) {
   const path = `public/${f}.json`;

@@ -243,6 +243,25 @@ jobs:
             rm -f ".incoming/$f"
           fi
 
+      # The record of finished paper setups, for the replay on each setup's
+      # page and the list on the Record page. Kept permanently upstream; the
+      # paper block in signal_v2.json forgets a finished setup after ten
+      # sessions. Same rule: only a file that declares its schema replaces it.
+      - name: Fetch the paper record
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          f=paper_record.json
+          if gh api "repos/$UPSTREAM/contents/feeds/$f" \
+               -H "Accept: application/vnd.github.raw" > ".incoming/$f" 2>/dev/null \
+             && python3 -c "import json,sys; d=json.load(open('.incoming/$f')); sys.exit(0 if d.get('schema')=='paper-record/1' and isinstance(d.get('trades'), list) and d.get('as_of') else 1)" 2>/dev/null; then
+            printf '  ok    %-18s %s\n' "$f" "$(du -h ".incoming/$f" | cut -f1)"
+          else
+            printf '  MISS  %-18s not published upstream yet, or not a valid feed — keeping the copy in this repo\n' "$f"
+            rm -f ".incoming/$f"
+          fi
+
       # Age is reported, never asserted, because staleness is upstream's
       # problem to fix and this job's problem to make visible.
       - name: Report feed freshness
