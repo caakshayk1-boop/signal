@@ -872,7 +872,7 @@
         <div style="text-align:right"><div class="big-px">${px != null ? '₹' + fmt(px, 2) : '—'}</div><div>${lv ? chg(lv.change_pct) + ` <span class="mut">${quoteWord()}</span>` : chg(r.r1d) + ' <span class="mut">last close</span>'}</div></div></div>
       <div class="kv" style="margin-top:0">${(() => { const L = liveRow(r); return [['1D', L.r1d], ['1W', L.r1w], ['1M', L.r1m], ['3M', r.r3m], ['6M', r.r6m]]; })().map(([k, v]) => `<div><em>${k}</em><b>${chg(v, 1)}</b></div>`).join('')}</div>
       <div><h3>52-week range</h3>${pos != null ? `<div class="rng" role="img" aria-label="${pos.toFixed(0)}% of the way from the 52-week low to the high"><i style="left:${pos}%"></i></div>
-        <div class="rng-l"><span>Low ₹${fmt(lo, 1)}</span><span>${pos.toFixed(0)}% of range</span><span>High ₹${fmt(hi, 1)}</span></div>
+        <div class="rng-l"><span>Low ₹${fmt(lo, 2)}</span><span>${pos.toFixed(0)}% of range</span><span>High ₹${fmt(hi, 2)}</span></div>
         <div class="sc-ls" style="margin-top:var(--s-2)">${lvlRow('52w high', hi, px)}${lvlRow('52w low', lo, px)}</div>`
         : `<p class="note">No 52-week range on the screen for this name${r.rng_sessions ? ` — ${r.rng_sessions} sessions of history` : ''}.</p>`}</div>
       <div><h3>Moving averages</h3><div class="sc-ls">${lvlRow('20-day', r.sma20, px)}${lvlRow('50-day', r.sma50, px)}${lvlRow('200-day', r.sma200, px)}</div></div>
@@ -899,7 +899,7 @@
       tip.innerHTML = `<b>${esc(r.sym)}</b><span class="mut">${esc(r.name || '')}</span><dl>
         <dt>${r.live ? 'Live' : 'Close'}</dt><dd>₹${fmt(r.price, 2) || '—'}</dd><dt>1D · 1W · 1M</dt><dd>${[r.r1d, r.r1w, r.r1m].map((v) => signed(v, 1) || '—').join(' · ')}</dd>
         <dt>50-day</dt><dd>${rel(r.sma50)}</dd><dt>200-day</dt><dd>${rel(r.sma200)}</dd>
-        <dt>52w high</dt><dd>${r.high52 != null ? '₹' + fmt(r.high52, 1) : '—'}</dd><dt>52w low</dt><dd>${r.low52 != null ? '₹' + fmt(r.low52, 1) : '—'}</dd>
+        <dt>52w high</dt><dd>${r.high52 != null ? '₹' + fmt(r.high52, 2) : '—'}</dd><dt>52w low</dt><dd>${r.low52 != null ? '₹' + fmt(r.low52, 2) : '—'}</dd>
         <dt>Move score</dt><dd>${mv.score == null ? 'not scored' : mv.score}</dd></dl><span class="tip-h">Click for the card</span>`;
       const bx = Math.min(x + 14, innerWidth - 280), by = Math.min(y + 14, innerHeight - 260);
       tip.style.left = bx + 'px'; tip.style.top = by + 'px'; tip.classList.add('on');
@@ -1544,8 +1544,8 @@
           <a class="btn sm" href="https://www.tradingview.com/chart/?symbol=NSE:${encodeURIComponent(s)}" target="_blank" rel="noopener">Chart ↗</a>
           <a class="btn sm" href="https://www.screener.in/company/${encodeURIComponent(s)}/consolidated/" target="_blank" rel="noopener">Filings ↗</a></div></div></div>
       ${r && r.high52 && r.low52 && r.high52 > r.low52 ? `<div style="margin-top:var(--s-4)"><div class="rng" role="img" aria-label="52-week range ${fmt(r.low52)} to ${fmt(r.high52)}"><i style="left:${clamp((px - r.low52) / (r.high52 - r.low52) * 100, 0, 100)}%"></i></div>
-        <div class="rng-l"><span>52w low ₹${fmt(r.low52, 1)}</span><span>${fhTxt}${fhTxt && !lv ? ' · at close' : ''}</span><span>52w high ₹${fmt(r.high52, 1)}</span></div></div>`
-      : r && r.rng_lo != null && r.rng_hi != null ? `<p class="note" style="margin-top:var(--s-3)">No 52-week range yet — ${r.rng_sessions || 'too few'} sessions of history. Its ${r.rng_sessions}-session range is ₹${fmt(r.rng_lo, 1)} – ₹${fmt(r.rng_hi, 1)}.</p>` : ''}
+        <div class="rng-l"><span>52w low ₹${fmt(r.low52, 2)}</span><span>${fhTxt}${fhTxt && !lv ? ' · at close' : ''}</span><span>52w high ₹${fmt(r.high52, 2)}</span></div></div>`
+      : r && r.rng_lo != null && r.rng_hi != null ? `<p class="note" style="margin-top:var(--s-3)">No 52-week range yet — ${r.rng_sessions || 'too few'} sessions of history. Its ${r.rng_sessions}-session range is ₹${fmt(r.rng_lo, 2)} – ₹${fmt(r.rng_hi, 2)}.</p>` : ''}
       </div></div>`;
 
     /* What matters and what changed — insight.js over this company's file.
