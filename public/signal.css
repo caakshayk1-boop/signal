@@ -6649,3 +6649,26 @@ main{min-height:calc(100vh - var(--barh))}
 .v2-exp[open] > summary::before{content:'−'}
 .v2-exp > summary span{font-weight:400;font-size:var(--t-2);color:var(--dim)}
 .v2-exp > :not(summary){margin:0 16px 16px}
+
+/* ═══ OPPORTUNITIES, PERFORMANCE, AND A ONE-LINE HOME HEADLINE ═══════════ */
+.route-h.route-home{margin-bottom:var(--s-5);padding-bottom:var(--s-4)}
+.route-h.route-home h1{font-size:clamp(26px,3.3vw,38px);line-height:1.15;max-width:none}
+.route-h.route-home p{font-size:var(--t-5)}
+/* Every plan by state: four counts that are always shown. */
+.v2-tally{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);
+  border-radius:var(--r-3);background:var(--surface);overflow:hidden}
+.v2-tally > div{padding:12px 14px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
+.v2-tally > div:first-child{border-left:0}
+.v2-tally b{font:600 var(--t-7)/1 var(--mono);font-variant-numeric:tabular-nums}
+.v2-tally span{font-size:var(--t-2);color:var(--dim)}
+@media(max-width:700px){.v2-tally{grid-template-columns:1fr 1fr}
+  .v2-tally > div:nth-child(3){border-left:0}
+  .v2-tally > div:nth-child(n+3){border-top:1px solid var(--line)}}
+.v2-st-h{margin:18px 0 10px;font-size:var(--t-4);font-weight:600}
+.v2-st-h span{font:500 var(--t-2)/1 var(--mono);color:var(--dim);margin-left:6px}
+/* The record on Performance: two labelled rows of four. */
+.v2-rec-h{margin:4px 0 8px;font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);
+  text-transform:uppercase;color:var(--dim)}
+.v2-rec-h ~ .v2-rec-h{margin-top:14px}
+@media(min-width:900px){.grid.v2-rec4{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.v2-model{margin-top:14px;font-size:var(--t-2)}
