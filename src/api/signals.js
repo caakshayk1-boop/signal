@@ -184,6 +184,10 @@ export default async function handler(req, res) {
             price: hit.price,
             change_pct: prev && prev !== 0 ? ((hit.price - prev) / prev) * 100 : null,
             basis: hit.basis || "market",
+            /* The time of the last trade, from the exchange's own data. A page
+               says when a price was observed from this, never from its clock:
+               on a holiday a weekday clock reads "in session" over a close. */
+            as_of: Number.isFinite(hit.asOf) ? hit.asOf : null,
           };
         }
       }
