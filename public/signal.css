@@ -6528,3 +6528,124 @@ main{min-height:calc(100vh - var(--barh))}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media(prefers-reduced-motion:reduce){.v2-card,.v2-st{transition:none}}
 @media(max-width:600px){.v2-tbl .hm{display:none}}
+
+/* ═══ THE SCREEN AS A DENSE TABLE (2 Oct 2026) ═════════════════════════════
+   Scoped to .scr-t, the Screen's own table, so the watchlist and the other
+   lists that reuse the .scr-r row grammar keep theirs. Twelve tracks for the
+   twelve cells screenTable emits — counted together, as the note above the
+   original .scr-r rule demands. */
+.scr-t .scr-r.scr-call{
+  grid-template-columns:24px minmax(0,1fr) 108px 66px 128px 76px 56px 60px 62px 30px 58px 112px;
+  gap:0 10px;align-items:center;padding:8px 14px}
+.scr-t .scr-r.rank-head{padding-top:10px;padding-bottom:10px}
+.scr-t .scr-r .s{display:flex;flex-wrap:wrap;align-items:center;row-gap:2px}
+.scr-t .scr-r .s b{font-size:var(--t-4);line-height:1.2}
+/* Two lines: the ticker; then the flow badge and the company · sector,
+   truncated rather than wrapped. The ::after is a zero-height flex item that
+   forces the break, so neither line depends on how long the other is. */
+.scr-t .scr-r .s::after{content:'';order:2;flex-basis:100%;height:0}
+.scr-t .scr-r .s > span{order:4;flex:1 1 0;min-width:0;font-size:var(--t-2);line-height:1.3;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
+.scr-t .scr-r .s > span em{font-style:normal;color:var(--muted)}
+.scr-t .scr-r .s .scr-ins{order:3;flex:none;margin:0 6px 0 0;font-size:var(--t-1);padding:1px 5px;line-height:1.3}
+.scr-t .scr-r .x,.scr-t .scr-r .m{font-size:var(--t-3)}
+
+/* The score it is ranked by: the number, and a bar the same length for every
+   row so a column of them reads as a ranking at a glance. */
+.scr-t .sc{display:flex;align-items:center;justify-content:flex-end;gap:6px}
+.sc-n{font:600 var(--t-4)/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--text);min-width:22px;text-align:right}
+.sc-b{flex:0 0 30px;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.sc-b i{display:block;height:100%;background:var(--accent)}
+.scr-r.rank-head .sc{justify-content:flex-end}
+
+/* Quality · Growth · Value · Technical: the four parts the score is made of.
+   Each carries its own letter, so nothing rests on colour; strong (70+) is
+   inked, weak (under 35) is dimmed. */
+.qgvt{display:flex;justify-content:flex-end;gap:4px}
+.qg{display:inline-flex;align-items:baseline;gap:1px;font:500 var(--t-1)/1 var(--mono);
+  font-style:normal;color:var(--dim);padding:3px 4px;border-radius:var(--r-1);background:var(--raised)}
+.qg b{font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;min-width:15px;text-align:right}
+.qg.hi{background:color-mix(in srgb,var(--up) 13%,transparent)} .qg.hi b{color:var(--up)}
+.qg.lo b{color:var(--dim);font-weight:400}
+.qg.na{opacity:.55}
+.qgvt-h{white-space:nowrap}
+
+/* The 52-week line is a column now, not a second line under every row. Its
+   two ends keep their prices; the distance-to labels live in the line's own
+   title and the stock card. */
+.scr-t .scr-r.scr-call > .pl-w{grid-column:auto;margin:0;padding:0;align-self:center}
+.scr-t .pl-ends{margin-top:5px;font-size:var(--t-1);gap:6px}
+.scr-t .pl-ends em,.scr-t .pl-ends .u52{display:none}
+.scr-t .pl-ends > span > span{display:none}
+
+/* Narrower desks drop the four parts first, then the 50-day; the score and
+   the line stay. */
+@media(max-width:1260px){
+  .scr-t .scr-r.scr-call{grid-template-columns:24px minmax(0,1fr) 108px 66px 0 76px 56px 60px 62px 30px 58px 120px}
+  .scr-t .scr-r.scr-call > .qgvt,.scr-t .scr-r.scr-call > .qgvt-h{visibility:hidden;overflow:hidden}
+}
+@media(max-width:1060px){
+  .scr-t .scr-r.scr-call{grid-template-columns:24px minmax(0,1fr) 108px 64px 0 76px 56px 0 60px 30px 56px 104px}
+  .scr-t .scr-r.scr-call > [data-l="vs 50D"],.scr-t .scr-r.rank-head > [data-s="v50"]{visibility:hidden;overflow:hidden}
+}
+
+/* The filter groups: one row per question, the label first. */
+.scr-fg{display:grid;gap:8px;margin-bottom:10px}
+.scr-fr{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.scr-fl{font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);text-transform:uppercase;
+  color:var(--dim);min-width:84px}
+
+/* ── ON A PHONE: three short lines, not a 230px card ───────────────────
+   Ticker and company with the price; then the call, the score, today and the
+   month as one labelled strip; then the 52-week line. The finer columns are on
+   the stock card a tap away. The column header has nothing to head here.
+   900, not 700: between the two, twelve fixed tracks left the name ~20px. */
+@media(max-width:900px){
+  .scr-t .scr-r.rank-head{display:none}
+  .scr-t .scr-r.scr-call{display:flex;flex-wrap:wrap;align-items:baseline;gap:0;padding:12px 14px}
+  .scr-t .scr-r.scr-call > .s{order:1;flex:1 1 60%;min-width:0}
+  .scr-t .scr-r.scr-call > .x[data-l="Price"]{order:2;flex:0 0 auto;font-size:var(--t-5);margin:0}
+  .scr-t .scr-r.scr-call > .x,.scr-t .scr-r.scr-call > .m,.scr-t .scr-r.scr-call > .i{display:none}
+  .scr-t .scr-r.scr-call > .x[data-l="Price"],.scr-t .scr-r.scr-call > .x[data-l="Call"],
+  .scr-t .scr-r.scr-call > .x.sc,.scr-t .scr-r.scr-call > .x[data-l="Today"],
+  .scr-t .scr-r.scr-call > .m{display:inline-flex;flex-direction:row;flex:0 0 auto;align-items:baseline;gap:5px}
+  .scr-t .scr-r.scr-call.rank-head{display:none}
+  /* A zero-height full-width item: the strip always starts its own line,
+     however short the call beside the price is. */
+  .scr-t .scr-r.scr-call:not(.rank-head)::after{content:'';order:3;flex:0 0 100%;height:0}
+  .scr-t .scr-r.scr-call > .x[data-l="Call"]{order:4;margin:8px 12px 0 0}
+  .scr-t .scr-r.scr-call > .x.sc{order:5;margin:8px 12px 0 0;align-items:center}
+  .scr-t .scr-r.scr-call > .x[data-l="Today"]{order:6;margin:8px 12px 0 0}
+  .scr-t .scr-r.scr-call > .m{order:7;margin:8px 0 0 0}
+  .scr-t .scr-r.scr-call > .x[data-l="Today"]::before,.scr-t .scr-r.scr-call > .m::before,
+  .scr-t .scr-r.scr-call > .x.sc::before{font:400 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);
+    text-transform:uppercase;color:var(--dim);flex:none}
+  .scr-t .scr-r.scr-call > .x.sc::before{content:'Score'}
+  .scr-t .scr-r.scr-call > .x[data-l="Today"]::before{content:'Today'}
+  .scr-t .scr-r.scr-call > .m::before{content:'1M'}
+  .scr-t .scr-r.scr-call > .x[data-l="Call"]::before{content:none}
+  .scr-t .scr-r.scr-call > .pl-w{order:8;flex:1 1 100%;margin:10px 0 0}
+  .scr-t .sc-b{flex-basis:24px}
+  .scr-fl{min-width:0;flex:1 1 100%}
+}
+
+/* ═══ TODAY, REORDERED (2 Oct 2026) ═══════════════════════════════════════ */
+/* No plans: one line, not a dashed panel the height of a card. */
+.v2-none{margin:0;padding:12px 14px;border-left:3px solid var(--line2);background:var(--raised);
+  border-radius:0 var(--r-2) var(--r-2) 0;color:var(--muted);font-size:var(--t-3);line-height:1.5}
+.v2-none b{color:var(--text);font-weight:600}
+/* Positions and watchlist side by side: both are short, both are yours. */
+.v2-duo{display:grid;gap:0 32px}
+@media(min-width:900px){.v2-duo{grid-template-columns:1fr 1fr}}
+.v2-duo > .sec{min-width:0}
+/* The regime sentence as the market's first line. */
+.sec .v2-ctx{margin:0 0 14px;font-size:var(--t-4)}
+/* The explainer, folded. */
+.v2-exp{margin-top:14px;border:1px solid var(--line);border-radius:var(--r-3);background:var(--surface)}
+.v2-exp > summary{cursor:pointer;list-style:none;padding:12px 16px;font-weight:600;font-size:var(--t-4);
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.v2-exp > summary::-webkit-details-marker{display:none}
+.v2-exp > summary::before{content:'+';font:600 var(--t-4)/1 var(--mono);color:var(--accent);width:12px}
+.v2-exp[open] > summary::before{content:'−'}
+.v2-exp > summary span{font-weight:400;font-size:var(--t-2);color:var(--dim)}
+.v2-exp > :not(summary){margin:0 16px 16px}

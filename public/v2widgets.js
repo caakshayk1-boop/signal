@@ -158,6 +158,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 .v2w .v2w-pc dl{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 10px;font:400 13px/1.4 var(--ui,var(--f-sans,system-ui,sans-serif))}
 .v2w .v2w-pc dt{color:var(--w-mut)}
 .v2w .v2w-pc dd{margin:0;color:var(--w-ink);font-variant-numeric:tabular-nums}
+.v2w .v2w-pc dd.v2w-sells span{display:block}
 .v2w .v2w-pc p{margin:0;font:400 12px/1.45 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut)}
 .v2w .v2w-rl{list-style:none;margin:0;padding:0;display:grid;gap:4px;font:400 13px/1.45 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink)}
 .v2w .v2w-rl li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--w-line);padding:4px 0}
@@ -754,7 +755,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
         <dl><dt>Buy</dt><dd>${px(p.entry_low)} – ${px(p.entry_high)}</dd>
           <dt>Window</dt><dd>${esc(dayShort(p.for_session))} – ${esc(dayShort(p.valid_through))}</dd>
           <dt>Stop</dt><dd>${px(p.stop)}${p.trailing ? ' (raised)' : p.risk_pct != null ? ` · ${Number(p.risk_pct).toFixed(1)}% under the top` : ''}</dd>
-          <dt>Sell</dt><dd>${sp[0]}% ${px(p.t1)} · ${sp[1]}% ${px(p.t2)} · ${sp[2]}% ${px(p.t3)}</dd>
+          <dt>Sell</dt><dd class="v2w-sells"><span>${sp[0]}% at ${px(p.t1)}</span><span>${sp[1]}% at ${px(p.t2)}</span><span>${sp[2]}% at ${px(p.t3)}</span></dd>
           ${p.fill_price != null ? `<dt>Filled</dt><dd>${px(p.fill_price)}${p.fill_session ? ' on ' + esc(dayShort(p.fill_session)) : ''} · ${rR(p.total_r)} so far</dd>` : ''}</dl>
         ${p.why ? `<p>Why: ${esc(p.symbol)} ${esc(p.why)}</p>` : ''}</article>`;
     };
@@ -771,7 +772,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
       <h3>${opts.title ? esc(opts.title) : 'Paper test: four engines, tracked forward'} <span class="v2w-tag pp">paper</span></h3>
       <p class="v2w-per">As of the ${esc(day(P.as_of))} close · simulated fills · no order is placed · not the published record</p>
       ${opts.compact ? '' : eng}
-      <h4 class="v2w-h">Paper setups</h4>${liveHtml}${opts.compact ? '' : doneHtml + intraHtml}
+      ${opts.compact ? '' : '<h4 class="v2w-h">Paper setups</h4>'}${liveHtml}${opts.compact ? '' : doneHtml + intraHtml}
       <p class="v2w-note">${esc(P.basis || '')}</p>
       ${opts.moreHref ? `<p class="v2w-more"><a href="${esc(opts.moreHref)}">Every paper engine and result →</a></p>` : ''}</section>`;
   }

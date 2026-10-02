@@ -2616,7 +2616,7 @@ ok("no figure counts up", !/countUp/.test(JS));
   ok("a missing chart point breaks the line rather than being bridged",
      /if \(p\[key\] == null\) \{ pen = false; continue; \}/.test(W2C));
   ok("the front pages carry the market cards from real closes and the weekly pulse",
-     /function v2Market\(nx, pu, d\)/.test(JS) && /series=' \+ encodeURIComponent\('\^NSEI'\)/.test(JS)
+     /function v2Market\(nx, pu, d\b/.test(JS) && /series=' \+ encodeURIComponent\('\^NSEI'\)/.test(JS)
      && /W\.nifty\(/.test(JS) && /W\.days\(/.test(JS) && /W\.sectors\(/.test(JS) && /W\.movers\(/.test(JS)
      && /id="hMkt"/.test(readFileSync("public/vision.js", "utf8")));
   ok("a market card that gets no data says so and draws nothing",
