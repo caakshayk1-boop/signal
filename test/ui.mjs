@@ -2203,6 +2203,15 @@ try {
     const st = await v.evaluate((s2) => { const el = document.querySelector(s2); return el ? { sk: !!el.querySelector(".sk"), txt: el.innerText.slice(0, 80) } : null; }, sel);
     ok(`vision ${hash} finished loading`, st && !st.sk, st);
   }
+  /* The Brief: a setup's plan, its levels on a chart, the technical read and
+     the business. Any company can be briefed, setup or not. It must finish,
+     draw its chart, and never print a NaN. */
+  await v.evaluate(() => { location.hash = "#/brief/RELIANCE"; });
+  await settled(v, SETTLE + 3500);
+  const vBr = await v.evaluate(() => { const b = document.getElementById("bBody"); if (!b) return null;
+    return { sk: !!b.querySelector(".sk"), chart: !!b.querySelector("#bChart svg, #bChart .st"), plan: /Buy between|No paper setup|no setup/i.test(b.innerText),
+      bad: /\bNaN\b|\bundefined\b|\bnull\b/.test(b.innerText) }; });
+  ok("vision's brief finishes for any company, with a chart and no NaN", !!vBr && !vBr.sk && vBr.chart && !vBr.bad, vBr);
   /* Setups: the end-of-day plans. Before the first private scan the feed
      404s and the page must say so in words; after it, every plan card carries
      an entry range, a stop and three exits. The retired engines are not on

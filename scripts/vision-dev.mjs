@@ -76,6 +76,21 @@ function signals(q) {
     }
     return { ok: true, at: new Date().toISOString(), quotes: out };
   }
+  /* ?series: production reads Yahoo. This box cannot, so it answers with a
+     SYNTHETIC walk ending at the screen's last close — enough to check a
+     chart's layout, never a price anyone should read. Labelled as such. */
+  if (q.get("series")) {
+    const sym = q.get("series").toUpperCase().replace(/\.NS$/, "");
+    const r = (j("screen-lite.json").rows || []).find((x) => x.sym === sym);
+    const end = r && r.price > 0 ? r.price : 100;
+    let seed = [...sym].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) % 2147483647;
+    const rnd = () => (seed = (seed * 48271) % 2147483647) / 2147483647;
+    const pts = [], d0 = Date.UTC(2026, 3, 1);
+    let c = end * 0.85;
+    for (let i = 0; i < 128; i++) { c *= 1 + (rnd() - 0.48) * 0.03; pts.push({ t: new Date(d0 + i * 86400000 * 1.4).toISOString().slice(0, 10), c: +c.toFixed(2) }); }
+    const k = end / pts[pts.length - 1].c; for (const p of pts) p.c = +(p.c * k).toFixed(2);
+    return { ok: true, symbol: sym, range: q.get("range") || "6mo", interval: "1d", basis: "synthetic (dev harness)", points: pts };
+  }
   return { __status: 410, ok: false, retired: true,
     error: "This endpoint was removed on 2026-10-01. Plans are published in /signal_v2.json.", successor: "/signal_v2.json" };
 }

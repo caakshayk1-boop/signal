@@ -879,3 +879,30 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 .ve-rules li+li{margin-top:var(--s-1)}
 .ve-card .vs-lv>div:first-child b{white-space:normal}
 .lvl div.near em{color:var(--warn)}
+
+/* ── HOME LEAD + BRIEF (2 Oct 2026) ─────────────────────────────────────
+   Four facts, then the two lists a visitor came for. Tiles are links, so the
+   whole tile is the target, not a word inside it. */
+.glance{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s-3);margin:var(--s-4) 0}
+@media (max-width:899px){.glance{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.glance .gl{display:flex;flex-direction:column;gap:2px;padding:var(--s-3) var(--s-4);border:1px solid var(--line);border-radius:var(--r-2);background:var(--panel);text-decoration:none;color:inherit;min-width:0}
+.glance .gl:hover{border-color:var(--accent)}
+.glance .gl span{font-size:var(--t-xs);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.glance .gl b{font-size:26px;line-height:1.15;font-variant-numeric:tabular-nums;color:var(--ink)}
+.glance .gl em{font-style:normal;font-size:var(--t-xs);color:var(--ink-3)}
+.hl{list-style:none;margin:0;padding:0}
+.hl li+li{border-top:1px solid var(--line)}
+.hl a{display:grid;grid-template-columns:minmax(80px,auto) minmax(0,1fr);gap:2px var(--s-3);padding:10px var(--s-4);text-decoration:none;color:inherit}
+.hl a:hover{background:var(--panel-2)}
+.hl b{font-size:var(--t-md)}
+.hl span{font-size:var(--t-sm);color:var(--ink-2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hl em{grid-column:1/-1;font-style:normal;font-size:var(--t-xs);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.chip.on{background:var(--accent);color:var(--panel)}
+.bplan{margin:0;display:grid;gap:0}
+.bplan>div{display:grid;grid-template-columns:120px minmax(0,1fr);gap:var(--s-3);padding:10px 0;border-top:1px solid var(--line)}
+.bplan>div:first-child{border-top:0;padding-top:0}
+.bplan dt{font-size:var(--t-sm);color:var(--ink-3)}
+.bplan dd{margin:0;display:flex;flex-direction:column;gap:2px;min-width:0}
+.bplan dd b{font-size:var(--t-xl);font-variant-numeric:tabular-nums}
+.bplan dd span{font-size:var(--t-xs);color:var(--ink-3)}
+@media (max-width:599px){.bplan>div{grid-template-columns:96px minmax(0,1fr)}}
