@@ -509,6 +509,10 @@
     else { k = 'shut'; t = `${hol ? 'Holiday' : 'Closed'} · opens ${nextOpen()}`; }
     return { k, t, hhmm };
   }
+  /* What a quote IS depends on the session: during it, live; otherwise it is
+     the last trade of the previous session. ABLBL read "-2.72% live" on the
+     Gandhi Jayanti holiday. */
+  const quoteWord = () => { const k = marketState().k; return k === 'open' ? 'live' : 'last close'; };
   function paintMarket() {
     const el = $('#mkt'); if (!el) return;
     const m = marketState();
@@ -865,7 +869,7 @@
     const pos = hi != null && lo != null && hi > lo && px != null ? clamp((px - lo) / (hi - lo) * 100, 0, 100) : null;
     drawer(`${esc(r.sym)} ${star(r.sym)}`, `
       <div class="sc-top"><div><div class="mut">${esc(r.name || '')}</div><div class="mut">${esc(r.sector || '')}${r.ind && r.ind !== r.sector ? ' · ' + esc(r.ind) : ''}</div></div>
-        <div style="text-align:right"><div class="big-px">${px != null ? '₹' + fmt(px, 2) : '—'}</div><div>${lv ? chg(lv.change_pct) + ' <span class="mut">live</span>' : chg(r.r1d) + ' <span class="mut">last close</span>'}</div></div></div>
+        <div style="text-align:right"><div class="big-px">${px != null ? '₹' + fmt(px, 2) : '—'}</div><div>${lv ? chg(lv.change_pct) + ` <span class="mut">${quoteWord()}</span>` : chg(r.r1d) + ' <span class="mut">last close</span>'}</div></div></div>
       <div class="kv" style="margin-top:0">${(() => { const L = liveRow(r); return [['1D', L.r1d], ['1W', L.r1w], ['1M', L.r1m], ['3M', r.r3m], ['6M', r.r6m]]; })().map(([k, v]) => `<div><em>${k}</em><b>${chg(v, 1)}</b></div>`).join('')}</div>
       <div><h3>52-week range</h3>${pos != null ? `<div class="rng" role="img" aria-label="${pos.toFixed(0)}% of the way from the 52-week low to the high"><i style="left:${pos}%"></i></div>
         <div class="rng-l"><span>Low ₹${fmt(lo, 1)}</span><span>${pos.toFixed(0)}% of range</span><span>High ₹${fmt(hi, 1)}</span></div>
@@ -1520,14 +1524,17 @@
        that was the 28 Sep close (₹135.45); live it was -2.2%. Above the build's
        52-week high the live price IS the new high, and says so. */
     const hi52 = num(r && r.high52), fh = px > 0 && hi52 > 0 ? (px / hi52 - 1) * 100 : num(r && r.from_high);
-    const fhTxt = fh == null ? '' : fh >= 0 ? 'above the 52w high — a new high' : signed(fh, 1) + ' from the high';
+    /* And below the build's 52-week low the price IS the new low: ABLBL sat at
+       ₹74.44 under a ₹75.1 low, the marker pinned to the edge as if inside it. */
+    const lo52 = num(r && r.low52), newLo = px > 0 && lo52 > 0 && px < lo52;
+    const fhTxt = fh == null ? '' : fh >= 0 ? 'above the 52w high — a new high' : newLo ? "under the 52w low — a new low" : signed(fh, 1) + ' from the high';
     $('#aHead').innerHTML = `<div class="pn"><div class="pb"><div class="ah">
       <div style="min-width:0;flex:1"><span class="eb" style="display:block;font-size:var(--t-xs);font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)">${esc((r && r.sector) || 'Not on the screen')}${r && r.ind && r.ind !== r.sector ? ' · ' + esc(r.ind) : ''}</span>
         <div class="row" style="gap:var(--s-2)"><h1>${esc(s)}</h1>${star(s)}</div><div class="nm">${esc((r && r.name) || '')}</div>
         <div class="row wrap" style="margin-top:var(--s-2)">
           ${r && r.risk ? `<span class="chip ${r.risk.level === 'HIGH' ? 'dn' : r.risk.level === 'MEDIUM' ? 'warn' : ''}">Risk ${esc(r.risk.level)}</span>` : ''}</div></div>
       <div class="ah-px"><div class="px">${px != null ? '₹' + fmt(px, 2) : '—'}</div>
-        <div class="px-s">${lv ? chg(lv.change_pct) + ' <span class="mut">live</span>' : r ? chg(r.r1d) + ` <span class="mut">close of ${esc(r.last_date || r.price_date || 'the last build')}</span>` : ''}</div>
+        <div class="px-s">${lv ? chg(lv.change_pct) + ` <span class="mut">${quoteWord()}</span>` : r ? chg(r.r1d) + ` <span class="mut">close of ${esc(r.last_date || r.price_date || 'the last build')}</span>` : ''}</div>
         <div class="row ah-act" style="margin-top:var(--s-2);gap:6px">
           <a class="btn sm" href="#/brief/${encodeURIComponent(s)}">Brief</a>
           <a class="btn sm" href="#/compare?s=${[s].concat(peersOf(s)).map(encodeURIComponent).join(',')}">Compare</a>

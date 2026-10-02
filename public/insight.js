@@ -75,7 +75,10 @@
       if (md != null || em != null) add('EBIT margin', em != null ? `${f1(em)}%` : '—', md != null ? `${pp(md)} on the prior year` : '', md == null ? '' : md >= 0 ? 'up' : 'dn', SRC.fin(r));
       if (de != null) add('Debt / equity', de < 0 ? 'Negative equity' : de.toFixed(2), de < 0 ? 'insolvency, not a clean balance sheet' : de < 0.3 ? 'lightly geared' : de > 1.5 ? 'heavily geared' : '', de < 0 || de > 1.5 ? 'dn' : '', SRC.fin(r));
       const cp = num(r.cfo_pat);
-      if (cp != null) add('Cash conversion', `${cp.toFixed(2)}×`, 'operating cash flow ÷ profit, multi-year median', cp < 0.6 ? 'dn' : cp >= 1 ? 'up' : '', SRC.fin(r));
+      /* Far above 1 is not "better": it means profit is a sliver of cash flow —
+         thin margins, heavy depreciation, or Ind AS 116 moving lease rent out
+         of operating cash (ABLBL read a green 13.16×). Not coloured above 2.5. */
+      if (cp != null) add('Cash conversion', `${cp.toFixed(2)}×`, cp > 2.5 ? 'thin profit or lease-heavy accounts, not extra quality' : 'operating cash flow ÷ profit, multi-year median', cp < 0.6 ? 'dn' : cp >= 1 && cp <= 2.5 ? 'up' : '', SRC.fin(r));
     }
     const r1m = num(r.r1m), med = num(c.median_1m);
     if (r1m != null) add('Price, 1 month', pct(r1m), med != null ? `screen median ${pct(med)} → ${pp(r1m - med)} relative` : '', r1m >= 0 ? 'up' : 'dn', SRC.px(r));
