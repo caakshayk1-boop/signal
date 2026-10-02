@@ -12315,9 +12315,63 @@
     const plans = r.d.plans || [];
     const pick = plans.find(p => p.state === 'awaiting_entry') || plans.find(p => V2_OPEN.has(p.state));
     if (pick) { go(v2PlanUrl(pick), { replace: true }); return; }
-    v2Shell('The brief', 'The current plan, in full.', v2StatusStrip(r.d) +
-      v2Empty(r.d, `There is no plan to brief for the ${v2Date(r.d.next_session)} session.`) +
-      `<p class="muted">The brief never substitutes a "best stock of the day" when nothing qualified.</p>`);
+    /* NO PUBLISHED PLAN, SO BRIEF THE PAPER SETUPS. The page said only that
+       there was nothing to brief, while twelve paper setups sat on the front
+       page. It now briefs one of them in full — the same Passport as /setup,
+       the price with the plan's levels drawn on it, the technical read and the
+       business — with a chip for each of the others. Every setup is labelled
+       paper; none is presented as a published plan. */
+    const d = r.d, P = d.paper || {};
+    const live = (P.plans || []).filter(p => p.state === 'awaiting_entry' || p.fill_price != null && !p.ended_session);
+    const nm = Object.fromEntries((P.engines || []).map(e => [e.id, e.name]));
+    if (!live.length || !window.V2W || !window.V2W.passport) {
+      v2Shell('The brief', 'The current setup, in full.', v2StatusStrip(d) +
+        v2Empty(d, `There is no plan or paper setup to brief for the ${v2Date(d.next_session)} session.`) +
+        `<p class="muted">The brief never substitutes a "best stock of the day" when nothing qualified.</p>`);
+      return;
+    }
+    const want = (new URLSearchParams(location.search).get('s') || '').toUpperCase();
+    const p = live.find(x => x.symbol === want) || live[0];
+    const chips = live.map(x => `<a class="chip${x === p ? ' on' : ''}" href="/brief?s=${encodeURIComponent(x.symbol)}" data-sym="${esc(x.symbol)}"
+      aria-current="${x === p ? 'page' : 'false'}">${esc(x.symbol)}</a>`).join('');
+    v2Shell('The brief', `${esc(p.symbol)} · paper setup · ${esc(nm[p.engine] || p.engine)} · for the ${v2Date(p.for_session)} session`,
+      `<p class="v2-none"><b>No published plan for the ${v2Date(d.next_session)} session — new plans are paused.</b> This briefs the paper setups instead: recorded and graded the same way, not proven, not the published record.</p>
+      <div class="chips v2-bpick" role="group" aria-label="Paper setups">${chips}</div>
+      <div class="v2-brief">
+        <div class="v2-brief-a">${window.V2W.passport(p, d)}<div id="bChart" class="v2w">${skel('sk-card', 1)}</div></div>
+        <div class="v2-brief-b"><div id="bRead">${skel('sk-card', 1)}</div></div>
+      </div>
+      <div id="bBiz" class="v2-brief-biz">${skel('sk-card', 1)}</div>
+      <p class="v2-pp-links"><a href="${setupHref(p)}">This setup on its own page</a> · <a href="${VISION_URL}/#/brief/${encodeURIComponent(p.symbol)}">${esc(p.symbol)} in Vision ↗</a> · <a href="/opportunities">Every setup</a></p>`);
+    const here = () => routeOf() === '/brief';
+    /* Each part arrives on its own; a slow one never holds the others. */
+    paperEntry(live).then(chk => {
+      if (!here()) return;
+      const slot = document.querySelector('[data-v2w-entry]');
+      if (slot && chk[p.id]) slot.innerHTML = window.V2W.entryHtml(chk[p.id]);
+      for (const x of live) { const c = chk[x.id], a = document.querySelector(`.v2-bpick [data-sym="${CSS.escape(x.symbol)}"]`);
+        if (c && a) { a.title = c.word; a.dataset.k = c.k; } }
+    });
+    get('/api/signals?series=' + encodeURIComponent(p.symbol) + '&range=6mo').catch(() => ({ ok: false })).then(ser => {
+      const box = here() && document.getElementById('bChart');
+      if (!box) return;
+      box.outerHTML = window.V2W.levels
+        ? window.V2W.levels(ser && ser.ok ? ser.data : null, { entry: [p.entry_low, p.entry_high], stop: p.stop, t: [p.t1, p.t2, p.t3],
+            sup: TREAD && TREAD.reads && TREAD.reads[p.symbol] ? TREAD.reads[p.symbol].sup : null,
+            res: TREAD && TREAD.reads && TREAD.reads[p.symbol] ? TREAD.reads[p.symbol].res : null },
+            { sym: p.symbol, error: ser && ser.error,
+              note: 'The band is the buy range; dashed lines are the stop (red) and the three targets (green); dotted grey lines are the read\u2019s support and resistance.' })
+        : '';
+    });
+    treadLoad().then(() => { const box = here() && document.getElementById('bRead'); if (box) box.innerHTML = treadBlock(p.symbol); });
+    get(FULL_URL).catch(() => ({ ok: false })).then(scr => {
+      const box = here() && document.getElementById('bBiz');
+      if (!box) return;
+      const row = scr && scr.ok && scr.data && Array.isArray(scr.data.rows) ? scr.data.rows.find(x => x && x.sym === p.symbol) : null;
+      box.innerHTML = !row ? `<p class="muted">${esc(p.symbol)} has no row in the current screen build, so no company figures are shown.</p>`
+        : window.BriefFundamentals ? window.BriefFundamentals.render(row, { symbol: p.symbol, screenHref: '/screen?q=' + encodeURIComponent(p.symbol), headingTag: 'h3' })
+        : `<p class="note">The company section could not load (brief_fundamentals.js did not arrive). The setup above is unaffected.</p>`;
+    });
   };
 
   // The phone tab bar's "More" opens the same dialog as the header button.
