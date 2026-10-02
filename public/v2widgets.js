@@ -1004,22 +1004,27 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
   const pct1 = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)}%`;
   function entry(p, q, ctx = {}) {
     const x = q && Number.isFinite(Number(q.price)) ? Number(q.price) : null;
-    const basis = ctx.open ? `Delayed quote${ctx.at ? ' at ' + ctx.at + ' IST' : ''}` : 'Last close';
+    /* The basis is the quote's own trade time when it carries one. Without it,
+       the session clock decides: delayed inside the session, the close outside. */
+    const ts = q && Number.isFinite(Number(q.as_of)) ? new Date(Number(q.as_of) * 1000 + 330 * 60000).toISOString() : null;
+    const basis = ts ? `last trade ${dayShort(ts.slice(0, 10))} ${ts.slice(11, 16)} IST, delayed`
+      : ctx.open ? `delayed quote${ctx.at ? ' at ' + ctx.at + ' IST' : ''}` : 'last close';
+    const at = x == null ? '' : `${px(x)} (${basis})`;
     if (!PAPER_LIVE.has(p.state)) return { k: 'done', word: PSTATE[p.state] || p.state, line: '' };
     if (p.state !== 'awaiting_entry') {
       if (x == null || p.fill_price == null) return { k: 'held', word: PSTATE[p.state] || 'Filled', line: `Filled at ${px(p.fill_price)}. No quote right now.` };
       return { k: 'held', word: PSTATE[p.state] || 'Filled',
-        line: `Filled at ${px(p.fill_price)}. ${basis} ${px(x)}, ${pct1((x / p.fill_price - 1) * 100)} from the fill; the stop is ${px(p.stop)}.` };
+        line: `Filled at ${px(p.fill_price)}. Now ${at}, ${pct1((x / p.fill_price - 1) * 100)} from the fill; the stop is ${px(p.stop)}.` };
     }
     if (x == null) return { k: 'na', word: 'Entry check unavailable', line: `No quote for ${p.symbol} right now, so this page cannot say where the price sits against the range.` };
     const opens = ctx.today && p.for_session > ctx.today ? ` The window opens ${dayShort(p.for_session)}.` : '';
     if (x <= p.stop) return { k: 'void', word: 'At or below the stop',
-      line: `${basis} ${px(x)} is at or below the ${px(p.stop)} stop. A setup is cancelled if its stop trades before it fills.${opens}` };
+      line: `${at} is at or below the ${px(p.stop)} stop. A setup is cancelled if its stop trades before it fills.${opens}` };
     if (x > p.entry_high) return { k: 'above', word: 'Above the most to pay',
-      line: `${basis} ${px(x)} is ${pct1((x / p.entry_high - 1) * 100)} above ${px(p.entry_high)}. It fills only if price comes back into the range by ${dayShort(p.valid_through)}; it is never chased.${opens}` };
+      line: `${at} is ${pct1((x / p.entry_high - 1) * 100)} above ${px(p.entry_high)}. It fills only if price comes back into the range by ${dayShort(p.valid_through)}; it is never chased.${opens}` };
     if (x < p.entry_low) return { k: 'below', word: 'Under the buy range',
-      line: `${basis} ${px(x)} is under ${px(p.entry_low)} and above the stop.${opens}` };
-    return { k: 'in', word: 'Inside the buy range', line: `${basis} ${px(x)} is between ${px(p.entry_low)} and ${px(p.entry_high)}.${opens}` };
+      line: `${at} is under ${px(p.entry_low)} and above the stop.${opens}` };
+    return { k: 'in', word: 'Inside the buy range', line: `${at} is between ${px(p.entry_low)} and ${px(p.entry_high)}.${opens}` };
   }
 
   /* The exit plan in shares and rupees, measured from the fill — or, before a
@@ -1045,7 +1050,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
     return `<div class="v2w-ladw"><table class="v2w-lad"><caption>Paper position: ${p.qty} shares, ${inr(p.qty * ref)} at ${esc(refWord)}</caption>
       <thead><tr><th scope="col">Exit</th><th scope="col">Price</th><th scope="col">Sell</th><th scope="col">Left</th><th scope="col">Cash back</th><th scope="col">Profit</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
-      <p class="v2w-note">If the ${px(istop)} stop trades before T1, the whole position is sold: about ${inr(-loss)} on ${p.qty} shares, before costs. A gap can open through a stop, so a real loss can be larger. Both money columns are running totals. Cash back includes the money paid in; only Profit is gain, before costs.</p>`;
+      <p class="v2w-note">If the ${px(istop)} stop trades before T1, the whole position is sold: a loss of about ${inr(loss)} on ${p.qty} shares, before costs. A gap can open through a stop, so a real loss can be larger. Both money columns are running totals. Cash back includes the money paid in; only Profit is gain, before costs.</p>`;
   }
 
   /* SINCE THE LAST SCAN. Built from dated fields the feed already carries —

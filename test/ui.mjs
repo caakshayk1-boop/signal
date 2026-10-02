@@ -329,7 +329,7 @@ try {
     ok("a setup has its own page with the plan, ladder and history",
        ppT.includes(sp.symbol) && /buy between/i.test(ppT) && /exit ladder/i.test(ppT) && /history/i.test(ppT), ppT.slice(0, 160));
     ok("...and its entry check names its basis, never 'live'",
-       /Delayed quote|Last close|Entry check unavailable|Filled at|Closed|Stopped|Never filled|Cancelled|Time exit/.test(ppT) && !/\blive price\b/i.test(ppT));
+       /last trade .* IST, delayed|delayed quote|last close|Entry check unavailable|Filled at|Closed|Stopped|Never filled|Cancelled|Time exit/i.test(ppT) && !/\blive price\b/i.test(ppT));
     ok("...and prints no NaN, undefined or null", !/\bNaN\b|undefined|\bnull\b/.test(ppT));
   }
   await p.goto(SITE + "/performance", { waitUntil: "domcontentloaded" });
