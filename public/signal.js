@@ -12002,8 +12002,13 @@
                  tile(v2Inr(m.nav_inr), 'Paper NAV', `from ${v2Inr(m.capital_inr)} reference capital`),
                  tile(v2Inr(m.charges_inr), 'Charges paid', 'modelled'));
     }
+    /* Two labelled rows of four on Performance — what was traded, and what
+       it did to the paper money — instead of eight tiles in a ragged 5 + 3. */
+    const tilesHtml = compact ? `<div class="grid v2-rec">${tiles.join('')}</div>`
+      : `<p class="v2-rec-h">Trades</p><div class="grid v2-rec v2-rec4">${tiles.slice(0, 4).join('')}</div>
+         <p class="v2-rec-h">Paper money</p><div class="grid v2-rec v2-rec4">${tiles.slice(4).join('')}</div>`;
     const rec = `${m.published ?? 0} published = ${m.awaiting_entry ?? 0} awaiting entry + ${m.active ?? 0} active + ${m.closed ?? 0} closed + ${m.expired_unfilled ?? 0} expired unfilled + ${m.cancelled_before_entry ?? 0} cancelled before entry`;
-    return `<div class="grid v2-rec">${tiles.join('')}</div>
+    return `${tilesHtml}
       <p class="v2-recon">${esc(rec)}${m.reconciles === false ? ' — <b>does not reconcile; reported as an error</b>' : ''}.</p>
       <p class="v2-disc">The forward record begins ${since ? v2Date(since) : 'with the first session scanned'}.</p>`;
   }
@@ -12038,11 +12043,13 @@
   R['/'] = async () => {
     const H = 'Indian equities, screened after the close.';
     const S = 'Review qualified setups, plan the next session, and track every paper trade.';
-    paint(head(H, S, 'Today') + skel('sk-card', 3), true);
+    /* One line, not two at 48px: the headline is the brand line, not the content. */
+    const hh = () => head(H, S, 'Today').replace('class="route-h"', 'class="route-h route-home"');
+    paint(hh() + skel('sk-card', 3), true);
     const [r, rg, nx, pu] = await Promise.all([v2Load(), get('/regime.json').catch(() => ({ ok: false })),
       get('/api/signals?series=' + encodeURIComponent('^NSEI') + '&range=1y').catch(() => ({ ok: false })),
       get('/pulse.json').catch(() => ({ ok: false }))]);
-    if (!r.ok) { paint(head(H, S, 'Today') + fail('The plan feed', r.why)); return; }
+    if (!r.ok) { paint(hh() + fail('The plan feed', r.why)); return; }
     const d = r.d;
     const plans = d.plans || [];
     const next = plans.filter(p => p.state === 'awaiting_entry');
@@ -12068,7 +12075,7 @@
        why there are none) and the paper setups; your positions and watchlist
        side by side; the market with its regime as the first line; the record. */
     const noPlans = `<p class="v2-none"><b>${esc(v2NoneWhy(d))}</b> ${esc(d.status_detail || '')}</p>`;
-    paint(head(H, S, 'Today') +
+    paint(hh() +
       (r.stale ? staleNote(r.age) : '') +
       v2StatusStrip(d) +
       vsec(`Plans for ${v2Date(d.next_session)}`, next.length ? `<div class="v2-cards">${next.map(p => v2Card(p, d)).join('')}</div>`
@@ -12096,20 +12103,26 @@
     const active = grp(p => V2_OPEN.has(p.state));
     const done = grp(p => ['closed', 'stopped', 'time_exited'].includes(p.state));
     const lapsed = grp(p => ['expired_unfilled', 'cancelled'].includes(p.state));
-    const block = (label, list, empty, lead) => vsec(label, list.length
-      ? `<div class="v2-cards">${list.map(p => v2Card(p, d)).join('')}</div>` : `<p class="muted">${esc(empty)}</p>`,
-      String(list.length), null, lead ? { lead: true } : undefined);
+    /* ONE TALLY, THEN ONLY THE STATES THAT HOLD SOMETHING. Five sections
+       each saying "none" in its own words — after a dashed box that said
+       the same thing as the first of them — was most of this page. The four
+       counts are always shown, so an empty state is still a stated zero; a
+       list is drawn only where there is something to list. The strategy list
+       is gone from here: the paper board above names and explains every
+       engine, and Performance keeps the list. */
+    const cards = (list) => `<div class="v2-cards">${list.map(p => v2Card(p, d)).join('')}</div>`;
+    const states = [['Extended — above the entry cap', extended], ['Active', active], ['Closed', done],
+                    ['Expired or cancelled before entry', lapsed]];
+    const tally = `<div class="v2-tally">${states.map(([l, list]) =>
+      `<div><b>${list.length}</b><span>${esc(l)}</span></div>`).join('')}</div>`;
     paint(head(T, S, 'Signal') + v2StatusStrip(d) +
-      (eligible.length ? '' : v2Empty(d, 'Nothing is eligible for the next session.')) +
-      block('Eligible next session', eligible, 'No plan is waiting for entry.', true) +
+      vsec('Eligible next session', eligible.length ? cards(eligible)
+        : `<p class="v2-none"><b>Nothing is eligible for the next session.</b> ${esc(d.status_detail || '')}</p>`,
+        String(eligible.length), null, { lead: true }) +
       v2Paper(d, {}) +
-      block('Extended — above the entry cap', extended, 'No plan is extended.') +
-      block('Active', active, 'No paper position is open.') +
-      block('Closed', done, 'Nothing has closed yet.') +
-      block('Expired or cancelled before entry', lapsed, 'None.') +
-      vsec('Rejected candidates', `<p class="muted">Candidates that failed a rule are not published, and neither are their reasons — the rules stay private. The count of names scanned is under Coverage above.</p>`) +
-      vsec('Strategies', v2Strategies(d)) +
-      `<p class="v2-note">${esc(d.notice || '')}</p>`);
+      vsec('Every plan by state', tally + states.filter(([, list]) => list.length)
+        .map(([l, list]) => `<h3 class="v2-st-h">${esc(l)} <span>${list.length}</span></h3>${cards(list)}`).join('')) +
+      `<p class="v2-note">Candidates that failed a rule are not published, and neither are their reasons — the rules stay private. The count of names scanned is under Coverage above. ${esc(d.notice || '')}</p>`);
   };
 
   function v2Strategies(d) {
@@ -12207,6 +12220,7 @@
       v2Widgets(d, 'perf', 'calendar') +
       vsec('Closed trades', closed.length ? `<table class="v2-tbl"><thead><tr><th scope="col">Symbol</th><th scope="col" class="hm">Signal</th><th scope="col" class="hm">Fill</th><th scope="col" class="hm">Exit</th><th scope="col">Outcome</th><th scope="col">Net R</th><th scope="col">Net ₹</th></tr></thead><tbody>${rows}</tbody></table>`
         : `<p class="muted">No trade has closed. A win rate needs closed trades, so none is shown.</p>`, String(closed.length)) +
+      `<div class="v2-duo">` +
       vsec('How it is counted', `<ul class="v2-list">
         <li>Fills and exits are simulated from daily bars. No order is placed anywhere.</li>
         <li>Win, loss or breakeven comes from final net P&amp;L after charges, never from which level was touched. Breakeven means within ±${(d.metrics || {}).breakeven_band_r ?? '—'}R. A target touch alone is not a win.</li>
@@ -12214,8 +12228,9 @@
         <li>R is measured on the risk fixed at entry. Costs assumed: ${esc(c.includes || '—')}; slippage ${c.slippage_bps_per_side ?? '—'} bp a side. Results are also checked at ${c.stress_multiplier_tested ?? '—'}× costs in research.</li>
         <li>Paper NAV starts from ${v2Inr((d.reference_size || {}).capital_inr)} of reference capital at ${(d.reference_size || {}).risk_per_trade_pct ?? '—'}% risk a trade. Mean R per trade is a diagnostic, not a portfolio return.</li>
       </ul>`) +
-      vsec('Strategies', v2Strategies(d)) +
-      vsec('Model', `<p>Mode ${esc(d.mode)} · last scan ${v2Date(d.session_date)} · published ${v2Time(d.published_at)}${d.forward_record_start ? ` · record began ${v2Date(d.forward_record_start)}` : ''}.</p>`));
+      vsec('Strategies', v2Strategies(d) +
+        `<p class="muted v2-model">Mode ${esc(d.mode)} · last scan ${v2Date(d.session_date)} · published ${v2Time(d.published_at)}${d.forward_record_start ? ` · record began ${v2Date(d.forward_record_start)}` : ''}.</p>`) +
+      `</div>`);
   };
 
   // ── OLD ADDRESSES ─────────────────────────────────────────────────────
