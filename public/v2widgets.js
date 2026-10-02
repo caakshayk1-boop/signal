@@ -816,7 +816,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
         ${box('Volume', 3, `${esc(r.vol_state || '—')}${r.vol_ratio != null ? ` <small>· up-day volume ${r.vol_ratio.toFixed(2)}× down-day</small>` : ''}`)}
         <div><h4>Outlook <em>by rule</em></h4><p>Next session: ${esc(r.lean)}<br>1 week: ${px(r.wk && r.wk[0])} – ${px(r.wk && r.wk[1])} <small>(typical range)</small><br>
           6 months: ${esc(r.m6 || '—')} · Long term: ${esc(r.lt || '—')}</p></div>
-        ${box('Extension', 4, `${r.ext == null ? '—' : r.ext.toFixed(1) + ' ATR'} above the 50 EMA`)}
+        ${box('Extension', 4, `${r.ext == null ? '—' : Math.abs(r.ext).toFixed(1) + ' ATR ' + (Math.sign(r.ext) === -1 ? 'below' : 'above') + ' the 50 EMA'}`)}
       </div>
       ${(r.why || []).length ? `<p class="v2w-note">Why: ${esc(r.why.join('; '))}.</p>` : ''}
       <p class="v2w-note">${esc(feed.basis || '')} Technicals alone never make a holding thesis. Not advice.</p></section>`;
