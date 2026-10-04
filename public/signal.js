@@ -10646,20 +10646,26 @@
   const MAP_DIMS = {
     verdict: { label: 'The call',
       help: 'The screen’s own verdict on each name.',
+      /* A category, not a scale: a low-to-high ramp under it read as a ranking. */
+      cats: [['mc-5', 'criteria met'], ['mc-3', 'entry not met, or watch (the tile says which)'], ['mc-1', 'fails the screen']],
       of: (r) => ({ BUY: 92, WAIT: 55, WATCH: 45, AVOID: 8 })[String((r.vd && r.vd.c) || '').toUpperCase()],
       fmt: (r) => (r.vd && r.vd.c) ? verdictWord(String(r.vd.c).toUpperCase()) : '—' },
     momentum: { label: 'Momentum',
       help: 'Six-month return, scaled across the universe.',
+      lo: 'fell 21% or more in six months', hi: 'rose 21% or more', mid: 'within ±7%',
       of: (r) => { const v = lvl(r.r6m); return v == null ? null : Math.max(0, Math.min(100, 50 + v * 1.2)); },
       fmt: (r) => pct(r.r6m) },
     value: { label: 'Value',
       help: 'The screen’s value score — cheap is bright.',
+      lo: 'value score under 25 (dear)', hi: '75 or more (cheap)', mid: '42–57',
       of: (r) => lvl(r.v), fmt: (r) => lvl(r.v) == null ? '—' : Math.round(lvl(r.v)) },
     quality: { label: 'Quality',
       help: 'Return on capital, margins and balance sheet.',
+      lo: 'quality score under 25', hi: '75 or more', mid: '42–57',
       of: (r) => lvl(r.q), fmt: (r) => lvl(r.q) == null ? '—' : Math.round(lvl(r.q)) },
     year: { label: 'Where in its year',
       help: 'Position between the 52-week low and high.',
+      lo: 'in the bottom quarter of its year', hi: 'in the top quarter', mid: 'near the middle',
       of: (r) => { const p = lvl(r.price), lo = lvl(r.low52), hi = lvl(r.high52);
         return (p == null || lo == null || hi == null || hi <= lo) ? null : (p - lo) / (hi - lo) * 100; },
       fmt: (r) => { const p = lvl(r.price), lo = lvl(r.low52), hi = lvl(r.high52);
@@ -10667,6 +10673,7 @@
     season: { label: 'This month, historically',
       help: 'How often this name has risen in the current calendar month, over eleven years. '
           + 'Historical, not predictive — and grey means it has no decade to judge by.',
+      lo: 'rose in under 25% of years', hi: 'in 75% or more', mid: '42–57%',
       of: (r) => { const d = SEAS && SEAS.stocks && SEAS.stocks[r.sym];
         const m = d && d.m && d.m[new Date().getMonth()];
         return m ? m[0] : null; },
@@ -11028,10 +11035,15 @@
             <option value="all">All sectors</option>
             ${sectors.map(x => `<option value="${esc(x)}"${x === MAP_SECTOR ? ' selected' : ''}>${esc(x)}</option>`).join('')}
           </select></label>
-        <div class="maplg" aria-hidden="true">
-          <span>low</span>${['mc-1','mc-2','mc-3','mc-4','mc-5'].map(c => `<i class="${c}"></i>`).join('')}<span>high</span>
-          <i class="mc-na"></i><span>no data</span>
-        </div>
+        ${/* THE KEY SAYS WHAT THIS VIEW'S COLOURS MEAN, in this view's units.
+             It read "low … high" under every view, including The call, which
+             is three categories and no scale at all. */''}
+        <p class="maplg" role="note"><b>Colour:</b>${D.cats
+          ? D.cats.map(([c, t]) => `<span><i class="${c}" aria-hidden="true"></i>${esc(t)}</span>`).join('')
+          : `<span><i class="mc-1" aria-hidden="true"></i>${esc(D.lo)}</span><i class="mc-2" aria-hidden="true"></i>`
+            + `<span><i class="mc-3" aria-hidden="true"></i>${esc(D.mid)}</span><i class="mc-4" aria-hidden="true"></i>`
+            + `<span><i class="mc-5" aria-hidden="true"></i>${esc(D.hi)}</span>`}
+          <span><i class="mc-na" aria-hidden="true"></i>${MAP_DIM === 'verdict' ? 'not rated' : 'no data'}</span></p>
       </div>`;
 
       body += `<div class="mapg">${scored.map(({ r, v }) => `

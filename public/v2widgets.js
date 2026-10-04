@@ -189,14 +189,14 @@ p.v2w-key{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin:8px
 p.v2w-key>span{display:inline-flex;align-items:center;gap:6px}
 p.v2w-key .t{color:var(--text,var(--ink,#1b1b1f));font-weight:600}
 p.v2w-key .n{flex-basis:100%;margin-top:2px}
-p.v2w-key .v2w-sw{display:inline-block;flex:none;position:static;margin:0;padding:0;min-width:0;max-width:16px;width:10px;height:10px;animation:none;border-radius:2px;background:var(--c,currentColor)}
+p.v2w-key .v2w-sw{display:inline-block;flex:none;position:static;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--text,var(--ink,#888)) 18%,transparent);margin:0;padding:0;min-width:0;max-width:16px;width:10px;height:10px;animation:none;border-radius:2px;background:var(--c,currentColor)}
 p.v2w-key .v2w-sw.bar{width:5px;height:12px;border-radius:1px}
 p.v2w-key .v2w-sw.edge{width:3px;height:14px;border-radius:1px}
 p.v2w-key .v2w-sw.dot{border-radius:50%}
 p.v2w-key .v2w-sw.ring{background:none;border-radius:50%;box-shadow:inset 0 0 0 2px var(--c,currentColor)}
 p.v2w-key .v2w-sw.out{background:none;box-shadow:inset 0 0 0 2px var(--c,currentColor)}
 p.v2w-key .v2w-sw.hatch{background:repeating-linear-gradient(135deg,var(--c,currentColor) 0 2px,transparent 2px 4px)}
-p.v2w-key .v2w-sw.text{width:auto;max-width:none;height:auto;background:none;color:var(--c,currentColor);font:600 12px/1 var(--mono,ui-monospace,monospace)}
+p.v2w-key .v2w-sw.text{box-shadow:none;width:auto;max-width:none;height:auto;background:none;color:var(--c,currentColor);font:600 12px/1 var(--mono,ui-monospace,monospace)}
 .v2w .v2w-chk span{color:var(--w-dim,var(--dim,#6b6b6b));font-size:13px}
 .v2w .v2w-plan{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0;margin:0 0 12px;border:1px solid var(--w-line,var(--line,#e5e2db));border-radius:10px;overflow:hidden}
 .v2w .v2w-plan > div{padding:10px 12px;box-shadow:inset -1px -1px 0 var(--w-line,var(--line,#e5e2db))}

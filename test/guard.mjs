@@ -2566,6 +2566,9 @@ ok("no figure counts up", !/countUp/.test(JS));
        && ["Bar colour · how often it rose:", "Edge colour · how much each objection weighs", "Row colours:", "Each part, scored 0–100:", "Colours on this page:"]
             .every((t) => JS.includes(t))
        && VJS.includes("A value is coloured by the change written under it:"));
+    ok("the map's key states each view's own colours; The call is keyed as categories, not a scale",
+       /cats: \[\['mc-5', 'criteria met'\]/.test(JS) && /<p class="maplg" role="note">/.test(JS) && !/<span>low<\/span>\$\{\['mc-1'/.test(JS)
+       && ["momentum", "value", "quality", "year", "season"].every((k) => new RegExp(`${k}: \\{ label:[\\s\\S]{0,400}?lo: '`).test(JS)));
     ok("RSI is printed as a level on the stock card, never as a signed, coloured change",
        /lvl\('RSI \(14\)', r\.rsi, '', 0\)/.test(JS) && !/yoy\('RSI', r\.rsi/.test(JS));
     ok("a finished setup's page shows its replay, from the record",
