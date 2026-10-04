@@ -430,6 +430,9 @@
    * The sign is now taken from the ROUNDED value, so it always agrees with
    * the digits beside it, and an unchanged instrument prints a bare 0.00% —
    * which is the whole truth about a move of zero. */
+  /* 81st, not 81th. */
+  const ordinal = n => { const v = Math.round(n), t = v % 100;
+    return v + (t >= 11 && t <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][v % 10] || 'th'); };
   const pct = v => {
     const n = Number(v);
     if (!isFinite(n)) return '—';
@@ -6135,7 +6138,7 @@
           PE percentile against the name's OWN history means something. */
     const pep = sn(r.pe_pctile);
     if (pep != null) {
-      add('Valuation vs its own history', Math.round(pep) + 'th pct',
+      add('Valuation vs its own history', ordinal(pep) + ' pct',
           pep <= 30 ? 'up' : pep >= 80 ? 'dn' : '',
           pep <= 30 ? 'Cheaper than it has usually traded on its own earnings.'
             : pep >= 80 ? 'More expensive than it has usually been. Multiple expansion is doing the work.'
@@ -6332,7 +6335,7 @@
     if (pe != null || pb != null) {
       P.push(`<p><b>What it costs.</b> ${pe != null ? `${N(pe)}x earnings` : ''}${
         pe != null && pb != null ? ' and ' : ''}${pb != null ? `${N(pb, 2)}x book` : ''}.${
-        pep != null ? ` Against its own history that is the ${Math.round(pep)}th percentile — ${
+        pep != null ? ` Against its own history that is the ${ordinal(pep)} percentile — ${
           pep <= 30 ? 'cheaper than it usually trades' : pep >= 80 ? 'dearer than it usually trades'
           : 'about where it normally sits'}.` : ''}${
         dy != null && dy > 0.5 ? ` It pays ${N(dy, 2)}% as dividend.` : ''}
@@ -11783,8 +11786,10 @@
           <span class="m ${dir(r.r1m)}">${pct(r.r1m)}</span>
           <span class="pl-w">${priceLine(r)}</span>
         </div>`; }).join('')}</div>`
-      : `<div class="empty">Nothing starred yet. Open <a href="/screen" style="color:var(--accent)">Screen</a>
-         or any company card and press the star.</div>`,
+      : `<div class="empty wempty"><b>Your watchlist is empty.</b>
+         <span>Press the star on any company card or Screen row to follow it here: its setup, results date, alerts and what moved since your last visit.
+         Vision keeps a separate list — each site stores its own in this browser.</span>
+         <a class="v2-gate-b" href="/screen">Browse companies →</a></div>`,
       syms.length ? `${syms.length} name${syms.length > 1 ? 's' : ''}` : '');
     if (syms.length) out = out.replace(/<\/section>$/, PLKEY + '</section>');
     // Filtered down to nothing is a different state from "nothing starred".
@@ -12154,7 +12159,15 @@
       : `<p class="v2-rec-h">Trades</p><div class="grid v2-rec v2-rec4">${tiles.slice(0, 4).join('')}</div>
          <p class="v2-rec-h">Paper money</p><div class="grid v2-rec v2-rec4">${tiles.slice(4).join('')}</div>`;
     const rec = `${m.published ?? 0} published = ${m.awaiting_entry ?? 0} awaiting entry + ${m.active ?? 0} active + ${m.closed ?? 0} closed + ${m.expired_unfilled ?? 0} expired unfilled + ${m.cancelled_before_entry ?? 0} cancelled before entry`;
-    return `${tilesHtml}
+    /* NOT STARTED IS A STATE, NOT A RESULT. With nothing published, the tiles
+       below are zeros and a starting balance; set out as tiles they look like
+       a performance that happened to be flat. The state is named first. */
+    const state = compact ? '' : !m.published
+      ? `<div class="v2-rec-none" role="note"><b>Record not started</b><span class="cnum">0 published · 0 closed</span>
+          <p>No plan has been published${since ? ` since the record began on ${v2Date(since)}` : ''}, so there is no result to report. The figures below are zeros and the starting balance, not outcomes.</p></div>`
+      : none ? `<div class="v2-rec-none" role="note"><b>No closed trade yet</b><span class="cnum">${m.published} published · 0 closed</span>
+          <p>A result exists only once a plan closes. Until then nothing below is a win rate or a return.</p></div>` : '';
+    return `${state}${tilesHtml}
       <p class="v2-recon">${esc(rec)}${m.reconciles === false ? ' — <b>does not reconcile; reported as an error</b>' : ''}.</p>
       <p class="v2-disc">The forward record begins ${since ? v2Date(since) : 'with the first session scanned'}.</p>`;
   }

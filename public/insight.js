@@ -58,6 +58,10 @@
 
   /* WHAT MATTERS — the handful of numbers that describe the business and the
      stock, each with one line of context. Order is fixed: business first. */
+  /* 1st, 2nd, 3rd, 11th, 81st. "81th percentile" was printed on every page
+     that named a percentile. */
+  const ord = (n) => { const v = Math.round(n), t = v % 100;
+    return v + (t >= 11 && t <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][v % 10] || 'th'); };
   function matters(r, x, c) {
     c = c || {}; const out = [];
     const add = (k, v, sub, tone, src) => out.push({ k, v, sub, tone: tone || '', src });
@@ -83,7 +87,7 @@
     const r1m = num(r.r1m), med = num(c.median_1m);
     if (r1m != null) add('Price, 1 month', pct(r1m), med != null ? `screen median ${pct(med)} → ${pp(r1m - med)} relative` : '', r1m >= 0 ? 'up' : 'dn', SRC.px(r));
     const pe = num(r.pe), pp_ = num(r.pe_pctile);
-    if (pe != null) add('Valuation', `PE ${f1(pe)}`, pp_ != null ? `${Math.round(pp_)}th percentile of its own history` : '', '', SRC.fin(r));
+    if (pe != null) add('Valuation', `PE ${f1(pe)}`, pp_ != null ? `${ord(pp_)} percentile of its own history` : '', '', SRC.fin(r));
     if (x && x.quality === 'complete') add('Institutions', `${(num(x.fii) + num(x.dii)).toFixed(2)}%`, `FII ${pp(num(x.fii_pp))} · DII ${pp(num(x.dii_pp))} q/q`, num(x.insti_pp) > 0 ? 'up' : num(x.insti_pp) < 0 ? 'dn' : '', SRC.ins(x));
     return out;
   }
@@ -132,8 +136,8 @@
     if (de != null && de < 0) put('watch', 'Negative equity', 'Debt/equity below zero means liabilities exceed assets', SRC.fin(r));
     else if (!fin && de != null && de > 1.5) put('watch', 'High leverage', `Debt/equity ${de.toFixed(2)}`, SRC.fin(r));
     const pe = num(r.pe_pctile);
-    if (pe != null && pe >= T.peHi) put('watch', 'Valued near the top of its own range', `PE in the ${Math.round(pe)}th percentile of its history`, SRC.fin(r));
-    else if (pe != null && pe <= T.peLo) put('watch', 'Valued near the bottom of its own range', `PE in the ${Math.round(pe)}th percentile of its history`, SRC.fin(r));
+    if (pe != null && pe >= T.peHi) put('watch', 'Valued near the top of its own range', `PE in the ${ord(pe)} percentile of its history`, SRC.fin(r));
+    else if (pe != null && pe <= T.peLo) put('watch', 'Valued near the bottom of its own range', `PE in the ${ord(pe)} percentile of its history`, SRC.fin(r));
     const cp = num(r.cfo_pat);
     if (!fin && cp != null && cp < 0.6) put('watch', 'Profit is not turning into cash', `Operating cash flow ${cp.toFixed(2)}× profit (multi-year median)`, SRC.fin(r));
     if (r.shares_changed) put('watch', 'Share count moved structurally', 'EPS growth is withheld: a split, bonus or issue makes it incomparable', SRC.fin(r));
@@ -187,7 +191,7 @@
     const pe = num(r.pe), pc = num(r.pe_pctile);
     if (pe != null && pc != null) {
       add('Valuation', pc >= T.peHi ? 'high in its own range' : pc <= T.peLo ? 'low in its own range' : 'mid-range for itself',
-        `PE ${f1(pe)}, the ${Math.round(pc)}th percentile of its own history`, `${T.peLo}th and ${T.peHi}th percentiles mark low and high`);
+        `PE ${f1(pe)}, the ${ord(pc)} percentile of its own history`, `${T.peLo}th and ${T.peHi}th percentiles mark low and high`);
     }
     // Ownership: the latest quarter's institutional change.
     if (x && x.quality === 'complete' && num(x.insti_pp) != null) {
@@ -203,6 +207,58 @@
       if (days >= 0) out.event = { t: `Results due ${String(ne).slice(0, 10)}`, s: `in ${days} day${days === 1 ? '' : 's'}`, src: SRC.cal() };
     }
     return out;
+  }
+
+  /* QUESTIONS TO INVESTIGATE. Research prompts, each triggered by the same
+     thresholds as the reads above and carrying the fact that triggered it.
+     A question is never an answer: it names what to look up next, and the
+     page holds no reply to any of them. At most four, in this fixed order
+     (business first, price last), so the list cannot grow into a report. */
+  function questions(r, x, c) {
+    c = c || {}; const out = [];
+    const ask = (q, basis) => out.push({ q, basis });
+    const fin = isFinancial(r);
+    const ry = num(r.rev_yoy), rc = num(r.rev_cagr), yrs = r.fy_count || 'several';
+    if (ry != null && rc != null && ry - rc >= T.growthPP)
+      ask('What drove the step-up in revenue, and does it recur — new capacity, pricing, an acquisition, or a one-off order?',
+        `Revenue ${pct(ry)} last year against ${pct(rc)} a year over ${yrs} years`);
+    else if (ry != null && rc != null && ry - rc <= -T.growthPP)
+      ask('Is the slowdown the industry\'s or this company\'s alone — how did its peers do over the same year?',
+        `Revenue ${pct(ry)} last year against ${pct(rc)} a year over ${yrs} years`);
+    const q = fin ? [num(r.roe), num(r.roe_med), 'ROE'] : [num(r.roce), num(r.roce_med), 'ROCE'];
+    if (q[0] != null && q[1] != null && q[0] - q[1] <= -T.rocePP)
+      ask(`Is ${q[2]} below its norm because new capital has not started earning yet, or because returns on the existing business are falling?`,
+        `${q[2]} ${f1(q[0])}% against a ${f1(q[1])}% multi-year median`);
+    const cp = num(r.cfo_pat);
+    if (!fin && cp != null && cp < 0.6)
+      ask('Where is the profit that did not arrive as cash — receivables, inventory, or capitalised costs?',
+        `Operating cash flow ${cp.toFixed(2)}× reported profit, multi-year median`);
+    const de = num(r.de);
+    if (!fin && de != null && de > 1.5)
+      ask('How much of operating profit goes to interest, and when does the debt fall due?', `Debt / equity ${de.toFixed(2)}`);
+    const pc = num(r.pe_pctile), r1m = num(r.r1m), med = num(c.median_1m);
+    const rel = r1m != null && med != null ? r1m - med : null;
+    if (pc != null && pc <= T.peLo && rel != null && rel <= -T.relPP)
+      ask('Is the valuation discount explained by price weakness or by the fundamentals?',
+        `PE at the ${ord(pc)} percentile of its own history; price ${pp(rel)} against the screen's median over a month`);
+    else if (pc != null && pc >= T.peHi)
+      ask('What has changed that would justify paying more than usual for the same earnings?', `PE at the ${ord(pc)} percentile of its own history`);
+    else if (pc != null && pc <= T.peLo)
+      ask('Is the market paying less than usual because earnings are expected to fall, or has it simply not looked?', `PE at the ${ord(pc)} percentile of its own history`);
+    if (x && x.quality === 'complete') {
+      const th = num(c.threshold_pp) || 0.5, ip = num(x.insti_pp);
+      if (ip != null && Math.abs(ip) >= th)
+        ask(`Which funds ${ip > 0 ? 'added' : 'cut'}, and did anything in the quarter's filings or results come before it?`,
+          `FII + DII ${pp(ip)} in ${x.period}`);
+    }
+    const ne = r.next_earnings, today = c.today ? Date.parse(c.today) : null;
+    if (ne && today != null) {
+      const days = Math.round((Date.parse(String(ne).slice(0, 10)) - today) / 86400000);
+      if (days >= 0 && days <= T.earnDays)
+        ask('Which of the figures above would the coming results confirm, and which would they contradict?',
+          `Results due ${String(ne).slice(0, 10)}, in ${days} day${days === 1 ? '' : 's'}`);
+    }
+    return out.slice(0, 4);
   }
 
   /* KEY DIFFERENCES across a comparison set — the extremes on each measured
@@ -258,5 +314,5 @@
     Institutions: 'Funds report holdings each quarter, so this shows where large, research-staffed money moved — after the fact, and for reasons they do not disclose.',
   };
 
-  root.VisionInsight = { T, matters, changes, differences, oneMinute, GLOSSARY, WHY, SRC, isFinancial };
+  root.VisionInsight = { ord, T, matters, changes, differences, oneMinute, questions, GLOSSARY, WHY, SRC, isFinancial };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -6729,3 +6729,15 @@ main{min-height:calc(100vh - var(--barh))}
 @media(hover:hover) and (pointer:fine){.v2-gate-b:hover{background:color-mix(in srgb,var(--accent) 88%,#000)}}
 @media(max-width:600px){.v2-gate-n{grid-template-columns:minmax(0,1fr)}.v2-gate-b{width:100%;justify-content:center}}
 @media(prefers-reduced-motion:reduce){.v2-gate-b{transition:none}}
+
+/* The record's state before it has a result: named first, above the tiles. */
+.v2-rec-none{display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:4px;align-items:baseline;
+  padding:14px 16px;margin:0 0 14px;border:1px solid var(--line);border-left:3px solid var(--line2,var(--line));
+  border-radius:var(--r-3,8px);background:var(--surface,transparent)}
+.v2-rec-none b{font:600 var(--t-5,17px)/1.3 var(--ui);color:var(--text)}
+.v2-rec-none span{font:500 var(--t-2,12px)/1 var(--mono);color:var(--muted);justify-self:end}
+.v2-rec-none p{grid-column:1/-1;margin:2px 0 0;font:400 var(--t-3,14px)/1.5 var(--ui);color:var(--muted)}
+@media(max-width:600px){.v2-rec-none{grid-template-columns:1fr}.v2-rec-none span{justify-self:start}}
+.wempty{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left}
+.wempty b{font:600 var(--t-5,17px)/1.3 var(--ui);color:var(--text)}
+.wempty span{max-width:60ch}

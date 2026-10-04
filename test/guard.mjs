@@ -2254,6 +2254,22 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
     ok("insight: negative D/E is named negative equity", c.watch.some((i) => /Negative equity/.test(i.t)));
     ok("insight: every claim carries a basis and a source", [...c.improved, ...c.watch].every((i) => i.basis && i.src));
     ok("insight: no recommendation language", !/\b(buy|sell|accumulate|target price|should)\b/i.test(readFileSync("public/insight.js", "utf8").replace(/\/\*[\s\S]*?\*\//g, "")));
+    /* THE UPGRADE: one-minute read, questions, why-it-matters, ordinals. */
+    const om0 = I.oneMinute({ sym: "X" }, null, {});
+    ok("insight: an empty row gets no one-minute read and no event", om0.reads.length === 0 && om0.event === null);
+    ok("insight: an empty row raises no question", I.questions({ sym: "X" }, null, {}).length === 0);
+    const qs = I.questions({ sym: "X", rev_yoy: -5, rev_cagr: 10, roce: 10, roce_med: 18, cfo_pat: 0.3, de: 2, pe_pctile: 10, r1m: -12,
+      next_earnings: "2026-10-10" }, { quality: "complete", insti_pp: 1, fii_pp: 0.6, dii_pp: 0.4, period: "Q1" }, { median_1m: -2, today: "2026-10-04" });
+    ok("insight: questions stop at four, each with the fact behind it", qs.length === 4 && qs.every((q) => q.q.endsWith("?") && q.basis));
+    ok("insight: the valuation question names both of its causes",
+       I.questions({ sym: "X", pe_pctile: 10, r1m: -12 }, null, { median_1m: -2 }).some((q) => /price weakness or by the fundamentals/.test(q.q)));
+    ok("insight: a lender gets no cash-conversion or debt question",
+       !I.questions({ sym: "B", sector: "Financial Services", cfo_pat: 0.2, de: 6 }, null, {}).length);
+    ok("insight: every What-matters key has a Why-it-matters line",
+       ["Revenue", "ROCE", "ROE", "EBIT margin", "Debt / equity", "Cash conversion", "Price, 1 month", "Valuation", "Institutions"].every((k) => I.WHY[k]));
+    ok("insight: 81st, 92nd, 11th — never 81th", [81, 92, 11, 3, 113].map(I.ord).join() === "81st,92nd,11th,3rd,113th");
+    ok("no page prints a percentile as Math.round(x) + 'th'",
+       ![JS, VJS, readFileSync("public/insight.js", "utf8")].some((src) => /Math\.round\([^)]*\)\s*\+\s*'th|Math\.round\([^)]*\)\}th/.test(src)));
   }
   {
     /* LENDERS: the screen's own rule (stock_screen.py::_is_financial). It takes
@@ -2699,6 +2715,27 @@ ok("no figure counts up", !/countUp/.test(JS));
   const PRIV = (JS.match(/R\['\/privacy'\] = async[\s\S]*?\n  \};/) || [""])[0];
   ok("privacy lists the real local-storage keys",
      ["sig:watch", "sig:alerts", "sig.sizer.v1", "sig:theme"].every((k) => PRIV.includes(k)) && !/One item in local storage/.test(PRIV));
+  /* THE UPGRADE (recommendations doc): each state named, each link a next question. */
+  ok("home's no-plan state is a designed card with the counts and two ways forward",
+     /function v2Gate\(d\)/.test(JS) && /class="v2-gate-b" href="\/opportunities#paper"/.test(JS) && /href="\/methodology#status"/.test(JS)
+     && /<h3 id="status">Strategy status<\/h3>/.test(JS));
+  ok("the record names 'not started' before its tiles, on the Record page only",
+     /Record not started/.test(JS) && /const state = compact \? '' :/.test(JS));
+  ok("the watchlist rows carry setup, results, alert and since-last-visit, with five quick filters",
+     /function watchTags\(/.test(JS) && ["setup", "results", "alert", "changed"].every((k) => new RegExp(`\\['${k}', '`).test(JS))
+     && /data-wquick=/.test(JS) && /RESULTS_SOON = 10/.test(JS));
+  ok("the since-last-visit move refuses a missing price instead of reading it as zero",
+     /raw == null \|\| raw === ''/.test(JS));
+  ok("an empty watchlist says the two sites keep separate lists", /Vision keeps a separate\s+list/.test(JS));
+  ok("every cross-site link says why to follow it",
+     /Why this company\? Open in Vision ↗/.test(JS) && /How did this become a setup\?/.test(VJS2) && /Not a paper setup tonight\./.test(VJS2));
+  ok("Vision's company page has the one-minute read and questions to investigate",
+     /panel\('One-minute read'/.test(VJS2) && /panel\('Questions to investigate'/.test(VJS2) && /class="mt-why"/.test(VJS2));
+  ok("Vision's home search says what it accepts, and recents can be cleared",
+     /id="hHint"/.test(VJS2) && /aria-describedby="hHint"/.test(VJS2) && /data-clr-recent/.test(VJS2));
+  ok("Vision's home tiles name where they go", /class="gl-go" aria-hidden="true"/.test(VJS2) && /Open the \$\{dest\} page/.test(VJS2));
+  ok("the paper digest's Why button is a real disclosure",
+     /class="v2w-why" aria-expanded="false" aria-controls=/.test(W2) && /window\.__v2wWhy/.test(W2));
   ok("the watchlist exports and imports, merging rather than overwriting",
      /id="wExport"/.test(JS) && /id="wImport"/.test(JS) && /kind: 'signal-watchlist'/.test(JS) && /new Set\(\[\.\.\.watchAll\(\), \.\.\.clean\]\)/.test(JS));
 }

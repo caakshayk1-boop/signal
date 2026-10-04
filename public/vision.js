@@ -927,6 +927,8 @@
      Vision setup. insight.js turns it into "what matters" and "what changed"
      — the same file the Worker runs to write the page's HTML. */
   const INS = () => window.VisionInsight || null;
+  const ordN = (n) => { const v = Math.round(n), t = v % 100;      // 81st, never 81th
+    return v + (t >= 11 && t <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][v % 10] || 'th'); };
   /* The screen's lender rule (stock_screen.py::_is_financial), via insight.js
      where it is written once for the browser and the Worker. The fallback is
      the same four words, for a page on which insight.js did not arrive. */
@@ -971,6 +973,11 @@
         <span class="one-f">${esc(x.fact)}</span><small class="one-r">Rule: ${esc(x.rule)}</small></li>`).join('')}
       ${om.event ? `<li class="one-ev"><span class="one-l">Next event</span><b class="one-w">${esc(om.event.t)}</b>
         <span class="one-f">${esc(om.event.s)}</span><small class="one-r">${esc(om.event.src)}</small></li>` : ''}</ol>`;
+  /* Questions to investigate: a prompt and the fact behind it. A company
+     where no threshold fired gets no panel — an empty list of questions
+     would read as "nothing to look into", which no page can know. */
+  const qsHtml = (qs) => `<ol class="qs">${qs.map((x) => `<li><b>${esc(x.q)}</b><small>Because: ${esc(x.basis)}</small></li>`).join('')}</ol>
+    <p class="note">Research prompts derived from the figures on this page, by the same thresholds as the reads above. Not recommendations, and nothing here answers them.</p>`;
   /* The one plan feed, fetched from one place (the guard counts the call). */
   const v2Feed = () => get('/signal_v2.json', 600000);
   const mattersHtml = (mt) => mt.length ? `${MT_KEY()}<div class="kv intel-kv" style="margin-top:0">${mt.map((m) => `<div title="${esc(m.src)}"><em>${esc(m.k)} ${defn(MT_DEF[m.k])}</em><b class="${m.tone}">${esc(m.v)}</b><small>${esc(m.sub || '')}</small>${
@@ -1175,7 +1182,7 @@
     const biz = `<div class="kv" style="margin-top:0">
         <div><em>ROCE</em><b>${lender ? 'n/a' : row.roce != null ? fmt(row.roce, 1) + '%' : '—'}</b><small>${lender ? 'not meaningful for a lender' : ''}</small></div>
         <div><em>Debt / equity</em><b class="${de != null && de < 0 ? 'dn' : ''}">${lender ? 'n/a' : de == null ? '—' : de < 0 ? 'Negative equity' : fmt(de, 2)}</b><small>${lender ? 'a lender borrows to lend' : ''}</small></div>
-        <div><em>PE</em><b>${row.pe != null ? fmt(row.pe, 1) : '—'}</b><small>${row.pe_pctile != null ? Math.round(row.pe_pctile) + 'th pct of its own history' : ''}</small></div>
+        <div><em>PE</em><b>${row.pe != null ? fmt(row.pe, 1) : '—'}</b><small>${row.pe_pctile != null ? ordN(row.pe_pctile) + ' pct of its own history' : ''}</small></div>
         <div><em>Revenue CAGR</em><b>${row.rev_cagr != null ? signed(row.rev_cagr, 1) : '—'}</b></div>
         <div><em>EPS CAGR</em><b>${row.eps_cagr != null ? signed(row.eps_cagr, 1) : '—'}</b><small>${row.eps_cagr == null ? 'withheld or not reported' : ''}</small></div>
         <div><em>ROE</em><b>${row.roe != null ? fmt(row.roe, 1) + '%' : '—'}</b></div>
@@ -1224,7 +1231,7 @@
     ['EBIT margin', (d) => d.r.ebit_margin, (v) => v == null ? NA : fmt(v, 1) + '%', null, true], ['ROCE', (d) => d.r.roce, (v) => v == null ? NA : fmt(v, 1) + '%', 'ROCE', true],
     ['ROE', (d) => d.r.roe, (v) => v == null ? NA : fmt(v, 1) + '%'], ['Debt / equity', (d) => d.r.de, (v) => v == null ? NA : v < 0 ? '<span class="dn">Negative equity</span>' : fmt(v, 2), null, true],
     ['Cash conversion', (d) => d.r.cfo_pat, (v) => v == null ? NA : fmt(v, 2) + '×', 'Cash conversion', true], ['PE', (d) => d.r.pe, (v) => v == null ? NA : fmt(v, 1)],
-    ['PE percentile', (d) => d.r.pe_pctile, (v) => v == null ? NA : Math.round(v) + 'th', 'PE percentile'],
+    ['PE percentile', (d) => d.r.pe_pctile, (v) => v == null ? NA : ordN(v), 'PE percentile'],
     ['FII + DII, q/q', (d) => d.x && d.x.quality === 'complete' ? d.x.insti_pp : null, (v) => v == null ? NA : signed(v, 2, ' pp')],
     ['Quality score', (d) => d.r.q, (v) => v == null ? NA : Math.round(v)], ['Growth score', (d) => d.r.g, (v) => v == null ? NA : Math.round(v)],
     ['Technical score', (d) => d.r.tech, (v) => v == null ? NA : Math.round(v)],
@@ -1533,6 +1540,8 @@
       ${panel('One-minute read', skel(3), { bodyId: 'aOne', fb: 'Screen' })}<div style="height:var(--s-4)"></div>
       <div class="grid g-2 intel">${panel('What matters', skel(5), { bodyId: 'aMat', fb: 'Screen' })}${panel('What changed', skel(5), { bodyId: 'aChg', fb: 'Screen' })}</div>
       <div style="height:var(--s-4)"></div>
+      ${panel('Questions to investigate', skel(3), { bodyId: 'aQs', fb: 'Screen' })}
+      <div style="height:var(--s-4)"></div>
       <div class="grid g-7-5"><div class="stack">
         ${panel('Why it reads the way it does', skel(5), { bodyId: 'aWhy', fb: 'Screen' })}
         ${panel('Move profile', skel(4), { bodyId: 'aChart', fb: 'Screen' })}
@@ -1548,7 +1557,7 @@
     Object.assign(S.quotes, q);
     const r = SCR && SCR[s], lv = liveOf(s), x = instiOf(s);
     if (r) noteRecent(s);
-    if (!r) { for (const id of ['aMat', 'aChg']) { const b = $('#' + id); if (b) b.closest('.pn').remove(); }
+    if (!r) { for (const id of ['aMat', 'aChg', 'aQs']) { const b = $('#' + id); if (b) b.closest('.pn').remove(); }
       $('#aHead').innerHTML = vhead('Asset', s, sr.ok ? `<b>${esc(s)}</b> is not on the NSE screen. Check the symbol — the screen covers ${Object.keys(SCR || {}).length.toLocaleString('en-IN')} names.` : 'The screen did not load, so this name cannot be looked up.');
       for (const id of ['aWhy', 'aChart', 'aLvl', 'aFun', 'aIns', 'aNews']) { const b = $('#' + id); if (b) b.closest('.pn').remove(); }
       const tr0 = $('#aTr'); if (tr0) tr0.remove();
@@ -1620,10 +1629,13 @@
       });
       $('#aMat').innerHTML = mattersHtml(I.matters(d.r, d.x, ctx));
       $('#aChg').innerHTML = changesHtml(I.changes(d.r, d.x, ctx), I.T);
+      { const qb = $('#aQs'); if (qb) { const qs = I.questions ? I.questions(d.r, d.x, ctx) : [];
+        if (qs.length) qb.innerHTML = qsHtml(qs); else qb.closest('.pn').remove(); } }
     } else {
       const why = co.ok ? 'insight.js did not load' : co.error;
       $('#aOne').innerHTML = failBox('This company\'s file', why);
       $('#aMat').innerHTML = failBox('This company\'s file', why); $('#aChg').innerHTML = failBox('This company\'s file', why);
+      { const qb = $('#aQs'); if (qb) qb.closest('.pn').remove(); }
     }
 
     $('#aWhy').innerHTML = r ? `${moveFactors(mv.parts)}
@@ -1667,7 +1679,7 @@
       <div><em>ROCE</em><b>${lender ? 'n/a' : r.roce != null ? fmt(r.roce, 1) + '%' : '—'}</b><small>${lender ? 'not meaningful for a lender' : r.roce_med != null ? 'median ' + fmt(r.roce_med, 1) + '%' : ''}</small></div>
       <div><em>ROE</em><b>${r.roe != null ? fmt(r.roe, 1) + '%' : '—'}</b><small>${lender ? (r.roe_med != null ? 'median ' + fmt(r.roe_med, 1) + '% · ' : '') + 'how a lender is judged' : ''}</small></div>
       <div><em>Debt / equity</em><b class="${de != null && de < 0 ? 'dn' : ''}">${de == null ? '—' : de < 0 ? 'Negative equity' : fmt(de, 2)}</b><small>${de != null && de < 0 ? 'insolvency, not a clean balance sheet' : lender && de != null ? 'a lender borrows to lend — not a risk measure here' : ''}</small></div>
-      <div><em>PE</em><b>${r.pe != null ? fmt(r.pe, 1) : '—'}</b><small>${r.pe_pctile != null ? `${Math.round(r.pe_pctile)}th pct of its own history` : ''}</small></div>
+      <div><em>PE</em><b>${r.pe != null ? fmt(r.pe, 1) : '—'}</b><small>${r.pe_pctile != null ? `${ordN(r.pe_pctile)} pct of its own history` : ''}</small></div>
       <div><em>Revenue CAGR</em><b>${r.rev_cagr != null ? signed(r.rev_cagr, 1) : '—'}</b></div>
       <div><em>EPS CAGR</em><b>${r.eps_cagr != null ? signed(r.eps_cagr, 1) : '—'}</b><small>${r.eps_cagr == null ? 'withheld or not reported' : ''}</small></div>
       <div><em>Piotroski</em><b>${r.piotroski != null ? r.piotroski + '/9' : '—'}</b></div>
@@ -2059,7 +2071,7 @@
       const td = rg.ok ? rg.data.today : null;
       $('#mReg').innerHTML = !td ? failBox('The regime', rg.error) : `<div class="pulse-h"><strong style="font-size:var(--t-xl)">${esc(td.t)}</strong></div>
         <p class="note" style="margin-top:var(--s-2)">${esc(td.d || '')}</p>
-        <div class="kv"><div><em>Realised vol</em><b>${td.vol_ann_pct != null ? td.vol_ann_pct + '%' : '—'}</b><small>${td.vol_pctile != null ? Math.round(td.vol_pctile) + 'th pct' : ''}</small></div>
+        <div class="kv"><div><em>Realised vol</em><b>${td.vol_ann_pct != null ? td.vol_ann_pct + '%' : '—'}</b><small>${td.vol_pctile != null ? ordN(td.vol_pctile) + ' pct' : ''}</small></div>
           <div><em>In this regime</em><b>${rg.data.run_days ?? '—'}</b><small>sessions</small></div></div>`;
     };
     await Promise.all([paint(), side()]);
