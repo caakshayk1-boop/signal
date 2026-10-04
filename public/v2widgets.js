@@ -277,6 +277,19 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
 .v2w-ed-l a,.v2w-ed-f a{color:var(--accent,#2743c8);font-weight:600}
 .v2w-ed-e,.v2w-ed-f{font-size:13px;color:var(--w-muted,var(--muted,#6b6a66))}
 @media (prefers-reduced-motion:reduce){dialog.v2w-ed[open]{animation:none}.v2w .v2w-edb{transition:none}}
+/* First-paint motion (see once()). Charts reveal left to right along time;
+   bars grow from their axis, staggered by row. Strong ease-out for the bars,
+   ease-in-out for the reveal, which is movement across the screen. */
+@keyframes v2wReveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes v2wGrow{from{transform:scaleX(0)}to{transform:none}}
+.v2w svg.v2w-reveal{animation:v2wReveal 900ms cubic-bezier(.77,0,.175,1) both}
+.v2w .v2w-grow .v2w-trk i{animation:v2wGrow 480ms cubic-bezier(.23,1,.32,1) both;animation-delay:calc(var(--i,0) * 24ms)}
+.v2w .v2w-grow .v2w-trk i.up,.v2w .v2w-grow .v2w-trk.one i{transform-origin:left center}
+.v2w .v2w-grow .v2w-trk i.dn{transform-origin:right center}
+/* A setup whose entry state changed since the last refresh: one soft pulse. */
+@keyframes v2wChg{0%{background:color-mix(in srgb,var(--accent,#2743c8) 16%,transparent)}100%{background:transparent}}
+.v2w .v2w-di.is-chg{animation:v2wChg 1400ms cubic-bezier(.23,1,.32,1)}
+@media (prefers-reduced-motion:reduce){.v2w svg.v2w-reveal,.v2w .v2w-grow .v2w-trk i,.v2w .v2w-di.is-chg{animation:none}}
 .v2w .v2w-new{display:inline-block;margin-left:6px;padding:2px 5px;border-radius:3px;font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
   font-style:normal;letter-spacing:.06em;text-transform:uppercase;vertical-align:2px;
   background:color-mix(in srgb,var(--accent,#2743c8) 14%,transparent);color:var(--accent,#2743c8)}
@@ -431,7 +444,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     return `<div class="v2w-leg" aria-hidden="true"><span><i></i>Paper NAV</span><span><i class="bm"></i>${esc(bname)}</span><span>both rebased to 100 at the start</span></div>
       <div class="v2w-chart" data-v2w-chart="${data}" role="img"
         aria-label="Paper NAV against ${esc(bname)}, rebased to 100, ${n} sessions. Latest: NAV ${pts[n - 1].n ?? 'not recorded'}, ${esc(bname)} ${pts[n - 1].b ?? 'not recorded'}.">
-        <svg viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" aria-hidden="true">
+        <svg${once('perf') ? ' class="v2w-reveal"' : ''} viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" aria-hidden="true">
           ${ticks.map((t) => `<line class="${Math.abs(t - 100) < 1e-9 ? 'v2w-base' : 'v2w-grid'}" x1="0" x2="${W}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}" vector-effect="non-scaling-stroke"/>`).join('')}
           <path class="v2w-l-bm" d="${path('b')}" vector-effect="non-scaling-stroke"/>
           <path class="v2w-l-nav" d="${path('n')}" vector-effect="non-scaling-stroke"/>
@@ -646,7 +659,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
       <div class="v2w-mk" data-v2w-mk="${data}" role="img"
         aria-label="Nifty 50 over the year: ${esc(sgn(chg))}, now ${esc(sgn(fromHi))} below its high of ${esc(num0(hi.c))}. Worst fall from a high ${esc(sgn(worst))}.">
         <div class="v2w-chart">
-          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+          <svg${once('nifty') ? ' class="v2w-reveal"' : ''} viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
             <line class="v2w-grid" x1="0" x2="${W}" y1="${Y(hi.c).toFixed(1)}" y2="${Y(hi.c).toFixed(1)}" vector-effect="non-scaling-stroke"/>
             <line class="v2w-grid" x1="0" x2="${W}" y1="${Y(lo.c).toFixed(1)}" y2="${Y(lo.c).toFixed(1)}" vector-effect="non-scaling-stroke"/>
             <path class="v2w-area" d="${area}"/>
@@ -745,10 +758,10 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     let mx = 0, upSec = 0;
     for (const x of S) { mx = Math.max(mx, Math.abs(x.median || 0)); if (x.median > 0) upSec++; }
     mx = mx || 1;
-    const rows = S.map((x) => {
+    const rows = S.map((x, xi) => {
       const w = Math.min(50, (Math.abs(x.median) / mx) * 50);
       return `<span class="nm" title="${esc(x.name)}">${esc(x.name)}<small>${esc(x.up)} of ${esc(x.n)} rose</small></span>
-        <span class="v2w-trk" aria-hidden="true"><i class="${x.median >= 0 ? 'up' : 'dn'}" style="width:${w.toFixed(1)}%"></i></span>
+        <span class="v2w-trk" aria-hidden="true"><i class="${x.median >= 0 ? 'up' : 'dn'}" style="width:${w.toFixed(1)}%;--i:${xi}"></i></span>
         <span class="val">${sgn(x.median, 2)}</span>`;
     }).join('');
     return `<section class="v2w" id="w-sectors" aria-label="${esc(Q)}">
@@ -759,7 +772,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
         <div class="v2w-k"><span>Typical stock</span><b class="v2w-big">${sgn(b.median, 1)}</b><em>median 1-week move</em></div>
         <div class="v2w-k"><span>Sectors up</span><b class="v2w-big">${upSec}</b><em>of ${S.length}</em></div>
       </div>
-      <div class="v2w-bars" role="list" aria-label="Sectors by median 1-week move">${rows}</div>
+      <div class="v2w-bars${once('sectors') ? ' v2w-grow' : ''}" role="list" aria-label="Sectors by median 1-week move">${rows}</div>
       <p class="v2w-note">Each bar is the middle stock of its sector, not a cap-weighted index, so one large name cannot carry it. The count under each sector says how wide the move was.</p>
       ${opts.more ? `<p class="v2w-more"><a href="${esc(opts.more)}">Every sector and name on the map →</a></p>` : ''}</section>`;
   }
@@ -772,8 +785,9 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     if (!U.length && !D.length) return failCard(Q, 'The weekly movers', opts.error);
     let mx = 0; for (const x of U.concat(D)) mx = Math.max(mx, Math.abs(x.r1w || 0)); mx = mx || 1;
     const href = opts.stockHref || ((s) => `/stock/${encodeURIComponent(s)}`);
-    const list = (L) => `<div class="v2w-bars">${L.map((x) => `<span class="nm"><a class="sym" href="${esc(href(x.sym))}">${esc(x.sym)}</a><small>${esc(x.sector || '')}${x.turnover_cr != null ? ` · ₹${esc(num0(x.turnover_cr))} cr a day` : ''}</small></span>
-      <span class="v2w-trk one" aria-hidden="true"><i class="${x.r1w >= 0 ? 'up' : 'dn'}" style="width:${Math.min(100, Math.abs(x.r1w) / mx * 100).toFixed(1)}%"></i></span>
+    const grow = once('movers');
+    const list = (L) => `<div class="v2w-bars${grow ? ' v2w-grow' : ''}">${L.map((x, i) => `<span class="nm" style="--i:${i}"><a class="sym" href="${esc(href(x.sym))}">${esc(x.sym)}</a><small>${esc(x.sector || '')}${x.turnover_cr != null ? ` · ₹${esc(num0(x.turnover_cr))} cr a day` : ''}</small></span>
+      <span class="v2w-trk one" aria-hidden="true"><i class="${x.r1w >= 0 ? 'up' : 'dn'}" style="width:${Math.min(100, Math.abs(x.r1w) / mx * 100).toFixed(1)}%;--i:${i}"></i></span>
       <span class="val">${sgn(x.r1w, 1)}</span>`).join('')}</div>`;
     return `<section class="v2w" id="w-movers" aria-label="${esc(Q)}">
       <h3>${esc(Q)}</h3>
@@ -1080,7 +1094,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     return `<section class="v2w" aria-label="${Q}"><h3>${esc(opts.title || Q)}</h3>
       <p class="v2w-per">${esc(opts.sym || '')} · ${n} daily closes to ${esc(day(last.t))} · last close ${money(last.c)}</p>
       <div class="v2w-pl" data-v2w-lv="${data}" role="img" aria-label="${esc(opts.sym || 'Price')}: ${n} daily closes, last ${money(last.c)}. ${labs.map((l) => l.range ? `buy ${money(l.range[0])} to ${money(l.range[1])}` : `${l.label} ${money(l.v)}`).join(', ')}.">
-        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+        <svg${once('levels') ? ' class="v2w-reveal"' : ''} viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
           ${band ? `<rect class="band" x="0" width="${W}" y="${y(band[1]).toFixed(1)}" height="${Math.max(2, y(band[0]) - y(band[1])).toFixed(1)}"/>` : ''}
           ${L.map((l) => `<line class="lv ${l.cls}" x1="0" x2="${W}" y1="${y(l.v).toFixed(1)}" y2="${y(l.v).toFixed(1)}" vector-effect="non-scaling-stroke"/>`).join('')}
           <path class="px" d="${d}" vector-effect="non-scaling-stroke"/>
@@ -1256,6 +1270,11 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
       panel.hidden = !open;
     });
   }
+  /* FIRST PAINT ONLY. A chart that draws itself in, or bars that grow from
+     their axis, explain the figure once — the first time a reader sees it.
+     Signal repaints its routes every minute; replaying the motion on each
+     repaint would be decoration on a figure that did not change. */
+  const once = (k) => { const s = (window.__v2wSeen = window.__v2wSeen || new Set()); if (s.has(k)) return false; s.add(k); return true; };
   function key(items, opts = {}) {
     injectCss();
     const sw = (it) => it.shape === 'text'

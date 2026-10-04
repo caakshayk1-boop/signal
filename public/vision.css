@@ -967,3 +967,15 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 .snap-u{width:100%;font-family:var(--mono,ui-monospace,monospace);font-size:var(--t-xs)}
 .snap-b{margin:0 0 var(--s-4);padding:var(--s-3) var(--s-4);border:1px solid var(--line);border-left:3px solid var(--accent,#2743c8);
   border-radius:var(--r-2);background:var(--panel);font-size:var(--t-sm,14px);color:var(--ink-2,var(--ink-3))}
+
+/* Compare: a materially different row is tinted once it lands, and its two
+   extremes carry a glyph. The tint fades in over 400ms on the first paint. */
+.cmp tr.cmp-diff th,.cmp tr.cmp-diff td{background:color-mix(in srgb,var(--accent,#2743c8) 4%,transparent)}
+.cmp tr.cmp-diff th,.cmp tr.cmp-diff td{animation:cmpIn 400ms cubic-bezier(.23,1,.32,1)}
+@keyframes cmpIn{from{background:transparent}}
+.cmp td.cmp-x{font-weight:650}
+.cmp-g{font-style:normal;font-size:.75em;margin-left:5px;color:var(--accent,#2743c8)}
+.cmp-key{padding:var(--s-2) var(--s-4) 0}
+/* Search results: the selected row moves its highlight, it does not jump. */
+#hL li,#palL li{transition:background-color 120ms ease,color 120ms ease}
+@media (prefers-reduced-motion:reduce){.cmp tr.cmp-diff th,.cmp tr.cmp-diff td{animation:none}#hL li,#palL li{transition:none}}

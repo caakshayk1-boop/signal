@@ -11811,6 +11811,9 @@
         </div>
         <div class="chips" role="group" aria-label="How many">${[[30, 'Top 30'], [100, 'Top 100'], [0, `All ${ranked.length}`]].map(([n, l]) =>
           `<button type="button" class="chip" data-mftop="${n}" aria-pressed="${mfTop === n}">${esc(l)}</button>`).join('')}</div>
+        ${ckey([{ c: 'var(--warn)', shape: 'box', label: 'flag on the row (e.g. a one-off year)' }, { c: 'var(--accent)', shape: 'box', label: 'held by the paper book' },
+          { c: 'var(--up)', shape: 'text', sample: '+4%', label: '1-month price move up' }, { c: 'var(--down)', shape: 'text', sample: '−4%', label: 'down' }],
+          { title: 'On each row:', note: 'ROCE and EBIT/EV are not coloured: a rank is not a verdict.' })}
         ${view.length ? `<div class="rank mf-t">
           <div class="rank-r scr-r rank-head"><span class="i">Rank</span><span class="s">Company</span>
             <span class="x">ROCE</span><span class="x">EBIT / EV</span><span class="x">Score</span><span class="x hm">Size</span><span class="m">1M</span></div>
@@ -11977,6 +11980,9 @@
         ${WQUICK.map(([k, l]) => `<button type="button" class="chip${k && !qCount[k] ? ' is-zero' : ''}" data-wquick="${k}"
            aria-pressed="${watchQuick === k}">${esc(l)} <b>${qCount[k]}</b></button>`).join('')}
       </div>
+      ${ckey([{ c: 'var(--accent)', shape: 'box', label: 'a setup or plan' }, { c: 'var(--warn)', shape: 'box', label: 'results within ' + RESULTS_SOON + ' days' },
+        { c: 'var(--line2)', shape: 'box', label: 'your nearest price alert (dashed)' }, { c: 'var(--up)', shape: 'text', sample: '+3%', label: 'up since your last visit' },
+        { c: 'var(--down)', shape: 'text', sample: '−3%', label: 'down since' }], { title: 'Tags under each name:' })}
       <p class="hint wq-def"><b>Has a setup</b>: a live paper setup or plan in tonight's feed.
         <b>Results soon</b>: a results date in the next ${RESULTS_SOON} days.
         <b>Changed</b>: price ${SINCE_MOVE}% or more away from what this browser recorded at your last visit${
@@ -12290,7 +12296,12 @@
           <span class="ev-a">${act(e)}</span></li>`; }).join('')}</ol>`;
     } else if (all.length) list = `<div class="empty">Nothing of this kind in the log.</div>`;
     paint(H() + state
-      + (all.length ? sec('The log', `<div class="chips" role="group" aria-label="Kind">${groups.map(([g, l]) =>
+      + (all.length ? sec('The log', `${ckey([
+          { c: 'var(--up)', shape: 'dot', label: 'entered its buy range' },
+          { c: 'var(--warn)', shape: 'dot', label: 'above the most to pay, or a results date' },
+          { c: 'var(--accent)', shape: 'dot', label: 'a new paper setup' },
+          { c: 'var(--down)', shape: 'dot', label: 'your price level reached' },
+          { c: 'var(--line2)', shape: 'dot', label: 'a filing, or a setup ended' }], { title: 'Each entry\'s dot:' })}<div class="chips" role="group" aria-label="Kind">${groups.map(([g, l]) =>
           `<button type="button" class="chip" data-evk="${esc(g)}" aria-pressed="${alertKind === g}">${esc(l)} <b>${cnt(g)}</b></button>`).join('')}</div>${list}
           <p class="hint">Kept in this browser: the last 300 entries. <button type="button" class="lnk" id="evClear">Clear the log</button></p>`,
           `${all.length} logged`) : '')
@@ -12635,7 +12646,18 @@
       if (routeOf() !== '/') return;
       for (const p of live) {
         const c = chk[p.id], cell = document.querySelector(`.v2w-dr[data-sym="${CSS.escape(p.symbol)}"] .s`);
-        if (c && cell && c.k !== 'done') { cell.textContent = c.word; cell.title = c.line; cell.dataset.k = c.k; }
+        if (c && cell && c.k !== 'done') {
+          cell.textContent = c.word; cell.title = c.line; cell.dataset.k = c.k;
+          /* ENTERED OR LEFT ITS RANGE SINCE THE LAST REFRESH: one pulse on the
+             row. Only on a measured change seen in this visit, never on the
+             first paint, where there is nothing to have changed from. */
+          const was = ENTRY_SEEN[p.id];
+          ENTRY_SEEN[p.id] = c.k;
+          const row = cell.closest('.v2w-di');
+          if (row && was && was !== c.k && c.k !== 'na' && was !== 'na') {
+            row.classList.remove('is-chg'); void row.offsetWidth; row.classList.add('is-chg');
+          }
+        }
       }
     });
   };
@@ -12767,6 +12789,7 @@
      it. Nothing here selects a setup; it reads the feed's levels back. */
   const setupHref = (p) => '/setup/' + encodeURIComponent(p.id);
   const PAPER_LIVE_STATES = new Set(['awaiting_entry', 'activated', 'partially_exited']);
+  const ENTRY_SEEN = {};     // id → last entry-check state seen in this visit (home pulse)
   async function paperEntry(list) {
     const W = window.V2W;
     if (!W || !W.entry || !list.length) return {};
