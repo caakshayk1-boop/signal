@@ -12157,7 +12157,7 @@
          window, state — linking to its full card over there, where the sells,
          the reason and the engine rules live. */
       v2Paper(d, { compact: true, digest: true, title: 'Paper setups — a test, not plans', moreHref: '/opportunities#paper',
-                   cardHref: setupHref }) +
+                   cardHref: setupHref, visionHref: (s) => VISION_URL + '/#/brief/' + encodeURIComponent(s), methodHref: '/methodology#status' }) +
       `<div class="v2-duo">` +
       vsec('Active paper positions', active.length ? `<div class="v2-cards">${active.map(p => v2Card(p, d)).join('')}</div>`
         : `<p class="muted">No open paper position. A setup becomes one when its buy range trades.</p>`, String(active.length)) +

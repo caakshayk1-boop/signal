@@ -239,6 +239,22 @@ p.v2w-key .v2w-sw.text{box-shadow:none;width:auto;max-width:none;height:auto;bac
   gap:4px 14px;align-items:baseline;padding:9px 14px;border-top:1px solid var(--w-line,var(--line,#e5e2db));
   color:var(--w-ink,inherit);text-decoration:none;font:400 13px/1.35 var(--ui,var(--f-sans,system-ui,sans-serif));font-variant-numeric:tabular-nums}
 .v2w .v2w-dr:first-child{border-top:0}
+.v2w .v2w-di{position:relative;border-top:1px solid var(--w-line,var(--line,#e5e2db))}
+.v2w .v2w-di:first-of-type{border-top:0}
+.v2w .v2w-di .v2w-dr{border-top:0;padding-right:64px}
+.v2w .v2w-why{position:absolute;right:8px;top:4px;min-width:44px;min-height:36px;padding:0 10px;border:1px solid var(--w-line,var(--line,#e5e2db));border-radius:999px;
+  background:var(--w-surf,#fff);color:var(--w-mut,#5f6068);font:500 12px/1 var(--ui,var(--f-sans,system-ui,sans-serif));cursor:pointer;
+  transition:transform 160ms cubic-bezier(.23,1,.32,1),background-color 160ms ease,color 160ms ease}
+.v2w .v2w-why:active{transform:scale(.97)}
+.v2w .v2w-why[aria-expanded="true"]{background:var(--w-acc,#2743c8);color:var(--w-surf,#fff);border-color:transparent}
+.v2w .v2w-why:focus-visible{outline:2px solid var(--w-acc,#2743c8);outline-offset:2px}
+.v2w .v2w-wp{padding:2px 14px 12px;font:400 13px/1.5 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink,inherit)}
+.v2w .v2w-wp:not([hidden]){animation:v2wIn 160ms cubic-bezier(.23,1,.32,1)}
+.v2w .v2w-wp p{margin:6px 0 0;max-width:80ch} .v2w .v2w-wp b{font-weight:600}
+.v2w .v2w-wl{display:flex;flex-wrap:wrap;gap:4px 16px} .v2w .v2w-wl a{color:var(--w-acc,#2743c8)}
+@keyframes v2wIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.v2w .v2w-wp:not([hidden]){animation:none}.v2w .v2w-why{transition:none}}
+@media (max-width:600px){.v2w .v2w-di .v2w-dr{padding-right:12px}.v2w .v2w-why{position:static;margin:0 12px 10px;min-height:44px}}
 .v2w a.v2w-dr:hover{background:var(--w-raised,var(--raised,rgba(0,0,0,.03)))}
 .v2w .v2w-dr b{font-weight:600;letter-spacing:.01em}
 .v2w .v2w-dr .e,.v2w .v2w-dr .w,.v2w .v2w-dr .s{color:var(--w-dim,var(--dim,#6b6b6b));font-size:12px}
@@ -858,6 +874,22 @@ p.v2w-key .v2w-sw.text{box-shadow:none;width:auto;max-width:none;height:auto;bac
        rather than repeating them. The same levels the card leads with — the
        buy range, the stop and its distance, the window, the state — and a
        link to that card, where the three sells and the reason live. */
+    /* WHY THIS APPEARED, IN PLACE. The row still opens the full setup page;
+       the disclosure beside it answers the smaller question without leaving
+       the list: the reason recorded at the close, the engine's rule, and
+       where to read further. A button cannot live inside a link, so the row
+       and its disclosure are siblings in one list item. */
+    const engWhat = Object.fromEntries((P.engines || []).map((e) => [e.id, e.what]));
+    const wid = (p) => 'why-' + String(p.id || p.symbol).replace(/[^A-Za-z0-9_-]/g, '-');
+    const whyPanel = (p) => `<div class="v2w-wp" id="${esc(wid(p))}" hidden>
+        ${p.why ? `<p><b>Why it was recorded:</b> ${esc(p.symbol)} ${esc(p.why)}, at the ${esc(day(p.filed_session))} close.</p>` : ''}
+        ${engWhat[p.engine] ? `<p><b>${esc(names[p.engine] || p.engine)}:</b> ${esc(engWhat[p.engine])}</p>` : ''}
+        <p class="v2w-wl">${opts.cardHref ? `<a href="${esc(opts.cardHref(p))}">The full setup: levels, exit ladder and history →</a>` : ''}
+          ${opts.visionHref ? `<a href="${esc(opts.visionHref(p.symbol))}">Why this company? Read it in Vision ↗</a>` : ''}
+          ${opts.methodHref ? `<a href="${esc(opts.methodHref)}">How the engines are graded</a>` : ''}</p></div>`;
+    const item = (p) => `<div class="v2w-di" role="listitem">${row(p)}
+        <button type="button" class="v2w-why" aria-expanded="false" aria-controls="${esc(wid(p))}" aria-label="Why ${esc(p.symbol)} appeared">Why</button>
+        ${whyPanel(p)}</div>`;
     const row = (p) => `<a class="v2w-dr" data-sym="${esc(p.symbol)}" href="${esc(opts.cardHref ? opts.cardHref(p) : stock(p.symbol))}">
         <b>${esc(p.symbol)}</b><span class="e">${esc(names[p.engine] || p.engine)}</span>
         <span class="n">${px(p.entry_low)} – ${px(p.entry_high)}</span>
@@ -866,7 +898,7 @@ p.v2w-key .v2w-sw.text{box-shadow:none;width:auto;max-width:none;height:auto;bac
         <span class="s">${esc(PSTATE[p.state] || p.state)}${p.fill_price != null ? ' · ' + rR(p.total_r) : ''}</span></a>`;
     const digestHtml = `<div class="v2w-dg" role="list"><div class="v2w-dr v2w-dh" aria-hidden="true"><b>Name</b><span class="e">Engine</span>
         <span class="n">Buy between</span><span class="n">Stop · risk</span><span class="w">Window</span><span class="s">State</span></div>
-        ${live.map(row).join('')}</div>`;
+        ${live.map(item).join('')}</div>`;
     const liveHtml = live.length ? (opts.digest ? digestHtml : `<div class="v2w-pcs">${live.map(card).join('')}</div>`)
       : `<p class="v2w-empty"><b>No paper setup is open or waiting.</b>The engines found nothing that met their rules on the ${esc(day(P.as_of))} close. They are not loosened to fill this space.</p>`;
     const doneHtml = done.length ? `<h4 class="v2w-h">Closed recently</h4><ul class="v2w-rl">${done.map((p) =>
@@ -1136,6 +1168,19 @@ p.v2w-key .v2w-sw.text{box-shadow:none;width:auto;max-width:none;height:auto;bac
    * severity, a band) is keyed where it is drawn, above the marks it explains.
    * A colour is never the only carrier: each swatch has its words. items:
    * [{ c: css colour, label, shape?: box|bar|edge|dot|ring|out|hatch|text, sample? }] */
+  /* One delegated listener for every Why disclosure on the page. */
+  if (typeof document !== 'undefined' && !window.__v2wWhy) {
+    window.__v2wWhy = true;
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest && e.target.closest('.v2w-why');
+      if (!b) return;
+      const panel = document.getElementById(b.getAttribute('aria-controls'));
+      if (!panel) return;
+      const open = b.getAttribute('aria-expanded') !== 'true';
+      b.setAttribute('aria-expanded', String(open));
+      panel.hidden = !open;
+    });
+  }
   function key(items, opts = {}) {
     injectCss();
     const sw = (it) => it.shape === 'text'
