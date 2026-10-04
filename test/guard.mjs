@@ -2794,6 +2794,23 @@ ok("no figure counts up", !/countUp/.test(JS));
        /\[\['mf_rank', '<=', 30\]\], \{ sort: 'mf_rank', dir: 1 \}\]/.test(VJS2) && /presetSort\(p\);/.test(VJS2)
        && /k === 'mf_rank' \? 1 : -1/.test(VJS2));
   }
+  {
+    /* Finish-gate round: contrast and focus measured on the rendered pages. */
+    const GC = readFileSync("public/signal.css", "utf8"), GV = readFileSync("public/vision.css", "utf8"),
+          GW = readFileSync("public/v2widgets.js", "utf8"), GVJ = readFileSync("public/vision.js", "utf8");
+    ok("the brief's --b-* tokens exist outside .brief, so the shared Business section is legible in dark",
+       /:root\{\s*--b-bg:var\(--bg\)[\s\S]{0,200}--b-ink:var\(--text\)/.test(GC));
+    ok("no text is dimmed with opacity on the ticker, the clock or the flat insight chip",
+       !/is-shut \.tkr-n\{opacity/.test(GC) && !/\.wc-i\{[^}]*opacity:\.62/.test(GC) && !/\.scr-ins\.is-flat\{[^}]*opacity/.test(GC));
+    ok("split-bar labels take dark ink on the light dark-mode fills", /\[data-theme="dark"\] \.splitb i\{color:var\(--on-ink\)\}/.test(GC));
+    ok("Vision's fourth ink holds AA in both themes", /--ink-4:#83868D/.test(GV) && /--ink-4:#6E7279/.test(GV));
+    ok("Vision's accent fills carry --on-accent, never a fixed white", /--on-accent:#0F1012/.test(GV) && !/background:var\(--accent\)[^}]*color:#fff/.test(GV));
+    ok("heat tiles: theme-aware alphas and dark ink on the strongest dark fill",
+       /var\(--ha\$\{i\}/.test(GVJ) && /hk\$\{heatK\(v, sc\)\}/.test(GVJ) && /\[data-theme="dark"\]\{--ha3:\.54\}/.test(GV));
+    ok("the screen's search and select show a focus ring, and calendar cells keep their outline",
+       /\.scr-in:focus-visible,\.scr-sel:focus-visible\{box-shadow/.test(GC) && /button\.v2w-c:focus-visible\{[^}]*outline:2px solid/.test(GW));
+    ok("Signal's screen opens the Magic Formula preset in rank order", /if \(k === 'magic'\) \{ scrSort = 'mf'; scrDir = 'desc'; \}/.test(JS));
+  }
   ok("the watchlist exports and imports, merging rather than overwriting",
      /id="wExport"/.test(JS) && /id="wImport"/.test(JS) && /kind: 'signal-watchlist'/.test(JS) && /new Set\(\[\.\.\.watchAll\(\), \.\.\.clean\]\)/.test(JS));
 }

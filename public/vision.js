@@ -766,8 +766,14 @@
     const cut = [0.15, 1, 2, 3, 5].map((c) => c * scale), m = Math.abs(n);
     if (m < cut[0]) return 'rgba(var(--neutral-rgb),.18)';
     let i = 0; while (i < 4 && m >= cut[i + 1]) i++;
-    return `rgba(var(${n > 0 ? '--up-rgb' : '--dn-rgb'}),${HEAT_A[i]})`;
+    return `rgba(var(${n > 0 ? '--up-rgb' : '--dn-rgb'}),var(--ha${i},${HEAT_A[i]}))`;
   };
+  /* Intensity step of a tile, for its INK: the strongest dark-mode fill is
+     bright enough that light text on it fell to 2.5:1 (measured), so it takes
+     dark ink; step 3 is thinned in dark (--ha3) so light ink holds 4.8:1. */
+  const heatK = (p, scale = 1) => { const n = num(p); if (n == null) return -1;
+    const cut = [0.15, 1, 2, 3, 5].map((c) => c * scale), m = Math.abs(n); if (m < cut[0]) return -1;
+    let i = 0; while (i < 4 && m >= cut[i + 1]) i++; return i; };
   const HEAT_SCALE = { r1d: 1, r1w: 2, r1m: 4 };
   const heatLegend = (key) => { const sc = HEAT_SCALE[key] || 1, cuts = [5, 3, 2, 1].map((c) => c * sc);
     return `<span class="hm-leg" aria-label="Colour scale">${cuts.map((c) => `<i style="background:${heatBg(-c - 0.01, sc)}" title="≤ −${c}%"></i>`).join('')}
@@ -847,7 +853,7 @@
            and on the card. Four letters or nothing — "BA…" names no one. */
         if (fit === 'xs' && t.h >= 12) for (let k = r.sym.length - 1; k >= 4; k--) {
           if (textW(r.sym.slice(0, k) + '…', 8) <= t.w - 8) { fit = 'ti'; txt = r.sym.slice(0, k) + '…'; break; } }
-        return `<a class="hm-t f-${fit}" href="#/asset/${esc(r.sym)}" data-sym="${esc(r.sym)}" style="left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px;background:${heatBg(v, sc)}"
+        return `<a class="hm-t f-${fit} hk${heatK(v, sc)}" href="#/asset/${esc(r.sym)}" data-sym="${esc(r.sym)}" style="left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px;background:${heatBg(v, sc)}"
           aria-label="${esc(r.sym)} ${v == null ? 'no move recorded' : signed(v)} — open card"><b>${esc(txt)}</b><span>${v == null ? '—' : signed(v, 1)}</span></a>`; }).join('');
     return { shown: pool.length, asked: opts.n, live: pool.filter((r) => r.live).length };
   }

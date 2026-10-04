@@ -64,8 +64,9 @@
   --ink:#EDEDEB;
   --ink-2:#B4B6BA;
   --ink-3:#8C8F95;
-  --ink-4:#62656B;
+  --ink-4:#83868D;  /* was #62656B: 3.07:1 on a panel, under AA for the text it carries */
   --accent:#8DA2FF;
+  --on-accent:#0F1012;  /* white on this light cobalt was 2.4:1 */
   --accent-bg:rgba(141,162,255,.12);
   --up:#3CC98C;  --up-rgb:60,201,140;
   --dn:#FF7B6F;  --dn-rgb:255,123,111;
@@ -91,8 +92,9 @@
   --ink:#16181D;
   --ink-2:#474B53;
   --ink-3:#676B73;
-  --ink-4:#9A9DA3;
+  --ink-4:#6E7279;  /* was #9A9DA3: 2.72:1 on white — headings, captions and "—" all used it */
   --accent:#2743C8;
+  --on-accent:#FFFFFF;
   --accent-bg:rgba(39,67,200,.07);
   --up:#0B7A55;  --up-rgb:11,122,85;
   --dn:#C4372C;  --dn-rgb:196,55,44;
@@ -115,7 +117,7 @@ input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-1)}
 .num,.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums slashed-zero;letter-spacing:-.01em}
 .vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.skip{position:absolute;left:var(--s-3);top:-60px;z-index:100;background:var(--accent);color:#fff;
+.skip{position:absolute;left:var(--s-3);top:-60px;z-index:100;background:var(--accent);color:var(--on-accent);
   padding:var(--s-2) var(--s-3);border-radius:var(--r-1);font-weight:600}
 .skip:focus{top:var(--s-2)}
 .up{color:var(--up)} .dn{color:var(--dn)} .warn{color:var(--warn)} .mut{color:var(--ink-3)} .dim{color:var(--ink-2)}
@@ -261,8 +263,8 @@ main{max-width:var(--maxw);margin:0 auto;padding:var(--s-5) var(--s-4) calc(var(
   white-space:nowrap;transition:border-color var(--d-fast),background var(--d-fast),color var(--d-fast),transform var(--d-fast)}
 .btn:hover{border-color:var(--ink-4);color:var(--ink)}
 .btn:active{transform:scale(.97)}
-.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
-.btn.pri:hover{filter:brightness(1.08);color:#fff}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.pri:hover{filter:brightness(1.08);color:var(--on-accent)}
 .btn.sm{height:26px;padding:0 var(--s-2);font-size:var(--t-xs)}
 .btn[aria-pressed="true"]{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
 .btn svg{width:14px;height:14px}
@@ -349,7 +351,7 @@ select.inp{padding-right:var(--s-5)}
   justify-content:flex-start;color:var(--ink);cursor:pointer;transition:filter var(--d-fast)}
 .hm-t:hover,.hm-t:focus-visible{filter:brightness(1.25);z-index:3;outline:1px solid var(--ink-2);outline-offset:-1px}
 .hm-t b{font-size:var(--t-sm);font-weight:700;line-height:1.15;white-space:nowrap}
-.hm-t span{font:500 var(--t-xs)/1.2 var(--f-mono);opacity:.92}
+.hm-t span{font:500 var(--t-xs)/1.2 var(--f-mono)}
 /* A label is drawn at a size that fits or not at all — never clipped. */
 .hm-t.f-md span{display:none}
 .hm-t.f-sm b{font-size:var(--t-2xs)} .hm-t.f-sm span{display:none}
@@ -357,6 +359,14 @@ select.inp{padding-right:var(--s-5)}
 .hm-t.f-ti{padding:2px 3px} .hm-t.f-ti b{font-size:8px;line-height:1.1} .hm-t.f-ti span{display:none}
 .hm-t.f-xs b,.hm-t.f-xs span{display:none}
 .hm-t{text-shadow:0 1px 1px rgba(0,0,0,.35)}
+/* Ink on the heat tiles, measured per step against the page ground. Dark
+   mode: step 4 takes dark ink (6.1:1 green, 5.2:1 red; light ink was 2.7 and
+   3.1), and step 3's fill is thinned from .62 to .54 so light ink holds 4.8:1
+   (it was 4.0). heatK() in vision.js sets the step class. */
+:root{--ha0:.16;--ha1:.3;--ha2:.46;--ha3:.62;--ha4:.72}  /* .8 put dark ink at 4.1:1 on red */
+:root[data-theme="dark"]{--ha4:.8}
+:root[data-theme="dark"]{--ha3:.54}
+:root[data-theme="dark"] .hm-t.hk4{color:#0F1012;text-shadow:none}
 :root[data-theme="light"] .hm-t{text-shadow:none}
 .hm-g{position:absolute;pointer-events:none;border:1px solid var(--bg);z-index:2}
 .hm-g em{position:absolute;left:4px;right:4px;top:2px;font-style:normal;font-size:var(--t-2xs);font-weight:700;letter-spacing:.08em;
