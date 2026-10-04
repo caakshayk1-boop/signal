@@ -279,7 +279,7 @@
       const [hi, lo] = [m[0], m[m.length - 1]];
       if (hi[1] - lo[1] < gap) continue;
       const f = (v) => unit === '×' ? v.toFixed(2) + '×' : unit === '%' ? f1(v) + '%' : f1(v);
-      out.push({ k, t: `${hi[0]} has the highest ${word} (${f(hi[1])}); ${lo[0]} the lowest (${f(lo[1])})` });
+      out.push({ k, hi: hi[0], lo: lo[0], t: `${hi[0]} has the highest ${word} (${f(hi[1])}); ${lo[0]} the lowest (${f(lo[1])})` });
     }
     return out;
   }

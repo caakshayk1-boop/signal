@@ -1326,9 +1326,20 @@
         $('#cmpBody').innerHTML = empty('Pick companies to compare', `Add up to five above, or start with <a href="#/compare?s=${[base].concat(peersOf(base)).join(',')}">${esc(base)} and its closest peers</a>.`); $('#cmpFoot').innerHTML = ''; return; }
       const rs = await Promise.all(syms.map((x) => F.co(x))); if (!alive()) return;
       const ds = rs.map((r, i) => r.ok ? r.data : { r: Object.assign({ sym: syms[i] }, SCR[syms[i]] || {}), x: null });
-      $('#cmpBody').innerHTML = `<div class="tw cmp-w"><table class="tbl cmp"><thead><tr><th scope="col">Measure</th>${ds.map((d) => `<th scope="col"><a class="sym" href="#/asset/${esc(d.r.sym)}">${esc(d.r.sym)}</a><small>${esc(d.r.name || '')}</small></th>`).join('')}</tr></thead>
-        <tbody>${CMP_ROWS.map(([k, g, f, dk, lna]) => `<tr><th scope="row">${esc(k)} ${dk ? defn(dk) : ''}</th>${ds.map((d) => `<td class="num">${lna && isLender(d.r) && !(k === 'Debt / equity' && num(g(d)) < 0) ? LENDER_NA : f(num(g(d)) != null ? num(g(d)) : g(d))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      /* MATERIAL DIFFERENCES, MARKED WHERE THEY SIT. The same pairs the Key
+         differences list names (insight.js thresholds), shown on the table:
+         ▲ the highest of the set, ▼ the lowest. A glyph and a word, never
+         colour alone, and no judgement — a high PE is not "better". */
       const dif = INS() ? INS().differences(ds.map((d) => d.r)) : [];
+      const ROWK = { rev_cagr: 'Revenue, multi-year', roce: 'ROCE', ebit_margin: 'EBIT margin', de: 'Debt / equity', pe: 'PE', r3m: '3 months', cfo_pat: 'Cash conversion' };
+      const mark = {}; for (const x of dif) if (ROWK[x.k] && x.hi) mark[ROWK[x.k]] = x;
+      const cell = (k, d, body) => { const m = mark[k], sym = d.r.sym;
+        return m && sym === m.hi ? `<td class="num cmp-x">${body}<i class="cmp-g" title="Highest of this set">▲<span class="vh"> highest of this set</span></i></td>`
+          : m && sym === m.lo ? `<td class="num cmp-x">${body}<i class="cmp-g" title="Lowest of this set">▼<span class="vh"> lowest of this set</span></i></td>`
+          : `<td class="num">${body}</td>`; };
+      $('#cmpBody').innerHTML = `<div class="tw cmp-w"><table class="tbl cmp"><thead><tr><th scope="col">Measure</th>${ds.map((d) => `<th scope="col"><a class="sym" href="#/asset/${esc(d.r.sym)}">${esc(d.r.sym)}</a><small>${esc(d.r.name || '')}</small></th>`).join('')}</tr></thead>
+        <tbody>${CMP_ROWS.map(([k, g, f, dk, lna]) => `<tr${mark[k] ? ' class="cmp-diff"' : ''}><th scope="row">${esc(k)} ${dk ? defn(dk) : ''}</th>${ds.map((d) => cell(k, d, lna && isLender(d.r) && !(k === 'Debt / equity' && num(g(d)) < 0) ? LENDER_NA : f(num(g(d)) != null ? num(g(d)) : g(d)))).join('')}</tr>`).join('')}</tbody></table></div>
+        ${Object.keys(mark).length ? `<p class="note cmp-key" role="note"><b class="cmp-g">▲</b> highest and <b class="cmp-g">▼</b> lowest of this set, marked only where the gap is large enough to list under Key differences. Neither is better or worse.</p>` : ''}`;
       $('#cmpFoot').innerHTML = (dif.length ? `<b>Key differences</b><ul class="plain">${dif.map((x) => `<li>${esc(x.t)}</li>`).join('')}</ul>` : '<b>Key differences</b> — none large enough to state.')
         + `<p class="note src">Company filings via the stock screen; shareholding from exchange filings; prices at the screen's last close. Descriptive — no row is scored better or worse.</p>`;
     };
