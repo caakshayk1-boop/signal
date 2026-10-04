@@ -11577,13 +11577,74 @@
     return { rank, why: reasons };
   }
 
+  /* One line of tags under the name: setup, results date, nearest alert,
+   * move since the last visit. A tag that has nothing to say is left out
+   * rather than printed as a dash — the row already has nine columns of those. */
+  function watchTags(sym, r, live, al, WF) {
+    const t = [];
+    const st = WF.setup[sym];
+    if (st) t.push(`<i class="wt wt-s">${esc(st.kind)} · ${esc((V2_STATE[st.p.state] || [st.p.state])[0])}</i>`);
+    const d = earnDays(r);
+    if (d != null && d >= 0 && d <= 60)
+      t.push(`<i class="wt${d <= RESULTS_SOON ? ' wt-w' : ''}">Results ${d === 0 ? 'today' : `in ${d}d`}</i>`);
+    const px = live && Number.isFinite(live.price) ? live.price : Number(r.price);
+    const mine = al.filter(a => a.sym === sym && Number(a.px) > 0);
+    if (mine.length) {
+      const away = (a) => Number.isFinite(px) && px > 0 ? (Number(a.px) - px) / px * 100 : null;
+      const near = mine.slice().sort((a, b) => Math.abs(away(a) ?? Infinity) - Math.abs(away(b) ?? Infinity))[0];
+      const w = away(near);
+      t.push(`<i class="wt wt-a">Alert ${near.op === 'above' ? '≥' : '≤'} ₹${esc(near.px)}${
+        w == null ? '' : ` · ${Math.abs(w).toFixed(1)}% away`}${mine.length > 1 ? ` · +${mine.length - 1}` : ''}</i>`);
+    }
+    const m = WF.since(sym);
+    if (m != null && Math.abs(m) >= SINCE_MOVE)
+      t.push(`<i class="wt ${m > 0 ? 'up' : 'dn'}">${m > 0 ? '+' : ''}${m.toFixed(1)}% since last visit</i>`);
+    return t.length ? `<span class="wtags">${t.join('')}</span>` : '';
+  }
+
   const TRIAGE = [
     ['ACTION', 'Something a level you were watching has actually reached.'],
     ['DEVELOPING', 'Close to a level, but not there. Worth a look, not a decision.'],
     ['WAIT', 'Nothing measured has changed. Left here so the list stays complete.'],
   ];
 
-  let watchQ = '', watchSort = 'sym', watchSec = '', WVIEW = null;
+  let watchQ = '', watchSort = 'sym', watchSec = '', watchQuick = '', WVIEW = null;
+  /* ── WHAT EACH STARRED NAME IS DOING ELSEWHERE ON THIS SITE ─────────────
+   * The table answered "where is the price"; a watchlist is also asked
+   * "is there a setup on it, is a results date coming, did I set a level,
+   * and has it moved since I last looked". Each answer is read off a feed
+   * this page already loads — the plan feed, the screen row, this browser's
+   * alerts and its last-visit snapshot — and none is computed here. */
+  const RESULTS_SOON = 10;      // the same window the stock card warns inside
+  const SINCE_MOVE = 3;         // the same move "Since your last visit" reports
+  const earnDays = (r) => {
+    if (!r || !r.next_earnings) return null;
+    const n = Math.round((new Date(String(r.next_earnings).slice(0, 10) + 'T00:00:00') - new Date()) / 86400000);
+    return Number.isFinite(n) ? n : null;
+  };
+  const watchFacts = (rowOf, al) => {
+    const setup = {};
+    for (const pl of ((V2 && V2.paper && V2.paper.plans) || []))
+      if (PAPER_LIVE_STATES.has(pl.state)) setup[pl.symbol] = { p: pl, kind: 'Paper setup' };
+    for (const pl of ((V2 && V2.plans) || []))
+      if (pl.state === 'awaiting_entry' || V2_OPEN.has(pl.state)) setup[pl.symbol] = { p: pl, kind: 'Plan' };
+    const base = visitBase && visitBase.px ? visitBase : null;
+    const since = (sym) => {
+      const raw = rowOf(sym).price;           // Number(null) is 0: a −100% move
+      if (raw == null || raw === '' || !base) return null;
+      const b = Number(base.px[sym]), now = Number(raw);
+      return b > 0 && now > 0 ? (now / b - 1) * 100 : null;
+    };
+    const hit = {
+      setup: (sym) => !!setup[sym],
+      results: (sym) => { const d = earnDays(rowOf(sym)); return d != null && d >= 0 && d <= RESULTS_SOON; },
+      alert: (sym) => al.some(a => a.sym === sym),
+      changed: (sym) => { const m = since(sym); return m != null && Math.abs(m) >= SINCE_MOVE; },
+    };
+    return { setup, since, hit, base };
+  };
+  const WQUICK = [['', 'All'], ['setup', 'Has a setup'], ['results', 'Results soon'],
+                  ['alert', 'Price alert'], ['changed', 'Changed since last visit']];
   R['/watch'] = async () => {
     lsSet(FSEEN, Date.now()); paintBell();
     const syms = watchAll();
@@ -11592,7 +11653,7 @@
 
     // The screen supplies every fundamental and level; live prices come from
     // the same quote route the rest of the site uses.
-    const idx = await screenIndex();
+    const [idx] = await Promise.all([screenIndex(), V2 ? null : v2Load().catch(() => null)]);
     const q = syms.length ? await quotes(syms) : {};
     let out = head('Watchlist', 'Names you starred and price levels you asked to be told about.',
       'Yours, on this device');
@@ -11615,6 +11676,10 @@
      * controls, and the only one with no way to search or order it. At ten
      * names that is fine; at eighty it is a wall. Search, sector and sort,
      * with the same grammar as the Screen so nothing new has to be learned. */
+    const al = alertsAll();
+    const rowOf = x => (idx && idx[x]) || { sym: x };
+    const WF = watchFacts(rowOf, al);
+    const qCount = Object.fromEntries(WQUICK.map(([k]) => [k, k ? syms.filter(WF.hit[k]).length : syms.length]));
     const WSORT = { sym: 'Symbol', r1d: 'Today', r1m: '1 month', rsi: 'RSI',
                     from_high: 'From 52w high', mcap_cr: 'Size' };
     const wSectors = [...new Set(syms.map(x => (idx && idx[x] || {}).sector).filter(Boolean))].sort();
@@ -11626,16 +11691,24 @@
             `<option value="${k}"${watchSort === k ? ' selected' : ''}>Order by ${esc(l)}</option>`).join('')}
         </select>
       </div>
-      ${wSectors.length > 1 ? `<div class="chips" role="group" aria-label="Sector">
+      ${wSectors.length > 1 ? `<div class="chips" role="group" aria-label="Sector"><span class="chips-l" aria-hidden="true">Sector</span>
         <button type="button" class="chip" data-wsec="" aria-pressed="${!watchSec}">All ${syms.length}</button>
         ${wSectors.map(sv => `<button type="button" class="chip" data-wsec="${esc(sv)}"
            aria-pressed="${watchSec === sv}">${esc(sv)}</button>`).join('')}
-      </div>` : ''}`, syms.length ? `${syms.length} starred` : '');
+      </div>` : ''}
+      ${syms.length ? `<div class="chips wq-chips" role="group" aria-label="Show"><span class="chips-l" aria-hidden="true">Show</span>
+        ${WQUICK.map(([k, l]) => `<button type="button" class="chip${k && !qCount[k] ? ' is-zero' : ''}" data-wquick="${k}"
+           aria-pressed="${watchQuick === k}">${esc(l)} <b>${qCount[k]}</b></button>`).join('')}
+      </div>
+      <p class="hint wq-def"><b>Has a setup</b>: a live paper setup or plan in tonight's feed.
+        <b>Results soon</b>: a results date in the next ${RESULTS_SOON} days.
+        <b>Changed</b>: price ${SINCE_MOVE}% or more away from what this browser recorded at your last visit${
+          WF.base ? ` (${esc(agoWord(WF.base.at))})` : ' — none recorded yet, so this stays empty until your next one'}.</p>` : ''}`,
+      syms.length ? `${syms.length} starred` : '');
 
-    /* Read once, above the first use: triage consults the alerts (a triggered
-     * one always outranks anything this site computes) and so does the alert
-     * table further down. */
-    const al = alertsAll();
+    /* The alerts are read once, above the filters: triage consults them (a
+     * triggered one always outranks anything this site computes), and so do
+     * the "Price alert" filter and the alert table further down. */
 
     /* The three counts, before the table. This is the answer to "is there
      * anything for me today", which is the only question a watchlist is
@@ -11659,10 +11732,10 @@
          * list the reader is looking at — numbering the unfiltered list and
          * then hiding rows leaves gaps that read as missing data. */
         const wq = watchQ.trim().toLowerCase();
-        const rowOf = x => (idx && idx[x]) || { sym: x };
         let view = syms.filter(x => {
           const r = rowOf(x);
           if (watchSec && r.sector !== watchSec) return false;
+          if (watchQuick && !WF.hit[watchQuick](x)) return false;
           if (!wq) return true;
           return `${x} ${r.name || ''} ${r.sector || ''} ${r.ind || ''}`.toLowerCase().includes(wq);
         });
@@ -11701,7 +11774,7 @@
               const [word] = TRIAGE[tg.rank];
               return `<span class="wtri wtri-${tg.rank}">
                 <i>${esc(word)}</i>${tg.why.length ? `<em>${esc(tg.why[0])}</em>` : ''}</span>`;
-            })()}</span>
+            })()}${watchTags(sym, r, live, al, WF)}</span>
           <span class="x">${px != null ? '₹' + esc(px) : '—'}</span>
           <span class="x ${live && dir(live.change_pct)}">${live && Number.isFinite(live.change_pct) ? pct(live.change_pct) : '—'}</span>
           <span class="x ${dir(v50)}">${v50 == null ? '—' : pct(v50)}</span>
@@ -11789,6 +11862,8 @@
     if (wso) wso.addEventListener('change', () => { watchSort = wso.value; R['/watch'](); });
     main.querySelectorAll('[data-wsec]').forEach(b =>
       b.addEventListener('click', () => { watchSec = b.dataset.wsec; R['/watch'](); }));
+    main.querySelectorAll('[data-wquick]').forEach(b =>
+      b.addEventListener('click', () => { watchQuick = b.dataset.wquick; R['/watch'](); }));
     /* EXPORT / IMPORT. The only way to move a local-only list between
        devices. The file is the same three keys this page reads; an import is
        validated and MERGED (union of symbols, alerts appended), never a
