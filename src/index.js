@@ -35,6 +35,7 @@ import subscribe from "./api/subscribe.js";
 import telegramWebhook from "./bot/webhook.js";
 import clientError from "./api/clienterror.js";
 import heat from "./api/heat.js";
+import snapshot from "./api/snapshot.js";
 import { signalPage, visionHome, visionCompany } from "./seo.js";
 
 const ROUTES = {
@@ -85,6 +86,8 @@ function health(env, request) {
     serves: (((request && request.headers.get("host")) || (u && u.hostname) || "")
              .toLowerCase().startsWith("gems.")) ? "gems" : "signal",
     turso_configured: Boolean(env.TURSO_URL && env.TURSO_TOKEN),
+    // Whether /api/snapshot can sign. Says which key exists, never its value.
+    snapshots: env.SNAPSHOT_KEY ? "SNAPSHOT_KEY" : env.EDIT_KEY ? "derived from EDIT_KEY" : "not configured",
     // The Data Sources page reads this rather than hardcoding a provider name,
     // so the page cannot claim a feed the Worker is not actually using.
     provider: providerInfo(),
@@ -338,6 +341,9 @@ export default {
     // Native, not in ROUTES: it needs env.ASSETS and the edge cache, and it
     // talks only to Yahoo, so the no-Turso dev proxy has nothing to add.
     if (url.pathname === "/api/heat") return heat(request, env, ctx);
+    // Native too: it reads env.ASSETS and signs with a Worker secret, and a
+    // signing request must never be forwarded by the dev proxy below.
+    if (url.pathname === "/api/snapshot") return snapshot(request, env);
 
     const handler = ROUTES[url.pathname];
     if (handler) {
@@ -462,7 +468,7 @@ export default {
       "/discover", "/funds",
       "/gems", "/heat", "/ipo", "/join", "/map", "/markets",
       "/methodology", "/news", "/privacy", "/radar", "/reads", "/screen",
-      "/sources", "/terms", "/watch",
+      "/sources", "/terms", "/watch", "/alerts",
       /* The cockpit's shell, reachable on signal.askakshay.com/vision for a
          check before the vision host resolves — and for the post-deploy suite,
          which runs against SIGNAL_URL. */

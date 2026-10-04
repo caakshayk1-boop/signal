@@ -6741,3 +6741,22 @@ main{min-height:calc(100vh - var(--barh))}
 .wempty{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left}
 .wempty b{font:600 var(--t-5,17px)/1.3 var(--ui);color:var(--text)}
 .wempty span{max-width:60ch}
+
+/* ── THE ALERT CENTRE ── a dated log: time | what changed and why | the action. */
+.evl{list-style:none;margin:8px 0 0;padding:0}
+.evd{font:600 var(--t-1,11px)/1 var(--mono);letter-spacing:var(--ls-wide,.06em);text-transform:uppercase;color:var(--dim);
+  padding:16px 0 6px;border-bottom:1px solid var(--line)}
+.ev{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:4px 16px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--line)}
+.ev-t{font:500 var(--t-2,12px)/1.3 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.ev-new{display:inline-block;margin-left:6px;font:600 var(--t-1,11px)/1 var(--mono);font-style:normal;text-transform:uppercase;
+  padding:2px 5px;border-radius:var(--r-1,3px);background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
+.ev-b{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ev-k{font:600 var(--t-1,11px)/1.2 var(--mono);text-transform:uppercase;letter-spacing:var(--ls-wide,.06em);color:var(--muted)}
+.ev-k::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:var(--line2,var(--line));vertical-align:1px}
+.ev-up::before{background:var(--up)}.ev-warn::before{background:var(--warn)}.ev-dn::before{background:var(--down)}.ev-acc::before{background:var(--accent)}
+.ev-b b{font:500 var(--t-4,15px)/1.4 var(--ui);color:var(--text)}
+.ev-b b a{color:inherit;font-weight:650}
+.ev-b small{font:400 var(--t-2,13px)/1.45 var(--ui);color:var(--muted)}
+.ev-a a{font:500 var(--t-3,14px)/1 var(--ui);color:var(--accent);white-space:nowrap;display:inline-flex;align-items:center;min-height:36px}
+.ev.is-new{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 5%,transparent),transparent 60%)}
+@media(max-width:600px){.ev{grid-template-columns:1fr}.ev-a a{min-height:44px}}

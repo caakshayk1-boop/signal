@@ -2736,6 +2736,42 @@ ok("no figure counts up", !/countUp/.test(JS));
   ok("Vision's home tiles name where they go", /class="gl-go" aria-hidden="true"/.test(VJS2) && /Open the \$\{dest\} page/.test(VJS2));
   ok("the paper digest's Why button is a real disclosure",
      /class="v2w-why" aria-expanded="false" aria-controls=/.test(W2) && /window\.__v2wWhy/.test(W2));
+  /* ROUND 4: alert centre, small upgrades, notes, signed snapshots. */
+  ok("/alerts is a real page: Worker PAGES, route meta, the bell's target",
+     /"\/watch", "\/alerts"/.test(readFileSync("src/index.js", "utf8")) && /R\['\/alerts'\] = async/.test(JS)
+     && /id="bellBtn" href="\/alerts"/.test(HTML) && /"\/alerts": \[/.test(readFileSync("src/route-meta.js", "utf8")));
+  ok("the alert centre's first run is a baseline, never a flood", /if \(!prev \|\| !prev\.s\) return \{ baseline: at \}/.test(JS));
+  ok("an unmeasured entry check keeps the last measured state", /KNOWN\.has\(k\) \? k : \(was != null \? was : 'na'\)/.test(JS)
+     && /was !== 'in' && was !== 'na'/.test(JS));
+  ok("price alerts land in the same log the bell counts", /logEvents\(hits\.map/.test(JS) && /const n = evAll\(\)\.filter/.test(JS));
+  ok("a first visit tags no setup New", /setupBase && Array\.isArray\(setupBase\.ids\)/.test(JS));
+  ok("privacy names every new browser key",
+     ["sig:events", "sig:evsnap", "sig:setupsSeen", "sig:visit"].every((k) => PRIV.includes(k)));
+  ok("Vision notes stay out of snapshots, and the page says so",
+     /data-note=/.test(VJS2) && /It never contains your notes/.test(VJS2) && !/vis:notes/.test(readFileSync("src/api/snapshot.js", "utf8")));
+  ok("a snapshot is opened only when its signature holds",
+     /if \(!r\.ok \|\| !r\.data \|\| !r\.data\.verified \|\| !r\.data\.snap\)/.test(VJS2) && /Nothing from this link is shown/.test(VJS2));
+  {
+    const { default: snap } = await import(new URL("../src/api/snapshot.js", import.meta.url));
+    const ASSETS = { fetch: async (req) => { const f = "public/c/" + new URL(req.url).pathname.split("/").pop();
+      try { return new Response(readFileSync(f), { headers: { "content-type": "application/json" } }); }
+      catch { return new Response("", { status: 404, headers: { "content-type": "text/html" } }); } } };
+    const call = async (env, q) => { const r = await snap(new Request("https://vision.askakshay.com/api/snapshot?" + q), { ASSETS, ...env });
+      return [r.status, await r.json()]; };
+    const E = { EDIT_KEY: "guard-only" };
+    const anyCo = (() => { try { return readdirSync("public/c").find((f) => f.endsWith(".json")); } catch { return null; } })();
+    ok("snapshots are refused, never unsigned, when no key is set", (await call({}, "sym=X"))[0] === 503);
+    if (anyCo) {
+      const [st, m] = await call(E, "sym=" + anyCo.replace(/\.json$/, ""));
+      ok("a snapshot is made from the company file and signed", st === 200 && /^[A-Za-z0-9_-]+\.[0-9a-f]{40}$/.test(m.token || ""), st);
+      const [, v] = await call(E, "t=" + m.token);
+      ok("...it verifies, and carries the date of every figure", v.verified === true && v.snap && v.snap.asof && "close" in v.snap.asof && v.snap.taken);
+      const [b, sg] = m.token.split(".");
+      const bad = b.slice(0, 10) + (b[10] === "A" ? "B" : "A") + b.slice(11) + "." + sg;
+      ok("...one changed character fails the check", (await call(E, "t=" + bad))[1].verified === false);
+      ok("...and a different key fails it", (await call({ EDIT_KEY: "other" }, "t=" + m.token))[1].verified === false);
+    } else ok("snapshot round-trip (skipped: public/c is written at deploy)", true);
+  }
   ok("the watchlist exports and imports, merging rather than overwriting",
      /id="wExport"/.test(JS) && /id="wImport"/.test(JS) && /kind: 'signal-watchlist'/.test(JS) && /new Set\(\[\.\.\.watchAll\(\), \.\.\.clean\]\)/.test(JS));
 }

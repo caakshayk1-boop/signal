@@ -953,3 +953,17 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 .qs li::before{content:counter(q);grid-row:span 2;font-family:var(--mono,ui-monospace,monospace);font-size:var(--t-xs);color:var(--ink-3);padding-top:2px}
 .qs b{font-weight:600;line-height:1.45;color:var(--ink)}
 .qs small{margin-top:2px;font-size:var(--t-xs);color:var(--ink-3);line-height:1.45}
+
+/* Search results: a watching marker, and one footer line for the screen's age. */
+.hl-w{font-style:normal;color:var(--accent,#2743c8);margin-left:5px;font-size:.85em}
+#hL .hl-f{display:block;padding:8px var(--s-4,16px);font-size:var(--t-xs);color:var(--ink-3);border-top:1px solid var(--line);cursor:default;background:none}
+
+/* Your notes: a plain field, saved as you type, its state said under it. */
+.note-t{width:100%;min-height:96px;resize:vertical;padding:var(--s-3);border:1px solid var(--line-2,var(--line));border-radius:var(--r-2);
+  background:var(--panel);color:var(--ink);font:inherit;line-height:1.5}
+.note-t:focus{outline:2px solid var(--accent,#2743c8);outline-offset:1px}
+.note-s{margin:6px 0 0}
+/* Snapshots. */
+.snap-u{width:100%;font-family:var(--mono,ui-monospace,monospace);font-size:var(--t-xs)}
+.snap-b{margin:0 0 var(--s-4);padding:var(--s-3) var(--s-4);border:1px solid var(--line);border-left:3px solid var(--accent,#2743c8);
+  border-radius:var(--r-2);background:var(--panel);font-size:var(--t-sm,14px);color:var(--ink-2,var(--ink-3))}

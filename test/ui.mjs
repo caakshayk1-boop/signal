@@ -1049,6 +1049,10 @@ try {
   await p.waitForTimeout(1200);
   ok("the alert can be deleted",
      (await p.evaluate(() => JSON.parse(localStorage.getItem("sig:alerts") || "[]"))).length === 0);
+  // The alert centre: the level that fired above is in the log the bell opens.
+  await p.goto(SITE + "/alerts", { waitUntil: "domcontentloaded" });
+  await settled(p, SETTLE + 2000);
+  ok("a fired price alert is in the alert log", /Price alert reached/i.test(await p.locator("main").innerText().catch(() => "")));
 
   await ctx.close();
 
@@ -1189,7 +1193,7 @@ try {
    * rendered failure panel. The second is the one that would have caught it. */
   console.log("\n  every route — thrown errors and rendered failures");
   const ROUTES = ["/", "/markets", "/opportunities", "/performance", "/screen",
-                  "/news", "/ipo", "/funds", "/watch", "/radar", "/reads", "/join",
+                  "/news", "/ipo", "/funds", "/watch", "/alerts", "/radar", "/reads", "/join",
                   "/methodology", "/sources", "/terms", "/privacy"];
   const swCtx = await newCtx({ viewport: { width: 1440, height: 900 } });
   const sw = await swCtx.newPage();
