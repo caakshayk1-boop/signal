@@ -150,6 +150,61 @@
     return o;
   }
 
+  /* THE ONE-MINUTE READ — five reads and the next event, each one a WORD
+     (the interpretation), the FACT it rests on, and the RULE that turned the
+     one into the other. Same thresholds as everything above (T), so the page
+     can print them. Missing is silent: a company without a field loses that
+     line, it never gets a neutral word for data that is not there. */
+  function oneMinute(r, x, c) {
+    c = c || {}; const out = { reads: [], event: null };
+    const add = (k, word, fact, rule, tone) => out.reads.push({ k, word, fact, rule, tone: tone || '' });
+    const fin = isFinancial(r);
+    // Business quality: returns against the company's own multi-year norm.
+    const q = fin ? [num(r.roe), num(r.roe_med), 'ROE'] : [num(r.roce), num(r.roce_med), 'ROCE'];
+    if (q[0] != null && q[1] != null) {
+      const d = q[0] - q[1];
+      add('Business quality', d >= T.rocePP ? 'above its own norm' : d <= -T.rocePP ? 'below its own norm' : 'in line with its norm',
+        `${q[2]} ${f1(q[0])}% against a ${f1(q[1])}% multi-year median`, `±${T.rocePP} pp of its median is in line`,
+        d >= T.rocePP ? 'up' : d <= -T.rocePP ? 'dn' : '');
+    }
+    // Growth: last year against the multi-year rate.
+    const ry = num(r.rev_yoy), rc = num(r.rev_cagr);
+    if (ry != null && rc != null) {
+      const d = ry - rc;
+      add('Growth', d >= T.growthPP ? 'accelerating' : d <= -T.growthPP ? 'slowing' : 'steady',
+        `Revenue ${pct(ry)} last year against ${pct(rc)} a year over ${r.fy_count || 'several'} years`, `±${T.growthPP} pp of the multi-year rate is steady`,
+        d >= T.growthPP ? 'up' : d <= -T.growthPP ? 'dn' : '');
+    }
+    // Price structure: where the close sits against its 50- and 200-day averages.
+    const px = num(r.price), s50 = num(r.sma50), s200 = num(r.sma200);
+    if (px != null && s50 != null && s200 != null) {
+      const a50 = px > s50, a200 = px > s200;
+      add('Price structure', a50 && a200 ? 'above both averages' : !a50 && !a200 ? 'below both averages' : `above the ${a50 ? '50' : '200'}-day, below the ${a50 ? '200' : '50'}-day`,
+        `₹${px.toFixed(2)} against ₹${s50.toFixed(2)} (50-day) and ₹${s200.toFixed(2)} (200-day)`, 'close against its 50- and 200-day averages',
+        a50 && a200 ? 'up' : !a50 && !a200 ? 'dn' : '');
+    }
+    // Valuation: PE against its own history, never against other companies.
+    const pe = num(r.pe), pc = num(r.pe_pctile);
+    if (pe != null && pc != null) {
+      add('Valuation', pc >= T.peHi ? 'high in its own range' : pc <= T.peLo ? 'low in its own range' : 'mid-range for itself',
+        `PE ${f1(pe)}, the ${Math.round(pc)}th percentile of its own history`, `${T.peLo}th and ${T.peHi}th percentiles mark low and high`);
+    }
+    // Ownership: the latest quarter's institutional change.
+    if (x && x.quality === 'complete' && num(x.insti_pp) != null) {
+      const th = num(c.threshold_pp) || 0.5, ip = num(x.insti_pp);
+      add('Ownership', ip >= th ? 'institutions added' : ip <= -th ? 'institutions reduced' : 'little changed',
+        `FII ${pp(num(x.fii_pp))}, DII ${pp(num(x.dii_pp))} in ${x.period}`, `a move under ${th} pp is no change`,
+        ip >= th ? 'up' : ip <= -th ? 'dn' : '');
+    }
+    // The next dated thing, kept apart from the reads: an event is not a judgement.
+    const ne = r.next_earnings, today = c.today ? Date.parse(c.today) : null;
+    if (ne && today != null) {
+      const days = Math.round((Date.parse(String(ne).slice(0, 10)) - today) / 86400000);
+      if (days >= 0) out.event = { t: `Results due ${String(ne).slice(0, 10)}`, s: `in ${days} day${days === 1 ? '' : 's'}`, src: SRC.cal() };
+    }
+    return out;
+  }
+
   /* KEY DIFFERENCES across a comparison set — the extremes on each measured
      row, stated with both numbers. Only rows where at least two names are
      measured, and only a gap large enough to be a difference. */
@@ -187,5 +242,5 @@
     'Volume spike': 'Today\'s volume ÷ its recent average. 2× means twice the usual shares changed hands.',
   };
 
-  root.VisionInsight = { T, matters, changes, differences, GLOSSARY, SRC, isFinancial };
+  root.VisionInsight = { T, matters, changes, differences, oneMinute, GLOSSARY, SRC, isFinancial };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

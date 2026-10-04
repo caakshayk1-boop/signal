@@ -906,3 +906,17 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 .bplan dd b{font-size:var(--t-xl);font-variant-numeric:tabular-nums}
 .bplan dd span{font-size:var(--t-xs);color:var(--ink-3)}
 @media (max-width:599px){.bplan>div{grid-template-columns:96px minmax(0,1fr)}}
+
+/* One-minute read: read · fact · rule per line, the next event apart. A list,
+   not a grid, so it reads top to bottom in one pass on any width. */
+.one{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.one li{display:grid;grid-template-columns:150px minmax(150px,220px) minmax(0,1fr);gap:4px 16px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line)}
+.one li:first-child{border-top:0}
+.one-l{font-size:var(--t-xs);color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
+.one-w{font-weight:600;color:var(--ink)} .one-w.up{color:var(--up)} .one-w.dn{color:var(--dn)}
+.one-f{font:400 var(--t-sm,13px)/1.45 var(--f-mono);color:var(--ink-2);font-variant-numeric:tabular-nums}
+.one-r{grid-column:3;font-size:var(--t-xs);color:var(--ink-3)}
+.one-ev{background:color-mix(in srgb,var(--accent,#2743c8) 5%,transparent)}
+@media (max-width:760px){.one li{grid-template-columns:minmax(0,1fr)}.one-r{grid-column:auto}}
+.one-sig{margin:var(--s-3) 0 0;padding-top:var(--s-3);border-top:1px solid var(--line);font-size:var(--t-sm,12px);color:var(--ink-2)}
+.one-sig b{color:var(--ink);font-weight:600;margin-right:4px} .one-sig a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}

@@ -11129,7 +11129,7 @@
       <p><b>The forward record begins 1 October 2026.</b> Every plan from that date is counted. Backtests are
         never imported into it.</p>
 
-      <h3>Strategy status</h3>
+      <h3 id="status">Strategy status</h3>
       <p>A rule's status is published beside it on Opportunities and Performance. <i>Research</i> means it has not
         shown a reliable edge and publishes nothing. <i>Paper test</i> (registry status <i>shadow</i>) means it is tracked forward on paper and shown in its own labelled
         section, but files no plan and never enters the record.
@@ -11944,7 +11944,7 @@
 
   /* What a reader needs before they open anything: is this session's scan in,
      is the market open, how much of the universe was read, when is the next. */
-  function v2StatusStrip(d) {
+  function v2StatusStrip(d, reg) {
     const nse = exchangeState('Asia/Kolkata', 9.25, 15.5, 'NSE');
     const cov = d.coverage || {};
     const covTxt = (cov.with_session_bar != null && cov.universe)
@@ -11961,7 +11961,7 @@
     const live = nse.open ? `NSE open · ${esc(nse.label)}` : nse.holiday ? `NSE closed · ${nse.label}` : `NSE closed · ${esc(nse.label)}`;
     return `<div class="v2-strip" role="status">
       <div${bad ? ' class="v2-late"' : ''}><span class="k">Latest session</span><b>${v2Date(d.session_date)}</b><span class="s">${esc(bad || 'scanned after the close')}</span></div>
-      <div><span class="k">Market</span><b>${live}</b><span class="s">Prices on this site are delayed, not live ticks</span></div>
+      <div><span class="k">Market</span><b>${live}</b><span class="s">${reg && reg.regime ? `Regime: <a href="/markets">${esc(String(reg.regime).replace(/_/g, ' '))}</a> · ` : ''}Prices on this site are delayed, not live ticks</span></div>
       <div><span class="k">Coverage</span><b>${cov.with_session_bar != null ? cov.with_session_bar.toLocaleString('en-IN') : '—'}</b><span class="s">${esc(covTxt)}</span></div>
       ${overdue
         ? `<div class="v2-late"><span class="k">Next scan</span><b>Overdue</b><span class="s">The scan due by ${v2Time(d.next_scan_due)} has not published. Everything here is from ${v2Date(d.session_date)}.</span></div>`
@@ -11986,7 +11986,7 @@
         <div class="v2-t"><span class="k">Stop</span><b class="cnum">${price(p.initial_stop)}</b><span class="s">${p.risk_pct != null ? v2Num(p.risk_pct, 1) + '% below the cap' : ''}</span></div>
         ${tgt('t1', ex.t1_pct)}${tgt('t2', ex.t2_pct)}${tgt('t3', ex.t3_pct)}
       </div>
-      <footer><a href="${v2PlanUrl(p)}">Plan ${esc(p.id)} →</a> <a href="${v2Vision(p.symbol)}">Research in Vision ↗</a></footer>
+      <footer><a href="${v2PlanUrl(p)}">Plan ${esc(p.id)} →</a> <a href="${v2Vision(p.symbol)}">Why this company? Open in Vision ↗</a></footer>
     </article>`;
   }
 
@@ -12000,6 +12000,30 @@
     error: 'The last run failed.',
     market_filter: `No new plans for the ${v2Date(d.next_session)} session.`,
   })[d.status] || `No plan qualified for the ${v2Date(d.next_session)} session.`;
+  /* THE PUBLICATION GATE, AS A STATE. "No plans" was a paragraph that read
+     like an empty result. It is a decision: no engine has earned the record
+     yet. The card says so, gives the three numbers that matter (published,
+     paper test, the record's own count) and the two things a reader can do. */
+  function v2Gate(d) {
+    const m = d.metrics || {};
+    const P = d.paper || {};
+    const cand = (P.plans || []).filter(p => p.state === 'awaiting_entry' || (p.fill_price != null && !p.ended_session)).length;
+    const title = d.status === 'paused' ? `No plan published for the ${v2Date(d.next_session)} session` : v2NoneWhy(d);
+    const why = d.status === 'paused'
+      ? 'The publication gate is closed: no engine has yet passed its promotion criteria on forward data, so nothing enters the record.'
+      : (d.status_detail || '');
+    return `<section class="v2-gate" aria-labelledby="v2GateH" role="status">
+      <div class="v2-gate-h"><span class="v2-gate-i" aria-hidden="true"></span>
+        <div><h3 id="v2GateH">${esc(title)}</h3><p>${esc(why)}</p></div></div>
+      <dl class="v2-gate-n">
+        <div><dt>Published plans</dt><dd class="cnum">${m.published ?? 0}</dd><dd class="s">${d.status === 'paused' ? 'publication paused' : 'this session'}</dd></div>
+        <div><dt>Paper test</dt><dd class="cnum">${cand}</dd><dd class="s">setup${cand === 1 ? '' : 's'} recorded and graded forward, not the record</dd></div>
+        <div><dt>Forward record</dt><dd class="cnum">${m.published ?? 0} · ${m.closed ?? 0}</dd><dd class="s">published · closed${d.forward_record_start ? ` since ${v2Date(d.forward_record_start)}` : ''}</dd></div>
+      </dl>
+      <p class="v2-gate-a">${cand ? `<a class="v2-gate-b" href="/opportunities#paper">Review the paper test →</a>` : ''}
+        <a href="/methodology#status">How an engine is promoted</a></p>
+    </section>`;
+  }
   const v2Empty = (d, what) => `<div class="empty v2-empty"><b>${esc(what)}</b>
     <p>${esc(d.status_detail || '')}</p></div>`;
 
@@ -12121,10 +12145,10 @@
        were mostly empty states. Now: the session's plans (or one line saying
        why there are none) and the paper setups; your positions and watchlist
        side by side; the market with its regime as the first line; the record. */
-    const noPlans = `<p class="v2-none"><b>${esc(v2NoneWhy(d))}</b> ${esc(d.status_detail || '')}</p>`;
+    const noPlans = v2Gate(d);
     paint(hh() +
       (r.stale ? staleNote(r.age) : '') +
-      v2StatusStrip(d) +
+      v2StatusStrip(d, reg) +
       (window.V2W && window.V2W.changes ? window.V2W.changes(d, { href: setupHref }) : '') +
       vsec(`Plans for ${v2Date(d.next_session)}`, next.length ? `<div class="v2-cards">${next.map(p => v2Card(p, d)).join('')}</div>`
         : noPlans, String(next.length), null, { lead: true }) +
@@ -12268,7 +12292,7 @@
       vsec('Stop and management', `<p>${esc(p.stop_rule)}</p><p>${esc(p.management)}</p><p class="muted">After ${d.time_exit_sessions} held sessions, whatever remains is sold at the next open. A stop does not cap a gap loss.</p>`) +
       vsec('Position', pos) +
       vsec('Updates', upd) +
-      vsec('Company research', `<p><a href="${v2Vision(p.symbol)}">${esc(p.symbol)} in Vision ↗</a> · <a href="/stock/${encodeURIComponent(p.symbol)}">Screen card</a></p>
+      vsec('Company research', `<p><a href="${v2Vision(p.symbol)}">Why this company? ${esc(p.symbol)} in Vision ↗</a> · <a href="/stock/${encodeURIComponent(p.symbol)}">Screen card</a></p>
         <p class="muted">The research below describes the company. It is not part of the plan's rules and does not change its levels.</p>
         ${fund}`) +
       `<p class="v2-note">${esc(d.notice || '')}</p>`);
@@ -12311,7 +12335,7 @@
         const nm0 = Object.fromEntries((rec.engines || []).map(e => [e.id, e.name]));
         v2Shell(t.symbol, `Paper setup · ${nm0[t.engine] || t.engine} · finished ${v2Date(t.ended_session || t.filed_session)}`,
           window.V2W.replay(t, rec, { noSymbol: true }) +
-          `<p class="v2-pp-links"><a href="${VISION_URL}/#/brief/${encodeURIComponent(t.symbol)}">${esc(t.symbol)} in Vision ↗</a>
+          `<p class="v2-pp-links"><a href="${VISION_URL}/#/brief/${encodeURIComponent(t.symbol)}">Read the company context in Vision ↗</a>
             · <a href="/stock/${encodeURIComponent(t.symbol)}">Screen card</a> · <a href="/performance#finished">Every finished setup</a></p>`);
         return;
       }
@@ -12325,7 +12349,7 @@
     const nm = Object.fromEntries((P.engines || []).map(e => [e.id, e.name]));
     v2Shell(p.symbol, `Paper setup · ${nm[p.engine] || p.engine} · for the ${v2Date(p.for_session)} session`,
       window.V2W.passport(p, d, { noSymbol: true }) +
-      `<p class="v2-pp-links"><a href="${VISION_URL}/#/brief/${encodeURIComponent(p.symbol)}">${esc(p.symbol)} in Vision: chart, technical read and the business ↗</a>
+      `<p class="v2-pp-links"><a href="${VISION_URL}/#/brief/${encodeURIComponent(p.symbol)}">Why this company? ${esc(p.symbol)} in Vision: chart, technical read and the business ↗</a>
         · <a href="/stock/${encodeURIComponent(p.symbol)}">Screen card</a> · <a href="/opportunities">Every setup</a></p>`);
     const e = (await paperEntry([p]))[p.id];
     const slot = document.querySelector('[data-v2w-entry]');
@@ -12411,7 +12435,7 @@
         <div class="v2-brief-b"><div id="bRead">${skel('sk-card', 1)}</div></div>
       </div>
       <div id="bBiz" class="v2-brief-biz">${skel('sk-card', 1)}</div>
-      <p class="v2-pp-links"><a href="${setupHref(p)}">This setup on its own page</a> · <a href="${VISION_URL}/#/brief/${encodeURIComponent(p.symbol)}">${esc(p.symbol)} in Vision ↗</a> · <a href="/opportunities">Every setup</a></p>`);
+      <p class="v2-pp-links"><a href="${setupHref(p)}">This setup on its own page</a> · <a href="${VISION_URL}/#/brief/${encodeURIComponent(p.symbol)}">Why this company? ${esc(p.symbol)} in Vision ↗</a> · <a href="/opportunities">Every setup</a></p>`);
     const here = () => routeOf() === '/brief';
     /* Each part arrives on its own; a slow one never holds the others. */
     paperEntry(live).then(chk => {

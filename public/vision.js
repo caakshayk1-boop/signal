@@ -958,6 +958,21 @@
     { c: 'var(--dn,#c4372c)', shape: 'text', sample: '7.1%', label: 'it moved the wrong way' },
     { c: 'var(--ink,currentColor)', shape: 'text', sample: '13.1%', label: 'a level, no direction' }],
     { title: 'A value is coloured by the change written under it:' }) : '';
+  /* THE ONE-MINUTE READ. Each line separates the three things a research note
+     blurs: the READ (a word), the FACT it rests on, and the RULE that turned
+     one into the other. The next event sits apart: a date is not a judgement. */
+  const oneHtml = (om) => (!om.reads.length && !om.event)
+    ? empty('Not enough published fields for a one-minute read', '<p>The panels below show what the screen does carry.</p>')
+    : `${window.V2W && window.V2W.key ? window.V2W.key([
+        { c: 'var(--up,#0b7a55)', shape: 'text', sample: 'Aa', label: 'the favourable side of its rule' },
+        { c: 'var(--dn,#c4372c)', shape: 'text', sample: 'Aa', label: 'the unfavourable side' },
+        { c: 'var(--ink,currentColor)', shape: 'text', sample: 'Aa', label: 'neither' }], { title: 'Read · fact · rule. Descriptive, not advice.' }) : ''}
+      <ol class="one">${om.reads.map((x) => `<li><span class="one-l">${esc(x.k)}</span><b class="one-w ${esc(x.tone)}">${esc(x.word)}</b>
+        <span class="one-f">${esc(x.fact)}</span><small class="one-r">Rule: ${esc(x.rule)}</small></li>`).join('')}
+      ${om.event ? `<li class="one-ev"><span class="one-l">Next event</span><b class="one-w">${esc(om.event.t)}</b>
+        <span class="one-f">${esc(om.event.s)}</span><small class="one-r">${esc(om.event.src)}</small></li>` : ''}</ol>`;
+  /* The one plan feed, fetched from one place (the guard counts the call). */
+  const v2Feed = () => get('/signal_v2.json', 600000);
   const mattersHtml = (mt) => mt.length ? `${MT_KEY()}<div class="kv intel-kv" style="margin-top:0">${mt.map((m) => `<div title="${esc(m.src)}"><em>${esc(m.k)} ${defn(MT_DEF[m.k])}</em><b class="${m.tone}">${esc(m.v)}</b><small>${esc(m.sub || '')}</small></div>`).join('')}</div>${srcNote(mt)}`
     : empty('Nothing measured', 'The screen carries no statements for this company.');
   const changesHtml = (ch, T) => {
@@ -1503,6 +1518,7 @@
     const s = resolveSym(arg);
     setTitle(SCR && SCR[s] ? `${s} — ${SCR[s].name}` : s);
     el.innerHTML = `<div id="aHead">${skel(3)}</div><div style="height:var(--s-4)"></div>
+      ${panel('One-minute read', skel(3), { bodyId: 'aOne', fb: 'Screen' })}<div style="height:var(--s-4)"></div>
       <div class="grid g-2 intel">${panel('What matters', skel(5), { bodyId: 'aMat', fb: 'Screen' })}${panel('What changed', skel(5), { bodyId: 'aChg', fb: 'Screen' })}</div>
       <div style="height:var(--s-4)"></div>
       <div class="grid g-7-5"><div class="stack">
@@ -1560,7 +1576,7 @@
         <div class="row ah-act" style="margin-top:var(--s-2);gap:6px">
           <a class="btn sm" href="#/brief/${encodeURIComponent(s)}">Brief</a>
           <a class="btn sm" href="#/compare?s=${[s].concat(peersOf(s)).map(encodeURIComponent).join(',')}">Compare</a>
-          <a class="btn sm" href="${SIGNAL_URL}/stock/${encodeURIComponent(s)}">On Signal ↗</a>
+          <a class="btn sm" href="${SIGNAL_URL}/stock/${encodeURIComponent(s)}" title="Its screen card, and any setup, on Signal">On Signal ↗</a>
           <button class="btn sm" type="button" data-copy="${VISION_URL}/company/${keyOf(s)}">Copy link</button>
           <a class="btn sm" href="#/alerts?sym=${esc(s)}">Alert</a>
           <a class="btn sm" href="https://www.tradingview.com/chart/?symbol=NSE:${encodeURIComponent(s)}" target="_blank" rel="noopener">Chart ↗</a>
@@ -1576,10 +1592,25 @@
     const I = INS();
     if (co.ok && I) {
       const d = co.data, ctx = Object.assign({ today: istToday() }, d.ctx, { vsig: d.vsig });
+      $('#aOne').innerHTML = I.oneMinute ? oneHtml(I.oneMinute(d.r, d.x, ctx)) : '';
+      /* SIGNAL CONNECTION, AS THE READER'S NEXT QUESTION. From the same plan
+         feed Signal reads: a live paper setup links to its own page; no setup
+         says so and offers the screen card. A feed that does not answer says
+         nothing rather than implying there is no setup. */
+      v2Feed().then((v2) => {
+        const box = $('#aOne'); if (!box || !alive()) return;
+        const P = v2 && v2.ok && v2.data && v2.data.paper ? v2.data.paper.plans || [] : null;
+        if (!P) return;
+        const sp = P.filter((x) => x.symbol === s && (x.state === 'awaiting_entry' || (x.fill_price != null && !x.ended_session)))[0];
+        box.insertAdjacentHTML('beforeend', `<p class="one-sig">${sp
+          ? `<b>How did this become a setup?</b> <a href="${SIGNAL_URL}/setup/${encodeURIComponent(sp.id)}">View it on Signal: levels, entry check and history ↗</a>`
+          : `<b>Not a paper setup tonight.</b> <a href="${SIGNAL_URL}/stock/${encodeURIComponent(s)}">Its screen card on Signal ↗</a>`}</p>`);
+      });
       $('#aMat').innerHTML = mattersHtml(I.matters(d.r, d.x, ctx));
       $('#aChg').innerHTML = changesHtml(I.changes(d.r, d.x, ctx), I.T);
     } else {
       const why = co.ok ? 'insight.js did not load' : co.error;
+      $('#aOne').innerHTML = failBox('This company\'s file', why);
       $('#aMat').innerHTML = failBox('This company\'s file', why); $('#aChg').innerHTML = failBox('This company\'s file', why);
     }
 
@@ -2224,7 +2255,7 @@
   const VE_ACTIVE = new Set(['activated', 'partially_exited']);
   const VE_DONE = new Set(['closed', 'stopped', 'time_exited']);
   F.veod = async () => {
-    const r = await get('/signal_v2.json', 600000);
+    const r = await v2Feed();
     if (r.ok) { mark('Setups', r.data.published_at); S.veod = r.data; }
     else if (absent(r)) { FR.Setups = { ok: true, na: true, naTxt: 'not yet published', naTitle: 'no end-of-day scan has been published yet', t: Date.now() }; paintBadges(); }
     else markFail('Setups', r.error);

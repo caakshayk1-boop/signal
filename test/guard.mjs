@@ -741,8 +741,10 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   ok("the five are the V2 destinations, in order",
      JSON.stringify(nav.map((n) => n.route)) === JSON.stringify(["/", "/opportunities", "/watch", "/performance", "/markets"]),
      nav.map((n) => n.route));
-  ok("on a phone they read Setups and Record, and Market gives its slot to More",
-     /<span class="l-m">Setups<\/span>/.test(HTML) && /<span class="l-m">Record<\/span>/.test(HTML)
+  /* ONE LABEL PER TAB. Each tab used to carry a desktop and a phone span with
+     the same word, so the accessible name read "Setups Setups". */
+  ok("on a phone they read Setups and Record, once each, and Market gives its slot to More",
+     /<span>Setups<\/span><\/a>/.test(HTML) && /<span>Record<\/span><\/a>/.test(HTML) && !/class="l-[dm]"/.test(HTML)
      && /class="t-desk"/.test(HTML) && /class="t-mob" data-more/.test(HTML));
   ok("the desktop names the same two pages the same way",
      nav.find((n) => n.route === "/opportunities")?.label === "Setups" && nav.find((n) => n.route === "/performance")?.label === "Record",
