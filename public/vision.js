@@ -956,7 +956,7 @@
   const MT_KEY = () => window.V2W && window.V2W.key ? window.V2W.key([
     { c: 'var(--up,#0b7a55)', shape: 'text', sample: '1.36×', label: 'the line beneath moved the right way' },
     { c: 'var(--dn,#c4372c)', shape: 'text', sample: '7.1%', label: 'it moved the wrong way' },
-    { c: 'var(--text,#1b1b1f)', shape: 'text', sample: '13.1%', label: 'a level, no direction' }],
+    { c: 'var(--ink,currentColor)', shape: 'text', sample: '13.1%', label: 'a level, no direction' }],
     { title: 'A value is coloured by the change written under it:' }) : '';
   const mattersHtml = (mt) => mt.length ? `${MT_KEY()}<div class="kv intel-kv" style="margin-top:0">${mt.map((m) => `<div title="${esc(m.src)}"><em>${esc(m.k)} ${defn(MT_DEF[m.k])}</em><b class="${m.tone}">${esc(m.v)}</b><small>${esc(m.sub || '')}</small></div>`).join('')}</div>${srcNote(mt)}`
     : empty('Nothing measured', 'The screen carries no statements for this company.');

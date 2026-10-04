@@ -5731,9 +5731,9 @@ main.is-nav{animation:routein var(--t-mid) var(--ease-out) backwards}
    of the ramp. Hatched so it reads as "nothing here" at a glance. */
 .mc-na{background:repeating-linear-gradient(45deg,var(--raised),var(--raised) 4px,
   var(--bg) 4px,var(--bg) 8px);color:var(--dim)}
-.maplg{display:flex;align-items:center;gap:4px;font-size:var(--t-2);color:var(--dim)}
-.maplg i{width:18px;height:12px;border-radius:3px;display:inline-block}
-.maplg span{margin:0 4px}
+.maplg{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:0;font-size:var(--t-2);color:var(--dim)}
+.maplg span{display:inline-flex;align-items:center;gap:6px} .maplg b{color:var(--text);font-weight:600}
+.maplg i{width:18px;height:12px;border-radius:3px;display:inline-block;box-shadow:inset 0 0 0 1px var(--line2)}
 @media(max-width:620px){
   .mapg{grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:3px}
   .mcell{min-height:42px;padding:6px}
