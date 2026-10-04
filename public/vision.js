@@ -575,7 +575,8 @@
     const seen = new Set();
     const addSym = (sym, name, k) => { if (seen.has(sym)) return; seen.add(sym);
       const sc = sym === Q ? 0 : sym.startsWith(Q) ? 1 : (name || '').toUpperCase().startsWith(Q) ? 2 : sym.includes(Q) ? 3 : (name || '').toUpperCase().includes(Q) ? 4 : 9;
-      if (sc < 9) out.push({ k, t: sym, sub: name || '', go: '#/asset/' + sym, sc }); };
+      const sec = SCR && SCR[sym] && SCR[sym].sector;
+      if (sc < 9) out.push({ k, t: sym, sub: (name || '') + (sec ? ' · ' + sec : ''), go: '#/asset/' + sym, sc }); };
     for (const w of S.watch) addSym(w.s, SCR && SCR[w.s] && SCR[w.s].name, 'Watch');
     if (SCR) for (const s in SCR) addSym(s, SCR[s].name, 'Stock');
     for (const p of pages.concat(acts)) if (p.t.toUpperCase().includes(Q)) out.push(Object.assign({ sc: 5 }, p));
@@ -596,7 +597,7 @@
         <span class="k">${esc(it.k)}</span><b>${esc(it.t)}</b><span>${esc(it.sub)}</span>${it.go && it.go.startsWith('#/asset/') ? `<span class="r">${star(it.t)}</span>` : ''}</li>`).join('')
         : `<li aria-disabled="true"><span>No match${SCR ? '' : ' yet — the full screen is still loading'}</span></li>`;
       inp.setAttribute('aria-activedescendant', palItems.length ? 'po' + palSel : '');
-      $('#palN').textContent = SCR ? `${Object.keys(SCR).length.toLocaleString('en-IN')} names searchable` : 'loading the screen…';
+      $('#palN').textContent = SCR ? `${Object.keys(SCR).length.toLocaleString('en-IN')} names searchable · screen build: ${badgeState('Screen').txt}` : 'loading the screen…';
       const sel = $('#po' + palSel); if (sel) sel.scrollIntoView({ block: 'nearest' });
     };
     const run = (it) => { if (!it) return; closeLayer(); if (it.run) it.run(); else if (it.href) location.href = it.href; else if (it.go) location.hash = it.go; };
@@ -1023,8 +1024,13 @@
     let hits = [], sel = 0;
     const paintL = () => { const Q = inp.value.trim().toUpperCase(); hits = findCo(inp.value); sel = clamp(sel, 0, Math.max(0, hits.length - 1));
       inp.setAttribute('aria-expanded', String(!!Q));
-      L.innerHTML = !Q ? '' : hits.length ? hits.map((x, i) => `<li role="option" id="ho${i}" aria-selected="${i === sel}" data-go="${esc(x)}"><b>${hilite(x, Q)}</b><span>${hilite(SCR[x].name, Q)}</span><em>${esc(SCR[x].sector || '')}</em></li>`).join('')
-        : `<li aria-disabled="true"><span>${SCR ? 'No company on the screen matches' : 'Loading the screen…'}</span></li>`;
+      /* A result says what kind of company it is, whether you already watch
+         it, and — once, at the foot — how old the figures behind it are. */
+      const meta = (x) => [SCR[x].sector, SCR[x].ind && SCR[x].ind !== SCR[x].sector ? SCR[x].ind : ''].filter(Boolean).map(esc).join(' · ');
+      const age = badgeState('Screen');
+      L.innerHTML = !Q ? '' : hits.length ? hits.map((x, i) => `<li role="option" id="ho${i}" aria-selected="${i === sel}" data-go="${esc(x)}"><b>${hilite(x, Q)}${watching(x) ? '<i class="hl-w" title="On your watchlist" aria-label="on your watchlist">★</i>' : ''}</b><span>${hilite(SCR[x].name, Q)}</span><em>${meta(x)}</em></li>`).join('')
+          + `<li class="hl-f" aria-disabled="true" role="presentation">Screen build: ${esc(age.txt)} · prices at the close of ${esc(dshort(SCR[hits[0]].last_date || '') || 'the last build')} · ↑↓ to move, ↵ to open</li>`
+        : `<li aria-disabled="true"><span>${SCR ? `No company on the screen matches “${esc(inp.value.trim())}”. The screen covers ${Object.keys(SCR).length.toLocaleString('en-IN')} NSE names; try the NSE symbol, or part of the name.` : 'Loading the screen…'}</span></li>`;
       inp.setAttribute('aria-activedescendant', hits.length ? 'ho' + sel : ''); };
     const go = (x) => { if (x) location.hash = '#/asset/' + x; };
     inp.addEventListener('input', () => { sel = 0; paintL(); });

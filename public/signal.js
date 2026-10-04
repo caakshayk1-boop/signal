@@ -2275,7 +2275,11 @@
     if (!b) return;
     ev.stopPropagation();                 // never open the card behind the star
     ev.preventDefault();
-    toggleWatch(b.dataset.watch);
+    const on = toggleWatch(b.dataset.watch);
+    /* Said once, briefly: the star changes in place, but a reader on a long
+       list cannot see the Watchlist it went to. */
+    toast(on ? `${b.dataset.watch} added to your watchlist` : `${b.dataset.watch} removed from your watchlist`,
+      on ? 'Its changes will appear under Alerts.' : '', 3500);
   });
 
   /* ── ALERTS ──────────────────────────────────────────────────────────────
@@ -2494,7 +2498,7 @@
     }
   }
 
-  function toast(title, body) {
+  function toast(title, body, ms) {
     let host = document.getElementById('toasts');
     if (!host) { host = document.createElement('div'); host.id = 'toasts'; document.body.appendChild(host); }
     const el = document.createElement('div');
@@ -2504,7 +2508,7 @@
       <button type="button" aria-label="Dismiss">✕</button>`;
     el.querySelector('button').addEventListener('click', () => el.remove());
     host.appendChild(el);
-    setTimeout(() => el.remove(), 12000);
+    setTimeout(() => el.remove(), ms || 12000);
   }
 
   /* ── shared widgets ────────────────────────────────────────────────────── */
@@ -12182,8 +12186,34 @@
   const treadBlock = (sym) => window.V2W && window.V2W.read
     ? window.V2W.read(TREAD, sym, { error: TREAD_WHY })
     : `<p class="muted">The read could not load (v2widgets.js did not arrive).</p>`;
-  const v2Paper = (d, opts) => window.V2W && window.V2W.paper
-    ? window.V2W.paper(d, { stockHref: (s) => '/stock/' + encodeURIComponent(s), ...opts }) : '';
+  /* NEW SINCE YOUR LAST VISIT, for setups. The ids this browser had seen are
+     fixed for the browsing session (sessionStorage), the way the visit
+     baseline is, so a tag does not vanish on the 60-second repaint; the
+     record is updated on every render and becomes the baseline next visit.
+     No record yet (a first visit) tags nothing: everything would be "new". */
+  const SSEEN = 'sig:setupsSeen';
+  const setupBase = (() => {
+    try {
+      const held = sessionStorage.getItem(SSEEN);
+      if (held) return JSON.parse(held);
+      const prev = lsGet(SSEEN, null);
+      sessionStorage.setItem(SSEEN, JSON.stringify(prev));
+      return prev;
+    } catch (e) { return null; }
+  })();
+  const isNewSetup = (p) => !!(setupBase && Array.isArray(setupBase.ids) && p && !setupBase.ids.includes(p.id));
+  const noteSetups = (d) => {
+    const ids = ((d && d.paper && d.paper.plans) || []).filter(p => PAPER_LIVE_STATES.has(p.state)).map(p => p.id);
+    if (!ids.length) return;
+    const was = (lsGet(SSEEN, {}) || {}).ids || [];
+    lsSet(SSEEN, { at: Date.now(), ids: [...new Set([...was, ...ids])].slice(-500) });
+  };
+  const v2Paper = (d, opts) => {
+    if (!window.V2W || !window.V2W.paper) return '';
+    const html = window.V2W.paper(d, { stockHref: (s) => '/stock/' + encodeURIComponent(s), isNew: isNewSetup, ...opts });
+    noteSetups(d);
+    return html;
+  };
   // A plan whose last close is already above its entry cap can still fill —
   // only if price comes back to the cap. Said in words, never a colour alone.
   const v2Extended = (p) => p.state === 'awaiting_entry' && p.last_close != null && p.last_close > p.entry_high;

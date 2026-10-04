@@ -254,6 +254,11 @@ p.v2w-key .v2w-sw.text{box-shadow:none;width:auto;max-width:none;height:auto;bac
 .v2w .v2w-wl{display:flex;flex-wrap:wrap;gap:4px 16px} .v2w .v2w-wl a{color:var(--w-acc,#2743c8)}
 @keyframes v2wIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.v2w .v2w-wp:not([hidden]){animation:none}.v2w .v2w-why{transition:none}}
+.v2w .v2w-new{display:inline-block;margin-left:6px;padding:2px 5px;border-radius:3px;font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-style:normal;letter-spacing:.06em;text-transform:uppercase;vertical-align:2px;
+  background:color-mix(in srgb,var(--accent,#2743c8) 14%,transparent);color:var(--accent,#2743c8)}
+.v2w .v2w-newsum{margin:0 0 8px;font-size:13px;color:var(--w-muted,var(--muted,#6b6a66))}
+.v2w .v2w-newsum .v2w-new{margin:0 4px 0 0}
 @media (max-width:600px){.v2w .v2w-di .v2w-dr{padding-right:12px}.v2w .v2w-why{position:static;margin:0 12px 10px;min-height:44px}}
 .v2w a.v2w-dr:hover{background:var(--w-raised,var(--raised,rgba(0,0,0,.03)))}
 .v2w .v2w-dr b{font-weight:600;letter-spacing:.01em}
@@ -859,9 +864,13 @@ p.v2w-key .v2w-sw.text{box-shadow:none;width:auto;max-width:none;height:auto;bac
         <p>${esc(e.what)} ${e.since ? `Recording since ${esc(day(e.since))}.` : 'Starts recording after the next session closes.'}</p></li>`).join('')}</ul>`;
     const live = (P.plans || []).filter((p) => PAPER_LIVE.has(p.state));
     const done = (P.plans || []).filter((p) => !PAPER_LIVE.has(p.state));
+    /* NEW SINCE YOUR LAST VISIT: the caller decides (it owns the browser's
+       record of what was seen); the widget only marks it, in a word. */
+    const isNew = (p) => !!(opts.isNew && opts.isNew(p));
+    const nNew = live.filter(isNew).length;
     const card = (p) => {
       const sp = p.sell_pct || [40, 35, 25];
-      return `<article class="v2w-pc" id="pp-${esc(p.symbol)}"><header><a href="${esc(opts.cardHref ? opts.cardHref(p) : stock(p.symbol))}">${esc(p.symbol)}</a>
+      return `<article class="v2w-pc" id="pp-${esc(p.symbol)}"><header><a href="${esc(opts.cardHref ? opts.cardHref(p) : stock(p.symbol))}">${esc(p.symbol)}</a>${isNew(p) ? '<i class="v2w-new">New</i>' : ''}
           <small>${esc(names[p.engine] || p.engine)}<br>${esc(PSTATE[p.state] || p.state)}</small></header>
         <dl><dt>Buy</dt><dd>${px(p.entry_low)} – ${px(p.entry_high)}</dd>
           <dt>Window</dt><dd>${esc(dayShort(p.for_session))} – ${esc(dayShort(p.valid_through))}</dd>
@@ -891,12 +900,12 @@ p.v2w-key .v2w-sw.text{box-shadow:none;width:auto;max-width:none;height:auto;bac
         <button type="button" class="v2w-why" aria-expanded="false" aria-controls="${esc(wid(p))}" aria-label="Why ${esc(p.symbol)} appeared">Why</button>
         ${whyPanel(p)}</div>`;
     const row = (p) => `<a class="v2w-dr" data-sym="${esc(p.symbol)}" href="${esc(opts.cardHref ? opts.cardHref(p) : stock(p.symbol))}">
-        <b>${esc(p.symbol)}</b><span class="e">${esc(names[p.engine] || p.engine)}</span>
+        <b>${esc(p.symbol)}${isNew(p) ? '<i class="v2w-new">New</i>' : ''}</b><span class="e">${esc(names[p.engine] || p.engine)}</span>
         <span class="n">${px(p.entry_low)} – ${px(p.entry_high)}</span>
         <span class="n">${px(p.stop)}${p.risk_pct != null ? ` <i>${Number(p.risk_pct).toFixed(1)}%</i>` : ''}</span>
         <span class="w">${esc(dayShort(p.for_session))} – ${esc(dayShort(p.valid_through))}</span>
         <span class="s">${esc(PSTATE[p.state] || p.state)}${p.fill_price != null ? ' · ' + rR(p.total_r) : ''}</span></a>`;
-    const digestHtml = `<div class="v2w-dg" role="list"><div class="v2w-dr v2w-dh" aria-hidden="true"><b>Name</b><span class="e">Engine</span>
+    const digestHtml = `${nNew ? `<p class="v2w-newsum"><i class="v2w-new">New</i> ${nNew} of ${live.length} not here at your last visit.</p>` : ''}<div class="v2w-dg" role="list"><div class="v2w-dr v2w-dh" aria-hidden="true"><b>Name</b><span class="e">Engine</span>
         <span class="n">Buy between</span><span class="n">Stop · risk</span><span class="w">Window</span><span class="s">State</span></div>
         ${live.map(item).join('')}</div>`;
     const liveHtml = live.length ? (opts.digest ? digestHtml : `<div class="v2w-pcs">${live.map(card).join('')}</div>`)
