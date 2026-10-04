@@ -2790,6 +2790,9 @@ ok("no figure counts up", !/countUp/.test(JS));
     ok("Vision shows a company's rank, or that it is unranked and why",
        /Magic Formula #\$\{r\.mf\.rank\} of \$\{r\.mf\.of\}/.test(VJS2) && /Not ranked by the Magic Formula: \$\{esc\(r\.mf\.why\)\}/.test(VJS2)
        && /\['magic', 'Magic Formula top 30'/.test(VJS2));
+    ok("Vision's Magic Formula preset opens in rank order, so its #1 is /magic's #1",
+       /\[\['mf_rank', '<=', 30\]\], \{ sort: 'mf_rank', dir: 1 \}\]/.test(VJS2) && /presetSort\(p\);/.test(VJS2)
+       && /k === 'mf_rank' \? 1 : -1/.test(VJS2));
   }
   ok("the watchlist exports and imports, merging rather than overwriting",
      /id="wExport"/.test(JS) && /id="wImport"/.test(JS) && /kind: 'signal-watchlist'/.test(JS) && /new Set\(\[\.\.\.watchAll\(\), \.\.\.clean\]\)/.test(JS));
