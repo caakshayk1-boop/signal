@@ -357,6 +357,21 @@
    it kept --bg at #F7F8FA and quietly overrode the white the redesign is
    built on. One definition per theme. */
 
+/* The brief's --b-* tokens, defined for the WHOLE page, not only inside
+   .brief. brief_fundamentals.js reads them with light fallbacks (#111 ink,
+   #555 muted, #fafafa panels), and the paper-setup page renders it outside
+   any .brief scope — so in dark mode its composite score drew #111 on
+   #0F1012, 1.01:1, invisible. Derived from the site's own tokens, so they
+   flip with the theme; .brief still overrides them with its tuned values. */
+:root{
+  --b-bg:var(--bg); --b-sur:var(--surface); --b-hi:var(--raised);
+  --b-line:var(--line); --b-line2:var(--line2);
+  --b-ink:var(--text); --b-mut:var(--muted); --b-dim:var(--dim);
+  --b-acc:var(--accent); --b-bull:var(--up); --b-bear:#AE3325; --b-gold:#8A6208;
+  --b-card:var(--surface); --b-body:var(--bg);
+}
+:root[data-theme="dark"]{ --b-bear:#D0776B; --b-gold:#C9A961; }
+
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}
@@ -1007,6 +1022,9 @@ h4.sh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-tran
 .scr-sel{flex:0 1 190px;min-width:0;max-width:100%;
          font-family:var(--mono);font-size:var(--t-3)}
 .scr-in:focus,.scr-sel:focus{outline:none;border-color:var(--live)}
+/* A 1px border-colour change was the only focus cue: too faint to find by
+   keyboard. The ring is the same 2px accent every other control uses. */
+.scr-in:focus-visible,.scr-sel:focus-visible{box-shadow:0 0 0 2px var(--accent)}
 /* THE NAME COLUMN TOOK ALL THE SLACK AND THEN STARVED. minmax(0,1fr) gave
    identity 700px of a 1198px row at 1440 — measured text ink: 180px median,
    313px max, 424px of it empty — while at 768 the same track fell to 191px and
@@ -1573,7 +1591,7 @@ body::before{display:none}
    have no sparkline because Yahoo publishes no daily close history for those
    tickers at all — verified, not assumed — so the cell says so. */
 .mk-nosp{font:400 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-transform:uppercase;
-  color:var(--dim);opacity:.6}
+  color:var(--dim)}
 .mk-p{grid-area:p;font:500 var(--t-5)/1 var(--mono);font-variant-numeric:tabular-nums;text-align:right}
 .mk-c{grid-area:c;font:500 var(--t-4)/1 var(--mono);font-variant-numeric:tabular-nums;text-align:right}
 /* Direction is never colour alone: every change carries its own sign, and the
@@ -2854,8 +2872,11 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
    argument for one on a page already dense with numerals. */
 .wc{display:grid;grid-template-columns:132px 1fr;gap:22px;align-items:center}
 .wc-r{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:14px 16px}
-.wc-i{display:flex;align-items:center;gap:12px;min-width:0;opacity:.62}
-.wc-i.on{opacity:1}
+.wc-i{display:flex;align-items:center;gap:12px;min-width:0}
+/* A shut exchange is quieter, but its words stay legible: the face fades, the
+   text drops to --muted/--dim. Fading the whole row put "Closed" at 2.4:1. */
+.wc-i:not(.on) .wc-f{opacity:.55}
+.wc-i:not(.on) .wc-c,.wc-i:not(.on) .wc-t{color:var(--muted)}
 .wc-f{width:38px;height:38px;flex:none}
 .wc-dial{fill:var(--surface);stroke:var(--line);stroke-width:1}
 .wc-i.on .wc-dial{stroke:var(--up);fill:color-mix(in srgb,var(--up) 8%,var(--surface))}
@@ -4089,7 +4110,10 @@ html:has(dialog[open]){overflow:hidden}
  * closed row was more noise than signal; at this length the whole INDIA block
  * is dim together, which reads as a state rather than a label repeated sixteen
  * times. The markets page still spells it out per instrument. */
-.tkr-i.is-shut .tkr-p,.tkr-i.is-shut .tkr-c,.tkr-i.is-shut .tkr-n{opacity:.5}
+.tkr-i.is-shut .tkr-p,.tkr-i.is-shut .tkr-c{color:var(--dim)}
+/* Dimmed by colour, not opacity. Half opacity took the shut block to 2.0:1
+   (the name) and 2.2:1 (a red change) — a state nobody could read. --dim holds
+   AA in both themes and still reads as quieter than an open market. */
 /* NO MOTION WHEN NONE IS WANTED. It becomes an ordinary scrollable row, which
  * is the same information without the movement. */
 /* NOTHING TO HOVER, NOTHING TO PAUSE. On a touch screen the only way to
@@ -4384,7 +4408,7 @@ html:has(dialog[open]){overflow:hidden}
  * thing in the row: the reader needs to know it was measured, not to look at
  * it. Without this state a blank cell means both "nothing moved" and "nothing
  * was filed", which are not the same answer. */
-.scr-ins.is-flat{background:transparent;border-color:var(--line);color:var(--dim);opacity:.75}
+.scr-ins.is-flat{background:transparent;border-color:var(--line);color:var(--dim)}
 .scr-ins.is-flat .ins-g{color:var(--dim)}
 
 /* ── THE FLOOR ───────────────────────────────────────────────────────────────
@@ -5103,7 +5127,7 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 
 .scr-h:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .scr-h.on{color:var(--text);font-weight:600}
-.scr-ar{font-style:normal;font-size:.8em;opacity:.7;margin-left:.25em}
+.scr-ar{font-style:normal;font-size:.8em;margin-left:.25em}
 
 /* The filter chips scrolled sideways with the scrollbar hidden, so on a mouse
    there was NOTHING saying more filters existed — "Nifty500 Ahimsa" sat off
@@ -5203,7 +5227,7 @@ a.rank-r.eng:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .freshbar:empty{display:none}
 .freshbar span{white-space:nowrap}
 .freshbar i{font-style:normal;text-transform:uppercase;letter-spacing:.07em;
-  opacity:.75;margin-right:.4em}
+  ;margin-right:.4em}
 
 /* ── WEEKLY READS ────────────────────────────────────────────────────────
    The one long-form surface on a site of tables. Everything here is set for
@@ -5487,6 +5511,9 @@ a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,
   animation:grow var(--t-slow) var(--ease-out) backwards}
 .splitb .sb-u{background:var(--up)} .splitb .sb-f{background:var(--dim)}
 .splitb .sb-d{background:var(--down)}
+/* Dark-mode fills are light (#3CC98C, #FF7B6F), so white labels on them fell
+   to 2.1–3.2:1. The dark ink holds 6:1 or better on all three. */
+:root[data-theme="dark"] .splitb i{color:var(--on-ink)}
 @keyframes grow{from{flex-basis:0 !important;opacity:.4}}
 .splitl{display:flex;justify-content:space-between;margin-top:6px;
   font-size:var(--t-2);color:var(--dim)}
@@ -6116,8 +6143,8 @@ body{background:var(--bg)}
 }
 @media(max-width:640px){
   .to-vision-bar{display:none}
-  
-  .fresh{padding:0 8px}
+  /* Dot only on a phone: 22px wide was a target you had to aim at. */
+  .fresh{padding:0 8px;min-width:36px;justify-content:center}
 }
 
 /* ── THE DISCLAIMER STRIP ─────────────────────────────────────────────────

@@ -63,7 +63,8 @@
 .v2w .v2w-c{min-height:54px;border:1px solid var(--w-line);border-radius:6px;padding:4px 5px;background:var(--w-bg);display:flex;flex-direction:column;gap:2px;
   font:400 10px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut);text-align:left;cursor:default;min-width:0}
 .v2w button.v2w-c{cursor:pointer;font:inherit;font-size:10px;color:var(--w-mut)}
-.v2w button.v2w-c:hover,.v2w button.v2w-c:focus-visible{border-color:var(--w-acc);outline:none}
+.v2w button.v2w-c:hover{border-color:var(--w-acc)}
+.v2w button.v2w-c:focus-visible{border-color:var(--w-acc);outline:2px solid var(--w-acc);outline-offset:1px}
 .v2w .v2w-c[aria-pressed="true"]{border-color:var(--w-acc);box-shadow:inset 0 0 0 1px var(--w-acc)}
 .v2w .v2w-c .d{font:600 12px/1 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink)}
 .v2w .v2w-c .s{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

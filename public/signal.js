@@ -5485,7 +5485,13 @@
           const k = b.dataset.p;
           if (k === 'all') scrPresets.clear();
           else if (scrPresets.has(k)) scrPresets.delete(k);
-          else scrPresets.add(k);
+          else {
+            scrPresets.add(k);
+            /* A ranking preset opens in rank order, so its #1 is /magic's #1.
+               Filtering the top 30 and leaving them in composite order put a
+               different name first on each page. */
+            if (k === 'magic') { scrSort = 'mf'; scrDir = 'desc'; }
+          }
           scrPage = 0;   // a changed filter invalidates the page number
           SCRDIV = null; // and invalidates any divergence run against the old page
           draw();
