@@ -254,6 +254,29 @@ p.v2w-key .v2w-sw.text{box-shadow:none;width:auto;max-width:none;height:auto;bac
 .v2w .v2w-wl{display:flex;flex-wrap:wrap;gap:4px 16px} .v2w .v2w-wl a{color:var(--w-acc,#2743c8)}
 @keyframes v2wIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.v2w .v2w-wp:not([hidden]){animation:none}.v2w .v2w-why{transition:none}}
+.v2w .v2w-edb{margin-left:8px;min-height:32px;padding:0 10px;border:1px solid var(--w-line,var(--line,#e5e2db));border-radius:999px;
+  background:none;color:var(--accent,#2743c8);font:500 12px/1 inherit;cursor:pointer;transition:transform 160ms cubic-bezier(.23,1,.32,1)}
+.v2w .v2w-edb:active{transform:scale(.97)}
+dialog.v2w-ed{border:0;padding:0;margin:0 0 0 auto;inset:0 0 0 auto;height:100%;max-height:100%;width:min(440px,100%);max-width:100%;
+  background:var(--w-bg,var(--bg,#fff));color:var(--w-ink,var(--text,var(--ink,#1a1a1a)));box-shadow:-12px 0 32px rgba(0,0,0,.18)}
+dialog.v2w-ed[open]{animation:v2wEdIn 220ms cubic-bezier(.32,.72,0,1)}
+dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
+@keyframes v2wEdIn{from{transform:translateX(100%)}to{transform:none}}
+.v2w-ed-in{padding:18px 20px 28px}
+.v2w-ed-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.v2w-ed-h h3{margin:0;font-size:20px}
+.v2w-ed-x{min-width:44px;min-height:44px;border:0;background:none;font-size:18px;cursor:pointer;color:inherit}
+.v2w-ed-what{margin:0 0 12px;line-height:1.5}
+.v2w-ed-n{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:0 0 14px}
+.v2w-ed-n dt{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--w-muted,var(--muted,#6b6a66))}
+.v2w-ed-n dd{margin:2px 0 0;font-weight:600}
+.v2w-ed h4{margin:14px 0 6px;font-size:14px}
+.v2w-ed-l{list-style:none;margin:0;padding:0}
+.v2w-ed-l li{padding:6px 0;border-top:1px solid var(--w-line,var(--line,#e5e2db));font-size:14px}
+.v2w-ed-l span{color:var(--w-muted,var(--muted,#6b6a66))}
+.v2w-ed-l a,.v2w-ed-f a{color:var(--accent,#2743c8);font-weight:600}
+.v2w-ed-e,.v2w-ed-f{font-size:13px;color:var(--w-muted,var(--muted,#6b6a66))}
+@media (prefers-reduced-motion:reduce){dialog.v2w-ed[open]{animation:none}.v2w .v2w-edb{transition:none}}
 .v2w .v2w-new{display:inline-block;margin-left:6px;padding:2px 5px;border-radius:3px;font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
   font-style:normal;letter-spacing:.06em;text-transform:uppercase;vertical-align:2px;
   background:color-mix(in srgb,var(--accent,#2743c8) 14%,transparent);color:var(--accent,#2743c8)}
@@ -847,6 +870,29 @@ p.v2w-key .v2w-sw.text{box-shadow:none;width:auto;max-width:none;height:auto;bac
                    expired_unfilled: 'Never filled', cancelled: 'Cancelled' };
   const rR = (v) => v == null ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(2)}R`;
   const px = (v) => v == null ? '—' : '₹' + Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  /* One listener for every engine's Details button, on either site. A native
+     <dialog>: focus trap, Escape and the backdrop come with it. */
+  if (!window.__v2wEngL) {
+    window.__v2wEngL = true;
+    document.addEventListener('click', (ev) => {
+      const b = ev.target.closest && ev.target.closest('[data-v2w-eng]');
+      if (!b) return;
+      const e = (window.__v2wEng || {})[b.dataset.v2wEng];
+      if (!e) return;
+      injectCss();
+      let dl = document.getElementById('v2wEd');
+      if (!dl) {
+        dl = document.createElement('dialog'); dl.id = 'v2wEd'; dl.className = 'v2w-ed';
+        dl.setAttribute('aria-labelledby', 'v2wEdT');
+        document.body.appendChild(dl);
+        dl.addEventListener('click', (x) => { if (x.target === dl || x.target.closest('[data-v2w-x]')) dl.close(); });
+      }
+      dl.innerHTML = `<div class="v2w-ed-in"><div class="v2w-ed-h"><h3 id="v2wEdT">${esc(e.name)}</h3>
+        <button type="button" class="v2w-ed-x" data-v2w-x aria-label="Close">✕</button></div>${e.html}</div>`;
+      dl.showModal();
+    });
+  }
+
   function paper(d, opts = {}) {
     injectCss();
     const Q = 'Paper test';
@@ -859,7 +905,27 @@ p.v2w-key .v2w-sw.text{box-shadow:none;width:auto;max-width:none;height:auto;bac
     }
     const names = Object.fromEntries(P.engines.map((e) => [e.id, e.name]));
     const need = P.min_closed_for_avg || 30;
+    /* THE ENGINE DRAWER. Each engine's whole story in one place: what it
+       looks for, since when, its counts, what it holds now and what it closed
+       recently. Built from this same feed at render time; opened by one
+       delegated listener (below), so a repaint never needs re-wiring. */
+    const reg = (window.__v2wEng = window.__v2wEng || {});
+    for (const e of P.engines) {
+      const mine = (P.plans || []).filter((p) => p.engine === e.id);
+      const lv = mine.filter((p) => PAPER_LIVE.has(p.state)), dn = mine.filter((p) => !PAPER_LIVE.has(p.state));
+      const link = (p) => `<a href="${esc(opts.cardHref ? opts.cardHref(p) : stock(p.symbol))}">${esc(p.symbol)}</a>`;
+      reg[e.id] = { name: e.name, html: `<p class="v2w-ed-what">${esc(e.what)}</p>
+        <dl class="v2w-ed-n"><div><dt>Kind</dt><dd>${e.kind === 'intraday' ? 'Intraday' : 'Daily bars'}</dd></div>
+          <div><dt>Recording since</dt><dd>${e.since ? esc(day(e.since)) : 'the next session'}</dd></div>
+          <div><dt>Filed · open · closed</dt><dd>${e.filed || 0} · ${e.open || 0} · ${e.closed || 0}</dd></div>
+          <div><dt>Won · lost</dt><dd>${e.closed ? `${e.wins || 0} · ${e.losses || 0}` : 'nothing closed yet'}</dd></div>
+          <div><dt>Average result</dt><dd>${e.avg_r == null ? `shown after ${need} closed (${e.closed || 0} so far)` : rR(e.avg_r)}</dd></div></dl>
+        <h4>Open or waiting (${lv.length})</h4>${lv.length ? `<ul class="v2w-ed-l">${lv.map((p) => `<li>${link(p)} <span>${esc(PSTATE[p.state] || p.state)} · buy ${px(p.entry_low)} – ${px(p.entry_high)}</span></li>`).join('')}</ul>` : '<p class="v2w-ed-e">None tonight. The engine is not loosened to fill this.</p>'}
+        ${dn.length ? `<h4>Ended recently (${dn.length})</h4><ul class="v2w-ed-l">${dn.slice(0, 10).map((p) => `<li>${link(p)} <span>${esc(PSTATE[p.state] || p.state)}${p.total_r != null ? ' · ' + rR(p.total_r) : ''}</span></li>`).join('')}</ul>` : ''}
+        <p class="v2w-ed-f">Paper only: simulated fills, no order placed, not the published record.${opts.methodHref ? ` <a href="${esc(opts.methodHref)}">How engines are graded →</a>` : ''}</p>` };
+    }
     const eng = `<ul class="v2w-eng">${P.engines.map((e) => `<li><b>${esc(e.name)} <span class="v2w-tag">${e.kind === 'intraday' ? 'intraday' : 'daily'}</span></b>
+        <button type="button" class="v2w-edb" data-v2w-eng="${esc(e.id)}" aria-haspopup="dialog">Details</button>
         <span class="n">${e.filed || 0} filed · ${e.open || 0} open · ${e.closed || 0} closed${e.closed ? ` (${e.wins || 0}W ${e.losses || 0}L)` : ''} · ${e.avg_r == null ? `avg after ${need} closed (${e.closed || 0}/${need})` : 'avg ' + rR(e.avg_r)}</span>
         <p>${esc(e.what)} ${e.since ? `Recording since ${esc(day(e.since))}.` : 'Starts recording after the next session closes.'}</p></li>`).join('')}</ul>`;
     const live = (P.plans || []).filter((p) => PAPER_LIVE.has(p.state));

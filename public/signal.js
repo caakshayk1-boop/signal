@@ -8802,7 +8802,21 @@
       const upstream = (hr.ok ? (hr.data.datasets || []) : [])
         .filter(d => OUR_DATASETS.some(re => re.test(String(d.dataset || ''))));
       const upstreamAge = ageHours(feedStamp(hr.ok ? hr.data : null));
+      /* THE STATE FIRST, THE TABLE SECOND. What is unavailable, what is past
+         its normal refresh, and what still holds — in that order, because a
+         reader opening this panel is asking whether to trust the page. */
+      const failed = rows.filter(x => !x.ok && !x.passive);
+      const stale = rows.filter(x => x.h != null && x.h > (x.maxH || 26));
+      const current = rows.filter(x => x.h != null && x.h <= (x.maxH || 26));
+      const names = (l) => l.map(x => esc(x.label)).join(', ');
       sheet('Data freshness', `
+        <div class="ds-sum" role="status">
+          <p><b>Unavailable:</b> ${failed.length ? names(failed) + '. Sections built from these show their own failure notice rather than old figures.' : 'nothing — every feed this page asked for answered.'}</p>
+          <p><b>Older than its normal refresh:</b> ${stale.length ? names(stale) + '. Their figures are real but dated; each section says its date.' : 'none.'}</p>
+          <p><b>Still reliable:</b> ${current.length} of ${current.length + stale.length + failed.length} feeds are inside their window${current.length ? ` (${names(current)})` : ''}.</p>
+          <button type="button" class="btn" id="dsRetry">Retry the feeds</button>
+          <span id="dsRetryMsg" class="ds-msg" aria-live="polite"></span>
+        </div>
         <p class="sheet-p">Every feed <b>this page</b> loaded, and how old the copy it loaded is —
           measured against your clock, from the timestamp inside the file. Each is judged against its
           own tolerance, because they do not move at the same speed: the wire is live and allowed an
@@ -8838,6 +8852,17 @@
           </div>` : ''}
         <p class="sheet-p" style="margin-top:14px">
           <a href="/methodology" style="color:var(--accent)">How this is measured →</a></p>`);
+      /* RETRY: drop the short-lived response cache, redraw the route from fresh
+         fetches, re-measure, and reopen this panel on the new answer. */
+      const rb = document.getElementById('dsRetry');
+      if (rb) rb.addEventListener('click', async () => {
+        rb.disabled = true;
+        const msg = document.getElementById('dsRetryMsg'); if (msg) msg.textContent = 'Fetching again…';
+        MICRO.clear();
+        try { const fn = R[routeOf()]; if (fn) await fn(); } catch (e) { /* the route reports its own failure */ }
+        await paintFreshness();
+        const b2 = document.getElementById('freshBtn'); if (b2 && b2.onclick) await b2.onclick();
+      });
     };
     };
     freshPaint();
@@ -12567,9 +12592,25 @@
        why there are none) and the paper setups; your positions and watchlist
        side by side; the market with its regime as the first line; the record. */
     const noPlans = v2Gate(d);
+    /* THE DECISION LINE. One sentence answering "is there anything for me
+       today": plans, paper setups (and how many are new to this browser),
+       the regime, and alerts not yet read. Each part links to where it is
+       acted on; none is a figure the strip above does not already rest on. */
+    const decision = (() => {
+      const liveP = (((d.paper || {}).plans) || []).filter(p => PAPER_LIVE_STATES.has(p.state));
+      const nNew = liveP.filter(isNewSetup).length;
+      const seen = Number(lsGet(FSEEN, 0)) || 0, nAl = evAll().filter(e => Number(e.at) > seen).length;
+      const parts = [
+        `<a href="/opportunities">${next.length ? `<b>${next.length}</b> plan${next.length === 1 ? '' : 's'} for ${esc(v2Date(d.next_session))}` : 'No plan published'}</a>`,
+        `<a href="/opportunities#paper"><b>${liveP.length}</b> paper setup${liveP.length === 1 ? '' : 's'}${nNew ? `, <b>${nNew}</b> new since your last visit` : ''}</a>`,
+        reg ? `<a href="/markets">regime: ${esc(String(reg.regime || '').replace(/_/g, ' '))}</a>` : '',
+        `<a href="/alerts">${nAl ? `<b>${nAl}</b> unread alert${nAl === 1 ? '' : 's'}` : 'no unread alerts'}</a>`,
+      ].filter(Boolean);
+      return `<p class="v2-dec"><span>Today:</span> ${parts.join(' · ')}.</p>`;
+    })();
     paint(hh() +
       (r.stale ? staleNote(r.age) : '') +
-      v2StatusStrip(d, reg) +
+      v2StatusStrip(d, reg) + decision +
       (window.V2W && window.V2W.changes ? window.V2W.changes(d, { href: setupHref }) : '') +
       vsec(`Plans for ${v2Date(d.next_session)}`, next.length ? `<div class="v2-cards">${next.map(p => v2Card(p, d)).join('')}</div>`
         : noPlans, String(next.length), null, { lead: true }) +
