@@ -11492,6 +11492,8 @@
         <li><b>Watchlist</b> (<code>sig:watch</code>) — the symbols you starred.</li>
         <li><b>Price alerts</b> (<code>sig:alerts</code>, <code>sig:fired</code>) — the levels you set and which ones already fired.
           They are checked only while a Signal page is open; nothing runs in the background.</li>
+        <li><b>Alerts log</b> (<code>sig:events</code>, <code>sig:evsnap</code>, <code>sig:evAt</code>, <code>sig:firedSeen</code>) — what changed on your watched names, the state it was compared against, and when you last opened Alerts.</li>
+        <li><b>What you have seen</b> (<code>sig:visit</code>, <code>sig:setupsSeen</code>) — prices and setups at your last visit, so changes since then can be marked.</li>
         <li><b>Position-size calculator</b> (<code>sig.sizer.v1</code>) — the capital and risk you last typed in.</li>
         <li><b>Display settings</b> (<code>sig:theme</code>, <code>sig:density</code>).</li>
       </ul>

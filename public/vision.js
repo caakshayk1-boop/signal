@@ -979,6 +979,73 @@
      would read as "nothing to look into", which no page can know. */
   const qsHtml = (qs) => `<ol class="qs">${qs.map((x) => `<li><b>${esc(x.q)}</b><small>Because: ${esc(x.basis)}</small></li>`).join('')}</ol>
     <p class="note">Research prompts derived from the figures on this page, by the same thresholds as the reads above. Not recommendations, and nothing here answers them.</p>`;
+  /* ── YOUR NOTES ─────────────────────────────────────────────────────────
+     Per company, in this browser only, saved as you type. Never put into a
+     snapshot: a snapshot is signed as Vision's figures, and a note is not. */
+  const NKEY = 'vis:notes', NOTE_MAX = 4000;
+  const noteOf = (sym) => (store.get(NKEY, {}) || {})[sym] || null;
+  const noteSaved = (n) => n && n.at ? `Saved in this browser · ${dshort(n.at)}, ${new Date(Date.parse(n.at) + 330 * 60000).toISOString().slice(11, 16)} IST` : 'Kept in this browser only. Nothing is sent anywhere.';
+  const notesHtml = (sym) => { const n = noteOf(sym);
+    return `<label class="vh" for="aNoteT">Your notes on ${esc(sym)}</label>
+      <textarea id="aNoteT" class="note-t" data-note="${esc(sym)}" maxlength="${NOTE_MAX}" rows="4" aria-describedby="aNoteS"
+        placeholder="What you are checking, what would change your mind, the date you will look again…">${esc(n ? n.t : '')}</textarea>
+      <p class="note note-s" id="aNoteS" role="status" aria-live="polite">${esc(noteSaved(n))}</p>`; };
+  let noteT = 0;
+  document.addEventListener('input', (e) => {
+    const ta = e.target.closest && e.target.closest('[data-note]'); if (!ta) return;
+    clearTimeout(noteT);
+    noteT = setTimeout(() => {
+      const all = store.get(NKEY, {}) || {}, sym = ta.dataset.note, t = ta.value.slice(0, NOTE_MAX);
+      if (t.trim()) all[sym] = { t, at: new Date().toISOString() }; else delete all[sym];
+      store.set(NKEY, all);
+      const st = $('#aNoteS'); if (st) st.textContent = t.trim() ? noteSaved(all[sym]) : 'Note cleared.';
+    }, 400);
+  });
+
+  /* ── SNAPSHOTS ──────────────────────────────────────────────────────────
+     The Worker computes and signs them (src/api/snapshot.js); this page only
+     asks for one and, when one is opened, shows it only if the signature
+     holds. A failed check shows the reason and nothing from the link. */
+  async function makeSnapshot(sym) {
+    toast('Making a snapshot…');
+    const r = await get('/api/snapshot?sym=' + encodeURIComponent(sym), 0);
+    if (!r.ok) { drawer('Snapshot not made', `<p class="note" style="font-size:var(--t-md)">${esc(r.error || 'the server did not answer')}. Nothing was created.</p>`); return; }
+    const u = r.data.url;
+    const copied = navigator.clipboard ? await navigator.clipboard.writeText(u).then(() => true, () => false) : false;
+    drawer(`Snapshot of ${esc(sym)}`, `<p class="note" style="font-size:var(--t-md)">${copied ? '<b>Link copied.</b> ' : ''}A fixed copy of this read, as Vision computes it now: the one-minute read, what matters and the questions, with the date of every figure. Signed by Vision, so it shows exactly what was computed, and it never updates. Your notes are not in it.</p>
+      <label class="vh" for="snapU">Snapshot link</label><input id="snapU" class="inp snap-u" readonly value="${esc(u)}">
+      <div class="row" style="gap:8px;margin-top:var(--s-3)"><a class="btn" href="#/snap/${esc(r.data.token)}">Open it</a>${copied ? '' : `<button class="btn" type="button" data-copy="${esc(u)}">Copy link</button>`}</div>`);
+    const f = $('#snapU'); if (f) f.addEventListener('focus', () => f.select());
+  }
+  document.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('[data-snap]'); if (b) { e.preventDefault(); makeSnapshot(b.dataset.snap); } });
+
+  V.snap = async (el, arg, alive) => {
+    setTitle('Snapshot');
+    el.innerHTML = vhead('Snapshot', 'Checking the signature…', '') + skel(4);
+    const r = arg ? await get('/api/snapshot?t=' + encodeURIComponent(arg), 3600000) : { ok: false, error: 'no snapshot in this link' };
+    if (!alive()) return;
+    if (!r.ok || !r.data || !r.data.verified || !r.data.snap) {
+      el.innerHTML = vhead('Snapshot', 'This snapshot could not be verified', '')
+        + `<div class="pn"><div class="pb">${empty('Nothing from this link is shown', `<p>${esc(r.error || 'the signature check failed')}. A snapshot is shown only when Vision's signature on it holds, so a link that was edited, cut short or made elsewhere cannot display figures under this site's name.</p><p><a class="btn" href="#/">Search Vision</a></p>`)}</div></div>`;
+      return;
+    }
+    const z = r.data.snap, A = z.asof || {};
+    const taken = Date.parse(z.taken), tIST = Number.isFinite(taken) ? new Date(taken + 330 * 60000).toISOString() : '';
+    const dated = [A.close ? `prices at the close of ${dshort(A.close)}` : '', A.fy ? `statements ${A.fy}` : '', A.holding ? `shareholding ${A.holding}` : ''].filter(Boolean).join(' · ');
+    setTitle(`${z.sym} snapshot`);
+    el.innerHTML = vhead('Snapshot', `${z.sym} — ${z.name}`,
+        `Taken ${esc(dshort(tIST.slice(0, 10)))}, ${esc(tIST.slice(11, 16))} IST · ${esc(dated)}.`,
+        `<a class="btn sm" href="#/asset/${encodeURIComponent(z.sym)}">Today's page →</a>`)
+      + `<p class="snap-b" role="note"><b>Signed by Vision, and fixed.</b> These are the figures Vision computed when the snapshot was taken, unaltered. They do not update; the company page has today's.</p>`
+      + `<div class="pn"><div class="pb"><div class="kv"><div><em>Price</em><b>${z.px != null ? '₹' + fmt(z.px, 2) : '—'}</b><small>${z.r1d != null ? signed(z.r1d, 2) + ' on the day' : ''}</small></div>
+          <div><em>52-week range</em><b>${z.lo52 != null && z.hi52 != null ? `₹${fmt(z.lo52, 2)} – ₹${fmt(z.hi52, 2)}` : '—'}</b><small>${esc(z.sector || '')}</small></div></div></div></div>
+        <div style="height:var(--s-4)"></div>`
+      + panel('One-minute read', oneHtml({ reads: (z.one || []).map((o) => ({ k: o.k, word: o.w, fact: o.f, rule: o.r, tone: o.t })), event: z.ev ? { t: z.ev.t, s: z.ev.s, src: z.ev.src } : null }))
+      + '<div style="height:var(--s-4)"></div>'
+      + panel('What mattered', (z.mt || []).length ? `<div class="kv intel-kv" style="margin-top:0">${z.mt.map((m) => `<div title="${esc(m.src)}"><em>${esc(m.k)}</em><b class="${esc(m.t)}">${esc(m.v)}</b><small>${esc(m.s)}</small></div>`).join('')}</div>${srcNote((z.mt || []).map((m) => ({ src: m.src })))}` : empty('Nothing measured', ''))
+      + ((z.qs || []).length ? '<div style="height:var(--s-4)"></div>' + panel('Questions to investigate', qsHtml((z.qs || []).map((q) => ({ q: q.q, basis: q.b })))) : '');
+  };
+
   /* The one plan feed, fetched from one place (the guard counts the call). */
   const v2Feed = () => get('/signal_v2.json', 600000);
   const mattersHtml = (mt) => mt.length ? `${MT_KEY()}<div class="kv intel-kv" style="margin-top:0">${mt.map((m) => `<div title="${esc(m.src)}"><em>${esc(m.k)} ${defn(MT_DEF[m.k])}</em><b class="${m.tone}">${esc(m.v)}</b><small>${esc(m.sub || '')}</small>${
@@ -1548,6 +1615,8 @@
       <div style="height:var(--s-4)"></div>
       ${panel('Questions to investigate', skel(3), { bodyId: 'aQs', fb: 'Screen' })}
       <div style="height:var(--s-4)"></div>
+      ${panel('Your notes', notesHtml(s), { bodyId: 'aNote' })}
+      <div style="height:var(--s-4)"></div>
       <div class="grid g-7-5"><div class="stack">
         ${panel('Why it reads the way it does', skel(5), { bodyId: 'aWhy', fb: 'Screen' })}
         ${panel('Move profile', skel(4), { bodyId: 'aChart', fb: 'Screen' })}
@@ -1563,7 +1632,7 @@
     Object.assign(S.quotes, q);
     const r = SCR && SCR[s], lv = liveOf(s), x = instiOf(s);
     if (r) noteRecent(s);
-    if (!r) { for (const id of ['aMat', 'aChg', 'aQs']) { const b = $('#' + id); if (b) b.closest('.pn').remove(); }
+    if (!r) { for (const id of ['aMat', 'aChg', 'aQs', 'aNote']) { const b = $('#' + id); if (b) b.closest('.pn').remove(); }
       $('#aHead').innerHTML = vhead('Asset', s, sr.ok ? `<b>${esc(s)}</b> is not on the NSE screen. Check the symbol — the screen covers ${Object.keys(SCR || {}).length.toLocaleString('en-IN')} names.` : 'The screen did not load, so this name cannot be looked up.');
       for (const id of ['aWhy', 'aChart', 'aLvl', 'aFun', 'aIns', 'aNews']) { const b = $('#' + id); if (b) b.closest('.pn').remove(); }
       const tr0 = $('#aTr'); if (tr0) tr0.remove();
@@ -1605,6 +1674,7 @@
           <a class="btn sm" href="#/compare?s=${[s].concat(peersOf(s)).map(encodeURIComponent).join(',')}">Compare</a>
           <a class="btn sm" href="${SIGNAL_URL}/stock/${encodeURIComponent(s)}" title="Its screen card, and any setup, on Signal">On Signal ↗</a>
           <button class="btn sm" type="button" data-copy="${VISION_URL}/company/${keyOf(s)}">Copy link</button>
+          <button class="btn sm" type="button" data-snap="${esc(s)}" title="A dated, signed copy of this read that does not change">Snapshot</button>
           <a class="btn sm" href="#/alerts?sym=${esc(s)}">Alert</a>
           <a class="btn sm" href="https://www.tradingview.com/chart/?symbol=NSE:${encodeURIComponent(s)}" target="_blank" rel="noopener">Chart ↗</a>
           <a class="btn sm" href="https://www.screener.in/company/${encodeURIComponent(s)}/consolidated/" target="_blank" rel="noopener">Filings ↗</a></div></div></div>
@@ -2468,7 +2538,7 @@
         and a high one is not a reason to buy.</p>
       <h3>No execution, no custody, no account</h3>
       <p>This site cannot place a trade, holds no money, connects to no broker and has no view of any account
-        you hold. The watchlist and price alerts live in your browser and nowhere else.</p>
+        you hold. The watchlist, price alerts, recent companies and your notes live in your browser and nowhere else. Making a snapshot sends only the company's symbol: the server computes and signs the figures, which travel inside the link you share. It never contains your notes.</p>
       <h3>Prices can be wrong</h3>
       <p>Market data comes from third parties over endpoints that carry no service guarantee. It may be delayed,
         stale or wrong — every panel prints its age for that reason. Check any figure against your broker or the
