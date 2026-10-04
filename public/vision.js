@@ -1853,7 +1853,7 @@
     ['bottom', 'Bottom reversal', 'Off the floor, reclaiming the 50-day, still under the 200-day', [['from_low', '>=', 15], ['above50', 'is', true], ['above200', 'is', false]]],
     ['highs', 'Near highs on volume', 'Within 3% of the 52-week high with volume behind it', [['from_high', '>=', -3], ['vol_spike', '>=', 1.5]]],
     ['qdisc', 'Quality at a discount', 'High quality, cheap against its own history', [['q', '>=', 70], ['pe_pctile', '<=', 30]]],
-    ['magic', 'Magic Formula top 30', 'Greenblatt: ROCE rank plus EBIT/EV rank, lowest sum first', [['mf_rank', '<=', 30]]],
+    ['magic', 'Magic Formula top 30', 'Greenblatt: ROCE rank plus EBIT/EV rank, lowest sum first', [['mf_rank', '<=', 30]], { sort: 'mf_rank', dir: 1 }],
     ['leaders', 'Momentum leaders', 'Strong 3 months, above every average, RSI not stretched', [['r3m', '>=', 20], ['stack', 'is', true], ['rsi', 'between', [55, 75]]]],
     ['oversold', 'Oversold quality', 'Good businesses the chart has sold down', [['rsi', '<=', 35], ['q', '>=', 60]]],
     ['compound', 'Compounders', 'High returns on capital, growing, little debt', [['roce', '>=', 20], ['rev_cagr', '>=', 15], ['de', 'between', [0, 0.5]]]],
@@ -1899,6 +1899,13 @@
     const fromUrl = params && params.get('s') ? decodeScreen(params.get('s')) : null;
     let st = Object.assign({ conds: presetConds(SPRESETS[0]).slice(0, 0), mode: 'all', q: '', sort: 'turnover_cr', dir: -1, cols: SCOL_DEF.slice(), preset: '' },
       store.get('vis:scr2', {}), fromUrl || {});
+    /* A preset that is a RANKING (Magic Formula) opens in rank order with the
+       rank column shown; filtering a ranked list and ordering it by turnover put
+       a different name first than /magic does on the Signal site. A screen saved
+       before this, still on the default sort, is put right on load. */
+    const presetSort = (p) => { if (!p || !p[4]) return; st.sort = p[4].sort; st.dir = p[4].dir;
+      if (!st.cols.includes(p[4].sort)) st.cols = ['sym', p[4].sort].concat(st.cols.filter((k) => k !== 'sym')); };
+    if (!fromUrl && st.sort === 'turnover_cr' && st.dir === -1) presetSort(SPRESETS.find((x) => x[0] === st.preset));
     el.innerHTML = vhead('Screener', 'Build a screen',
       'Any field the screen publishes, any number of conditions. Unmeasured values never pass a numeric rule and sort last. Presets are starting points, not recommendations.', fb('Screen'))
       + `<div class="pn"><div class="pb" id="sbPre"></div></div><div style="height:var(--s-3)"></div>
@@ -2004,13 +2011,13 @@
     });
     el.addEventListener('input', (e) => { if (e.target.closest('.cond') && e.target.matches('input.inp')) { readConds(); st.preset = ''; limit = 100; paint(); } });
     el.addEventListener('click', (e) => {
-      const pr = e.target.closest('[data-pre]'); if (pr) { const p = SPRESETS.find((x) => x[0] === pr.dataset.pre); st.conds = presetConds(p); st.mode = 'all'; st.preset = p[0];
+      const pr = e.target.closest('[data-pre]'); if (pr) { const p = SPRESETS.find((x) => x[0] === pr.dataset.pre); st.conds = presetConds(p); st.mode = 'all'; st.preset = p[0]; presetSort(p);
         $$('[data-mode]', el).forEach((b) => b.setAttribute('aria-pressed', b.dataset.mode === 'all')); paintPresets(); paintConds(); limit = 100; paint(); return; }
       const md = e.target.closest('[data-mode]'); if (md) { st.mode = md.dataset.mode; $$('[data-mode]', el).forEach((b) => b.setAttribute('aria-pressed', b === md)); paint(); return; }
       const rm = e.target.closest('[data-rm]'); if (rm) { readConds(); st.conds.splice(+rm.dataset.rm, 1); st.preset = ''; paintPresets(); paintConds(); paint(); return; }
       if (e.target.closest('#cAdd')) { readConds(); st.conds.push({ f: 'r1m', op: '>=', v: null }); paintConds(); const last = $$('.cond', el).pop(); if (last) $('.c-f', last).focus(); return; }
       if (e.target.closest('#cClear')) { st.conds = []; st.preset = ''; paintPresets(); paintConds(); paint(); return; }
-      const sb = e.target.closest('[data-sort]'); if (sb) { const k = sb.dataset.sort; st.dir = st.sort === k ? -st.dir : (k === 'sym' || k === 'sector' ? 1 : -1); st.sort = k; paint(); return; }
+      const sb = e.target.closest('[data-sort]'); if (sb) { const k = sb.dataset.sort; st.dir = st.sort === k ? -st.dir : (k === 'sym' || k === 'sector' || k === 'mf_rank' ? 1 : -1); st.sort = k; paint(); return; }
       const cd = e.target.closest('[data-card]'); if (cd) { stockCard(cd.dataset.card); return; }
       if (e.target.closest('#cSave')) { readConds(); const n = prompt('Name this screen:', st.preset ? (SPRESETS.find((p) => p[0] === st.preset) || [])[1] : ''); if (!n) return;
         const sv = store.get('vis:screens', {}); sv[n.slice(0, 40)] = { conds: st.conds, mode: st.mode, sort: st.sort, dir: st.dir, cols: st.cols }; store.set('vis:screens', sv); paintSaved(); toast(`Saved “${n.slice(0, 40)}” in this browser`); return; }
