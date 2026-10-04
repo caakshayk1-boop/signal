@@ -2346,16 +2346,121 @@
   /* THE BELL. Alerts that fired since the reader last opened the watchlist,
      where the alerts are listed. Opening /watch marks them seen. */
   const FSEEN = 'sig:firedSeen';
+  /* THE BELL COUNTS THE ALERT CENTRE. Every kind of change — a price level, a
+     setup entering its range, a results date moving — lands in one log, and
+     the bell is the number of entries since the reader last opened /alerts. */
   const paintBell = () => {
     const b = document.getElementById('bellBtn');
     if (!b) return;
     const seen = Number(lsGet(FSEEN, 0)) || 0;
-    const n = Object.values(lsGet(AFIRED, {})).filter(t => Number(t) > seen).length;
+    const n = evAll().filter(e => Number(e.at) > seen).length;
     const dot = b.querySelector('.bell-n');
     if (dot) { dot.hidden = !n; dot.textContent = n > 9 ? '9+' : String(n); }
-    b.setAttribute('aria-label', n ? `Watchlist and price alerts — ${n} fired since you last looked`
-                                   : 'Watchlist and price alerts');
+    b.setAttribute('aria-label', n ? `Alerts — ${n} new since you last looked` : 'Alerts');
   };
+
+  /* ── THE ALERT CENTRE ───────────────────────────────────────────────────
+   * What changed on the names this reader watches, as a log: what changed,
+   * when, why (the feed and the field), and the page to act on it.
+   *
+   * IN THIS BROWSER, LIKE THE WATCHLIST. Detection is a comparison against
+   * the last state this browser recorded, run when the site is open — there
+   * is no server, no push and no background worker, and the page says so.
+   * The FIRST run records a baseline and reports nothing: without a previous
+   * state, every setup and every date would arrive at once as "new", which is
+   * a list of facts dressed as a list of changes. */
+  const EKEY = 'sig:events', ESNAP = 'sig:evsnap', ECHK = 'sig:evAt';
+  const EV_KIND = {
+    entered: ['Entered its buy range', 'Setups', 'up'],
+    above:   ['Moved above the most to pay', 'Setups', 'warn'],
+    setup:   ['New paper setup', 'Setups', 'acc'],
+    ended:   ['Setup no longer live', 'Setups', ''],
+    results: ['Results date', 'Results', 'warn'],
+    insti:   ['New shareholding filing', 'Filings', ''],
+    annual:  ['New annual figures', 'Filings', ''],
+    price:   ['Price alert reached', 'Price', 'dn'],
+  };
+  function evAll() { const l = lsGet(EKEY, []); return Array.isArray(l) ? l : []; }
+  function logEvents(list) {
+    if (!list.length) return 0;
+    const have = evAll(), ids = new Set(have.map(e => e.id));
+    const fresh = list.filter(e => e && e.id && !ids.has(e.id));
+    if (fresh.length) lsSet(EKEY, fresh.concat(have).slice(0, 300));
+    return fresh.length;
+  }
+  let evBusy = null;
+  /* force: the /alerts page always re-checks; elsewhere at most every 20 min,
+     because institutional.json is ~750KB and the bell is not worth that on
+     every navigation. */
+  async function scanEvents(force) {
+    if (evBusy) return evBusy;
+    const syms = watchAll();
+    if (!syms.length) return { none: true };
+    if (!force && Date.now() - (Number(lsGet(ECHK, 0)) || 0) < 20 * 60000) return { skipped: true };
+    evBusy = (async () => {
+      const [idx, , ins] = await Promise.all([screenIndex(), V2 ? null : v2Load().catch(() => null), loadInsti().catch(() => ({}))]);
+      if (!idx) return { failed: 'the screen did not load' };
+      const watched = new Set(syms);
+      const plans = ((V2 && V2.paper && V2.paper.plans) || []).filter(pl => watched.has(pl.symbol));
+      const live = plans.filter(pl => PAPER_LIVE_STATES.has(pl.state));
+      const chk = live.length ? await paperEntry(live).catch(() => ({})) : {};
+      const now = {};
+      for (const sym of syms) {
+        const r = idx[sym] || {}, x = (ins || {})[sym] || {};
+        now[sym] = { ne: r.next_earnings ? String(r.next_earnings).slice(0, 10) : null,
+                     ip: x.quality === 'complete' ? x.period : null, fy: r.fy || null, st: {} };
+      }
+      const prev = lsGet(ESNAP, null), at = Date.now();
+      /* An unmeasured check ('na': no quote; 'gap': not graded) keeps the last
+         MEASURED state. Overwriting it with "unknown" would let a setup that
+         sat in its range all along be announced as having just entered it,
+         the first time a quote came back. */
+      const KNOWN = new Set(['in', 'above', 'below', 'void', 'held', 'done']);
+      for (const pl of live) {
+        const k = chk[pl.id] && chk[pl.id].k;
+        const was = prev && prev.s && prev.s[pl.symbol] && (prev.s[pl.symbol].st || {})[pl.id];
+        now[pl.symbol].st[pl.id] = KNOWN.has(k) ? k : (was != null ? was : 'na');
+      }
+      lsSet(ESNAP, { at, s: now }); lsSet(ECHK, at);
+      if (!prev || !prev.s) return { baseline: at };
+      const nm = Object.fromEntries((((V2 && V2.paper) || {}).engines || []).map(e => [e.id, e.name]));
+      const ev = [];
+      const add = (k, sym, what, why, href, key) => ev.push({ id: `${k}|${sym}|${key}`, at, k, sym, what, why, href });
+      for (const sym of syms) {
+        const a = prev.s[sym], b = now[sym];
+        if (!a) continue;                       // starred since the last check: its baseline is now
+        for (const [id, st] of Object.entries(b.st)) {
+          const pl = live.find(x => x.id === id), was = (a.st || {})[id];
+          const c = chk[id];
+          if (was == null) add('setup', sym, `${nm[pl.engine] || pl.engine}: buy ${price(pl.entry_low)} – ${price(pl.entry_high)} for the ${v2Date(pl.for_session)} session`,
+            'A new paper setup in the plan feed on a name you watch.', setupHref(pl), id);
+          else if (st === 'in' && was !== 'in' && was !== 'na') add('entered', sym, c ? c.word : 'Inside the buy range',
+            c && c.line ? c.line : `The price is between ${price(pl.entry_low)} and ${price(pl.entry_high)}.`, setupHref(pl), id + '|in|' + new Date(at).toISOString().slice(0, 10));
+          else if (st === 'above' && was !== 'above' && was !== 'na') add('above', sym, c ? c.word : 'Above the most to pay',
+            c && c.line ? c.line : `The price is above ${price(pl.entry_high)}.`, setupHref(pl), id + '|above|' + new Date(at).toISOString().slice(0, 10));
+        }
+        for (const id of Object.keys(a.st || {})) if (!(id in b.st)) {
+          const pl = plans.find(x => x.id === id);
+          add('ended', sym, pl ? (V2_STATE[pl.state] || [pl.state])[0] : 'No longer in the plan feed',
+            'The setup left the live states in the plan feed.', pl ? setupHref(pl) : '/opportunities', id);
+        }
+        if (b.ne && a.ne && b.ne !== a.ne) add('results', sym, `Moved from ${v2Date(a.ne)} to ${v2Date(b.ne)}`, 'Results calendar on the screen.', '/stock/' + encodeURIComponent(sym), b.ne);
+        else if (b.ne && !a.ne) add('results', sym, `Announced for ${v2Date(b.ne)}`, 'Results calendar on the screen.', '/stock/' + encodeURIComponent(sym), b.ne);
+        if (b.ip && a.ip && b.ip !== a.ip) {
+          const x = ins[sym];
+          add('insti', sym, `${b.ip} filed: institutions ${ppFmt(Number(x.insti_pp))} on the quarter`,
+            `Exchange shareholding filings, ${b.ip} against ${x.prev_period || a.ip}.`, '/stock/' + encodeURIComponent(sym), b.ip);
+        }
+        if (b.fy && a.fy && b.fy !== a.fy) add('annual', sym, `${b.fy} statements are now on the screen`,
+          'Company filings via the stock screen.', VISION_URL + '/company/' + encodeURIComponent(sym), b.fy);
+      }
+      const n = logEvents(ev);
+      ev.filter(e => e.k === 'entered').forEach(e => toast(`${e.sym}: ${EV_KIND.entered[0].toLowerCase()}`, e.why));
+      paintBell();
+      return { added: n };
+    })();
+    try { return await evBusy; } finally { evBusy = null; }
+  }
   const addAlert = a => { const l = alertsAll(); l.push(a); return lsSet(AKEY, l); };
   const dropAlert = i => { const l = alertsAll(); l.splice(i, 1); lsSet(AKEY, l); };
 
@@ -2374,6 +2479,9 @@
       if (!hit && fired[key]) delete fired[key];        // re-arm once it crosses back
     });
     lsSet(AFIRED, fired);
+    logEvents(hits.map(h => ({ id: `price|${h.sym}|${h.op}|${h.px}|${fired[`${h.sym}|${h.op}|${h.px}`]}`, at: Date.now(), k: 'price', sym: h.sym,
+      what: `${h.op === 'above' ? 'At or above' : 'At or below'} ₹${h.px} — now ₹${h.px_now}`,
+      why: h.note ? `Your alert: ${h.note}` : 'A level you set on the Watchlist.', href: '/watch' })));
     paintBell();
     hits.forEach(h => toast(`${h.sym} is ${h.op} ${h.px}`,
       `Now ${h.px_now}. ${h.note || ''}`.trim()));
@@ -8222,6 +8330,7 @@
     ['/ipo', 'IPO', 'Books open now, and how last year’s listings did'],
     ['/screen', 'Screen', 'All names, searchable'],
     ['/watch', 'Watchlist', 'Names you starred, and your price alerts'],
+    ['/alerts', 'Alerts', 'What changed on the names you watch'],
     ['/news', 'News', 'The full wire, and the screened names each story touches'],
     ['/brief', 'Brief', 'The current plan, in full'],
     ['/discover', 'Discover', 'Every way into the screen'],
@@ -11649,7 +11758,6 @@
   const WQUICK = [['', 'All'], ['setup', 'Has a setup'], ['results', 'Results soon'],
                   ['alert', 'Price alert'], ['changed', 'Changed since last visit']];
   R['/watch'] = async () => {
-    lsSet(FSEEN, Date.now()); paintBell();
     const syms = watchAll();
     paint(head('Watchlist', 'Names you starred and price levels you asked to be told about.',
       'Yours, on this device') + skel('sk-row', 4), true);
@@ -11972,6 +12080,64 @@
   const v2Badge = (st) => {
     const [w, c, i] = V2_STATE[st] || [st, '', '·'];
     return `<span class="v2-st is-${c}"><i aria-hidden="true">${i}</i>${esc(w)}</span>`;
+  };
+  /* ── /alerts — THE ALERT CENTRE ─────────────────────────────────────── */
+  let alertKind = '';
+  R['/alerts'] = async () => {
+    const H = () => head('Alerts', 'What changed on the names you watch, newest first.', 'Yours, on this device');
+    paint(H() + skel('sk-row', 4), true);
+    const res = await scanEvents(true).catch(e => ({ failed: e && e.message || 'the check failed' }));
+    if (routeOf() !== '/alerts') return;
+    const seenBefore = Number(lsGet(FSEEN, 0)) || 0;
+    lsSet(FSEEN, Date.now()); paintBell();
+    const syms = watchAll(), all = evAll(), snap = lsGet(ESNAP, null);
+    const groups = [['', 'All'], ...[...new Set(Object.values(EV_KIND).map(k => k[1]))].map(g => [g, g])];
+    const shown = all.filter(e => !alertKind || (EV_KIND[e.k] || [])[1] === alertKind);
+    const cnt = (g) => g ? all.filter(e => (EV_KIND[e.k] || [])[1] === g).length : all.length;
+    const dayOf = (t) => new Date(Number(t) + 330 * 60000).toISOString().slice(0, 10);
+    const timeOf = (t) => new Date(Number(t) + 330 * 60000).toISOString().slice(11, 16) + ' IST';
+    const act = (e) => e.href && /^https?:/.test(e.href) ? `<a href="${esc(e.href)}" rel="noopener">Open in Vision ↗</a>`
+      : e.k === 'price' ? `<a href="/watch">Your price alerts →</a>`
+      : /^\/setup\//.test(e.href || '') ? `<a href="${esc(e.href)}">Open the setup →</a>`
+      : `<a href="${esc(e.href || '/watch')}">Open ${esc(e.sym)} →</a>`;
+    let state = '';
+    if (!syms.length) state = `<div class="empty wempty"><b>Nothing to watch yet.</b>
+        <span>Alerts follow the names on your Watchlist. Star a company and changes to it — a setup entering its range, a results date moving, a new filing, a price level you set — are logged here.</span>
+        <a class="v2-gate-b" href="/screen">Browse companies →</a></div>`;
+    else if (res && res.failed) state = `<p class="v2-none"><b>This check did not run:</b> ${esc(res.failed)}. The log below is from earlier checks.</p>`;
+    else if (res && res.baseline && !all.length) state = `<div class="empty wempty"><b>Tracking started ${esc(timeOf(res.baseline))}.</b>
+        <span>This browser has recorded where your ${syms.length} name${syms.length === 1 ? '' : 's'} stand. A change is something that differs from this record, so the first entries appear on a later visit.</span></div>`;
+    else if (!all.length) state = `<div class="empty wempty"><b>No change on your ${syms.length} name${syms.length === 1 ? '' : 's'}.</b>
+        <span>Checked ${esc(timeOf(snap && snap.at || Date.now()))} against the state recorded ${snap ? 'at the previous check' : 'earlier'}. Nothing crossed into a setup, moved a results date or filed.</span></div>`;
+    let list = '';
+    if (shown.length) {
+      let d0 = '';
+      list = `<ol class="evl">${shown.map(e => {
+        const [word, , tone] = EV_KIND[e.k] || [e.k, '', ''];
+        const d = dayOf(e.at), hd = d !== d0 ? `<li class="evd" aria-hidden="true">${esc(v2Date(d))}</li>` : '';
+        d0 = d;
+        return `${hd}<li class="ev${Number(e.at) > seenBefore ? ' is-new' : ''}">
+          <span class="ev-t">${esc(timeOf(e.at))}${Number(e.at) > seenBefore ? '<i class="ev-new">New</i>' : ''}</span>
+          <span class="ev-b"><span class="ev-k ev-${esc(tone)}">${esc(word)}</span>
+            <b><a href="/stock/${encodeURIComponent(e.sym)}">${esc(e.sym)}</a> · ${esc(e.what)}</b>
+            <small>${esc(e.why || '')}</small></span>
+          <span class="ev-a">${act(e)}</span></li>`; }).join('')}</ol>`;
+    } else if (all.length) list = `<div class="empty">Nothing of this kind in the log.</div>`;
+    paint(H() + state
+      + (all.length ? sec('The log', `<div class="chips" role="group" aria-label="Kind">${groups.map(([g, l]) =>
+          `<button type="button" class="chip" data-evk="${esc(g)}" aria-pressed="${alertKind === g}">${esc(l)} <b>${cnt(g)}</b></button>`).join('')}</div>${list}
+          <p class="hint">Kept in this browser: the last 300 entries. <button type="button" class="lnk" id="evClear">Clear the log</button></p>`,
+          `${all.length} logged`) : '')
+      + sec('What is tracked', `<ul class="v2-list">
+          <li><b>Setups.</b> A new paper setup on a name you watch; its price entering the buy range or moving above the most to pay (a delayed quote in the session, the last close outside it); the setup leaving the live states.</li>
+          <li><b>Results.</b> A results date announced or moved, from the screen's calendar.</li>
+          <li><b>Filings.</b> A new quarter's shareholding filed; a new fiscal year's statements reaching the screen.</li>
+          <li><b>Price.</b> A level you set on the <a href="/watch">Watchlist</a>.</li></ul>
+        <p class="hint">Checked when this site is open — on this page every time, elsewhere at most every 20 minutes. Nothing runs in the background and nothing leaves this browser.
+          ${snap ? `Last check ${esc(v2Date(dayOf(snap.at)))}, ${esc(timeOf(snap.at))}.` : ''}</p>`));
+    main.querySelectorAll('[data-evk]').forEach(b => b.addEventListener('click', () => { alertKind = b.dataset.evk; R['/alerts'](); }));
+    const cl = document.getElementById('evClear');
+    if (cl) cl.addEventListener('click', () => { lsSet(EKEY, []); paintBell(); R['/alerts'](); });
   };
   const v2PlanUrl = (p) => '/plan/' + encodeURIComponent(p.id);
   const v2Vision = (sym) => VISION_URL + '/company/' + encodeURIComponent(sym);
@@ -12687,6 +12853,8 @@
                      'Mutual funds ranked on three- and five-year return against their own drawdown and volatility. Direct plans only, because the cost difference compounds.'],
     '/watch':       ['Watchlist — your names, sorted by what needs attention',
                      'The names you follow, ranked by what changed rather than alphabetically.'],
+    '/alerts':      ['Alerts — what changed on the names you watch',
+                     'Setups entering their buy range, results dates moving, new filings and your price levels, logged in this browser.'],
     '/brief':       ['The brief — the current plan, in full',
                      'The current plan with every level and condition, or a plain statement that nothing qualified.'],
     '/methodology': ['Methodology — how a plan is built and graded',
@@ -12783,7 +12951,7 @@
    * breadcrumb reading "Today" while you are looking at Today is noise. */
   const WHERE = { '/': '', '/markets': 'Market', '/ipo': 'IPO',
                   '/opportunities': 'Setups', '/performance': 'Record', '/plan/:id': 'Plan', '/setup/:id': 'Setup',
-                  '/screen': 'Screen', '/brief': 'Brief', '/watch': 'Watchlist',
+                  '/screen': 'Screen', '/brief': 'Brief', '/watch': 'Watchlist', '/alerts': 'Alerts',
                   '/radar': 'Market · Radar', '/discover': 'All tools',
                   '/map': 'Market · Map', '/reads': 'Weekly reads', '/heat': 'Market · Heatmap',
                   '/join': 'The brief', '/methodology': 'Methodology',
@@ -13600,6 +13768,8 @@
   })();
 
   paintBell();
+  /* The alert check runs once the page is idle, never ahead of first paint. */
+  (window.requestIdleCallback || ((f) => setTimeout(f, 2500)))(() => { scanEvents(false).catch(() => {}); });
 
   document.getElementById('themeBtn').addEventListener('click', () => {
     const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';

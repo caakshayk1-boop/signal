@@ -65,6 +65,10 @@ export const SIGNAL_META = {
   "Watchlist — your names, sorted by what needs attention",
   "The names you follow, ranked by what changed rather than alphabetically."
  ],
+ "/alerts": [
+  "Alerts — what changed on the names you watch",
+  "Setups entering their buy range, results dates moving, new filings and your price levels, logged in this browser."
+ ],
  "/brief": [
   "The brief — the current plan, in full",
   "The current plan with every level and condition, or a plain statement that nothing qualified."
