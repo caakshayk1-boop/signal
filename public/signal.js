@@ -430,6 +430,9 @@
    * The sign is now taken from the ROUNDED value, so it always agrees with
    * the digits beside it, and an unchanged instrument prints a bare 0.00% —
    * which is the whole truth about a move of zero. */
+  /* 81st, not 81th. */
+  const ordinal = n => { const v = Math.round(n), t = v % 100;
+    return v + (t >= 11 && t <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][v % 10] || 'th'); };
   const pct = v => {
     const n = Number(v);
     if (!isFinite(n)) return '—';
@@ -6135,7 +6138,7 @@
           PE percentile against the name's OWN history means something. */
     const pep = sn(r.pe_pctile);
     if (pep != null) {
-      add('Valuation vs its own history', Math.round(pep) + 'th pct',
+      add('Valuation vs its own history', ordinal(pep) + ' pct',
           pep <= 30 ? 'up' : pep >= 80 ? 'dn' : '',
           pep <= 30 ? 'Cheaper than it has usually traded on its own earnings.'
             : pep >= 80 ? 'More expensive than it has usually been. Multiple expansion is doing the work.'
@@ -6332,7 +6335,7 @@
     if (pe != null || pb != null) {
       P.push(`<p><b>What it costs.</b> ${pe != null ? `${N(pe)}x earnings` : ''}${
         pe != null && pb != null ? ' and ' : ''}${pb != null ? `${N(pb, 2)}x book` : ''}.${
-        pep != null ? ` Against its own history that is the ${Math.round(pep)}th percentile — ${
+        pep != null ? ` Against its own history that is the ${ordinal(pep)} percentile — ${
           pep <= 30 ? 'cheaper than it usually trades' : pep >= 80 ? 'dearer than it usually trades'
           : 'about where it normally sits'}.` : ''}${
         dy != null && dy > 0.5 ? ` It pays ${N(dy, 2)}% as dividend.` : ''}
@@ -11129,7 +11132,7 @@
       <p><b>The forward record begins 1 October 2026.</b> Every plan from that date is counted. Backtests are
         never imported into it.</p>
 
-      <h3>Strategy status</h3>
+      <h3 id="status">Strategy status</h3>
       <p>A rule's status is published beside it on Opportunities and Performance. <i>Research</i> means it has not
         shown a reliable edge and publishes nothing. <i>Paper test</i> (registry status <i>shadow</i>) means it is tracked forward on paper and shown in its own labelled
         section, but files no plan and never enters the record.
@@ -11577,13 +11580,74 @@
     return { rank, why: reasons };
   }
 
+  /* One line of tags under the name: setup, results date, nearest alert,
+   * move since the last visit. A tag that has nothing to say is left out
+   * rather than printed as a dash — the row already has nine columns of those. */
+  function watchTags(sym, r, live, al, WF) {
+    const t = [];
+    const st = WF.setup[sym];
+    if (st) t.push(`<i class="wt wt-s">${esc(st.kind)} · ${esc((V2_STATE[st.p.state] || [st.p.state])[0])}</i>`);
+    const d = earnDays(r);
+    if (d != null && d >= 0 && d <= 60)
+      t.push(`<i class="wt${d <= RESULTS_SOON ? ' wt-w' : ''}">Results ${d === 0 ? 'today' : `in ${d}d`}</i>`);
+    const px = live && Number.isFinite(live.price) ? live.price : Number(r.price);
+    const mine = al.filter(a => a.sym === sym && Number(a.px) > 0);
+    if (mine.length) {
+      const away = (a) => Number.isFinite(px) && px > 0 ? (Number(a.px) - px) / px * 100 : null;
+      const near = mine.slice().sort((a, b) => Math.abs(away(a) ?? Infinity) - Math.abs(away(b) ?? Infinity))[0];
+      const w = away(near);
+      t.push(`<i class="wt wt-a">Alert ${near.op === 'above' ? '≥' : '≤'} ₹${esc(near.px)}${
+        w == null ? '' : ` · ${Math.abs(w).toFixed(1)}% away`}${mine.length > 1 ? ` · +${mine.length - 1}` : ''}</i>`);
+    }
+    const m = WF.since(sym);
+    if (m != null && Math.abs(m) >= SINCE_MOVE)
+      t.push(`<i class="wt ${m > 0 ? 'up' : 'dn'}">${m > 0 ? '+' : ''}${m.toFixed(1)}% since last visit</i>`);
+    return t.length ? `<span class="wtags">${t.join('')}</span>` : '';
+  }
+
   const TRIAGE = [
     ['ACTION', 'Something a level you were watching has actually reached.'],
     ['DEVELOPING', 'Close to a level, but not there. Worth a look, not a decision.'],
     ['WAIT', 'Nothing measured has changed. Left here so the list stays complete.'],
   ];
 
-  let watchQ = '', watchSort = 'sym', watchSec = '', WVIEW = null;
+  let watchQ = '', watchSort = 'sym', watchSec = '', watchQuick = '', WVIEW = null;
+  /* ── WHAT EACH STARRED NAME IS DOING ELSEWHERE ON THIS SITE ─────────────
+   * The table answered "where is the price"; a watchlist is also asked
+   * "is there a setup on it, is a results date coming, did I set a level,
+   * and has it moved since I last looked". Each answer is read off a feed
+   * this page already loads — the plan feed, the screen row, this browser's
+   * alerts and its last-visit snapshot — and none is computed here. */
+  const RESULTS_SOON = 10;      // the same window the stock card warns inside
+  const SINCE_MOVE = 3;         // the same move "Since your last visit" reports
+  const earnDays = (r) => {
+    if (!r || !r.next_earnings) return null;
+    const n = Math.round((new Date(String(r.next_earnings).slice(0, 10) + 'T00:00:00') - new Date()) / 86400000);
+    return Number.isFinite(n) ? n : null;
+  };
+  const watchFacts = (rowOf, al) => {
+    const setup = {};
+    for (const pl of ((V2 && V2.paper && V2.paper.plans) || []))
+      if (PAPER_LIVE_STATES.has(pl.state)) setup[pl.symbol] = { p: pl, kind: 'Paper setup' };
+    for (const pl of ((V2 && V2.plans) || []))
+      if (pl.state === 'awaiting_entry' || V2_OPEN.has(pl.state)) setup[pl.symbol] = { p: pl, kind: 'Plan' };
+    const base = visitBase && visitBase.px ? visitBase : null;
+    const since = (sym) => {
+      const raw = rowOf(sym).price;           // Number(null) is 0: a −100% move
+      if (raw == null || raw === '' || !base) return null;
+      const b = Number(base.px[sym]), now = Number(raw);
+      return b > 0 && now > 0 ? (now / b - 1) * 100 : null;
+    };
+    const hit = {
+      setup: (sym) => !!setup[sym],
+      results: (sym) => { const d = earnDays(rowOf(sym)); return d != null && d >= 0 && d <= RESULTS_SOON; },
+      alert: (sym) => al.some(a => a.sym === sym),
+      changed: (sym) => { const m = since(sym); return m != null && Math.abs(m) >= SINCE_MOVE; },
+    };
+    return { setup, since, hit, base };
+  };
+  const WQUICK = [['', 'All'], ['setup', 'Has a setup'], ['results', 'Results soon'],
+                  ['alert', 'Price alert'], ['changed', 'Changed since last visit']];
   R['/watch'] = async () => {
     lsSet(FSEEN, Date.now()); paintBell();
     const syms = watchAll();
@@ -11592,7 +11656,7 @@
 
     // The screen supplies every fundamental and level; live prices come from
     // the same quote route the rest of the site uses.
-    const idx = await screenIndex();
+    const [idx] = await Promise.all([screenIndex(), V2 ? null : v2Load().catch(() => null)]);
     const q = syms.length ? await quotes(syms) : {};
     let out = head('Watchlist', 'Names you starred and price levels you asked to be told about.',
       'Yours, on this device');
@@ -11615,6 +11679,10 @@
      * controls, and the only one with no way to search or order it. At ten
      * names that is fine; at eighty it is a wall. Search, sector and sort,
      * with the same grammar as the Screen so nothing new has to be learned. */
+    const al = alertsAll();
+    const rowOf = x => (idx && idx[x]) || { sym: x };
+    const WF = watchFacts(rowOf, al);
+    const qCount = Object.fromEntries(WQUICK.map(([k]) => [k, k ? syms.filter(WF.hit[k]).length : syms.length]));
     const WSORT = { sym: 'Symbol', r1d: 'Today', r1m: '1 month', rsi: 'RSI',
                     from_high: 'From 52w high', mcap_cr: 'Size' };
     const wSectors = [...new Set(syms.map(x => (idx && idx[x] || {}).sector).filter(Boolean))].sort();
@@ -11626,16 +11694,24 @@
             `<option value="${k}"${watchSort === k ? ' selected' : ''}>Order by ${esc(l)}</option>`).join('')}
         </select>
       </div>
-      ${wSectors.length > 1 ? `<div class="chips" role="group" aria-label="Sector">
+      ${wSectors.length > 1 ? `<div class="chips" role="group" aria-label="Sector"><span class="chips-l" aria-hidden="true">Sector</span>
         <button type="button" class="chip" data-wsec="" aria-pressed="${!watchSec}">All ${syms.length}</button>
         ${wSectors.map(sv => `<button type="button" class="chip" data-wsec="${esc(sv)}"
            aria-pressed="${watchSec === sv}">${esc(sv)}</button>`).join('')}
-      </div>` : ''}`, syms.length ? `${syms.length} starred` : '');
+      </div>` : ''}
+      ${syms.length ? `<div class="chips wq-chips" role="group" aria-label="Show"><span class="chips-l" aria-hidden="true">Show</span>
+        ${WQUICK.map(([k, l]) => `<button type="button" class="chip${k && !qCount[k] ? ' is-zero' : ''}" data-wquick="${k}"
+           aria-pressed="${watchQuick === k}">${esc(l)} <b>${qCount[k]}</b></button>`).join('')}
+      </div>
+      <p class="hint wq-def"><b>Has a setup</b>: a live paper setup or plan in tonight's feed.
+        <b>Results soon</b>: a results date in the next ${RESULTS_SOON} days.
+        <b>Changed</b>: price ${SINCE_MOVE}% or more away from what this browser recorded at your last visit${
+          WF.base ? ` (${esc(agoWord(WF.base.at))})` : ' — none recorded yet, so this stays empty until your next one'}.</p>` : ''}`,
+      syms.length ? `${syms.length} starred` : '');
 
-    /* Read once, above the first use: triage consults the alerts (a triggered
-     * one always outranks anything this site computes) and so does the alert
-     * table further down. */
-    const al = alertsAll();
+    /* The alerts are read once, above the filters: triage consults them (a
+     * triggered one always outranks anything this site computes), and so do
+     * the "Price alert" filter and the alert table further down. */
 
     /* The three counts, before the table. This is the answer to "is there
      * anything for me today", which is the only question a watchlist is
@@ -11659,10 +11735,10 @@
          * list the reader is looking at — numbering the unfiltered list and
          * then hiding rows leaves gaps that read as missing data. */
         const wq = watchQ.trim().toLowerCase();
-        const rowOf = x => (idx && idx[x]) || { sym: x };
         let view = syms.filter(x => {
           const r = rowOf(x);
           if (watchSec && r.sector !== watchSec) return false;
+          if (watchQuick && !WF.hit[watchQuick](x)) return false;
           if (!wq) return true;
           return `${x} ${r.name || ''} ${r.sector || ''} ${r.ind || ''}`.toLowerCase().includes(wq);
         });
@@ -11701,7 +11777,7 @@
               const [word] = TRIAGE[tg.rank];
               return `<span class="wtri wtri-${tg.rank}">
                 <i>${esc(word)}</i>${tg.why.length ? `<em>${esc(tg.why[0])}</em>` : ''}</span>`;
-            })()}</span>
+            })()}${watchTags(sym, r, live, al, WF)}</span>
           <span class="x">${px != null ? '₹' + esc(px) : '—'}</span>
           <span class="x ${live && dir(live.change_pct)}">${live && Number.isFinite(live.change_pct) ? pct(live.change_pct) : '—'}</span>
           <span class="x ${dir(v50)}">${v50 == null ? '—' : pct(v50)}</span>
@@ -11710,8 +11786,10 @@
           <span class="m ${dir(r.r1m)}">${pct(r.r1m)}</span>
           <span class="pl-w">${priceLine(r)}</span>
         </div>`; }).join('')}</div>`
-      : `<div class="empty">Nothing starred yet. Open <a href="/screen" style="color:var(--accent)">Screen</a>
-         or any company card and press the star.</div>`,
+      : `<div class="empty wempty"><b>Your watchlist is empty.</b>
+         <span>Press the star on any company card or Screen row to follow it here: its setup, results date, alerts and what moved since your last visit.
+         Vision keeps a separate list — each site stores its own in this browser.</span>
+         <a class="v2-gate-b" href="/screen">Browse companies →</a></div>`,
       syms.length ? `${syms.length} name${syms.length > 1 ? 's' : ''}` : '');
     if (syms.length) out = out.replace(/<\/section>$/, PLKEY + '</section>');
     // Filtered down to nothing is a different state from "nothing starred".
@@ -11789,6 +11867,8 @@
     if (wso) wso.addEventListener('change', () => { watchSort = wso.value; R['/watch'](); });
     main.querySelectorAll('[data-wsec]').forEach(b =>
       b.addEventListener('click', () => { watchSec = b.dataset.wsec; R['/watch'](); }));
+    main.querySelectorAll('[data-wquick]').forEach(b =>
+      b.addEventListener('click', () => { watchQuick = b.dataset.wquick; R['/watch'](); }));
     /* EXPORT / IMPORT. The only way to move a local-only list between
        devices. The file is the same three keys this page reads; an import is
        validated and MERGED (union of symbols, alerts appended), never a
@@ -11944,7 +12024,7 @@
 
   /* What a reader needs before they open anything: is this session's scan in,
      is the market open, how much of the universe was read, when is the next. */
-  function v2StatusStrip(d) {
+  function v2StatusStrip(d, reg) {
     const nse = exchangeState('Asia/Kolkata', 9.25, 15.5, 'NSE');
     const cov = d.coverage || {};
     const covTxt = (cov.with_session_bar != null && cov.universe)
@@ -11961,7 +12041,7 @@
     const live = nse.open ? `NSE open · ${esc(nse.label)}` : nse.holiday ? `NSE closed · ${nse.label}` : `NSE closed · ${esc(nse.label)}`;
     return `<div class="v2-strip" role="status">
       <div${bad ? ' class="v2-late"' : ''}><span class="k">Latest session</span><b>${v2Date(d.session_date)}</b><span class="s">${esc(bad || 'scanned after the close')}</span></div>
-      <div><span class="k">Market</span><b>${live}</b><span class="s">Prices on this site are delayed, not live ticks</span></div>
+      <div><span class="k">Market</span><b>${live}</b><span class="s">${reg && reg.regime ? `Regime: <a href="/markets">${esc(String(reg.regime).replace(/_/g, ' '))}</a> · ` : ''}Prices on this site are delayed, not live ticks</span></div>
       <div><span class="k">Coverage</span><b>${cov.with_session_bar != null ? cov.with_session_bar.toLocaleString('en-IN') : '—'}</b><span class="s">${esc(covTxt)}</span></div>
       ${overdue
         ? `<div class="v2-late"><span class="k">Next scan</span><b>Overdue</b><span class="s">The scan due by ${v2Time(d.next_scan_due)} has not published. Everything here is from ${v2Date(d.session_date)}.</span></div>`
@@ -11986,7 +12066,7 @@
         <div class="v2-t"><span class="k">Stop</span><b class="cnum">${price(p.initial_stop)}</b><span class="s">${p.risk_pct != null ? v2Num(p.risk_pct, 1) + '% below the cap' : ''}</span></div>
         ${tgt('t1', ex.t1_pct)}${tgt('t2', ex.t2_pct)}${tgt('t3', ex.t3_pct)}
       </div>
-      <footer><a href="${v2PlanUrl(p)}">Plan ${esc(p.id)} →</a> <a href="${v2Vision(p.symbol)}">Research in Vision ↗</a></footer>
+      <footer><a href="${v2PlanUrl(p)}">Plan ${esc(p.id)} →</a> <a href="${v2Vision(p.symbol)}">Why this company? Open in Vision ↗</a></footer>
     </article>`;
   }
 
@@ -12000,6 +12080,30 @@
     error: 'The last run failed.',
     market_filter: `No new plans for the ${v2Date(d.next_session)} session.`,
   })[d.status] || `No plan qualified for the ${v2Date(d.next_session)} session.`;
+  /* THE PUBLICATION GATE, AS A STATE. "No plans" was a paragraph that read
+     like an empty result. It is a decision: no engine has earned the record
+     yet. The card says so, gives the three numbers that matter (published,
+     paper test, the record's own count) and the two things a reader can do. */
+  function v2Gate(d) {
+    const m = d.metrics || {};
+    const P = d.paper || {};
+    const cand = (P.plans || []).filter(p => p.state === 'awaiting_entry' || (p.fill_price != null && !p.ended_session)).length;
+    const title = d.status === 'paused' ? `No plan published for the ${v2Date(d.next_session)} session` : v2NoneWhy(d);
+    const why = d.status === 'paused'
+      ? 'The publication gate is closed: no engine has yet passed its promotion criteria on forward data, so nothing enters the record.'
+      : (d.status_detail || '');
+    return `<section class="v2-gate" aria-labelledby="v2GateH" role="status">
+      <div class="v2-gate-h"><span class="v2-gate-i" aria-hidden="true"></span>
+        <div><h3 id="v2GateH">${esc(title)}</h3><p>${esc(why)}</p></div></div>
+      <dl class="v2-gate-n">
+        <div><dt>Published plans</dt><dd class="cnum">${m.published ?? 0}</dd><dd class="s">${d.status === 'paused' ? 'publication paused' : 'this session'}</dd></div>
+        <div><dt>Paper test</dt><dd class="cnum">${cand}</dd><dd class="s">setup${cand === 1 ? '' : 's'} recorded and graded forward, not the record</dd></div>
+        <div><dt>Forward record</dt><dd class="cnum">${m.published ?? 0} · ${m.closed ?? 0}</dd><dd class="s">published · closed${d.forward_record_start ? ` since ${v2Date(d.forward_record_start)}` : ''}</dd></div>
+      </dl>
+      <p class="v2-gate-a">${cand ? `<a class="v2-gate-b" href="/opportunities#paper">Review the paper test →</a>` : ''}
+        <a href="/methodology#status">How an engine is promoted</a></p>
+    </section>`;
+  }
   const v2Empty = (d, what) => `<div class="empty v2-empty"><b>${esc(what)}</b>
     <p>${esc(d.status_detail || '')}</p></div>`;
 
@@ -12055,7 +12159,15 @@
       : `<p class="v2-rec-h">Trades</p><div class="grid v2-rec v2-rec4">${tiles.slice(0, 4).join('')}</div>
          <p class="v2-rec-h">Paper money</p><div class="grid v2-rec v2-rec4">${tiles.slice(4).join('')}</div>`;
     const rec = `${m.published ?? 0} published = ${m.awaiting_entry ?? 0} awaiting entry + ${m.active ?? 0} active + ${m.closed ?? 0} closed + ${m.expired_unfilled ?? 0} expired unfilled + ${m.cancelled_before_entry ?? 0} cancelled before entry`;
-    return `${tilesHtml}
+    /* NOT STARTED IS A STATE, NOT A RESULT. With nothing published, the tiles
+       below are zeros and a starting balance; set out as tiles they look like
+       a performance that happened to be flat. The state is named first. */
+    const state = compact ? '' : !m.published
+      ? `<div class="v2-rec-none" role="note"><b>Record not started</b><span class="cnum">0 published · 0 closed</span>
+          <p>No plan has been published${since ? ` since the record began on ${v2Date(since)}` : ''}, so there is no result to report. The figures below are zeros and the starting balance, not outcomes.</p></div>`
+      : none ? `<div class="v2-rec-none" role="note"><b>No closed trade yet</b><span class="cnum">${m.published} published · 0 closed</span>
+          <p>A result exists only once a plan closes. Until then nothing below is a win rate or a return.</p></div>` : '';
+    return `${state}${tilesHtml}
       <p class="v2-recon">${esc(rec)}${m.reconciles === false ? ' — <b>does not reconcile; reported as an error</b>' : ''}.</p>
       <p class="v2-disc">The forward record begins ${since ? v2Date(since) : 'with the first session scanned'}.</p>`;
   }
@@ -12121,10 +12233,10 @@
        were mostly empty states. Now: the session's plans (or one line saying
        why there are none) and the paper setups; your positions and watchlist
        side by side; the market with its regime as the first line; the record. */
-    const noPlans = `<p class="v2-none"><b>${esc(v2NoneWhy(d))}</b> ${esc(d.status_detail || '')}</p>`;
+    const noPlans = v2Gate(d);
     paint(hh() +
       (r.stale ? staleNote(r.age) : '') +
-      v2StatusStrip(d) +
+      v2StatusStrip(d, reg) +
       (window.V2W && window.V2W.changes ? window.V2W.changes(d, { href: setupHref }) : '') +
       vsec(`Plans for ${v2Date(d.next_session)}`, next.length ? `<div class="v2-cards">${next.map(p => v2Card(p, d)).join('')}</div>`
         : noPlans, String(next.length), null, { lead: true }) +
@@ -12133,7 +12245,7 @@
          window, state — linking to its full card over there, where the sells,
          the reason and the engine rules live. */
       v2Paper(d, { compact: true, digest: true, title: 'Paper setups — a test, not plans', moreHref: '/opportunities#paper',
-                   cardHref: setupHref }) +
+                   cardHref: setupHref, visionHref: (s) => VISION_URL + '/#/brief/' + encodeURIComponent(s), methodHref: '/methodology#status' }) +
       `<div class="v2-duo">` +
       vsec('Active paper positions', active.length ? `<div class="v2-cards">${active.map(p => v2Card(p, d)).join('')}</div>`
         : `<p class="muted">No open paper position. A setup becomes one when its buy range trades.</p>`, String(active.length)) +
@@ -12268,7 +12380,7 @@
       vsec('Stop and management', `<p>${esc(p.stop_rule)}</p><p>${esc(p.management)}</p><p class="muted">After ${d.time_exit_sessions} held sessions, whatever remains is sold at the next open. A stop does not cap a gap loss.</p>`) +
       vsec('Position', pos) +
       vsec('Updates', upd) +
-      vsec('Company research', `<p><a href="${v2Vision(p.symbol)}">${esc(p.symbol)} in Vision ↗</a> · <a href="/stock/${encodeURIComponent(p.symbol)}">Screen card</a></p>
+      vsec('Company research', `<p><a href="${v2Vision(p.symbol)}">Why this company? ${esc(p.symbol)} in Vision ↗</a> · <a href="/stock/${encodeURIComponent(p.symbol)}">Screen card</a></p>
         <p class="muted">The research below describes the company. It is not part of the plan's rules and does not change its levels.</p>
         ${fund}`) +
       `<p class="v2-note">${esc(d.notice || '')}</p>`);
@@ -12311,7 +12423,7 @@
         const nm0 = Object.fromEntries((rec.engines || []).map(e => [e.id, e.name]));
         v2Shell(t.symbol, `Paper setup · ${nm0[t.engine] || t.engine} · finished ${v2Date(t.ended_session || t.filed_session)}`,
           window.V2W.replay(t, rec, { noSymbol: true }) +
-          `<p class="v2-pp-links"><a href="${VISION_URL}/#/brief/${encodeURIComponent(t.symbol)}">${esc(t.symbol)} in Vision ↗</a>
+          `<p class="v2-pp-links"><a href="${VISION_URL}/#/brief/${encodeURIComponent(t.symbol)}">Read the company context in Vision ↗</a>
             · <a href="/stock/${encodeURIComponent(t.symbol)}">Screen card</a> · <a href="/performance#finished">Every finished setup</a></p>`);
         return;
       }
@@ -12325,7 +12437,7 @@
     const nm = Object.fromEntries((P.engines || []).map(e => [e.id, e.name]));
     v2Shell(p.symbol, `Paper setup · ${nm[p.engine] || p.engine} · for the ${v2Date(p.for_session)} session`,
       window.V2W.passport(p, d, { noSymbol: true }) +
-      `<p class="v2-pp-links"><a href="${VISION_URL}/#/brief/${encodeURIComponent(p.symbol)}">${esc(p.symbol)} in Vision: chart, technical read and the business ↗</a>
+      `<p class="v2-pp-links"><a href="${VISION_URL}/#/brief/${encodeURIComponent(p.symbol)}">Why this company? ${esc(p.symbol)} in Vision: chart, technical read and the business ↗</a>
         · <a href="/stock/${encodeURIComponent(p.symbol)}">Screen card</a> · <a href="/opportunities">Every setup</a></p>`);
     const e = (await paperEntry([p]))[p.id];
     const slot = document.querySelector('[data-v2w-entry]');
@@ -12411,7 +12523,7 @@
         <div class="v2-brief-b"><div id="bRead">${skel('sk-card', 1)}</div></div>
       </div>
       <div id="bBiz" class="v2-brief-biz">${skel('sk-card', 1)}</div>
-      <p class="v2-pp-links"><a href="${setupHref(p)}">This setup on its own page</a> · <a href="${VISION_URL}/#/brief/${encodeURIComponent(p.symbol)}">${esc(p.symbol)} in Vision ↗</a> · <a href="/opportunities">Every setup</a></p>`);
+      <p class="v2-pp-links"><a href="${setupHref(p)}">This setup on its own page</a> · <a href="${VISION_URL}/#/brief/${encodeURIComponent(p.symbol)}">Why this company? ${esc(p.symbol)} in Vision ↗</a> · <a href="/opportunities">Every setup</a></p>`);
     const here = () => routeOf() === '/brief';
     /* Each part arrives on its own; a slow one never holds the others. */
     paperEntry(live).then(chk => {

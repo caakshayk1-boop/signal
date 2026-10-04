@@ -886,7 +886,19 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 .glance{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s-3);margin:var(--s-4) 0}
 @media (max-width:899px){.glance{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .glance .gl{display:flex;flex-direction:column;gap:2px;padding:var(--s-3) var(--s-4);border:1px solid var(--line);border-radius:var(--r-2);background:var(--panel);text-decoration:none;color:inherit;min-width:0}
-.glance .gl:hover{border-color:var(--accent)}
+.glance .gl{position:relative;transition:border-color 160ms ease,transform 160ms cubic-bezier(.23,1,.32,1)}
+@media (hover:hover) and (pointer:fine){.glance .gl:hover{border-color:var(--accent)}.glance .gl:hover .gl-go{color:var(--accent,#2743c8)}}
+.glance .gl:focus-visible{outline:2px solid var(--accent,#2743c8);outline-offset:2px}
+.glance .gl:active{transform:scale(.98)}
+.glance .gl .gl-go{font-style:normal;font-size:var(--t-xs);font-weight:600;color:var(--ink-3);margin-top:4px;transition:color 160ms ease}
+@media (prefers-reduced-motion:reduce){.glance .gl,.glance .gl .gl-go{transition:none}.glance .gl:active{transform:none}}
+.hhint{margin:var(--s-2) 0 0;font-size:var(--t-xs);color:var(--ink-3)}
+.hhint .kbd{font-size:inherit}
+@media (hover:none),(pointer:coarse){.hhint .k{display:none}}
+.hrec .hrec-x{font:inherit;font-size:var(--t-xs);min-height:32px;padding:0 8px;margin-right:6px;border:0;background:none;
+  color:var(--ink-3);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+@media (hover:hover) and (pointer:fine){.hrec .hrec-x:hover{color:var(--ink)}}
+@media (pointer:coarse){.hrec .hrec-x{min-height:44px}}
 .glance .gl span{font-size:var(--t-xs);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 .glance .gl b{font-size:26px;line-height:1.15;font-variant-numeric:tabular-nums;color:var(--ink)}
 .glance .gl em{font-style:normal;font-size:var(--t-xs);color:var(--ink-3)}
@@ -906,3 +918,38 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 .bplan dd b{font-size:var(--t-xl);font-variant-numeric:tabular-nums}
 .bplan dd span{font-size:var(--t-xs);color:var(--ink-3)}
 @media (max-width:599px){.bplan>div{grid-template-columns:96px minmax(0,1fr)}}
+
+/* One-minute read: read · fact · rule per line, the next event apart. A list,
+   not a grid, so it reads top to bottom in one pass on any width. */
+.one{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.one li{display:grid;grid-template-columns:150px minmax(150px,220px) minmax(0,1fr);gap:4px 16px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line)}
+.one li:first-child{border-top:0}
+.one-l{font-size:var(--t-xs);color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
+.one-w{font-weight:600;color:var(--ink)} .one-w.up{color:var(--up)} .one-w.dn{color:var(--dn)}
+.one-f{font:400 var(--t-sm,13px)/1.45 var(--f-mono);color:var(--ink-2);font-variant-numeric:tabular-nums}
+.one-r{grid-column:3;font-size:var(--t-xs);color:var(--ink-3)}
+.one-ev{background:color-mix(in srgb,var(--accent,#2743c8) 5%,transparent)}
+@media (max-width:760px){.one li{grid-template-columns:minmax(0,1fr)}.one-r{grid-column:auto}}
+.one-sig{margin:var(--s-3) 0 0;padding-top:var(--s-3);border-top:1px solid var(--line);font-size:var(--t-sm,12px);color:var(--ink-2)}
+.one-sig b{color:var(--ink);font-weight:600;margin-right:4px} .one-sig a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+
+/* "Why it matters" under a What-matters figure. Native <details>: the open
+   state is announced by the platform, and nothing animates — it is read once
+   per company, then left open or shut. */
+.mt-why{margin-top:6px}
+.mt-why summary{cursor:pointer;font-size:var(--t-xs);font-weight:600;color:var(--ink-3);list-style:none;display:inline-flex;align-items:center;gap:4px;min-height:28px}
+.mt-why summary::-webkit-details-marker{display:none}
+.mt-why summary::before{content:'+';font-family:var(--mono,ui-monospace,monospace);width:1ch}
+.mt-why[open] summary::before{content:'−'}
+.mt-why summary:focus-visible{outline:2px solid var(--accent,#2743c8);outline-offset:2px;border-radius:2px}
+@media (hover:hover) and (pointer:fine){.mt-why summary:hover{color:var(--ink)}}
+@media (pointer:coarse){.mt-why summary{min-height:44px}}
+.mt-why p{margin:2px 0 0;font-size:var(--t-xs);line-height:1.5;color:var(--ink-2,var(--ink-3));font-weight:400}
+
+/* Questions to investigate: a numbered list, the prompt in ink, its basis under it. */
+.qs{list-style:none;margin:0;padding:0;counter-reset:q}
+.qs li{counter-increment:q;display:grid;grid-template-columns:28px 1fr;column-gap:var(--s-2);padding:var(--s-3) 0;border-top:1px solid var(--line)}
+.qs li:first-child{border-top:0;padding-top:0}
+.qs li::before{content:counter(q);grid-row:span 2;font-family:var(--mono,ui-monospace,monospace);font-size:var(--t-xs);color:var(--ink-3);padding-top:2px}
+.qs b{font-weight:600;line-height:1.45;color:var(--ink)}
+.qs small{margin-top:2px;font-size:var(--t-xs);color:var(--ink-3);line-height:1.45}

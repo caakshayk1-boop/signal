@@ -927,6 +927,8 @@
      Vision setup. insight.js turns it into "what matters" and "what changed"
      — the same file the Worker runs to write the page's HTML. */
   const INS = () => window.VisionInsight || null;
+  const ordN = (n) => { const v = Math.round(n), t = v % 100;      // 81st, never 81th
+    return v + (t >= 11 && t <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][v % 10] || 'th'); };
   /* The screen's lender rule (stock_screen.py::_is_financial), via insight.js
      where it is written once for the browser and the Worker. The fallback is
      the same four words, for a page on which insight.js did not arrive. */
@@ -958,7 +960,28 @@
     { c: 'var(--dn,#c4372c)', shape: 'text', sample: '7.1%', label: 'it moved the wrong way' },
     { c: 'var(--ink,currentColor)', shape: 'text', sample: '13.1%', label: 'a level, no direction' }],
     { title: 'A value is coloured by the change written under it:' }) : '';
-  const mattersHtml = (mt) => mt.length ? `${MT_KEY()}<div class="kv intel-kv" style="margin-top:0">${mt.map((m) => `<div title="${esc(m.src)}"><em>${esc(m.k)} ${defn(MT_DEF[m.k])}</em><b class="${m.tone}">${esc(m.v)}</b><small>${esc(m.sub || '')}</small></div>`).join('')}</div>${srcNote(mt)}`
+  /* THE ONE-MINUTE READ. Each line separates the three things a research note
+     blurs: the READ (a word), the FACT it rests on, and the RULE that turned
+     one into the other. The next event sits apart: a date is not a judgement. */
+  const oneHtml = (om) => (!om.reads.length && !om.event)
+    ? empty('Not enough published fields for a one-minute read', '<p>The panels below show what the screen does carry.</p>')
+    : `${window.V2W && window.V2W.key ? window.V2W.key([
+        { c: 'var(--up,#0b7a55)', shape: 'text', sample: 'Aa', label: 'the favourable side of its rule' },
+        { c: 'var(--dn,#c4372c)', shape: 'text', sample: 'Aa', label: 'the unfavourable side' },
+        { c: 'var(--ink,currentColor)', shape: 'text', sample: 'Aa', label: 'neither' }], { title: 'Read · fact · rule. Descriptive, not advice.' }) : ''}
+      <ol class="one">${om.reads.map((x) => `<li><span class="one-l">${esc(x.k)}</span><b class="one-w ${esc(x.tone)}">${esc(x.word)}</b>
+        <span class="one-f">${esc(x.fact)}</span><small class="one-r">Rule: ${esc(x.rule)}</small></li>`).join('')}
+      ${om.event ? `<li class="one-ev"><span class="one-l">Next event</span><b class="one-w">${esc(om.event.t)}</b>
+        <span class="one-f">${esc(om.event.s)}</span><small class="one-r">${esc(om.event.src)}</small></li>` : ''}</ol>`;
+  /* Questions to investigate: a prompt and the fact behind it. A company
+     where no threshold fired gets no panel — an empty list of questions
+     would read as "nothing to look into", which no page can know. */
+  const qsHtml = (qs) => `<ol class="qs">${qs.map((x) => `<li><b>${esc(x.q)}</b><small>Because: ${esc(x.basis)}</small></li>`).join('')}</ol>
+    <p class="note">Research prompts derived from the figures on this page, by the same thresholds as the reads above. Not recommendations, and nothing here answers them.</p>`;
+  /* The one plan feed, fetched from one place (the guard counts the call). */
+  const v2Feed = () => get('/signal_v2.json', 600000);
+  const mattersHtml = (mt) => mt.length ? `${MT_KEY()}<div class="kv intel-kv" style="margin-top:0">${mt.map((m) => `<div title="${esc(m.src)}"><em>${esc(m.k)} ${defn(MT_DEF[m.k])}</em><b class="${m.tone}">${esc(m.v)}</b><small>${esc(m.sub || '')}</small>${
+      INS() && INS().WHY && INS().WHY[m.k] ? `<details class="mt-why"><summary>Why it matters</summary><p>${esc(INS().WHY[m.k])}</p></details>` : ''}</div>`).join('')}</div>${srcNote(mt)}`
     : empty('Nothing measured', 'The screen carries no statements for this company.');
   const changesHtml = (ch, T) => {
     const grp = (k, h, cls) => ch[k].length ? `<div class="wc ${cls}"><h3>${h}</h3><ul>${ch[k].map((i) => `<li><b>${esc(i.t)}</b><span>${esc(i.basis)}</span><small>${esc(i.src)}</small></li>`).join('')}</ul></div>` : '';
@@ -986,7 +1009,8 @@
         <h1>Understand any Indian company in minutes.</h1>
         <p class="sub">Price, financials, ownership, technical structure and market context for ~1,000 NSE names. Every figure carries its source and its age.</p>
         <div class="hsearch"><input id="hQ" type="search" role="combobox" aria-expanded="false" aria-controls="hL" aria-autocomplete="list" autocomplete="off" spellcheck="false"
-          placeholder="Search a company — Reliance, TCS, HDFC Bank…" aria-label="Search a company"><ul id="hL" role="listbox" aria-label="Matching companies"></ul></div>
+          placeholder="Search a company — Reliance, TCS, HDFC Bank…" aria-label="Search a company" aria-describedby="hHint"><ul id="hL" role="listbox" aria-label="Matching companies"></ul></div>
+        <p id="hHint" class="hhint">Company name or NSE symbol. Every figure on a company page names its source and its age.<span class="k"> Press <span class="kbd">/</span> on any page to search.</span></p>
         <div id="hRecent" class="row wrap hrec"></div><p id="hSince" class="since" hidden></p></section>
       <div id="hGlance" class="glance">${skel(2)}</div>
       <div class="grid g-2">${panel('Paper setups for the next session', skel(5), { bodyId: 'hPaper', flush: true, more: '#/brief', moreText: 'Open the brief' })}${panel('Strongest technical reads', skel(5), { bodyId: 'hReads', flush: true, more: '#/screener', moreText: 'Screener' })}</div>
@@ -1031,9 +1055,17 @@
     }
     paintL();
     const chip = (x) => `<a class="chip" href="#/asset/${esc(x)}">${esc(x)}</a>`;
-    const rec = S.recent.filter((x) => SCR && SCR[x]).slice(0, 6), wl = S.watch.map((w) => w.s).filter((x) => !rec.includes(x)).slice(0, 6);
-    $('#hRecent').innerHTML = (rec.length ? `<span class="mut">Recent</span>${rec.map(chip).join('')}` : '') + (wl.length ? `<span class="mut">Watching</span>${wl.map(chip).join('')}` : '')
-      + (!rec.length && !wl.length ? `<span class="mut">Try</span>${['RELIANCE', 'TCS', 'HDFCBANK', 'INFY'].filter((x) => SCR && SCR[x]).map(chip).join('')}` : '');
+    /* Recent companies are kept in this browser only; the reader can empty
+       that list without clearing the rest of the site's data. */
+    const paintRecent = () => {
+      const rec = S.recent.filter((x) => SCR && SCR[x]).slice(0, 6), wl = S.watch.map((w) => w.s).filter((x) => !rec.includes(x)).slice(0, 6);
+      $('#hRecent').innerHTML = (rec.length ? `<span class="mut">Recent</span>${rec.map(chip).join('')}<button type="button" class="hrec-x" data-clr-recent aria-label="Clear recent companies">Clear</button>` : '')
+        + (wl.length ? `<span class="mut">Watching</span>${wl.map(chip).join('')}` : '')
+        + (!rec.length && !wl.length ? `<span class="mut">Try</span>${['RELIANCE', 'TCS', 'HDFCBANK', 'INFY'].filter((x) => SCR && SCR[x]).map(chip).join('')}` : '');
+      const x = $('[data-clr-recent]');
+      if (x) x.addEventListener('click', () => { S.recent = []; store.set('vis:recent', []); paintRecent(); toast('Recent companies cleared'); });
+    };
+    paintRecent();
     {
       const mine = [...new Set([...S.watch.map((w) => w.s), ...S.recent])].filter((x) => SCR && SCR[x] && num(SCR[x].price) > 0);
       const px = {}; for (const x of mine) px[x] = num(SCR[x].price);
@@ -1085,13 +1117,15 @@
     const strong = reads ? Object.entries(reads).filter(([k, r]) => SCR && SCR[k] && r.score >= 8)
       .sort((a, b) => (b[1].score - a[1].score) || ((b[1].action === 'enter') - (a[1].action === 'enter')) || a[0].localeCompare(b[0])) : [];
     const br = P && P.breadth, C = site && site.changed;
-    const tile = (k, v, s2, href) => `<a class="gl" href="${href}"><span>${k}</span><b>${v}</b><em>${s2}</em></a>`;
+    /* Each figure is also the way into the list it counts: the tile says
+       where it goes, so a number is never a dead end. */
+    const tile = (k, v, s2, href, dest) => `<a class="gl" href="${href}" aria-label="${esc(`${k}: ${v}, ${s2}. Open the ${dest} page`)}"><span>${k}</span><b>${v}</b><em>${s2}</em><i class="gl-go" aria-hidden="true">${esc(dest)} →</i></a>`;
     const nx = D && D.next_session ? dshort(D.next_session) : 'the next session';
     $('#hGlance').innerHTML = [
-      tile('Paper setups', live.length ? String(live.length) : '0', live.length ? `open or waiting · for ${esc(nx)}` : 'none met their rules', '#/brief'),
-      tile('Strongest reads', reads ? String(strong.length) : '—', reads ? 'score 8+ of 10, conditions met' : 'reads did not load', '#/brief'),
-      tile('Breadth, this week', br && br.counted ? `${br.up}/${br.counted}` : '—', br && br.counted ? 'screened names that rose' : 'pulse did not load', '#/heatmap'),
-      tile('Results in 7 days', C ? String(C.results_n) : '—', C ? 'companies reporting' : 'screen summary did not load', '#/today'),
+      tile('Paper setups', live.length ? String(live.length) : '0', live.length ? `open or waiting · for ${esc(nx)}` : 'none met their rules', '#/brief', 'Brief'),
+      tile('Strongest reads', reads ? String(strong.length) : '—', reads ? 'score 8+ of 10, conditions met' : 'reads did not load', '#/brief', 'Brief'),
+      tile('Breadth, this week', br && br.counted ? `${br.up}/${br.counted}` : '—', br && br.counted ? 'screened names that rose' : 'pulse did not load', '#/heatmap', 'Heatmap'),
+      tile('Results in 7 days', C ? String(C.results_n) : '—', C ? 'companies reporting' : 'screen summary did not load', '#/today', 'Today'),
     ].join('');
     const money = (v) => v == null ? '—' : '₹' + fmt(v, v < 100 ? 2 : 1);
     $('#hPaper').innerHTML = !D || !D.paper ? empty('The paper test has not published yet', 'Setups appear after the next session closes.')
@@ -1148,7 +1182,7 @@
     const biz = `<div class="kv" style="margin-top:0">
         <div><em>ROCE</em><b>${lender ? 'n/a' : row.roce != null ? fmt(row.roce, 1) + '%' : '—'}</b><small>${lender ? 'not meaningful for a lender' : ''}</small></div>
         <div><em>Debt / equity</em><b class="${de != null && de < 0 ? 'dn' : ''}">${lender ? 'n/a' : de == null ? '—' : de < 0 ? 'Negative equity' : fmt(de, 2)}</b><small>${lender ? 'a lender borrows to lend' : ''}</small></div>
-        <div><em>PE</em><b>${row.pe != null ? fmt(row.pe, 1) : '—'}</b><small>${row.pe_pctile != null ? Math.round(row.pe_pctile) + 'th pct of its own history' : ''}</small></div>
+        <div><em>PE</em><b>${row.pe != null ? fmt(row.pe, 1) : '—'}</b><small>${row.pe_pctile != null ? ordN(row.pe_pctile) + ' pct of its own history' : ''}</small></div>
         <div><em>Revenue CAGR</em><b>${row.rev_cagr != null ? signed(row.rev_cagr, 1) : '—'}</b></div>
         <div><em>EPS CAGR</em><b>${row.eps_cagr != null ? signed(row.eps_cagr, 1) : '—'}</b><small>${row.eps_cagr == null ? 'withheld or not reported' : ''}</small></div>
         <div><em>ROE</em><b>${row.roe != null ? fmt(row.roe, 1) + '%' : '—'}</b></div>
@@ -1197,7 +1231,7 @@
     ['EBIT margin', (d) => d.r.ebit_margin, (v) => v == null ? NA : fmt(v, 1) + '%', null, true], ['ROCE', (d) => d.r.roce, (v) => v == null ? NA : fmt(v, 1) + '%', 'ROCE', true],
     ['ROE', (d) => d.r.roe, (v) => v == null ? NA : fmt(v, 1) + '%'], ['Debt / equity', (d) => d.r.de, (v) => v == null ? NA : v < 0 ? '<span class="dn">Negative equity</span>' : fmt(v, 2), null, true],
     ['Cash conversion', (d) => d.r.cfo_pat, (v) => v == null ? NA : fmt(v, 2) + '×', 'Cash conversion', true], ['PE', (d) => d.r.pe, (v) => v == null ? NA : fmt(v, 1)],
-    ['PE percentile', (d) => d.r.pe_pctile, (v) => v == null ? NA : Math.round(v) + 'th', 'PE percentile'],
+    ['PE percentile', (d) => d.r.pe_pctile, (v) => v == null ? NA : ordN(v), 'PE percentile'],
     ['FII + DII, q/q', (d) => d.x && d.x.quality === 'complete' ? d.x.insti_pp : null, (v) => v == null ? NA : signed(v, 2, ' pp')],
     ['Quality score', (d) => d.r.q, (v) => v == null ? NA : Math.round(v)], ['Growth score', (d) => d.r.g, (v) => v == null ? NA : Math.round(v)],
     ['Technical score', (d) => d.r.tech, (v) => v == null ? NA : Math.round(v)],
@@ -1503,7 +1537,10 @@
     const s = resolveSym(arg);
     setTitle(SCR && SCR[s] ? `${s} — ${SCR[s].name}` : s);
     el.innerHTML = `<div id="aHead">${skel(3)}</div><div style="height:var(--s-4)"></div>
+      ${panel('One-minute read', skel(3), { bodyId: 'aOne', fb: 'Screen' })}<div style="height:var(--s-4)"></div>
       <div class="grid g-2 intel">${panel('What matters', skel(5), { bodyId: 'aMat', fb: 'Screen' })}${panel('What changed', skel(5), { bodyId: 'aChg', fb: 'Screen' })}</div>
+      <div style="height:var(--s-4)"></div>
+      ${panel('Questions to investigate', skel(3), { bodyId: 'aQs', fb: 'Screen' })}
       <div style="height:var(--s-4)"></div>
       <div class="grid g-7-5"><div class="stack">
         ${panel('Why it reads the way it does', skel(5), { bodyId: 'aWhy', fb: 'Screen' })}
@@ -1520,7 +1557,7 @@
     Object.assign(S.quotes, q);
     const r = SCR && SCR[s], lv = liveOf(s), x = instiOf(s);
     if (r) noteRecent(s);
-    if (!r) { for (const id of ['aMat', 'aChg']) { const b = $('#' + id); if (b) b.closest('.pn').remove(); }
+    if (!r) { for (const id of ['aMat', 'aChg', 'aQs']) { const b = $('#' + id); if (b) b.closest('.pn').remove(); }
       $('#aHead').innerHTML = vhead('Asset', s, sr.ok ? `<b>${esc(s)}</b> is not on the NSE screen. Check the symbol — the screen covers ${Object.keys(SCR || {}).length.toLocaleString('en-IN')} names.` : 'The screen did not load, so this name cannot be looked up.');
       for (const id of ['aWhy', 'aChart', 'aLvl', 'aFun', 'aIns', 'aNews']) { const b = $('#' + id); if (b) b.closest('.pn').remove(); }
       const tr0 = $('#aTr'); if (tr0) tr0.remove();
@@ -1560,7 +1597,7 @@
         <div class="row ah-act" style="margin-top:var(--s-2);gap:6px">
           <a class="btn sm" href="#/brief/${encodeURIComponent(s)}">Brief</a>
           <a class="btn sm" href="#/compare?s=${[s].concat(peersOf(s)).map(encodeURIComponent).join(',')}">Compare</a>
-          <a class="btn sm" href="${SIGNAL_URL}/stock/${encodeURIComponent(s)}">On Signal ↗</a>
+          <a class="btn sm" href="${SIGNAL_URL}/stock/${encodeURIComponent(s)}" title="Its screen card, and any setup, on Signal">On Signal ↗</a>
           <button class="btn sm" type="button" data-copy="${VISION_URL}/company/${keyOf(s)}">Copy link</button>
           <a class="btn sm" href="#/alerts?sym=${esc(s)}">Alert</a>
           <a class="btn sm" href="https://www.tradingview.com/chart/?symbol=NSE:${encodeURIComponent(s)}" target="_blank" rel="noopener">Chart ↗</a>
@@ -1576,11 +1613,29 @@
     const I = INS();
     if (co.ok && I) {
       const d = co.data, ctx = Object.assign({ today: istToday() }, d.ctx, { vsig: d.vsig });
+      $('#aOne').innerHTML = I.oneMinute ? oneHtml(I.oneMinute(d.r, d.x, ctx)) : '';
+      /* SIGNAL CONNECTION, AS THE READER'S NEXT QUESTION. From the same plan
+         feed Signal reads: a live paper setup links to its own page; no setup
+         says so and offers the screen card. A feed that does not answer says
+         nothing rather than implying there is no setup. */
+      v2Feed().then((v2) => {
+        const box = $('#aOne'); if (!box || !alive()) return;
+        const P = v2 && v2.ok && v2.data && v2.data.paper ? v2.data.paper.plans || [] : null;
+        if (!P) return;
+        const sp = P.filter((x) => x.symbol === s && (x.state === 'awaiting_entry' || (x.fill_price != null && !x.ended_session)))[0];
+        box.insertAdjacentHTML('beforeend', `<p class="one-sig">${sp
+          ? `<b>How did this become a setup?</b> <a href="${SIGNAL_URL}/setup/${encodeURIComponent(sp.id)}">View it on Signal: levels, entry check and history ↗</a>`
+          : `<b>Not a paper setup tonight.</b> <a href="${SIGNAL_URL}/stock/${encodeURIComponent(s)}">Its screen card on Signal ↗</a>`}</p>`);
+      });
       $('#aMat').innerHTML = mattersHtml(I.matters(d.r, d.x, ctx));
       $('#aChg').innerHTML = changesHtml(I.changes(d.r, d.x, ctx), I.T);
+      { const qb = $('#aQs'); if (qb) { const qs = I.questions ? I.questions(d.r, d.x, ctx) : [];
+        if (qs.length) qb.innerHTML = qsHtml(qs); else qb.closest('.pn').remove(); } }
     } else {
       const why = co.ok ? 'insight.js did not load' : co.error;
+      $('#aOne').innerHTML = failBox('This company\'s file', why);
       $('#aMat').innerHTML = failBox('This company\'s file', why); $('#aChg').innerHTML = failBox('This company\'s file', why);
+      { const qb = $('#aQs'); if (qb) qb.closest('.pn').remove(); }
     }
 
     $('#aWhy').innerHTML = r ? `${moveFactors(mv.parts)}
@@ -1624,7 +1679,7 @@
       <div><em>ROCE</em><b>${lender ? 'n/a' : r.roce != null ? fmt(r.roce, 1) + '%' : '—'}</b><small>${lender ? 'not meaningful for a lender' : r.roce_med != null ? 'median ' + fmt(r.roce_med, 1) + '%' : ''}</small></div>
       <div><em>ROE</em><b>${r.roe != null ? fmt(r.roe, 1) + '%' : '—'}</b><small>${lender ? (r.roe_med != null ? 'median ' + fmt(r.roe_med, 1) + '% · ' : '') + 'how a lender is judged' : ''}</small></div>
       <div><em>Debt / equity</em><b class="${de != null && de < 0 ? 'dn' : ''}">${de == null ? '—' : de < 0 ? 'Negative equity' : fmt(de, 2)}</b><small>${de != null && de < 0 ? 'insolvency, not a clean balance sheet' : lender && de != null ? 'a lender borrows to lend — not a risk measure here' : ''}</small></div>
-      <div><em>PE</em><b>${r.pe != null ? fmt(r.pe, 1) : '—'}</b><small>${r.pe_pctile != null ? `${Math.round(r.pe_pctile)}th pct of its own history` : ''}</small></div>
+      <div><em>PE</em><b>${r.pe != null ? fmt(r.pe, 1) : '—'}</b><small>${r.pe_pctile != null ? `${ordN(r.pe_pctile)} pct of its own history` : ''}</small></div>
       <div><em>Revenue CAGR</em><b>${r.rev_cagr != null ? signed(r.rev_cagr, 1) : '—'}</b></div>
       <div><em>EPS CAGR</em><b>${r.eps_cagr != null ? signed(r.eps_cagr, 1) : '—'}</b><small>${r.eps_cagr == null ? 'withheld or not reported' : ''}</small></div>
       <div><em>Piotroski</em><b>${r.piotroski != null ? r.piotroski + '/9' : '—'}</b></div>
@@ -2016,7 +2071,7 @@
       const td = rg.ok ? rg.data.today : null;
       $('#mReg').innerHTML = !td ? failBox('The regime', rg.error) : `<div class="pulse-h"><strong style="font-size:var(--t-xl)">${esc(td.t)}</strong></div>
         <p class="note" style="margin-top:var(--s-2)">${esc(td.d || '')}</p>
-        <div class="kv"><div><em>Realised vol</em><b>${td.vol_ann_pct != null ? td.vol_ann_pct + '%' : '—'}</b><small>${td.vol_pctile != null ? Math.round(td.vol_pctile) + 'th pct' : ''}</small></div>
+        <div class="kv"><div><em>Realised vol</em><b>${td.vol_ann_pct != null ? td.vol_ann_pct + '%' : '—'}</b><small>${td.vol_pctile != null ? ordN(td.vol_pctile) + ' pct' : ''}</small></div>
           <div><em>In this regime</em><b>${rg.data.run_days ?? '—'}</b><small>sessions</small></div></div>`;
     };
     await Promise.all([paint(), side()]);
@@ -2224,7 +2279,7 @@
   const VE_ACTIVE = new Set(['activated', 'partially_exited']);
   const VE_DONE = new Set(['closed', 'stopped', 'time_exited']);
   F.veod = async () => {
-    const r = await get('/signal_v2.json', 600000);
+    const r = await v2Feed();
     if (r.ok) { mark('Setups', r.data.published_at); S.veod = r.data; }
     else if (absent(r)) { FR.Setups = { ok: true, na: true, naTxt: 'not yet published', naTitle: 'no end-of-day scan has been published yet', t: Date.now() }; paintBadges(); }
     else markFail('Setups', r.error);
