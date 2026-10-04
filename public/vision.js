@@ -973,7 +973,8 @@
         <span class="one-f">${esc(om.event.s)}</span><small class="one-r">${esc(om.event.src)}</small></li>` : ''}</ol>`;
   /* The one plan feed, fetched from one place (the guard counts the call). */
   const v2Feed = () => get('/signal_v2.json', 600000);
-  const mattersHtml = (mt) => mt.length ? `${MT_KEY()}<div class="kv intel-kv" style="margin-top:0">${mt.map((m) => `<div title="${esc(m.src)}"><em>${esc(m.k)} ${defn(MT_DEF[m.k])}</em><b class="${m.tone}">${esc(m.v)}</b><small>${esc(m.sub || '')}</small></div>`).join('')}</div>${srcNote(mt)}`
+  const mattersHtml = (mt) => mt.length ? `${MT_KEY()}<div class="kv intel-kv" style="margin-top:0">${mt.map((m) => `<div title="${esc(m.src)}"><em>${esc(m.k)} ${defn(MT_DEF[m.k])}</em><b class="${m.tone}">${esc(m.v)}</b><small>${esc(m.sub || '')}</small>${
+      INS() && INS().WHY && INS().WHY[m.k] ? `<details class="mt-why"><summary>Why it matters</summary><p>${esc(INS().WHY[m.k])}</p></details>` : ''}</div>`).join('')}</div>${srcNote(mt)}`
     : empty('Nothing measured', 'The screen carries no statements for this company.');
   const changesHtml = (ch, T) => {
     const grp = (k, h, cls) => ch[k].length ? `<div class="wc ${cls}"><h3>${h}</h3><ul>${ch[k].map((i) => `<li><b>${esc(i.t)}</b><span>${esc(i.basis)}</span><small>${esc(i.src)}</small></li>`).join('')}</ul></div>` : '';
@@ -1001,7 +1002,8 @@
         <h1>Understand any Indian company in minutes.</h1>
         <p class="sub">Price, financials, ownership, technical structure and market context for ~1,000 NSE names. Every figure carries its source and its age.</p>
         <div class="hsearch"><input id="hQ" type="search" role="combobox" aria-expanded="false" aria-controls="hL" aria-autocomplete="list" autocomplete="off" spellcheck="false"
-          placeholder="Search a company — Reliance, TCS, HDFC Bank…" aria-label="Search a company"><ul id="hL" role="listbox" aria-label="Matching companies"></ul></div>
+          placeholder="Search a company — Reliance, TCS, HDFC Bank…" aria-label="Search a company" aria-describedby="hHint"><ul id="hL" role="listbox" aria-label="Matching companies"></ul></div>
+        <p id="hHint" class="hhint">Company name or NSE symbol. Every figure on a company page names its source and its age.<span class="k"> Press <span class="kbd">/</span> on any page to search.</span></p>
         <div id="hRecent" class="row wrap hrec"></div><p id="hSince" class="since" hidden></p></section>
       <div id="hGlance" class="glance">${skel(2)}</div>
       <div class="grid g-2">${panel('Paper setups for the next session', skel(5), { bodyId: 'hPaper', flush: true, more: '#/brief', moreText: 'Open the brief' })}${panel('Strongest technical reads', skel(5), { bodyId: 'hReads', flush: true, more: '#/screener', moreText: 'Screener' })}</div>
@@ -1046,9 +1048,17 @@
     }
     paintL();
     const chip = (x) => `<a class="chip" href="#/asset/${esc(x)}">${esc(x)}</a>`;
-    const rec = S.recent.filter((x) => SCR && SCR[x]).slice(0, 6), wl = S.watch.map((w) => w.s).filter((x) => !rec.includes(x)).slice(0, 6);
-    $('#hRecent').innerHTML = (rec.length ? `<span class="mut">Recent</span>${rec.map(chip).join('')}` : '') + (wl.length ? `<span class="mut">Watching</span>${wl.map(chip).join('')}` : '')
-      + (!rec.length && !wl.length ? `<span class="mut">Try</span>${['RELIANCE', 'TCS', 'HDFCBANK', 'INFY'].filter((x) => SCR && SCR[x]).map(chip).join('')}` : '');
+    /* Recent companies are kept in this browser only; the reader can empty
+       that list without clearing the rest of the site's data. */
+    const paintRecent = () => {
+      const rec = S.recent.filter((x) => SCR && SCR[x]).slice(0, 6), wl = S.watch.map((w) => w.s).filter((x) => !rec.includes(x)).slice(0, 6);
+      $('#hRecent').innerHTML = (rec.length ? `<span class="mut">Recent</span>${rec.map(chip).join('')}<button type="button" class="hrec-x" data-clr-recent aria-label="Clear recent companies">Clear</button>` : '')
+        + (wl.length ? `<span class="mut">Watching</span>${wl.map(chip).join('')}` : '')
+        + (!rec.length && !wl.length ? `<span class="mut">Try</span>${['RELIANCE', 'TCS', 'HDFCBANK', 'INFY'].filter((x) => SCR && SCR[x]).map(chip).join('')}` : '');
+      const x = $('[data-clr-recent]');
+      if (x) x.addEventListener('click', () => { S.recent = []; store.set('vis:recent', []); paintRecent(); toast('Recent companies cleared'); });
+    };
+    paintRecent();
     {
       const mine = [...new Set([...S.watch.map((w) => w.s), ...S.recent])].filter((x) => SCR && SCR[x] && num(SCR[x].price) > 0);
       const px = {}; for (const x of mine) px[x] = num(SCR[x].price);
@@ -1100,13 +1110,15 @@
     const strong = reads ? Object.entries(reads).filter(([k, r]) => SCR && SCR[k] && r.score >= 8)
       .sort((a, b) => (b[1].score - a[1].score) || ((b[1].action === 'enter') - (a[1].action === 'enter')) || a[0].localeCompare(b[0])) : [];
     const br = P && P.breadth, C = site && site.changed;
-    const tile = (k, v, s2, href) => `<a class="gl" href="${href}"><span>${k}</span><b>${v}</b><em>${s2}</em></a>`;
+    /* Each figure is also the way into the list it counts: the tile says
+       where it goes, so a number is never a dead end. */
+    const tile = (k, v, s2, href, dest) => `<a class="gl" href="${href}" aria-label="${esc(`${k}: ${v}, ${s2}. Open the ${dest} page`)}"><span>${k}</span><b>${v}</b><em>${s2}</em><i class="gl-go" aria-hidden="true">${esc(dest)} →</i></a>`;
     const nx = D && D.next_session ? dshort(D.next_session) : 'the next session';
     $('#hGlance').innerHTML = [
-      tile('Paper setups', live.length ? String(live.length) : '0', live.length ? `open or waiting · for ${esc(nx)}` : 'none met their rules', '#/brief'),
-      tile('Strongest reads', reads ? String(strong.length) : '—', reads ? 'score 8+ of 10, conditions met' : 'reads did not load', '#/brief'),
-      tile('Breadth, this week', br && br.counted ? `${br.up}/${br.counted}` : '—', br && br.counted ? 'screened names that rose' : 'pulse did not load', '#/heatmap'),
-      tile('Results in 7 days', C ? String(C.results_n) : '—', C ? 'companies reporting' : 'screen summary did not load', '#/today'),
+      tile('Paper setups', live.length ? String(live.length) : '0', live.length ? `open or waiting · for ${esc(nx)}` : 'none met their rules', '#/brief', 'Brief'),
+      tile('Strongest reads', reads ? String(strong.length) : '—', reads ? 'score 8+ of 10, conditions met' : 'reads did not load', '#/brief', 'Brief'),
+      tile('Breadth, this week', br && br.counted ? `${br.up}/${br.counted}` : '—', br && br.counted ? 'screened names that rose' : 'pulse did not load', '#/heatmap', 'Heatmap'),
+      tile('Results in 7 days', C ? String(C.results_n) : '—', C ? 'companies reporting' : 'screen summary did not load', '#/today', 'Today'),
     ].join('');
     const money = (v) => v == null ? '—' : '₹' + fmt(v, v < 100 ? 2 : 1);
     $('#hPaper').innerHTML = !D || !D.paper ? empty('The paper test has not published yet', 'Setups appear after the next session closes.')

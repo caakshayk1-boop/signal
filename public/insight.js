@@ -242,5 +242,21 @@
     'Volume spike': 'Today\'s volume ÷ its recent average. 2× means twice the usual shares changed hands.',
   };
 
-  root.VisionInsight = { T, matters, changes, differences, oneMinute, GLOSSARY, SRC, isFinancial };
+  /* WHY A WHAT-MATTERS FIGURE MATTERS. One sentence or two per card key,
+     about the measure, never about the company: the card already says what
+     the number is; this says what a reader would use it for, and where it
+     stops being informative. Nothing here predicts. */
+  const WHY = {
+    Revenue: 'Sales are the base every other figure is built on. Growth above the multi-year rate means demand is speeding up; below it, slowing. Neither says why.',
+    ROCE: 'Operating profit earned on each rupee of capital. A business earning well above its cost of capital can grow without diluting its owners; one earning below it gets less valuable as it grows.',
+    ROE: 'Profit on each rupee of shareholders\' equity. A lender\'s raw material is borrowed money, so this replaces ROCE as the measure of how well its capital is used.',
+    'EBIT margin': 'The share of each sale left after operating costs. Widening means costs grew slower than sales; narrowing, the reverse. One year can be a one-off, which is why the median sits beside it.',
+    'Debt / equity': 'Borrowing against what owners have put in. Debt magnifies a good year and a bad one alike, and has to be serviced in both. Negative equity means liabilities exceed assets.',
+    'Cash conversion': 'Whether reported profit arrives as cash. Profit is an accounting estimate; cash pays salaries, interest and dividends. A gap that persists for years is worth reading the notes for.',
+    'Price, 1 month': 'How the market has priced the company recently, against the median of the screen. It describes sentiment, not value, and a month is short.',
+    Valuation: 'A PE says little across industries. Against the company\'s own history it shows whether the market is paying more or less than usual for the same earnings.',
+    Institutions: 'Funds report holdings each quarter, so this shows where large, research-staffed money moved — after the fact, and for reasons they do not disclose.',
+  };
+
+  root.VisionInsight = { T, matters, changes, differences, oneMinute, GLOSSARY, WHY, SRC, isFinancial };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
