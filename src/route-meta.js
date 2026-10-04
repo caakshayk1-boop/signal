@@ -65,6 +65,10 @@ export const SIGNAL_META = {
   "Watchlist — your names, sorted by what needs attention",
   "The names you follow, ranked by what changed rather than alphabetically."
  ],
+ "/magic": [
+  "Magic Formula — Greenblatt's ranking across the NSE screen",
+  "Every company on the screen ranked by return on capital and earnings yield, the two ranks added, and a forward paper book that buys the top."
+ ],
  "/alerts": [
   "Alerts — what changed on the names you watch",
   "Setups entering their buy range, results dates moving, new filings and your price levels, logged in this browser."

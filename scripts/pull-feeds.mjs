@@ -118,6 +118,8 @@ const EXTRA = [
   ["technical_read", FEEDS_RAW + "technical_read.json", (d) => d && d.schema === "technical-read/1" && d.reads && typeof d.reads === "object" && !!d.session_date, "technical reads", "published_at"],
   /* Every finished paper setup, kept permanently: the replay's source. */
   ["paper_record", FEEDS_RAW + "paper_record.json", (d) => d && d.schema === "paper-record/1" && Array.isArray(d.trades) && !!d.as_of, "paper record", "as_of"],
+  /* The Magic Formula paper book (the private engine's MGF book). */
+  ["magic_book", FEEDS_RAW + "magic_book.json", (d) => d && d.schema === "magic-book/1" && Array.isArray(d.positions) && !!d.as_of, "Magic Formula book", "as_of"],
 ];
 for (const [f, url, valid, what, stampKey] of EXTRA) {
   const path = `public/${f}.json`;

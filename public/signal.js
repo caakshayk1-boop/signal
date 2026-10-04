@@ -4565,7 +4565,7 @@
   const noteScreenMeta = (d) => {
     if (!d || typeof d !== 'object') return d;
     for (const k of ['weights', 'changes', 'universe', 'universe_size',
-                     'universe_core', 'universe_ext', 'built_on']) {
+                     'universe_core', 'universe_ext', 'built_on', 'magic_formula']) {
       if (d[k] !== undefined) SCREEN_META[k] = d[k];
     }
     /* The screen is a NIGHTLY file and the ledger is live, so a route reading
@@ -4886,6 +4886,9 @@
     value:      ['Cheap',          r => (r.v ?? 0) >= 70],
     debtfree:   ['Debt-free',      r => (r.de ?? 9) <= 0.1],
     compounder: ['Compounders',    r => (r.roce ?? 0) >= 20 && (r.rev_cagr ?? 0) >= 12],
+    /* Greenblatt's ranking, computed by the screen itself (stock_screen.
+     * magic_formula). The top 30 of it, by its own published rank. */
+    magic:      ['Magic Formula top 30', r => Number.isInteger(r.mf?.rank) && r.mf.rank <= 30],
     /* ── NIFTY500 AHIMSA ─────────────────────────────────────────────────
      * NSE Indices launched it on 10 July 2026: the Nifty 500 filtered to
      * companies not engaged in activities harmful to animals, 326 of the 500
@@ -4903,11 +4906,12 @@
   const SCR_GROUPS = [
     ['The call', ['buy_lt', 'buy_pos', 'buy_swing', 'waiting', 'avoid']],
     ['Chart', ['breakout', 'rsleader', 'volume', 'oversold']],
-    ['Business', ['quality', 'value', 'debtfree', 'compounder']],
+    ['Business', ['quality', 'value', 'debtfree', 'compounder', 'magic']],
     ['Index', ['ahimsa']],
   ];
   const SORTS = { comp: 'Composite', q: 'Quality', g: 'Growth', v: 'Value',
                   tech: 'Technical', r1m: '1M return', roce: 'ROCE', mcap_cr: 'Size',
+                  mf: 'Magic Formula rank',
                   // The columns the headings sort by, listed here too so the
                   // dropdown and the headings speak one vocabulary. Without
                   // this the select still read "Rank by Composite" while the
@@ -4936,6 +4940,8 @@
      * distance computed per row, not stored, so sorting on the raw sma would
      * rank by price level instead of by distance — the opposite of what the
      * column shows. `sym` is text and is handled by the comparator, not here. */
+    // A rank: lower is better, so negated for the one-direction sort. Unranked is null, last.
+    if (k === 'mf')   return Number.isInteger(r.mf?.rank) ? -r.mf.rank : null;
     if (k === 'v50')  return r.sma50  ? (r.price - r.sma50)  / r.sma50  * 100 : null;
     if (k === 'v200') return r.sma200 ? (r.price - r.sma200) / r.sma200 * 100 : null;
     if (!k.startsWith('i_')) return r[k];
@@ -8335,6 +8341,7 @@
     ['/screen', 'Screen', 'All names, searchable'],
     ['/watch', 'Watchlist', 'Names you starred, and your price alerts'],
     ['/alerts', 'Alerts', 'What changed on the names you watch'],
+    ['/magic', 'Magic Formula', "Greenblatt's ranking across the screen, and its paper book"],
     ['/news', 'News', 'The full wire, and the screened names each story touches'],
     ['/brief', 'Brief', 'The current plan, in full'],
     ['/discover', 'Discover', 'Every way into the screen'],
@@ -8795,7 +8802,21 @@
       const upstream = (hr.ok ? (hr.data.datasets || []) : [])
         .filter(d => OUR_DATASETS.some(re => re.test(String(d.dataset || ''))));
       const upstreamAge = ageHours(feedStamp(hr.ok ? hr.data : null));
+      /* THE STATE FIRST, THE TABLE SECOND. What is unavailable, what is past
+         its normal refresh, and what still holds — in that order, because a
+         reader opening this panel is asking whether to trust the page. */
+      const failed = rows.filter(x => !x.ok && !x.passive);
+      const stale = rows.filter(x => x.h != null && x.h > (x.maxH || 26));
+      const current = rows.filter(x => x.h != null && x.h <= (x.maxH || 26));
+      const names = (l) => l.map(x => esc(x.label)).join(', ');
       sheet('Data freshness', `
+        <div class="ds-sum" role="status">
+          <p><b>Unavailable:</b> ${failed.length ? names(failed) + '. Sections built from these show their own failure notice rather than old figures.' : 'nothing — every feed this page asked for answered.'}</p>
+          <p><b>Older than its normal refresh:</b> ${stale.length ? names(stale) + '. Their figures are real but dated; each section says its date.' : 'none.'}</p>
+          <p><b>Still reliable:</b> ${current.length} of ${current.length + stale.length + failed.length} feeds are inside their window${current.length ? ` (${names(current)})` : ''}.</p>
+          <button type="button" class="btn" id="dsRetry">Retry the feeds</button>
+          <span id="dsRetryMsg" class="ds-msg" aria-live="polite"></span>
+        </div>
         <p class="sheet-p">Every feed <b>this page</b> loaded, and how old the copy it loaded is —
           measured against your clock, from the timestamp inside the file. Each is judged against its
           own tolerance, because they do not move at the same speed: the wire is live and allowed an
@@ -8831,6 +8852,17 @@
           </div>` : ''}
         <p class="sheet-p" style="margin-top:14px">
           <a href="/methodology" style="color:var(--accent)">How this is measured →</a></p>`);
+      /* RETRY: drop the short-lived response cache, redraw the route from fresh
+         fetches, re-measure, and reopen this panel on the new answer. */
+      const rb = document.getElementById('dsRetry');
+      if (rb) rb.addEventListener('click', async () => {
+        rb.disabled = true;
+        const msg = document.getElementById('dsRetryMsg'); if (msg) msg.textContent = 'Fetching again…';
+        MICRO.clear();
+        try { const fn = R[routeOf()]; if (fn) await fn(); } catch (e) { /* the route reports its own failure */ }
+        await paintFreshness();
+        const b2 = document.getElementById('freshBtn'); if (b2 && b2.onclick) await b2.onclick();
+      });
     };
     };
     freshPaint();
@@ -10511,6 +10543,8 @@
    * is the thing a reader needs to choose between them. Ordered by how often
    * they answer a question rather than alphabetically. */
   const DISCOVER = [
+    ['/magic',   'Magic Formula', 'Greenblatt’s ranking, every company',
+                 'Return on capital and earnings yield, each ranked across the screen and added — plus a paper book that buys the top and holds a year.'],
     ['/heat',    'The heatmap',   'Today, in each name’s own units',
                  'Colour is the move measured against that stock’s own average range, not in percent — so a quiet megacap having a violent day outshines a smallcap having a normal one.'],
     ['/map',     'The map',       'Every NSE name on one screen',
@@ -11726,6 +11760,132 @@
     ['WAIT', 'Nothing measured has changed. Left here so the list stays complete.'],
   ];
 
+  /* ── /magic — THE MAGIC FORMULA ─────────────────────────────────────────
+   * Greenblatt's ranking across the whole screen, and the paper book that buys
+   * its top. The ranking is the screen's own (stock_screen.magic_formula); the
+   * book is the private engine's (magic_book.json). This page computes no
+   * rank and no return: it prints both as published. */
+  let mfQ = '', mfTop = 30, mfSec = '';
+  const mfOrd = (n) => { const v = Math.round(n), t = v % 100;
+    return v + (t >= 11 && t <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][v % 10] || 'th'); };
+  R['/magic'] = async () => {
+    const T = 'Magic Formula', S = "Greenblatt's two ranks across every company on the screen, and a paper book that buys the top.";
+    paint(head(T, S, 'Research · not advice') + skel('sk-row', 6), true);
+    const [idx, bk] = await Promise.all([screenIndex(), get('/magic_book.json').catch(() => ({ ok: false }))]);
+    if (routeOf() !== '/magic') return;
+    if (!idx) { paint(head(T, S, 'Research · not advice') + fail('The screen', 'it did not load')); return; }
+    const M = SCREEN_META.magic_formula || null;
+    const all = Object.values(idx);
+    const ranked = all.filter(r => Number.isInteger(r.mf?.rank)).sort((a, b) => a.mf.rank - b.mf.rank);
+    const book = bk && bk.ok && bk.data && bk.data.schema === 'magic-book/1' ? bk.data : null;
+    const held = new Set(((book && book.positions) || []).map(p => p.sym));
+    let out = head(T, S, 'Research · not advice');
+
+    /* HOW IT RANKS — the five steps, as the book states them, and what this
+       screen does differently. */
+    const ex = M && M.excluded ? Object.entries(M.excluded) : [];
+    out += sec('How it ranks', `<ol class="mf-steps">
+        <li><b>Return on capital.</b> ROCE: operating profit (EBIT) ÷ capital employed. A business that earns more on what it uses ranks higher.</li>
+        <li><b>Earnings yield.</b> EBIT ÷ enterprise value (market cap + debt − cash). A business that is cheaper for what it earns ranks higher.</li>
+        <li><b>Rank every company on both, separately.</b> 1 is best on each.</li>
+        <li><b>Add the two ranks.</b> The lowest sum ranks first.</li>
+        <li><b>The book's method:</b> buy a basket of the top names, hold each about a year, repeat. The paper book below does exactly that, forward.</li></ol>
+      ${M ? `<p class="hint">Ranked <b>${M.ranked}</b> of ${M.universe} companies on the screen. Not ranked:
+        ${ex.map(([k, n]) => `${esc(k)} <b>${n}</b>`).join(' · ')}.</p>
+        <p class="hint"><b>Where this differs from the book:</b> ${esc(M.rules && M.rules.deviation || '')}</p>`
+      : `<p class="v2-none"><b>The screen has not published this ranking yet.</b> It is computed on every nightly screen build; the first build with it fills this page.</p>`}`,
+      '', 'A published formula with no tuned setting. It ranks; it does not forecast.');
+
+    /* THE RANKING */
+    if (ranked.length) {
+      const secs = [...new Set(ranked.map(r => r.sector).filter(Boolean))].sort();
+      const q = mfQ.trim().toLowerCase();
+      let view = ranked.filter(r => (!mfSec || r.sector === mfSec)
+        && (!q || `${r.sym} ${r.name || ''} ${r.ind || ''}`.toLowerCase().includes(q)));
+      const total = view.length;
+      if (mfTop) view = view.slice(0, mfTop);
+      out += sec('The ranking', `<div class="tools">
+          <input type="search" id="mfq" class="scr-in" value="${esc(mfQ)}" placeholder="Search the ranking" aria-label="Search the ranking">
+          <select id="mfsec" class="scr-sel" aria-label="Sector"><option value="">Every sector</option>
+            ${secs.map(x => `<option value="${esc(x)}"${mfSec === x ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select>
+        </div>
+        <div class="chips" role="group" aria-label="How many">${[[30, 'Top 30'], [100, 'Top 100'], [0, `All ${ranked.length}`]].map(([n, l]) =>
+          `<button type="button" class="chip" data-mftop="${n}" aria-pressed="${mfTop === n}">${esc(l)}</button>`).join('')}</div>
+        ${view.length ? `<div class="rank mf-t">
+          <div class="rank-r scr-r rank-head"><span class="i">Rank</span><span class="s">Company</span>
+            <span class="x">ROCE</span><span class="x">EBIT / EV</span><span class="x">Score</span><span class="x hm">Size</span><span class="m">1M</span></div>
+          ${view.map(r => { const m = r.mf; return `<div class="rank-r scr-r" data-sym="${esc(r.sym)}" role="button" tabindex="0">
+            <span class="i cnum">${m.rank}</span>
+            <span class="s">${watchBtn(r.sym)}<b><i class="mf-rk">#${m.rank}</i>${esc(r.sym)}</b><span>${esc(r.name || '')}</span>
+              <span class="wtags"><i class="wt">${esc(r.sector || '—')}</i>${m.one_off ? '<i class="wt wt-w" title="EBIT margin moved sharply last year; the formula reads the latest year">One-off year</i>' : ''}${held.has(r.sym) ? '<i class="wt wt-s">In the paper book</i>' : ''}</span></span>
+            <span class="x cnum" data-l="ROCE">${Number(m.roc).toFixed(1)}%<small>#${m.roc_rank}</small></span>
+            <span class="x cnum" data-l="EBIT / EV">${Number(m.ey).toFixed(1)}%<small>#${m.ey_rank}</small></span>
+            <span class="x cnum" data-l="Score">${m.score}</span>
+            <span class="x cnum hm" data-l="Size">${r.mcap_cr != null ? '₹' + Math.round(r.mcap_cr).toLocaleString('en-IN') + ' cr' : '—'}</span>
+            <span class="m ${dir(r.r1m)}" data-l="1M">${pct(r.r1m)}</span></div>`; }).join('')}</div>
+          <p class="hint">Showing ${view.length} of ${total}${mfSec || q ? ' that match' : ''}. Score is the ROCE rank plus the EBIT/EV rank; the small figure under each is that rank.
+            A company's rank moves with its price every night (price changes EV) and with each new annual report.</p>`
+        : `<div class="empty">No ranked company matches.</div>`}`,
+        `${ranked.length} ranked`, '', { lead: true });
+    }
+
+    /* THE PAPER BOOK */
+    let bookHtml;
+    if (!book) bookHtml = `<p class="v2-none"><b>The paper book has not published yet.</b> It starts with the first session on or after 5 Oct 2026:
+        the first cohort is chosen that evening from this ranking and filled at the next session's open.</p>`;
+    else {
+      const sm = book.summary || {}, R2 = book.rules || {};
+      const navs = (book.nav || []).filter(x => x && x.nav != null);
+      const inr = (v) => v == null ? '—' : '₹' + Math.round(v).toLocaleString('en-IN');
+      const rp = (v) => v == null ? '—' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)}%`;
+      const chart = (() => {
+        const pts = navs.filter(x => x.bench != null);
+        if (pts.length < 2) return '';
+        const W = 640, H = 160, P = 8, ys = pts.flatMap(x => [x.nav, x.bench]);
+        const lo = Math.min(...ys), hi = Math.max(...ys), span = hi - lo || 1;
+        const X = (i) => P + i * (W - 2 * P) / (pts.length - 1), Y = (v) => H - P - (v - lo) / span * (H - 2 * P);
+        const line = (k) => pts.map((x, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(x[k]).toFixed(1)}`).join('');
+        return `<figure class="mf-ch"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Book value against the ${esc(book.benchmark || 'benchmark')} since ${esc(v2Date(pts[0].d))}">
+            <line x1="${P}" x2="${W - P}" y1="${Y(R2.capital || 1e6)}" y2="${Y(R2.capital || 1e6)}" class="mf-base"/>
+            <path d="${line('bench')}" class="mf-b"/><path d="${line('nav')}" class="mf-n"/></svg>
+          <figcaption class="mf-lg"><span><i class="mf-sw"></i>Paper book</span><span><i class="mf-sw mf-sw-b"></i>${esc(book.benchmark || 'Benchmark')}, same start</span><span><i class="mf-sw mf-sw-0"></i>₹10 lakh start</span></figcaption></figure>`;
+      })();
+      const rows = (list, closed) => list.map(p => `<div class="rank-r scr-r" data-sym="${esc(p.sym)}" role="button" tabindex="0">
+          <span class="s"><b>${esc(p.sym)}</b><span>${esc(p.name || '')}</span><span class="wtags"><i class="wt">Cohort ${esc(p.cohort || '—')}</i><i class="wt">Picked at rank ${p.rank ?? '—'}${p.of ? ' of ' + p.of : ''}</i>${p.flag ? `<i class="wt wt-w">${esc(p.flag)}</i>` : ''}</span></span>
+          <span class="x" data-l="Bought">${p.status === 'pending' ? 'Fills next open' : p.status === 'unfilled' ? 'Unfilled' : esc(v2Date(p.fill_session))}<small>${p.fill_px != null ? price(p.fill_px) + ' × ' + p.qty : ''}</small></span>
+          <span class="x cnum" data-l="${closed ? 'Sold' : 'Last'}">${closed ? (p.exit_px != null ? price(p.exit_px) : '—') : (p.last_px != null ? price(p.last_px) : '—')}<small>${closed ? esc(v2Date(p.exit_session)) : (p.days != null ? p.days + ' days' : '')}</small></span>
+          <span class="m ${dir(p.ret_pct)}" data-l="Return">${p.ret_pct == null ? '—' : rp(p.ret_pct)}</span>
+          <span class="x hm" data-l="Exit">${closed ? (p.net_inr != null ? inr(p.net_inr) + ' net' : '') : (p.exit_due ? 'Sells ' + esc(v2Date(p.exit_due)) : '')}</span></div>`).join('');
+      bookHtml = `<div class="grid v2-rec v2-rec4">
+          ${tile(inr(sm.nav), 'Book value', `from ₹10,00,000 · ${rp(sm.ret_pct)}`, dir(sm.ret_pct))}
+          ${tile(rp(sm.bench_ret_pct), esc(book.benchmark || 'Benchmark'), 'over the same days', dir(sm.bench_ret_pct))}
+          ${tile(String((sm.open || 0) + (sm.pending || 0)), 'Positions', `${sm.open || 0} held · ${sm.pending || 0} filling · ${sm.closed || 0} sold`)}
+          ${tile(String(sm.cohorts || 0), 'Monthly cohorts', `next: ${esc(v2Date(sm.next_cohort))}`)}
+        </div>${chart}
+        ${(book.positions || []).length ? `<div class="rank mf-b-t"><div class="rank-r scr-r rank-head"><span class="s">Held</span><span class="x">Bought</span><span class="x">Last</span><span class="m">Return</span><span class="x hm">Exit</span></div>${rows(book.positions, false)}</div>` : ''}
+        ${(book.closed || []).length ? `<h3 class="mf-h">Sold or unfilled</h3><div class="rank mf-b-t">${rows(book.closed, true)}</div>` : ''}
+        <ul class="v2-list mf-rules"><li>${esc(R2.slots)} slots of ${inr(R2.per_position)}; ${esc(R2.per_month)} names a month, the best-ranked not already held, with turnover of at least ₹${esc(R2.min_turnover_cr)} cr a day.</li>
+          <li>Entry: ${esc(R2.entry)}. Exit: ${esc(R2.exit)}. Costs: ${esc(R2.costs)}. Dividends: ${esc(R2.dividends)}.</li>
+          <li>${esc(book.basis)} As of ${esc(v2Date(book.as_of))}; rules fixed ${esc(v2Date(R2.preregistered))}.</li></ul>`;
+    }
+    out += sec('The paper book', bookHtml, book ? `${(book.summary || {}).cohorts || 0} cohort${(book.summary || {}).cohorts === 1 ? '' : 's'}` : '',
+      'Paper, forward only. Nothing is claimed until the first cohort completes its year in October 2027.');
+    out += sec('Why there is no backtest', `<p class="muted">This site has each company's last four annual reports as they read today, and today's list of companies.
+        A backtest on that would pick from statements published after the date it pretends to decide on, out of a list of survivors.
+        Its result would look precise and mean nothing, so the book is tested forward instead, from a start date fixed in advance.
+        The ranking is research, not a recommendation to buy or sell anything.</p>`);
+    paint(out);
+
+    const qi = document.getElementById('mfq');
+    if (qi) qi.addEventListener('input', async () => {
+      mfQ = qi.value; const at = qi.selectionStart; await R['/magic']();
+      const again = document.getElementById('mfq'); if (again) { again.focus(); try { again.setSelectionRange(at, at); } catch (e) { /* not text */ } }
+    });
+    const ss = document.getElementById('mfsec');
+    if (ss) ss.addEventListener('change', () => { mfSec = ss.value; R['/magic'](); });
+    main.querySelectorAll('[data-mftop]').forEach(b => b.addEventListener('click', () => { mfTop = Number(b.dataset.mftop); R['/magic'](); }));
+  };
+
   let watchQ = '', watchSort = 'sym', watchSec = '', watchQuick = '', WVIEW = null;
   /* ── WHAT EACH STARRED NAME IS DOING ELSEWHERE ON THIS SITE ─────────────
    * The table answered "where is the price"; a watchlist is also asked
@@ -12432,9 +12592,25 @@
        why there are none) and the paper setups; your positions and watchlist
        side by side; the market with its regime as the first line; the record. */
     const noPlans = v2Gate(d);
+    /* THE DECISION LINE. One sentence answering "is there anything for me
+       today": plans, paper setups (and how many are new to this browser),
+       the regime, and alerts not yet read. Each part links to where it is
+       acted on; none is a figure the strip above does not already rest on. */
+    const decision = (() => {
+      const liveP = (((d.paper || {}).plans) || []).filter(p => PAPER_LIVE_STATES.has(p.state));
+      const nNew = liveP.filter(isNewSetup).length;
+      const seen = Number(lsGet(FSEEN, 0)) || 0, nAl = evAll().filter(e => Number(e.at) > seen).length;
+      const parts = [
+        `<a href="/opportunities">${next.length ? `<b>${next.length}</b> plan${next.length === 1 ? '' : 's'} for ${esc(v2Date(d.next_session))}` : 'No plan published'}</a>`,
+        `<a href="/opportunities#paper"><b>${liveP.length}</b> paper setup${liveP.length === 1 ? '' : 's'}${nNew ? `, <b>${nNew}</b> new since your last visit` : ''}</a>`,
+        reg ? `<a href="/markets">regime: ${esc(String(reg.regime || '').replace(/_/g, ' '))}</a>` : '',
+        `<a href="/alerts">${nAl ? `<b>${nAl}</b> unread alert${nAl === 1 ? '' : 's'}` : 'no unread alerts'}</a>`,
+      ].filter(Boolean);
+      return `<p class="v2-dec"><span>Today:</span> ${parts.join(' · ')}.</p>`;
+    })();
     paint(hh() +
       (r.stale ? staleNote(r.age) : '') +
-      v2StatusStrip(d, reg) +
+      v2StatusStrip(d, reg) + decision +
       (window.V2W && window.V2W.changes ? window.V2W.changes(d, { href: setupHref }) : '') +
       vsec(`Plans for ${v2Date(d.next_session)}`, next.length ? `<div class="v2-cards">${next.map(p => v2Card(p, d)).join('')}</div>`
         : noPlans, String(next.length), null, { lead: true }) +
@@ -12885,6 +13061,8 @@
                      'Mutual funds ranked on three- and five-year return against their own drawdown and volatility. Direct plans only, because the cost difference compounds.'],
     '/watch':       ['Watchlist — your names, sorted by what needs attention',
                      'The names you follow, ranked by what changed rather than alphabetically.'],
+    '/magic':       ['Magic Formula — Greenblatt\'s ranking across the NSE screen',
+                     'Every company on the screen ranked by return on capital and earnings yield, the two ranks added, and a forward paper book that buys the top.'],
     '/alerts':      ['Alerts — what changed on the names you watch',
                      'Setups entering their buy range, results dates moving, new filings and your price levels, logged in this browser.'],
     '/brief':       ['The brief — the current plan, in full',
@@ -12983,7 +13161,7 @@
    * breadcrumb reading "Today" while you are looking at Today is noise. */
   const WHERE = { '/': '', '/markets': 'Market', '/ipo': 'IPO',
                   '/opportunities': 'Setups', '/performance': 'Record', '/plan/:id': 'Plan', '/setup/:id': 'Setup',
-                  '/screen': 'Screen', '/brief': 'Brief', '/watch': 'Watchlist', '/alerts': 'Alerts',
+                  '/screen': 'Screen', '/brief': 'Brief', '/watch': 'Watchlist', '/alerts': 'Alerts', '/magic': 'Magic Formula',
                   '/radar': 'Market · Radar', '/discover': 'All tools',
                   '/map': 'Market · Map', '/reads': 'Weekly reads', '/heat': 'Market · Heatmap',
                   '/join': 'The brief', '/methodology': 'Methodology',

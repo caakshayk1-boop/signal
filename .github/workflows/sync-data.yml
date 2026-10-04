@@ -262,6 +262,21 @@ jobs:
             rm -f ".incoming/$f"
           fi
 
+      - name: Fetch the Magic Formula paper book
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          f=magic_book.json
+          if gh api "repos/$UPSTREAM/contents/feeds/$f" \
+               -H "Accept: application/vnd.github.raw" > ".incoming/$f" 2>/dev/null \
+             && python3 -c "import json,sys; d=json.load(open('.incoming/$f')); sys.exit(0 if d.get('schema')=='magic-book/1' and isinstance(d.get('positions'), list) and d.get('as_of') else 1)" 2>/dev/null; then
+            printf '  ok    %-18s %s\n' "$f" "$(du -h ".incoming/$f" | cut -f1)"
+          else
+            printf '  MISS  %-18s not published upstream yet, or not a valid feed — keeping the copy in this repo\n' "$f"
+            rm -f ".incoming/$f"
+          fi
+
       # Age is reported, never asserted, because staleness is upstream's
       # problem to fix and this job's problem to make visible.
       - name: Report feed freshness

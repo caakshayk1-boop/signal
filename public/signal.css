@@ -6760,3 +6760,39 @@ main{min-height:calc(100vh - var(--barh))}
 .ev-a a{font:500 var(--t-3,14px)/1 var(--ui);color:var(--accent);white-space:nowrap;display:inline-flex;align-items:center;min-height:36px}
 .ev.is-new{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 5%,transparent),transparent 60%)}
 @media(max-width:600px){.ev{grid-template-columns:1fr}.ev-a a{min-height:44px}}
+
+/* ── /magic ── */
+.mf-steps{margin:0 0 12px;padding-left:22px;display:grid;gap:6px;font:400 var(--t-4,15px)/1.5 var(--ui);color:var(--text)}
+.mf-steps b{font-weight:600}
+.mf-t .rank-r,.mf-b-t .rank-r{align-items:start}
+.mf-t .x small,.mf-b-t .x small{display:block;font:400 var(--t-1,11px)/1.3 var(--mono);color:var(--muted);margin-top:2px}
+.mf-h{font:600 var(--t-4,15px)/1.3 var(--ui);margin:18px 0 6px}
+.mf-rules{margin-top:14px}
+.mf-ch{margin:14px 0 6px}
+.mf-ch svg{width:100%;height:auto;display:block}
+.mf-ch path{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.mf-n{stroke:var(--accent)}
+.mf-b{stroke:var(--muted);stroke-dasharray:5 4}
+.mf-base{stroke:var(--line);stroke-width:1}
+.mf-lg{display:flex;flex-wrap:wrap;gap:6px 16px;font:500 var(--t-2,12px)/1.3 var(--ui);color:var(--muted);margin-top:6px}
+.mf-sw{display:inline-block;width:16px;height:0;border-top:2px solid var(--accent);vertical-align:middle;margin-right:6px}
+.mf-sw-b{border-top:2px dashed var(--muted)}
+.mf-sw-0{border-top:1px solid var(--line)}
+/* The rank leads the name on a phone, where the rank column is folded away;
+   each figure names its measure through the site's data-l chip labels. */
+.mf-rk{display:none;font:600 var(--t-2,12px)/1 var(--mono);font-style:normal;color:var(--accent);margin-right:6px}
+@media(max-width:600px){.mf-t .hm,.mf-b-t .hm{display:none}
+  .mf-rk{display:inline}}
+
+/* The freshness sheet leads with its state: unavailable, dated, reliable. */
+.ds-sum{border:1px solid var(--line);border-radius:var(--r-3,8px);padding:12px 14px;margin:0 0 14px;background:var(--surface,transparent)}
+.ds-sum p{margin:0 0 6px;font:400 var(--t-3,14px)/1.5 var(--ui);color:var(--text)}
+.ds-sum .btn{margin-top:4px;min-height:40px}
+.ds-msg{margin-left:10px;font:400 var(--t-2,13px)/1.4 var(--ui);color:var(--muted)}
+
+/* The decision line under the strip: one sentence, each part a link. */
+.v2-dec{margin:10px 0 18px;font:400 var(--t-4,15px)/1.6 var(--ui);color:var(--muted)}
+.v2-dec span{font:600 var(--t-1,11px)/1 var(--mono);text-transform:uppercase;letter-spacing:var(--ls-wide,.06em);color:var(--dim);margin-right:6px}
+.v2-dec a{color:var(--text);text-decoration:underline;text-decoration-color:var(--line2,var(--line));text-underline-offset:3px}
+.v2-dec a b{font-weight:650}
+@media (hover:hover) and (pointer:fine){.v2-dec a:hover{text-decoration-color:var(--accent)}}
