@@ -308,7 +308,7 @@ try {
      (await p.locator(".v2w [data-v2w-mk], .v2w .v2w-hm-g").count()) === 2
      || /did not load/.test((await p.locator(".v2w").allInnerTexts().catch(() => [])).join(" ")));
   ok("zero plans is said in words, not left blank",
-       nNext > 0 || /No plan qualified for the|new plans are paused\.|session was not scanned\.|The last run failed\.|No new plans for the/.test(v2Home), nNext);
+       nNext > 0 || /No plan published for the .+ session|No plan qualified for the|new plans are paused\.|session was not scanned\.|The last run failed\.|No new plans for the/.test(v2Home), nNext);
   }
   await p.goto(SITE + "/opportunities", { waitUntil: "domcontentloaded" });
   await until(p, () => /Eligible next session/.test(document.querySelector("main")?.innerText || ""));
