@@ -468,7 +468,7 @@ export default {
       "/discover", "/funds",
       "/gems", "/heat", "/ipo", "/join", "/map", "/markets",
       "/methodology", "/news", "/privacy", "/radar", "/reads", "/screen",
-      "/sources", "/terms", "/watch", "/alerts",
+      "/sources", "/terms", "/watch", "/alerts", "/magic",
       /* The cockpit's shell, reachable on signal.askakshay.com/vision for a
          check before the vision host resolves — and for the post-deploy suite,
          which runs against SIGNAL_URL. */

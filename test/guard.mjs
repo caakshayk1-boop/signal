@@ -2772,6 +2772,25 @@ ok("no figure counts up", !/countUp/.test(JS));
       ok("...and a different key fails it", (await call({ EDIT_KEY: "other" }, "t=" + m.token))[1].verified === false);
     } else ok("snapshot round-trip (skipped: public/c is written at deploy)", true);
   }
+  /* ROUND 5: the Magic Formula. The ranking is the screen's; the book is the engine's. */
+  {
+    const IXS = readFileSync("src/index.js", "utf8"), SYNC5 = readFileSync(".github/workflows/sync-data.yml", "utf8"),
+          PULL5 = readFileSync("scripts/pull-feeds.mjs", "utf8"), MFR = (JS.match(/R\['\/magic'\] = async[\s\S]*?\n  \};/) || [""])[0];
+    ok("/magic is a real page: Worker PAGES, route meta, sitemap, Discover",
+       /"\/alerts", "\/magic"/.test(IXS) && /"\/magic": \[/.test(readFileSync("src/route-meta.js", "utf8"))
+       && /\/magic</.test(readFileSync("public/sitemap.xml", "utf8")) && /\['\/magic',\s+'Magic Formula'/.test(JS));
+    ok("the Magic Formula book is mirrored, schema-checked, in both feed paths",
+       /f=magic_book\.json/.test(SYNC5) && /magic-book\/1/.test(SYNC5) && /magic_book/.test(PULL5) && /magic-book\/1/.test(PULL5));
+    ok("/magic prints the screen's rank and computes none",
+       MFR.length > 2000 && /a\.mf\.rank - b\.mf\.rank/.test(MFR) && !/roc_rank\s*[+]|ey_rank\s*[+]|\.sort\([^)]*roc\b/.test(MFR));
+    ok("/magic says why there is no backtest, and that the book is paper", /Why there is no backtest/.test(MFR) && /Paper, forward only/.test(MFR));
+    ok("/magic makes no forecast", !/will (rise|beat|outperform)|expected return|probabilit|guarantee/i.test(MFR));
+    ok("the screen offers the formula as a preset and a sort, unranked last",
+       /magic:\s+\['Magic Formula top 30'/.test(JS) && /if \(k === 'mf'\)\s+return Number\.isInteger\(r\.mf\?\.rank\) \? -r\.mf\.rank : null/.test(JS));
+    ok("Vision shows a company's rank, or that it is unranked and why",
+       /Magic Formula #\$\{r\.mf\.rank\} of \$\{r\.mf\.of\}/.test(VJS2) && /Not ranked by the Magic Formula: \$\{esc\(r\.mf\.why\)\}/.test(VJS2)
+       && /\['magic', 'Magic Formula top 30'/.test(VJS2));
+  }
   ok("the watchlist exports and imports, merging rather than overwriting",
      /id="wExport"/.test(JS) && /id="wImport"/.test(JS) && /kind: 'signal-watchlist'/.test(JS) && /new Set\(\[\.\.\.watchAll\(\), \.\.\.clean\]\)/.test(JS));
 }
