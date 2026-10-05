@@ -2343,6 +2343,14 @@ try {
   /* The screener's presets and builder. */
   await v.evaluate(() => { location.hash = "#/screener"; });
   await settled(v, SETTLE + 2000);
+  /* Eight ideas show first; the rest sit behind a disclosure that says how many. */
+  const vPre0 = await v.evaluate(() => ({ shown: [...document.querySelectorAll(".pre")].filter((e) => e.offsetParent).length,
+    tog: (document.querySelector("[data-pretog]") || {}).textContent || "" }));
+  ok("the screener shows eight ideas and a disclosure for the rest", vPre0.shown === 8 && /^Show all \d+ ideas$/.test(vPre0.tog), vPre0);
+  await v.click("[data-pretog]");
+  await v.waitForTimeout(300);
+  ok("the disclosure reveals every idea and offers to fold them", await v.evaluate(() => [...document.querySelectorAll(".pre")].filter((e) => e.offsetParent).length > 8
+    && /Show fewer/.test((document.querySelector("[data-pretog]") || {}).textContent || "")));
   await v.click('[data-pre="compound"]');
   await v.waitForTimeout(400);
   const vScr = await v.evaluate(() => ({ conds: document.querySelectorAll(".cond").length, n: (document.getElementById("cN") || {}).textContent || "" }));
