@@ -2801,12 +2801,19 @@ ok("no figure counts up", !/countUp/.test(JS));
     ok("/vetted makes no forecast and gives no advice",
        !/will (rise|beat|outperform|fall)|expected return|probabilit|guarantee|\b(buy|sell)\b|target price|upside/i.test(
          VTR.replace("a recommendation to buy or sell anything", "")));
+    ok("/vetted has the four lenses and the eight tests, and says the history is shorter than the recipe's",
+       /Four lenses/.test(VTR) && /data-vtlens/.test(VTR) && /Eight tests/.test(VTR) && /data-vteight/.test(VTR)
+       && /A company that could not be measured on a test has not passed it/.test(VTR) && /Not applied: no vetted company could be measured on it/.test(VTR));
+    ok("the eight tests and lenses are printed from the screen, never recomputed here",
+       /V\.eight/.test(VTR) && /V\.lenses/.test(VTR) && !/\.(roce_med|rev_cagr|r3y_cagr|net_margin|insiders)\b/.test(VTR));
+    ok("the screen has an Eight tests preset that waits for the data", /eight:\s+\['Eight tests',\s+r => r\.vet\?\.q\?\.a === true\]/.test(JS) && /k !== 'eight' \|\| SCREEN\.some\(r => r\.vet && r\.vet\.q\)/.test(JS));
     ok("/vetted orders by the screen's own composite and adds nothing to it", /in the order of the screen.s own composite/.test(VTR) && /Vetting adds nothing to it/.test(VTR));
     ok("the screen has a Vetted preset, and the company page prints the gate's one line",
        /vetted:\s+\['Vetted',\s+r => r\.vet\?\.s === 'cleared'\]/.test(JS) && /const vetLine = \(r\)/.test(JS) && /\$\{vetLine\(r\)\}/.test(JS));
     const VJS3 = readFileSync("public/vision.js", "utf8");
     ok("Vision carries the LIMITED version: status and reason only, never the case",
-       /r\.vet\.s === 'cleared'/.test(VJS3) && /\['vetted', 'Vetted', 'Quality'/.test(VJS3) && /\['qvet', 'Quality at a discount, vetted'/.test(VJS3)
+       /r\.vet\.s === 'cleared'/.test(VJS3) && /\['vetted', 'Vetted', 'Quality'/.test(VJS3) && /\['lens_small'/.test(VJS3) && /\['eight', 'Passes the eight tests'/.test(VJS3)
+       && ['lsmall', 'lmom', 'ldebt', 'ldiv', 'leight'].every((k) => new RegExp("\\['" + k + "', ").test(VJS3))
        && !/vet\.c\b|vet\?\.c\b|\.vet\.c\./.test(VJS3));
     ok("the screen offers the formula as a preset and a sort, unranked last",
        /magic:\s+\['Magic Formula top 30'/.test(JS) && /if \(k === 'mf'\)\s+return Number\.isInteger\(r\.mf\?\.rank\) \? -r\.mf\.rank : null/.test(JS));
