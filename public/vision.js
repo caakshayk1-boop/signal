@@ -1953,7 +1953,11 @@
     const save = () => store.set('vis:scr2', { conds: st.conds, mode: st.mode, sort: st.sort, dir: st.dir, cols: st.cols, preset: st.preset });
 
     const paintPresets = () => {
-      $('#sbPre').innerHTML = `<div class="presets">${SPRESETS.map((p) => `<button type="button" class="pre${st.preset === p[0] ? ' on' : ''}" data-pre="${p[0]}" title="${esc(p[2])}"><b>${esc(p[1])}</b><span>${esc(p[2])}</span></button>`).join('')}</div>`;
+      /* The vetted presets wait for the data: until a screen build carries `vet`, they would
+         return nothing and say nothing about why. */
+      const VET_PRE = new Set(['lsmall', 'lmom', 'ldebt', 'ldiv', 'leight']);
+      const hasVet = all0.some((r) => r.vet && (r.vet.q || r.vet.l));
+      $('#sbPre').innerHTML = `<div class="presets">${SPRESETS.filter((p) => hasVet || !VET_PRE.has(p[0])).map((p) => `<button type="button" class="pre${st.preset === p[0] ? ' on' : ''}" data-pre="${p[0]}" title="${esc(p[2])}"><b>${esc(p[1])}</b><span>${esc(p[2])}</span></button>`).join('')}</div>`;
     };
     const fieldSelect = (cur) => {
       const groups = [...new Set(SF.map((f) => f[2]))];
