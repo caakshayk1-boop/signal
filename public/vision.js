@@ -2815,7 +2815,7 @@
         <div class="pb"><div class="vs-grid">${older.map((p) => vePlanCard(p, D)).join('')}</div></div></section>` : ''}
       <div style="height:var(--s-4)"></div>
       <section class="pn"><div class="ph"><h2>Active paper positions</h2><span class="n">${active.length}</span></div>
-        <div class="pb">${active.length ? `<div class="vs-grid">${active.map((p) => vePlanCard(p, D)).join('')}</div>` : empty('None open', 'A plan becomes a position only when the next session\'s prices fill it inside its range.')}</div></section>
+        <div class="pb">${active.length ? `<div class="vs-grid">${active.map((p) => vePlanCard(p, D)).join('')}</div>` : D.status === 'paused' ? empty('No plan fills', 'The plan method is paused, so no plan can fill. The paper test below tracks its own positions.') : empty('None open', 'A plan becomes a position only when the next session\'s prices fill it inside its range.')}</div></section>
       <div style="height:var(--s-4)"></div>
       ${window.V2W && window.V2W.paper ? '<div style="height:var(--s-4)"></div>' + window.V2W.paper(D, { stockHref: (x) => '#/brief/' + encodeURIComponent(x) }) : ''}
       <div style="height:var(--s-4)"></div>
