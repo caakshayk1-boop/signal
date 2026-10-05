@@ -3832,12 +3832,15 @@
        is exactly how it showed NSE open on Ganesh Chaturthi. Fetched
        alongside, never awaited on its own: a holiday name is worth a slot in
        an existing round trip, not a delay to the whole board. */
-    const [m, p, cl, tk] = await Promise.all([
+    const [m, p, cl, tk, nx] = await Promise.all([
       get('/api/markets'), get('/pulse.json'), get('/api/calendar').catch(() => ({ ok: false })),
       /* The ticker carries every index's 52-week range and its own trend
          series, which /api/markets does not — and the barometer leads this
          page, so it cannot wait for the board's own fetch further down. */
       get('/api/ticker'),
+      /* The Nifty's year and its daily calendar: these four market cards used
+         to sit on the front page, which now carries one line and links here. */
+      get('/api/signals?series=' + encodeURIComponent('^NSEI') + '&range=1y').catch(() => ({ ok: false })),
     ]);
     if (cl && cl.ok && cl.data && cl.data.ok && cl.data.holidays) setHolidays(cl.data.holidays.rows);
     let out = head('Markets', 'Live prices, and how the wider market did underneath them.', 'The board');
@@ -3858,6 +3861,7 @@
         ['Screened', pu.universe || 1000, 'names re-run daily'],
       ]);
     }
+    out += v2Market(nx, p, null, '', 'The year and the week');
 
     /* ── THE BAROMETER LEADS THE BOARD ───────────────────────────────────
      * It is the one reading on this page that is ABOUT the page — every
@@ -12498,15 +12502,35 @@
      sentences of prose were the first thing under the status strip, above the
      charts they describe and the setups a reader came for. It is the same
      text, one tap away, at the end of what it explains. */
-  function v2Market(nx, pu, d, ctx = '') {
+  function v2Market(nx, pu, d, ctx = '', title = 'The market') {
     const W = window.V2W && window.V2W.market;
-    if (!W) return vsec('The market', `<p class="muted">The market charts could not load. Everything else on this page is complete without them.</p>`);
+    if (!W) return vsec(title, `<p class="muted">The market charts could not load. Everything else on this page is complete without them.</p>`);
     const sr = nx && nx.ok ? nx.data : null, pd = pu && pu.ok ? pu.data : null;
     const why = (x) => (x && (x.error || x.why)) || 'no answer';
-    const ex = window.V2W.explain ? window.V2W.explain({ series: sr, pulse: pd, feed: d, plansRef: '/opportunities',
+    const ex = d && window.V2W.explain ? window.V2W.explain({ series: sr, pulse: pd, feed: d, plansRef: '/opportunities',
       recordRef: '/performance', enginesRef: '/performance', paperRef: '/opportunities#paper', error: why(nx) }) : '';
-    return vsec('The market', `${ctx}<div class="v2w-grid2">${W.nifty(sr, { more: '/markets', error: why(nx) })}${W.days(sr, { error: why(nx) })}</div>
+    return vsec(title, `${ctx}<div class="v2w-grid2">${W.nifty(sr, { more: '/markets', error: why(nx) })}${W.days(sr, { error: why(nx) })}</div>
       <div class="v2w-grid2">${W.sectors(pd, { more: '/map', error: why(pu) })}${W.movers(pd, { error: why(pu) })}</div>
+      ${ex ? `<details class="v2-exp"><summary>Read this page in plain words <span>every sentence names its source</span></summary>${ex}</details>` : ''}`);
+  }
+
+  /* THE MARKET ON THE FRONT PAGE IS A LINE, NOT FOUR CHARTS. The same four
+     cards sat on Vision's home too, so the two sites opened on the same
+     picture. Signal is where the setups are; the charts live on Market, and
+     Vision's home keeps them as the research site. The regime sentence and
+     the week's breadth stay here because they frame the setups above. The
+     plain-words reading stays, one tap away, as before. */
+  function v2MarketLine(nx, pu, d, ctx = '') {
+    const sr = nx && nx.ok ? nx.data : null, pd = pu && pu.ok ? pu.data : null;
+    const br = pd && pd.breadth;
+    const week = br && br.counted
+      ? `<p class="v2-mline"><b class="cnum">${br.up}</b> of <b class="cnum">${br.counted}</b> screened names rose this week${pd.built_on ? ` (built ${esc(v2Date(pd.built_on))})` : ''}.`
+        + ` <a href="/markets">Charts on Market →</a> <a href="/map">Every sector on the map →</a></p>`
+      : `<p class="v2-mline">This week's breadth did not load. <a href="/markets">Charts on Market →</a></p>`;
+    const why = (x) => (x && (x.error || x.why)) || 'no answer';
+    const ex = window.V2W && window.V2W.explain ? window.V2W.explain({ series: sr, pulse: pd, feed: d, plansRef: '/opportunities',
+      recordRef: '/performance', enginesRef: '/performance', paperRef: '/opportunities#paper', error: why(nx) }) : '';
+    return vsec('The market', `${ctx}${week}
       ${ex ? `<details class="v2-exp"><summary>Read this page in plain words <span>every sentence names its source</span></summary>${ex}</details>` : ''}`);
   }
 
@@ -12530,7 +12554,11 @@
     }
     /* Two labelled rows of four on Performance — what was traded, and what
        it did to the paper money — instead of eight tiles in a ragged 5 + 3. */
-    const tilesHtml = compact ? `<div class="grid v2-rec">${tiles.join('')}</div>`
+    /* On the front page, a record with nothing published is one sentence:
+       four tiles reading 0, 0, —, — spent the page's best space on nothing. */
+    const tilesHtml = compact && !m.published
+      ? `<p class="v2-rec-line"><b>Plans published: 0.</b> Nothing has been published${since ? ` since ${v2Date(since)}` : ''}, so there is no result to report yet. Closed trades, win rate and mean R appear here once plans close.</p>`
+      : compact ? `<div class="grid v2-rec">${tiles.join('')}</div>`
       : `<p class="v2-rec-h">Trades</p><div class="grid v2-rec v2-rec4">${tiles.slice(0, 4).join('')}</div>
          <p class="v2-rec-h">Paper money</p><div class="grid v2-rec v2-rec4">${tiles.slice(4).join('')}</div>`;
     const rec = `${m.published ?? 0} published = ${m.awaiting_entry ?? 0} awaiting entry + ${m.active ?? 0} active + ${m.closed ?? 0} closed + ${m.expired_unfilled ?? 0} expired unfilled + ${m.cancelled_before_entry ?? 0} cancelled before entry`;
@@ -12578,7 +12606,10 @@
     const H = 'Indian equities, screened after the close.';
     const S = 'Review qualified setups, plan the next session, and track every paper trade.';
     /* One line, not two at 48px: the headline is the brand line, not the content. */
-    const hh = () => head(H, S, 'Today').replace('class="route-h"', 'class="route-h route-home"');
+    /* NO EYEBROW. "Today" sat above a headline that already says what the
+       page is; nineteen small-caps labels on one page was the loudest
+       template tell the taste audit found. */
+    const hh = (extra = '') => `<div class="route-h route-home"><h1>${esc(H)}</h1><p>${esc(S)}</p>${extra}</div>`;
     paint(hh() + skel('sk-card', 3), true);
     const [r, rg, nx, pu] = await Promise.all([v2Load(), get('/regime.json').catch(() => ({ ok: false })),
       get('/api/signals?series=' + encodeURIComponent('^NSEI') + '&range=1y').catch(() => ({ ok: false })),
@@ -12618,33 +12649,40 @@
       const nNew = liveP.filter(isNewSetup).length;
       const seen = Number(lsGet(FSEEN, 0)) || 0, nAl = evAll().filter(e => Number(e.at) > seen).length;
       const parts = [
-        `<a href="/opportunities">${next.length ? `<b>${next.length}</b> plan${next.length === 1 ? '' : 's'} for ${esc(v2Date(d.next_session))}` : 'No plan published'}</a>`,
+        `<a href="/opportunities">${next.length ? `<b>${next.length}</b> plan${next.length === 1 ? '' : 's'} for ${esc(v2Date(d.next_session))}` : 'no plan published'}</a>`,
         `<a href="/opportunities#paper"><b>${liveP.length}</b> paper setup${liveP.length === 1 ? '' : 's'}${nNew ? `, <b>${nNew}</b> new since your last visit` : ''}</a>`,
         reg ? `<a href="/markets">regime: ${esc(String(reg.regime || '').replace(/_/g, ' '))}</a>` : '',
         `<a href="/alerts">${nAl ? `<b>${nAl}</b> unread alert${nAl === 1 ? '' : 's'}` : 'no unread alerts'}</a>`,
       ].filter(Boolean);
-      return `<p class="v2-dec"><span>Today:</span> ${parts.join(' · ')}.</p>`;
+      return `<p class="v2-dec"><span>Today:</span> ${parts.join(', ')}.</p>`;
     })();
-    paint(hh() +
+    /* ONE HERO BAND. The headline and today's sentence on the left; the four
+       status facts (session, market, coverage, next scan) as a plain list on
+       the right, not four boxed cards. It used to be a headline, a 4-card
+       strip, then the sentence: three stacked bands saying one thing. The
+       band animates in once per page load, never on a revisit within it. */
+    const heroIn = !window.__homeIn; window.__homeIn = true;
+    paint(`<div class="home">` +
+      /* What changed since the last scan sits under today's sentence, in the
+         hero's own column: it is the "what is new" half of the same answer. */
+      `<div class="home-hero${heroIn ? ' is-in' : ''}">${hh(decision + (window.V2W && window.V2W.changes ? `<div class="home-chg">${window.V2W.changes(d, { href: setupHref, flat: true })}</div>` : ''))}${v2StatusStrip(d, reg)}</div>` +
       (r.stale ? staleNote(r.age) : '') +
-      v2StatusStrip(d, reg) + decision +
-      (window.V2W && window.V2W.changes ? window.V2W.changes(d, { href: setupHref }) : '') +
       vsec(`Plans for ${v2Date(d.next_session)}`, next.length ? `<div class="v2-cards">${next.map(p => v2Card(p, d)).join('')}</div>`
         : noPlans, String(next.length), null, { lead: true }) +
       /* A DIGEST, NOT A COPY. The front page listed the same twelve full cards
          the Setups page does. Here each setup is one line — buy range, stop,
          window, state — linking to its full card over there, where the sells,
          the reason and the engine rules live. */
-      v2Paper(d, { compact: true, digest: true, title: 'Paper setups — a test, not plans', moreHref: '/opportunities#paper',
-                   cardHref: setupHref, visionHref: (s) => VISION_URL + '/#/brief/' + encodeURIComponent(s), methodHref: '/methodology#status' }) +
+      `<div class="home-paper">` + v2Paper(d, { compact: true, digest: true, flat: true, title: 'Paper setups: a test, not plans', moreHref: '/opportunities#paper',
+                   cardHref: setupHref, visionHref: (s) => VISION_URL + '/#/brief/' + encodeURIComponent(s), methodHref: '/methodology#status' }) + `</div>` +
       `<div class="v2-duo">` +
       vsec('Active paper positions', active.length ? `<div class="v2-cards">${active.map(p => v2Card(p, d)).join('')}</div>`
         : `<p class="muted">No open paper position. A setup becomes one when its buy range trades.</p>`, String(active.length)) +
       vsec('Your watchlist', watchHtml, watch.length ? String(watch.length) : '') +
       `</div>` +
-      v2Market(nx, pu, d, ctx) +
+      v2MarketLine(nx, pu, d, ctx) +
       vsec('Record', v2Record(d, true) + `<p><a href="/performance">Full record →</a></p>`) +
-      `<p class="v2-note">${esc(d.notice || '')}</p>`);
+      `<p class="v2-note">${esc(d.notice || '')}</p></div>`);
     /* The digest's State column becomes the entry check once quotes arrive:
        "Inside the buy range", "Above the most to pay", and so on. */
     const live = ((d.paper || {}).plans || []).filter(p => p.state === 'awaiting_entry' || p.fill_price != null);
