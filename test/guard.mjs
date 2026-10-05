@@ -2887,6 +2887,19 @@ ok("no figure counts up", !/countUp/.test(JS));
        /sessionStorage\.setItem\('vis:cu'/.test(MJ) && /\^\\d\[\\d,\]\*\$/.test(MJ) && /: it\.txt/.test(MJ));
     ok("the ⌘K palette and the keyboard are not animated by the motion module",
        !/openPalette[\s\S]{0,200}Motion\./.test(MJ) && /\.drw\{transition-timing-function:var\(--ease-drawer\)\}/.test(BLK));
+    ok("a sheet's blocks keep their height, so the 1D to 6M returns cannot be squeezed to a line",
+       /\.drw-b > \*\{flex-shrink:0\}/.test(MC) && /\.drw-b\{[^}]*display:flex;flex-direction:column/.test(MC));
+    ok("a sheet leaves the way it came, and a late clean-up cannot wipe the sheet that replaced it",
+       /\.drw:not\(\.on\)\{transition-duration:200ms\}/.test(BLK) && /const mine = \+\+layerTok/.test(MJ) && /if \(mine !== layerTok\) return/.test(MJ)
+       && /closeLayer\(true\)/.test(MJ) && !/openPalette\(\)[^;]*closeLayer\(true\)/.test(MJ));
+    ok("selected state is one sliding thumb that moves only when the selection changed",
+       /className = 'seg-thumb'/.test(MJ) && /prev\.idx !== idx/.test(MJ) && /\.seg\.has-thumb button\[aria-pressed="true"\]\{background:none/.test(BLK));
+    ok("changes that answer a click may fade; nothing else replays",
+       /const caused = \(\) => performance\.now\(\) - lastAct < 500/.test(MJ) && /addEventListener\('click', \(\) => \{ lastAct/.test(MJ) && /if \(!live\(\)\) answered\(n\)/.test(MJ));
+    ok("every view's blocks enter through one selector, a nested block rides with its parent, and only the first screenful of rows fades",
+       /\.view \.pn, \.view \.v2w/.test(MJ) && /closest\('\.m-in, \.m-hold'\)/.test(MJ) && /rowN < 14/.test(MJ));
+    ok("the screener shows eight ideas and a disclosure for the rest, and a chosen idea is never hidden",
+       /CAP = 8/.test(MJ) && /findIndex\(\(p\) => p\[0\] === st\.preset\) >= CAP/.test(MJ) && /\.presets:not\(\.open\) \.pre-x\{display:none\}/.test(BLK));
     ok("hover motion is for fine pointers", /@media \(hover:hover\) and \(pointer:fine\)\{\s*\.pre:hover\{transform:translateY\(-2px\)/.test(BLK));
   }
   ok("the watchlist exports and imports, merging rather than overwriting",

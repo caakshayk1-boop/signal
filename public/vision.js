@@ -538,11 +538,22 @@
     requestAnimationFrame(() => { $('.scrim', L).classList.add('on'); $('.drw', L).classList.add('on'); $('.drw [data-close]', L).focus(); });
     document.body.style.overflow = 'hidden';
   }
-  function closeLayer() {
+  /* A sheet leaves the way it came (200 ms), when the reader closes it. Anything
+     else (a new sheet, a navigation) clears it at once; the token stops a late
+     clean-up from wiping whatever replaced it. The palette is opened from the
+     keyboard, often, and is never animated. */
+  let layerTok = 0;
+  function closeLayer(soft) {
     const L = $('#layer'); if (!L.innerHTML) return;
-    L.innerHTML = ''; document.body.style.overflow = '';
+    const mine = ++layerTok, drw = $('.drw.on', L);
+    const done = () => { if (mine !== layerTok) return; L.innerHTML = ''; };
+    document.body.style.overflow = '';
     if (drawerRet && drawerRet.focus) try { drawerRet.focus({ preventScroll: true }); } catch (e) { /* gone */ }
     drawerRet = null;
+    if (soft === true && drw && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      drw.classList.remove('on'); const sc = $('.scrim', L); if (sc) sc.classList.remove('on');
+      L.style.pointerEvents = 'none'; setTimeout(() => { done(); L.style.pointerEvents = ''; }, 210);
+    } else L.innerHTML = '';
   }
   const trapTab = (e) => {
     const box = $('#layer .drw, #layer .pal'); if (!box || e.key !== 'Tab') return;
@@ -630,10 +641,14 @@
      Reduced motion: nothing is tagged and the ambient field is never drawn. */
   const Motion = (() => {
     const reduceMQ = matchMedia('(prefers-reduced-motion: reduce)');
-    const ENTER = '.view > .vhead, .view > .pn, .view .grid > .pn, .glance > .gl, .presets > .pre, .hm-g';
-    let navAt = 0, touched = false, batchN = 0, batchT = 0, io = null;
+    const ENTER = '.view > .vhead, .view > .hero, .view .pn, .view .v2w, .view > .brief > section, .view .grid > *, .view .stack > *, .glance > .gl, .presets > .pre, .hm-g, .view .callout, tbody > tr';
+    let navAt = 0, touched = false, batchN = 0, batchT = 0, io = null, rowN = 0, rowT = 0, lastAct = 0;
     const live = () => !reduceMQ.matches && !touched && performance.now() - navAt < 5000;
     for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { touched = true; }, { capture: true, passive: true });
+    /* A click is a cause. Changes that arrive within half a second of one (a sorted
+       table, a new condition) may answer it with a short fade; nothing else may. */
+    addEventListener('click', () => { lastAct = performance.now(); }, { capture: true, passive: true });
+    const caused = () => performance.now() - lastAct < 500;
     const clear = (el, ms) => setTimeout(() => el.classList.remove('m-in', 'm-fade'), ms);
     const play = (el, i) => {
       el.style.setProperty('--i', i);
@@ -645,6 +660,15 @@
       if (seen.has(el)) return; seen.add(el);
       if (!live()) return;
       const now = performance.now();
+      /* Table rows: the first screenful fades in, in order. The rest do not. */
+      if (el.matches('tr')) {
+        if (now - rowT > 140) rowN = 0;
+        rowT = now;
+        if (rowN < 14) { el.style.setProperty('--i', rowN); el.classList.add('m-fade'); clear(el, 220 + rowN * 30 + 600); }
+        rowN++; return;
+      }
+      /* A block inside a block that is already entering rides with its parent. */
+      if (el.parentElement && el.parentElement.closest('.m-in, .m-hold')) return;
       if (now - batchT > 140) batchN = 0;
       batchT = now;
       /* Heatmap tiles: the first screenful pops in; the other hundreds do not
@@ -666,6 +690,7 @@
       if (root.matches(ENTER)) enter(root);
       root.querySelectorAll && root.querySelectorAll(ENTER).forEach(enter);
       countUp(root); markers(root);
+      (root.matches('.own-svg') ? [root] : $$('.own-svg, .rank-svg', root)).forEach((c) => { c.classList.add('m-wipe'); setTimeout(() => c.classList.remove('m-wipe'), 900); });
     };
     const fadeKids = (host) => {
       if (!live()) return;
@@ -685,9 +710,57 @@
       mo.observe($('#main'), { childList: true, subtree: true });
     }
     function nav() {
-      navAt = performance.now(); touched = false; batchN = 0; watch();
+      navAt = performance.now(); touched = false; batchN = 0; watch(); watchAll(); segPos.clear();
       const o = $('#nav .nav-ind');
       if (o) { try { const m = new DOMMatrix(getComputedStyle(o).transform); if (m.a) { indX = m.m41; indW = m.a * 100; } } catch (e) { /* ok */ } }
+    }
+
+    /* Segmented controls: the selected state is one thumb that slides, not a
+       background that switches. It moves only when the selection changed. */
+    const segPos = new Map();
+    const segKey = (s, b) => (s.getAttribute('aria-label') || '') + '|' + Object.keys(b.dataset).join(',');
+    function segPlace(s, anim) {
+      const btns = $$('button', s), on = btns.find((b) => b.getAttribute('aria-pressed') === 'true');
+      let th = $('.seg-thumb', s);
+      if (!on || !s.offsetWidth) { if (th) th.style.opacity = '0'; return; }
+      const sr = s.getBoundingClientRect(), r = on.getBoundingClientRect();
+      const x = r.left - sr.left - s.clientLeft, w = r.width, idx = btns.indexOf(on), key = segKey(s, btns[0]);
+      if (!th) { th = document.createElement('i'); th.className = 'seg-thumb'; th.setAttribute('aria-hidden', 'true'); s.prepend(th); s.classList.add('has-thumb'); }
+      th.style.opacity = ''; th.style.height = r.height + 'px';
+      const to = `translateX(${x}px) scaleX(${w / 100})`;
+      let from = null;
+      if (anim && !reduceMQ.matches && th.animate) {
+        const cur = getComputedStyle(th).transform;
+        const prev = segPos.get(key);
+        if (cur && cur !== 'none') { try { const m = new DOMMatrix(cur); from = `translateX(${m.m41}px) scaleX(${m.a})`; } catch (e) { /* ok */ } }
+        else if (prev && prev.idx !== idx) from = `translateX(${prev.x}px) scaleX(${prev.w / 100})`;
+      }
+      th.style.transform = to;
+      if (from && from !== to) { try { th.animate([{ transform: from }, { transform: to }], { duration: 220, easing: 'cubic-bezier(.77,0,.175,1)' }); } catch (e) { /* ok */ } }
+      segPos.set(key, { idx, x, w });
+    }
+    function segs(root) {
+      if (root.nodeType !== 1) return;
+      (root.matches('.seg') ? [root] : $$('.seg', root)).forEach((s) => segPlace(s, true));
+    }
+    /* Answers to a click, and nothing else: a table that was sorted fades, a new
+       condition row arrives. Both are short and neither staggers. */
+    function answered(el) {
+      if (el.nodeType !== 1 || reduceMQ.matches || !caused()) return;
+      const rows = el.matches('tbody > tr') ? [el] : $$('tbody > tr', el), conds = el.matches('.cond') ? [el] : $$('.cond', el);
+      rows.slice(0, 40).forEach((r) => { r.style.setProperty('--i', 0); r.classList.add('m-fade'); clear(r, 300); });
+      conds.forEach((c) => { c.style.setProperty('--i', 0); c.classList.add('m-in'); clear(c, 450); });
+    }
+    let so = null;
+    function watchAll() {
+      if (so) return;
+      so = new MutationObserver((muts) => {
+        for (const m of muts) {
+          if (m.type === 'attributes') { const sg = m.target.closest && m.target.closest('.seg'); if (sg) segPlace(sg, true); continue; }
+          m.addedNodes.forEach((n) => { segs(n); if (!live()) answered(n); });
+        }
+      });
+      so.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-pressed'] });
     }
 
     /* Nav indicator: one bar that travels between links. */
@@ -806,8 +879,10 @@
           tx = (e.clientX / innerWidth - 0.5) * -20; ty = (e.clientY / innerHeight - 0.5) * -12; if (!raf) raf = requestAnimationFrame(step); }, { passive: true });
       }
     }
+    /* Items revealed by a click arrive in order, 30 ms apart. */
+    const stagger = (els) => { if (reduceMQ.matches) return; els.slice(0, 12).forEach((e, i) => { e.style.setProperty('--i', i); e.classList.add('m-fade'); clear(e, 220 + i * 30 + 400); }); };
     header(); spotlight(); stars();
-    return { nav, navInd, countUp, markers, field, fieldHTML };
+    return { nav, navInd, countUp, markers, field, fieldHTML, stagger };
   })();
 
   /* ── ROUTER ─────────────────────────────────────────────────────────────── */
@@ -1067,7 +1142,7 @@
     drawer(`${esc(r.sym)} ${star(r.sym)}`, `
       <div class="sc-top"><div><div class="mut">${esc(r.name || '')}</div><div class="mut">${esc(r.sector || '')}${r.ind && r.ind !== r.sector ? ' · ' + esc(r.ind) : ''}</div></div>
         <div style="text-align:right"><div class="big-px">${px != null ? '₹' + fmt(px, 2) : '—'}</div><div>${lv ? chg(lv.change_pct) + ` <span class="mut">${quoteWord()}</span>` : chg(r.r1d) + ' <span class="mut">last close</span>'}</div></div></div>
-      <div class="kv" style="margin-top:0">${(() => { const L = liveRow(r); return [['1D', L.r1d], ['1W', L.r1w], ['1M', L.r1m], ['3M', r.r3m], ['6M', r.r6m]]; })().map(([k, v]) => `<div><em>${k}</em><b>${chg(v, 1)}</b></div>`).join('')}</div>
+      <div class="kv kv-5" style="margin-top:0">${(() => { const L = liveRow(r); return [['1D', L.r1d], ['1W', L.r1w], ['1M', L.r1m], ['3M', r.r3m], ['6M', r.r6m]]; })().map(([k, v]) => `<div><em>${k}</em><b>${chg(v, 1)}</b></div>`).join('')}</div>
       <div><h3>52-week range</h3>${pos != null ? `<div class="rng" role="img" aria-label="${pos.toFixed(0)}% of the way from the 52-week low to the high"><i style="left:${pos}%"></i></div>
         <div class="rng-l"><span>Low ₹${fmt(lo, 2)}</span><span>${pos.toFixed(0)}% of range</span><span>High ₹${fmt(hi, 2)}</span></div>
         <div class="sc-ls" style="margin-top:var(--s-2)">${lvlRow('52w high', hi, px)}${lvlRow('52w low', lo, px)}</div>`
@@ -1818,8 +1893,8 @@
     const s = resolveSym(arg);
     setTitle(SCR && SCR[s] ? `${s}, ${SCR[s].name}` : s);
     el.innerHTML = `<div id="aHead">${skel(3)}</div><div style="height:var(--s-4)"></div>
-      ${panel('One-minute read', skel(3), { bodyId: 'aOne', fb: 'Screen' })}<div style="height:var(--s-4)"></div>
-      <div class="grid g-2 intel">${panel('What matters', skel(5), { bodyId: 'aMat', fb: 'Screen' })}${panel('What changed', skel(5), { bodyId: 'aChg', fb: 'Screen' })}</div>
+      ${panel('One-minute read', skel(8), { bodyId: 'aOne', fb: 'Screen' })}<div style="height:var(--s-4)"></div>
+      <div class="grid g-2 intel">${panel('What matters', skel(10), { bodyId: 'aMat', fb: 'Screen' })}${panel('What changed', skel(10), { bodyId: 'aChg', fb: 'Screen' })}</div>
       <div style="height:var(--s-4)"></div>
       ${panel('Questions to investigate', skel(3), { bodyId: 'aQs', fb: 'Screen' })}
       <div style="height:var(--s-4)"></div>
@@ -2148,7 +2223,10 @@
          return nothing and say nothing about why. */
       const VET_PRE = new Set(['lsmall', 'lmom', 'ldebt', 'ldiv', 'leight']);
       const hasVet = all0.some((r) => r.vet && (r.vet.q || r.vet.l));
-      $('#sbPre').innerHTML = `<div class="presets">${SPRESETS.filter((p) => hasVet || !VET_PRE.has(p[0])).map((p) => `<button type="button" class="pre${st.preset === p[0] ? ' on' : ''}" data-pre="${p[0]}" title="${esc(p[2])}"><b>${esc(p[1])}</b><span>${esc(p[2])}</span></button>`).join('')}</div>`;
+      /* Eight ideas first; the rest one click away. A chosen preset is never hidden. */
+      const list = SPRESETS.filter((p) => hasVet || !VET_PRE.has(p[0])), CAP = 8;
+      const opened = !!store.get('vis:presAll') || list.findIndex((p) => p[0] === st.preset) >= CAP;
+      $('#sbPre').innerHTML = `<div class="presets${opened ? ' open' : ''}">${list.map((p, i) => `<button type="button" class="pre${i >= CAP ? ' pre-x' : ''}${st.preset === p[0] ? ' on' : ''}" data-pre="${p[0]}" title="${esc(p[2])}"><b>${esc(p[1])}</b><span>${esc(p[2])}</span></button>`).join('')}${list.length > CAP ? `<button type="button" class="pre-tog" data-pretog aria-expanded="${opened}">${opened ? 'Show fewer ideas' : `Show all ${list.length} ideas`}</button>` : ''}</div>`;
     };
     const fieldSelect = (cur) => {
       const groups = [...new Set(SF.map((f) => f[2]))];
@@ -2225,6 +2303,8 @@
     });
     el.addEventListener('input', (e) => { if (e.target.closest('.cond') && e.target.matches('input.inp')) { readConds(); st.preset = ''; limit = 100; paint(); } });
     el.addEventListener('click', (e) => {
+      const tg = e.target.closest('[data-pretog]'); if (tg) { store.set('vis:presAll', !store.get('vis:presAll')); paintPresets();
+        const nt = $('[data-pretog]', el); if (nt) nt.focus({ preventScroll: true }); if (store.get('vis:presAll')) Motion.stagger($$('.pre-x', el)); return; }
       const pr = e.target.closest('[data-pre]'); if (pr) { const p = SPRESETS.find((x) => x[0] === pr.dataset.pre); st.conds = presetConds(p); st.mode = 'all'; st.preset = p[0]; presetSort(p);
         $$('[data-mode]', el).forEach((b) => b.setAttribute('aria-pressed', b.dataset.mode === 'all')); paintPresets(); paintConds(); limit = 100; paint(); return; }
       const md = e.target.closest('[data-mode]'); if (md) { st.mode = md.dataset.mode; $$('[data-mode]', el).forEach((b) => b.setAttribute('aria-pressed', b === md)); paint(); return; }
@@ -2818,7 +2898,7 @@
   document.addEventListener('click', (e) => {
     const st = e.target.closest('[data-star]'); if (st) { e.preventDefault(); e.stopPropagation(); toggleWatch(st.dataset.star); return; }
     const sb = e.target.closest('[data-star-btn]'); if (sb) { toggleWatch(sb.dataset.starBtn); sb.textContent = watching(sb.dataset.starBtn) ? 'Watching' : 'Add to watchlist'; return; }
-    if (e.target.closest('[data-close]')) { closeLayer(); return; }
+    if (e.target.closest('[data-close]')) { closeLayer(true); return; }
     const ac = e.target.closest('[data-act]'); if (ac) { e.preventDefault(); closeLayer(); if (ac.dataset.act === 'theme') toggleTheme(); else openPalette(); return; }
     if (e.target.closest('[data-palette]')) { openPalette(); return; }
     const cp = e.target.closest('[data-copy]'); if (cp) { const u = cp.dataset.copy;
@@ -2830,7 +2910,7 @@
   }, true);
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#layer .pal') ? closeLayer() : openPalette(); return; }
-    if (e.key === 'Escape') { closeLayer(); return; }
+    if (e.key === 'Escape') { closeLayer(true); return; }
     if (e.key === '/' && !e.target.closest('input,textarea,select,[contenteditable]') && !$('#layer').innerHTML) { e.preventDefault(); openPalette(); return; }
     trapTab(e);
   });
