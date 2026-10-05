@@ -48,11 +48,11 @@
   const pp = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${f1(Math.abs(v))} pp`;
 
   const SRC = {
-    fin: (r) => `Company filings via the stock screen — ${r.fy || 'latest FY'}, ${r.fy_count || '?'} fiscal years`,
+    fin: (r) => `Company filings via the stock screen, ${r.fy || 'latest FY'}, ${r.fy_count || '?'} fiscal years`,
     px: (r) => `NSE daily prices, close of ${r.last_date || 'the last build'}`,
     ins: (x) => `Exchange shareholding filings — ${x.period} against ${x.prev_period}`,
     scr: (c) => `Stock screen, this build against the build of ${c.compared_with || 'the previous run'}`,
-    cal: () => 'Results date as listed on the screen (Yahoo calendar) — check the exchange filing',
+    cal: () => 'Results date as listed on the screen (Yahoo calendar); check the exchange filing',
     uni: (c) => `The screen's own universe: median 1-month return of ${c.universe || 'all'} names`,
   };
 

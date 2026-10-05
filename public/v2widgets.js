@@ -141,7 +141,7 @@
 .v2w .v2w-src{display:inline-block;margin-left:4px;padding:1px 7px;border:1px solid var(--w-line);border-radius:999px;font:500 11px/1.5 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut);text-decoration:none;white-space:nowrap}
 a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 /* paper test + technical read */
-.v2w .v2w-tag{display:inline-block;padding:1px 8px;border:1px solid var(--w-line);border-radius:999px;font:600 10px/1.6 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.06em;text-transform:uppercase;color:var(--w-mut);vertical-align:middle}
+.v2w .v2w-tag{display:inline-block;padding:1px 8px;border:1px solid var(--w-line);border-radius:999px;font:600 10px/1.6 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut);vertical-align:middle}
 .v2w .v2w-tag.pp{border-color:var(--w-warn);color:var(--w-warn)}
 .v2w .v2w-eng{display:grid;gap:8px;margin:0 0 14px;padding:0;list-style:none}
 .v2w .v2w-eng li{display:block;padding:10px 12px;border:1px solid var(--w-line);border-radius:8px;background:var(--w-bg)}
@@ -149,7 +149,7 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 .v2w .v2w-eng .n{font:400 12px/1.4 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink);font-variant-numeric:tabular-nums}
 .v2w .v2w-eng .n::before{content:" · ";color:var(--w-dim)}
 .v2w .v2w-eng p{margin:4px 0 0;font:400 12px/1.45 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut)}
-.v2w h4.v2w-h{font:600 12px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim);margin:16px 0 8px}
+.v2w h4.v2w-h{font:600 13px/1.3 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink);margin:18px 0 8px}
 .v2w .v2w-pcs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
 .v2w .v2w-pc{border:1px solid var(--w-line);border-radius:8px;padding:12px;background:var(--w-surf);display:grid;gap:6px;min-width:0}
 .v2w .v2w-pc header{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -184,6 +184,10 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 .v2w.v2w-flat .v2w-ch li.r4{grid-template-columns:64px minmax(0,1fr)}
 .v2w.v2w-flat .v2w-ch .t{font:600 12px/1.4 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:0;text-transform:none}
 .v2w.v2w-flat.v2w-chs h3{font-size:13px;margin:0 0 6px}
+.v2w.v2w-flat .v2w-eng{gap:0}
+.v2w.v2w-flat .v2w-eng li{border:0;border-top:1px solid var(--w-line,var(--line,#e5e2db));border-radius:0;background:none;padding:12px 0}
+.v2w.v2w-flat .v2w-eng li:last-child{border-bottom:1px solid var(--w-line,var(--line,#e5e2db))}
+.v2w.v2w-flat .v2w-tag{letter-spacing:0;text-transform:none}
 .v2w.v2w-flat .v2w-dh{font:500 12px/1 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:0;text-transform:none}
 .v2w .v2w-ch .w i{font-style:normal;color:var(--w-dim,var(--dim,#6b6b6b));font-size:12px;margin-left:4px}
 .v2w .v2w-ch a{color:inherit}
@@ -335,10 +339,11 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
 .v2w .v2w-sc{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:3px;margin:0 0 4px}
 .v2w .v2w-sc i{height:8px;border-radius:2px;background:var(--w-line)}
 .v2w .v2w-sc i.on{background:var(--w-acc)}
-.v2w .v2w-rdg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0 0}
+/* The five parts are ruled cells, not five boxes inside the card. */
+.v2w .v2w-rdg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px;margin:12px 0 0}
 @media (max-width:599px){.v2w .v2w-rdg{grid-template-columns:minmax(0,1fr)}}
-.v2w .v2w-rdg>div{border:1px solid var(--w-line);border-radius:8px;padding:10px 12px;min-width:0}
-.v2w .v2w-rdg h4{display:flex;justify-content:space-between;font:600 11px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim);margin:0 0 6px}
+.v2w .v2w-rdg>div{border-top:1px solid var(--w-line);padding:10px 0;min-width:0}
+.v2w .v2w-rdg h4{display:flex;justify-content:space-between;font:600 13px/1.3 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink);margin:0 0 4px}
 .v2w .v2w-rdg h4 em{font-style:normal;letter-spacing:0;color:var(--w-ink);font-variant-numeric:tabular-nums}
 .v2w .v2w-rdg p{margin:0;font:400 13px/1.5 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink)}
 .v2w .v2w-rdg p small{color:var(--w-mut);font-size:12px}

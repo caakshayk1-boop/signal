@@ -2551,7 +2551,7 @@ ok("no figure counts up", !/countUp/.test(JS));
     ok("the analyst counts paper setups from the engines' own fields",
        /PP\.engines\.reduce\(\(a, e\) => a \+ \(e\.open \|\| 0\)/.test(W2) && /not counted in the record/.test(W2));
     ok("both sites show the paper board and the read",
-       /v2Paper\(d, \{ cardHref: setupHref \}\)/.test(V2B) && /v2Paper\(d, \{ compact: true/.test(V2B) && /sec\('Technical read', treadBlock\(r\.sym\)/.test(JS)
+       /v2Paper\(d, \{ cardHref: setupHref(, flat: true)? \}\)/.test(V2B) && /v2Paper\(d, \{ compact: true/.test(V2B) && /sec\('Technical read', treadBlock\(r\.sym\)/.test(JS)
        && /window\.V2W\.paper\(D, \{ stockHref/.test(readFileSync("public/vision.js", "utf8"))
        && /window\.V2W\.read\(ok \? tr\.data : null, s/.test(readFileSync("public/vision.js", "utf8")));
     const SYNC_T = readFileSync(".github/workflows/sync-data.yml", "utf8"), PULL_T = readFileSync("scripts/pull-feeds.mjs", "utf8");
