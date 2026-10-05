@@ -2,87 +2,87 @@
    guard.mjs fails the build if this falls out of step. */
 export const SIGNAL_META = {
  "/": [
-  "Signal — Indian equities, screened after the close",
+  "Signal, Indian equities, screened after the close",
   "Review qualified setups, plan the next session, and track every paper trade. NSE equities, long only, with a forward record that starts empty."
  ],
  "/opportunities": [
-  "Setups — every paper setup and plan by state",
+  "Setups, every paper setup and plan by state",
   "Next-session plans for NSE equities, grouped as eligible, extended, active, closed and expired, each with its entry range, stop and three targets."
  ],
  "/performance": [
-  "Record — the Signal forward record",
+  "Record, the Signal forward record",
   "Every paper plan, wins and losses alike, with reconciled counts, net P&L after modelled costs and the date the record began."
  ],
  "/setup/:id": [
-  "Setup — a Signal paper setup",
+  "Setup, a Signal paper setup",
   "One paper setup: buy range, stop, three sells, the exit ladder in shares and rupees, whether its entry still holds against a delayed quote, and everything that happened to it."
  ],
  "/plan/:id": [
-  "Plan — Signal",
+  "Plan, Signal",
   "One conditional paper plan: entry range, stop, three targets, exit sizes, expiry and every update since publication."
  ],
  "/markets": [
-  "Markets — the board, 71 instruments with a year of context",
+  "Markets, the board, 71 instruments with a year of context",
   "Indices, sectors, commodities and currencies on one board, each against its own 52-week range. Sector heat, breadth and what moved today."
  ],
  "/screen": [
-  "Screen — every NSE name we track, filterable",
+  "Screen, every NSE name we track, filterable",
   "Every name in the universe on price, trend, quality, value and institutional flow. FII and DII holding quarter on quarter, from the company’s own filings."
  ],
  "/heat": [
-  "The heatmap — today in each name’s own units",
+  "The heatmap, today in each name’s own units",
   "The market coloured by how far each name moved against its own average range rather than in percent, outlined by the screen’s standing call, and marked where a name is in today’s wire."
  ],
  "/map": [
-  "The map — every NSE name on one screen",
+  "The map, every NSE name on one screen",
   "The whole screened market as one picture, coloured by the call, momentum, value, quality, position in its year, or how often each name has risen in this calendar month over eleven years."
  ],
  "/reads": [
-  "Weekly reads — seven companies, studied properly",
+  "Weekly reads, seven companies, studied properly",
   "One company per sector, every Saturday. What it sells, how the money arrives, and what would break it."
  ],
  "/discover": [
-  "Discover — every way into the screened names",
+  "Discover, every way into the screened names",
   "Each section of this site, what question it answers, and which of the same screened names it is looking at."
  ],
  "/radar": [
-  "Signal radar — the market, and the names carrying it",
+  "Signal radar, the market, and the names carrying it",
   "A breadth-based market score with every term printed, and the eight highest-scoring names ranked on trend, momentum, volume and institutional flow."
  ],
  "/ipo": [
-  "IPO — books open now, and how last year’s listings did",
+  "IPO, books open now, and how last year’s listings did",
   "Issues open and upcoming with demand, valuation and peer comparison, plus every recent listing measured against its issue price."
  ],
  "/news": [
-  "News — the wire, and the screened names each story touches",
+  "News, the wire, and the screened names each story touches",
   "Market news filtered to what touches the NSE screen, with the companies each story affects."
  ],
  "/funds": [
-  "Funds — SIP screen over AMFI NAV, Direct plans only",
+  "Funds, SIP screen over AMFI NAV, Direct plans only",
   "Mutual funds ranked on three- and five-year return against their own drawdown and volatility. Direct plans only, because the cost difference compounds."
  ],
  "/watch": [
-  "Watchlist — your names, sorted by what needs attention",
+  "Watchlist, your names, sorted by what needs attention",
   "The names you follow, ranked by what changed rather than alphabetically."
  ],
  "/magic": [
-  "Magic Formula — Greenblatt's ranking across the NSE screen",
+  "Magic Formula, Greenblatt's ranking across the NSE screen",
   "Every company on the screen ranked by return on capital and earnings yield, the two ranks added, and a forward paper book that buys the top."
  ],
  "/alerts": [
-  "Alerts — what changed on the names you watch",
+  "Alerts, what changed on the names you watch",
   "Setups entering their buy range, results dates moving, new filings and your price levels, logged in this browser."
  ],
  "/brief": [
-  "The brief — the current plan, in full",
+  "The brief, the current plan, in full",
   "The current plan with every level and condition, or a plain statement that nothing qualified."
  ],
  "/methodology": [
-  "Methodology — how a plan is built and graded",
+  "Methodology, how a plan is built and graded",
   "Risk-first plans, next-session entry, three targets with fixed exit sizes, simulated fills and how the forward record is counted."
  ],
  "/sources": [
-  "Data sources — where each number comes from",
+  "Data sources, where each number comes from",
   "The feed behind every figure on this site, and how fresh each one is."
  ],
  "/terms": [
@@ -98,19 +98,19 @@ export const SIGNAL_META = {
   "Join the list for the daily email. It is not being sent yet; the brief is on the site every morning."
  ],
  "/about": [
-  "About — who builds Signal",
+  "About, who builds Signal",
   "Signal is built by Akshay Kothari, a Chartered Accountant working in FP&A: what the site is, what it is not, and when its record began."
  ],
  "/disclaimer": [
-  "Disclaimer — educational research, not investment advice",
+  "Disclaimer, educational research, not investment advice",
   "Signal is not registered with SEBI as a Research Analyst or Investment Adviser. Nothing on it is a recommendation or personalised advice."
  ],
  "/disclosures": [
-  "Disclosures — conflicts, incentives and who pays for this",
-  "Who pays for Signal (nobody), personal positions, employment, and the conflict of an author grading his own engines — stated plainly."
+  "Disclosures, conflicts, incentives and who pays for this",
+  "Who pays for Signal (nobody), personal positions, employment, and the conflict of an author grading his own engines, stated plainly."
  ],
  "/404": [
-  "Not found — signal.askakshay.com",
+  "Not found, signal.askakshay.com",
   "There is no page at this address."
  ]
 };

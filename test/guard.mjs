@@ -2618,7 +2618,7 @@ ok("no figure counts up", !/countUp/.test(JS));
   ok("a scan past its due time reads Overdue, never a past time as pending",
      /const overdue = Number\.isFinite\(due\) && Date\.now\(\) > due/.test(V2C) && /<b>Overdue<\/b>/.test(V2C));
   ok("a failed or incomplete run is named in the strip, never 'scanned after the close'",
-     /error: 'the last run failed — plans as of the last good run'/.test(V2C) && /data_unavailable: 'not scanned — data incomplete'/.test(V2C));
+     /error: 'the last run failed[,;] plans as of the last good run'/.test(V2C) && /data_unavailable: 'not scanned, data incomplete'/.test(V2C));
   ok("the plan page links the company research into Vision", /v2Vision\(p\.symbol\)/.test(V2C));
   ok("the plan page renders the shared Business section, or says it did not arrive",
      /window\.BriefFundamentals\.render\(scrRow, \{/.test(V2C) && /could not load/.test(V2C) && /screenHref:/.test(V2C));

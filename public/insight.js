@@ -50,7 +50,7 @@
   const SRC = {
     fin: (r) => `Company filings via the stock screen, ${r.fy || 'latest FY'}, ${r.fy_count || '?'} fiscal years`,
     px: (r) => `NSE daily prices, close of ${r.last_date || 'the last build'}`,
-    ins: (x) => `Exchange shareholding filings — ${x.period} against ${x.prev_period}`,
+    ins: (x) => `Exchange shareholding filings, ${x.period} against ${x.prev_period}`,
     scr: (c) => `Stock screen, this build against the build of ${c.compared_with || 'the previous run'}`,
     cal: () => 'Results date as listed on the screen (Yahoo calendar); check the exchange filing',
     uni: (c) => `The screen's own universe: median 1-month return of ${c.universe || 'all'} names`,
@@ -73,7 +73,7 @@
     if (fin) {
       const roe = num(r.roe), rm = num(r.roe_med);
       if (roe != null) add('ROE', `${f1(roe)}%`, rm != null ? `median ${f1(rm)}% · how a lender is judged` : 'how a lender is judged', '', SRC.fin(r));
-      if (de != null) add('Debt / equity', de < 0 ? 'Negative equity' : de.toFixed(2), de < 0 ? 'insolvency, not a clean balance sheet' : 'a lender borrows to lend — not a risk measure here', de < 0 ? 'dn' : '', SRC.fin(r));
+      if (de != null) add('Debt / equity', de < 0 ? 'Negative equity' : de.toFixed(2), de < 0 ? 'insolvency, not a clean balance sheet' : 'a lender borrows to lend, not a risk measure here', de < 0 ? 'dn' : '', SRC.fin(r));
     } else {
       const md = num(r.margin_delta), em = num(r.ebit_margin);
       if (md != null || em != null) add('EBIT margin', em != null ? `${f1(em)}%` : '—', md != null ? `${pp(md)} on the prior year` : '', md == null ? '' : md >= 0 ? 'up' : 'dn', SRC.fin(r));
@@ -220,10 +220,10 @@
     const fin = isFinancial(r);
     const ry = num(r.rev_yoy), rc = num(r.rev_cagr), yrs = r.fy_count || 'several';
     if (ry != null && rc != null && ry - rc >= T.growthPP)
-      ask('What drove the step-up in revenue, and does it recur — new capacity, pricing, an acquisition, or a one-off order?',
+      ask('What drove the step-up in revenue, and does it recur, new capacity, pricing, an acquisition, or a one-off order?',
         `Revenue ${pct(ry)} last year against ${pct(rc)} a year over ${yrs} years`);
     else if (ry != null && rc != null && ry - rc <= -T.growthPP)
-      ask('Is the slowdown the industry\'s or this company\'s alone — how did its peers do over the same year?',
+      ask('Is the slowdown the industry\'s or this company\'s alone, how did its peers do over the same year?',
         `Revenue ${pct(ry)} last year against ${pct(rc)} a year over ${yrs} years`);
     const q = fin ? [num(r.roe), num(r.roe_med), 'ROE'] : [num(r.roce), num(r.roce_med), 'ROCE'];
     if (q[0] != null && q[1] != null && q[0] - q[1] <= -T.rocePP)
@@ -231,7 +231,7 @@
         `${q[2]} ${f1(q[0])}% against a ${f1(q[1])}% multi-year median`);
     const cp = num(r.cfo_pat);
     if (!fin && cp != null && cp < 0.6)
-      ask('Where is the profit that did not arrive as cash — receivables, inventory, or capitalised costs?',
+      ask('Where is the profit that did not arrive as cash, receivables, inventory, or capitalised costs?',
         `Operating cash flow ${cp.toFixed(2)}× reported profit, multi-year median`);
     const de = num(r.de);
     if (!fin && de != null && de > 1.5)
@@ -288,8 +288,8 @@
   const GLOSSARY = {
     R: 'R is the risk taken on a trade: entry minus stop. A result of +2R made twice what was risked; −1R lost exactly the planned amount.',
     ATR: 'Average true range: how far the price typically moves in one bar, including gaps. Stops and targets are placed in ATR so they fit each stock\'s own noise.',
-    ROCE: 'Return on capital employed: operating profit (EBIT) ÷ (equity + debt). Computed from filings — no data vendor publishes it.',
-    'Relative strength': 'How a stock moved against a benchmark over the same window. Here the benchmark is the median of the ~1,000 names on the screen — the same universe every other Vision figure describes — rather than the 50 in the Nifty.',
+    ROCE: 'Return on capital employed: operating profit (EBIT) ÷ (equity + debt). Computed from filings, no data vendor publishes it.',
+    'Relative strength': 'How a stock moved against a benchmark over the same window. Here the benchmark is the median of the ~1,000 names on the screen; the same universe every other Vision figure describes, rather than the 50 in the Nifty.',
     Breadth: 'How many names rose against how many fell. A broad rise lifts most stocks; a narrow one is carried by a few.',
     'Confidence interval': 'The range the true average plausibly lies in, given how few trades there are. If it spans zero, the sign of the result is not yet settled.',
     'PE percentile': 'Where today\'s price-to-earnings sits within this company\'s own history — 90th means higher than 90% of its past readings.',
@@ -311,7 +311,7 @@
     'Cash conversion': 'Whether reported profit arrives as cash. Profit is an accounting estimate; cash pays salaries, interest and dividends. A gap that persists for years is worth reading the notes for.',
     'Price, 1 month': 'How the market has priced the company recently, against the median of the screen. It describes sentiment, not value, and a month is short.',
     Valuation: 'A PE says little across industries. Against the company\'s own history it shows whether the market is paying more or less than usual for the same earnings.',
-    Institutions: 'Funds report holdings each quarter, so this shows where large, research-staffed money moved — after the fact, and for reasons they do not disclose.',
+    Institutions: 'Funds report holdings each quarter, so this shows where large, research-staffed money moved, after the fact, and for reasons they do not disclose.',
   };
 
   root.VisionInsight = { ord, T, matters, changes, differences, oneMinute, questions, GLOSSARY, WHY, SRC, isFinancial };

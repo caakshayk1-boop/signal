@@ -768,3 +768,7 @@ main{max-width:var(--wrap);margin:0 auto;padding:var(--s5) var(--s4) 0}
   background:var(--warn-soft);border:1px solid var(--line);
   font-size:13px;line-height:1.5;color:var(--mut)}
 .bcov b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* Craft floor: no coloured side stripe above 1px. */
+.flags li{border-left:1px solid color-mix(in srgb,var(--warn) 45%,transparent)}
+.health{border-left:1px solid var(--line)}
