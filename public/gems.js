@@ -1219,7 +1219,17 @@
      * that is not a number, and it is deliberately short: headlines and their
      * source, nothing summarised into a house view. The page does not have an
      * opinion on the news and should not pretend to. */
-    const wire = Array.isArray(news) ? news.filter(n => n && n.title).slice(0, 6) : [];
+    /* ONE STORY, ONCE. Two outlets syndicate the same wire copy, so the same
+       headline or the same summary arrived twice (the RBI policy paragraph on
+       5 Oct 2026). A repeated headline drops the story; a summary already
+       printed under another headline is not printed again. */
+    const norm = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const seenT = new Set(), seenS = new Set();
+    const wire = (Array.isArray(news) ? news.filter(n => n && n.title) : [])
+      .filter(n => !seenT.has(norm(n.title)) && seenT.add(norm(n.title)))
+      .map(n => { const k = norm(String(n.summary || '').slice(0, 260)); if (!k) return n;
+        if (seenS.has(k)) return { ...n, summary: '' }; seenS.add(k); return n; })
+      .slice(0, 6);
     if (wire.length) {
       add('wire', 'Wire', sec('wire', 'What moved, and why',
         `<b>${wire.length}</b> stories the desk read this morning. Headlines and their
