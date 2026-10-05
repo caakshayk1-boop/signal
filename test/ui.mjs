@@ -445,7 +445,10 @@ try {
   await p.waitForTimeout(400);
   const prog = await p.evaluate(() => {
     const b = document.getElementById("scrollprog");
-    return b ? parseFloat(b.style.width) || 0 : -1;
+    // The bar draws with transform: scaleX, never width (a width change per
+    // scroll frame is layout work). Read the drawn width, which is what a
+    // reader sees, as a share of the viewport.
+    return b ? Math.round(b.getBoundingClientRect().width / innerWidth * 100) : -1;
   });
   ok("the scroll progress bar tracks the page", prog > 5, prog + "%");
 
