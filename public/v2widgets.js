@@ -82,7 +82,6 @@
 .v2w .v2w-steps li.end-dn{color:var(--w-dn)}.v2w .v2w-steps li.end-up{color:var(--w-up)}
 .v2w .v2w-steps li i{font-style:normal}
 @media (max-width:599px){.v2w{padding:14px}.v2w .v2w-k b{font-size:19px}.v2w .v2w-c{min-height:48px}.v2w .v2w-c .s{font-size:9px}}
-@media (prefers-reduced-motion:no-preference){.v2w .v2w-cross,.v2w .v2w-dot,.v2w .v2w-tip{transition:left .06s linear}}
 /* market cards: same shell, charts from market data (not the record) */
 .v2w-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:0 0 16px}
 .v2w-grid2>.v2w{margin:0}
@@ -297,8 +296,8 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
    ease-in-out for the reveal, which is movement across the screen. */
 @keyframes v2wReveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
 @keyframes v2wGrow{from{transform:scaleX(0)}to{transform:none}}
-.v2w svg.v2w-reveal{animation:v2wReveal 900ms cubic-bezier(.77,0,.175,1) both}
-.v2w .v2w-grow .v2w-trk i{animation:v2wGrow 480ms cubic-bezier(.23,1,.32,1) both;animation-delay:calc(var(--i,0) * 24ms)}
+.v2w svg.v2w-reveal{animation:v2wReveal 400ms cubic-bezier(.77,0,.175,1) both}
+.v2w .v2w-grow .v2w-trk i{animation:v2wGrow 280ms cubic-bezier(.23,1,.32,1) both;animation-delay:calc(var(--i,0) * 24ms)}
 .v2w .v2w-grow .v2w-trk i.up,.v2w .v2w-grow .v2w-trk.one i{transform-origin:left center}
 .v2w .v2w-grow .v2w-trk i.dn{transform-origin:right center}
 /* A setup whose entry state changed since the last refresh: one soft pulse. */

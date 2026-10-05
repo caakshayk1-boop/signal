@@ -47,7 +47,7 @@
   --maxw:1240px;
 
   --ease:cubic-bezier(.2,.7,.2,1);
-  --d-fast:120ms; --d-med:200ms; --d-slow:320ms;
+  --d-fast:120ms; --d-med:200ms; --d-slow:280ms;
 }
 
 /* DARK — the same neutrals as Signal's dark theme: near-black without a blue
@@ -333,7 +333,7 @@ select.inp{padding-right:var(--s-5)}
 .gauge{position:relative;height:6px;border-radius:3px;margin:var(--s-4) 0 var(--s-2);
   background:linear-gradient(90deg,rgba(var(--dn-rgb),.55),rgba(var(--neutral-rgb),.35) 50%,rgba(var(--up-rgb),.55))}
 .gauge i{position:absolute;top:-5px;width:3px;height:16px;border-radius:2px;background:var(--ink);
-  transform:translateX(-50%);box-shadow:0 0 0 3px var(--panel);transition:left var(--d-slow) var(--ease)}
+  transform:translateX(-50%);box-shadow:0 0 0 3px var(--panel)}
 .gauge-l{display:flex;justify-content:space-between;font-size:var(--t-xs);color:var(--ink-4)}
 .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:1px;background:var(--line);
   border:1px solid var(--line);border-radius:var(--r-1);overflow:hidden;margin-top:var(--s-4)}
@@ -403,9 +403,10 @@ select.inp{padding-right:var(--s-5)}
 .nw .meta .tag{color:var(--accent);font-weight:600}
 
 /* ── STATES ─────────────────────────────────────────────────────────────── */
-.sk{background:linear-gradient(90deg,var(--panel-2),var(--panel-3),var(--panel-2));background-size:200% 100%;
-  animation:sk 1.3s linear infinite;border-radius:var(--r-1)}
-@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.sk{position:relative;overflow:hidden;background:var(--panel-2);border-radius:var(--r-1)}
+.sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);
+  background:linear-gradient(90deg,transparent,var(--panel-3),transparent);animation:sk 1.3s linear infinite}
+@keyframes sk{to{transform:translateX(100%)}}
 .sk-l{height:12px;margin:10px 0}
 .st{padding:var(--s-5) var(--s-4);text-align:center;color:var(--ink-3);font-size:var(--t-md);line-height:1.55}
 .st b{display:block;color:var(--ink-2);font-weight:600;margin-bottom:var(--s-1)}
@@ -441,8 +442,9 @@ select.inp{padding-right:var(--s-5)}
 /* ── COMMAND PALETTE ────────────────────────────────────────────────────── */
 .pal{position:fixed;z-index:70;left:50%;top:12vh;width:min(640px,calc(100vw - 24px));background:var(--panel);
   border:1px solid var(--line-2);border-radius:var(--r-2);box-shadow:var(--shadow-pop);overflow:hidden;
-  transform:translateX(-50%) scale(.98);opacity:0;transition:opacity var(--d-fast),transform var(--d-fast)}
-.pal.on{opacity:1;transform:translateX(-50%) scale(1)}
+  transform:translateX(-50%);opacity:0}
+.pal.on{opacity:1}
+body:has(.pal) .scrim{transition:none}
 .pal input{width:100%;height:52px;border:0;border-bottom:1px solid var(--line);background:none;padding:0 var(--s-4);
   font-size:var(--t-xl);outline:none}
 .pal ul{list-style:none;margin:0;padding:var(--s-1);max-height:min(56vh,440px);overflow:auto}
@@ -979,9 +981,9 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
   border-radius:var(--r-2);background:var(--panel);font-size:var(--t-sm,14px);color:var(--ink-2,var(--ink-3))}
 
 /* Compare: a materially different row is tinted once it lands, and its two
-   extremes carry a glyph. The tint fades in over 400ms on the first paint. */
+   extremes carry a glyph. The tint fades in over 280ms on the first paint. */
 .cmp tr.cmp-diff th,.cmp tr.cmp-diff td{background:color-mix(in srgb,var(--accent,#2743c8) 4%,transparent)}
-.cmp tr.cmp-diff th,.cmp tr.cmp-diff td{animation:cmpIn 400ms cubic-bezier(.23,1,.32,1)}
+.cmp tr.cmp-diff th,.cmp tr.cmp-diff td{animation:cmpIn 280ms cubic-bezier(.23,1,.32,1)}
 @keyframes cmpIn{from{background:transparent}}
 .cmp td.cmp-x{font-weight:650}
 .cmp-g{font-style:normal;font-size:.75em;margin-left:5px;color:var(--accent,#2743c8)}
@@ -1017,7 +1019,7 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
    of the page's ten "eyebrows". */
 .hrow h3.k{text-transform:none;letter-spacing:0;font-size:var(--t-sm)}
 @keyframes heroIn{from{opacity:0;transform:translateY(6px)}}
-@media (prefers-reduced-motion:no-preference){.hero2.is-in>*{animation:heroIn 320ms cubic-bezier(.23,1,.32,1) both}.hero2.is-in>*:nth-child(n+3){animation-delay:60ms}}
+@media (prefers-reduced-motion:no-preference){.hero2.is-in>*{animation:heroIn 280ms cubic-bezier(.23,1,.32,1) both}.hero2.is-in>*:nth-child(n+3){animation-delay:60ms}}
 /* The wide panel carries its eight setups in two columns rather than one
    column with an empty middle. */
 @media (min-width:901px){.g-21 #hPaper ul.hl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:var(--s-5);padding:0 var(--s-4)}

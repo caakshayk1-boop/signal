@@ -659,7 +659,7 @@
     }
     paintStars(); paintBadges();
   }
-  const setTitle = (t) => { document.title = t ? `${t} · Vision` : 'Vision, understand any Indian company in minutes'; };
+  const setTitle = (t) => { document.title = t ? `${t} · Vision` : 'Vision: understand any Indian company in minutes'; };
   const vhead = (eb, title, sub, right) => { setTitle(title);
     return `<div class="vhead"><div><h1>${esc(title)}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${right ? `<div class="vhead-r">${right}</div>` : ''}</div>`; };
 

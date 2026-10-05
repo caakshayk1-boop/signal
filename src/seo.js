@@ -109,11 +109,11 @@ function signalFacts(route, site) {
   const line = (h) => `<p class="pre-m">${h}</p>`;
   switch (route) {
     case "/markets": case "/radar": case "/heat": case "/map":
-      return (b ? line(`Market barometer <b>${esc(b.score)}/100</b> — ${esc(b.band || "")}${b.date ? `, as of ${esc(day(b.date))}` : ""}.`) : "")
+      return (b ? line(`Market barometer <b>${esc(b.score)}/100</b>, ${esc(b.band || "")}${b.date ? `, as of ${esc(day(b.date))}` : ""}.`) : "")
         + (w ? line(`Over the past week <b>${esc(w.up)}</b> of <b>${esc(w.counted)}</b> screened names rose and <b>${esc(w.down)}</b> fell.`) : "")
         + (site.above200 != null ? line(`<b>${esc(site.above200)}%</b> of names trade above their 200-day average.`) : "");
     case "/screen": case "/discover":
-      return line(`<b>${esc(site.universe)}</b> NSE names screened on price, trend, quality, value and institutional flow${built ? ` — build of ${esc(built)}` : ""}.`);
+      return line(`<b>${esc(site.universe)}</b> NSE names screened on price, trend, quality, value and institutional flow${built ? `, build of ${esc(built)}` : ""}.`);
     case "/opportunities": case "/performance": case "/brief":
       return line("Signal: conditional next-session paper plans for NSE equities and a forward record of every one, from 1 October 2026. The live page loads them from the plan feed.");
     case "/watch":
@@ -139,7 +139,7 @@ export async function signalPage(request, env, path) {
   const body = `<p class="pre-k">Signal · ${esc(h1)}</p>
     <h1 class="pre-h">${esc(title)}</h1>
     <p class="pre-s">${esc(desc)}</p>${signalFacts(key, site)}
-    <ul class="pre-l">${SIGNAL_LINKS.filter(([h]) => h !== path).map(([h, t]) => `<li><a href="${h}">${t}</a></li>`).join("")}<li><a href="${VISION}/">Vision — company research ↗</a></li></ul>
+    <ul class="pre-l">${SIGNAL_LINKS.filter(([h]) => h !== path).map(([h, t]) => `<li><a href="${h}">${t}</a></li>`).join("")}<li><a href="${VISION}/">Vision, company research ↗</a></li></ul>
     <p class="pre-n">A summary written by the server${site && site.built_at ? ` from the build of ${esc(day(site.built_at))}` : ""}. The live page replaces it as soon as it loads.</p>`;
   const rw = headRewriter({ title, desc, canonical, site: "Signal", robots: "index,follow,max-image-preview:large",
     ld: { "@context": "https://schema.org", "@graph": [
@@ -153,7 +153,7 @@ async function signalStock(request, env, shell, raw, site) {
   const sym = raw.toUpperCase().replace(/\.NS$/, "");
   const d = await asset(env, request, `/c/${keyOf(sym)}.json`, 600_000);
   if (!d || !d.r) {
-    const rw = headRewriter({ title: `${sym} — not on the screen · Signal`, desc: `${sym} is not among the NSE names Signal screens.`,
+    const rw = headRewriter({ title: `${sym}: not on the screen · Signal`, desc: `${sym} is not among the NSE names Signal screens.`,
       canonical: null, site: "Signal", robots: "noindex,follow" })
       .on("section.pre", { element(e) { e.setInnerContent(`<p class="pre-k">Signal · Stock</p><h1 class="pre-h">${esc(sym)} is not on the screen</h1>
         <p class="pre-s">Signal screens ${esc(site ? site.universe : "about a thousand")} NSE names. Check the symbol, or <a href="/screen">browse the screen</a>.</p>`, { html: true }); } });
@@ -162,20 +162,20 @@ async function signalStock(request, env, shell, raw, site) {
   const r = d.r, name = r.name || sym, canonical = `${SIGNAL}/stock/${encodeURIComponent(sym)}`;
   /* The SAME title and description signal.js writes after it loads, so a
      crawler with JavaScript and one without read the same head. */
-  const title = `${sym} — ${r.name || "Company"} · Signal`;
+  const title = `${sym}, ${r.name || "Company"} · Signal`;
   const desc = `${r.name || sym}: price against its own year, trend, quality and value scores, `
     + `and FII/DII holding quarter on quarter from the company's own filings.`;
   const lead = `${name} (NSE: ${sym}${r.sector ? ", " + r.sector : ""}) closed at ${inr(r.price)}${r.last_date ? " on " + r.last_date : ""}, ${pct(r.from_high)} from its 52-week high.`
     + (r.roce != null ? ` ROCE ${r.roce}%.` : "") + (r.rev_cagr != null ? ` Revenue growth ${pct(r.rev_cagr)} a year.` : "");
   const ch = insight.changes(r, d.x, Object.assign({ today: istDate() }, d.ctx, { vsig: d.vsig }));
-  const li = (xs) => xs.slice(0, 3).map((i) => `<li>${esc(i.t)} — ${esc(i.basis)}</li>`).join("");
+  const li = (xs) => xs.slice(0, 3).map((i) => `<li>${esc(i.t)}: ${esc(i.basis)}</li>`).join("");
   const body = `<p class="pre-k">Signal · Stock · ${esc(r.sector || "")}</p>
-    <h1 class="pre-h">${esc(sym)} — ${esc(name)}</h1>
+    <h1 class="pre-h">${esc(sym)}, ${esc(name)}</h1>
     <p class="pre-s">${esc(lead)}</p>
     <p class="pre-m">52-week range ${inr(r.low52)} – ${inr(r.high52)} · 50-day ${inr(r.sma50)} · 200-day ${inr(r.sma200)} · 1 month ${pct(r.r1m)}</p>
     ${ch.improved.length ? `<p class="pre-m"><b>Improved</b></p><ul class="pre-l">${li(ch.improved)}</ul>` : ""}
     ${ch.weakened.length ? `<p class="pre-m"><b>Weakened</b></p><ul class="pre-l">${li(ch.weakened)}</ul>` : ""}
-    <p class="pre-m"><a href="${VISION}/company/${keyOf(sym)}">Open ${esc(sym)} in Vision — the full company research →</a></p>
+    <p class="pre-m"><a href="${VISION}/company/${keyOf(sym)}">Open ${esc(sym)} in Vision, the full company research →</a></p>
     <p class="pre-n">Written by the server from the screen build${d.ctx && d.ctx.built_at ? ` of ${esc(day(d.ctx.built_at))}` : ""}. Descriptive, not a recommendation. The live page replaces it on load.</p>`;
   const rw = headRewriter({ title, desc, canonical, site: "Signal", robots: "index,follow,max-image-preview:large",
     ld: { "@context": "https://schema.org", "@graph": [
@@ -188,7 +188,7 @@ async function signalStock(request, env, shell, raw, site) {
 
 /* ─────────────────────────────── VISION ─────────────────────────────── */
 
-const V_TITLE = "Vision — understand any Indian company in minutes";
+const V_TITLE = "Vision: understand any Indian company in minutes";
 const V_DESC = "Price, financials, ownership, events, technical structure and market context for ~1,000 NSE companies in one research workspace. Every number carries its source and its age. Educational research, not advice.";
 
 async function visionShell(env, request) {
@@ -197,7 +197,7 @@ async function visionShell(env, request) {
 }
 
 const vPage = (inner) => `<div class="ssr">${inner}
-  <p class="ssr-n">This page was written by the server so it reads without JavaScript. The live workspace replaces it as soon as it loads. Educational research — not SEBI-registered advice.</p></div>`;
+  <p class="ssr-n">This page was written by the server so it reads without JavaScript. The live workspace replaces it as soon as it loads. Educational research, not SEBI-registered advice.</p></div>`;
 
 export async function visionHome(request, env) {
   const shell = await visionShell(env, request);
@@ -206,11 +206,11 @@ export async function visionHome(request, env) {
   const top = (site && site.top) || [];
   const body = vPage(`<p class="ssr-k"><a href="${SIGNAL}/">← Signal</a> · Vision</p>
     <h1>Understand any Indian company in minutes.</h1>
-    <p class="ssr-s">Price, financials, ownership, events, technical structure and market context — one research workspace for ${esc(site ? site.universe : "~1,000")} NSE companies. Signal finds what deserves attention; Vision shows why.</p>
+    <p class="ssr-s">Price, financials, ownership, events, technical structure and market context: one research workspace for ${esc(site ? site.universe : "~1,000")} NSE companies. Signal finds what deserves attention; Vision shows why.</p>
     ${site && site.barometer ? `<p>Market barometer <b>${esc(site.barometer.score)}/100</b> (${esc(site.barometer.band || "")}). Past week: ${esc(site.week ? site.week.up : "—")} names rose, ${esc(site.week ? site.week.down : "—")} fell.</p>` : ""}
     ${sig.length ? `<h2>Plans for ${esc(ve.next_session || "the next session")}</h2><table><thead><tr><th>Company</th><th>Buy only</th><th>Stop</th><th>T1</th><th>T2</th><th>T3</th></tr></thead><tbody>
       ${sig.slice(0, 12).map((s) => `<tr><td><a href="/company/${keyOf(s.sym)}">${esc(s.sym)}</a></td><td>₹${Number(s.entry_low).toFixed(2)}–₹${Number(s.entry_high).toFixed(2)}</td><td>₹${Number(s.stop).toFixed(2)}</td><td>₹${Number(s.t1).toFixed(2)}</td><td>₹${Number(s.t2).toFixed(2)}</td><td>₹${Number(s.t3).toFixed(2)}</td></tr>`).join("")}</tbody></table>
-      <p class="ssr-m">Conditional plans made after the close of ${esc(ve.session_date || "")}: never buy above the top of the range; fills are simulated. ${ve.mode === "paper" ? "Paper mode." : "Research mode — not validated."}</p>` : ""}
+      <p class="ssr-m">Conditional plans made after the close of ${esc(ve.session_date || "")}: never buy above the top of the range; fills are simulated. ${ve.mode === "paper" ? "Paper mode." : "Research mode, not validated."}</p>` : ""}
     ${top.length ? `<h2>Most-traded companies</h2><ul class="ssr-dir">${top.map((c) => `<li><a href="/company/${keyOf(c.sym)}">${esc(c.sym)}</a> <span>${esc(c.name || "")}</span></li>`).join("")}</ul>` : ""}`);
   const rw = headRewriter({ title: V_TITLE, desc: V_DESC, canonical: VISION + "/", site: "Vision", robots: "index,follow,max-image-preview:large",
     ld: { "@context": "https://schema.org", "@graph": [
@@ -226,7 +226,7 @@ export async function visionCompany(request, env, raw) {
   const key = keyOf(decodeURIComponent(raw));
   const d = await asset(env, request, `/c/${key}.json`, 600_000);
   if (!d || !d.r) {
-    const rw = headRewriter({ title: `${key} — not on the screen · Vision`, desc: `${key} is not among the NSE companies Vision covers.`, canonical: null, site: "Vision", robots: "noindex,follow" })
+    const rw = headRewriter({ title: `${key}: not on the screen · Vision`, desc: `${key} is not among the NSE companies Vision covers.`, canonical: null, site: "Vision", robots: "noindex,follow" })
       .on("main#main", { element(e) { e.setInnerContent(vPage(`<h1>${esc(key)} is not on the screen</h1><p><a href="/">Search Vision's ~1,000 companies</a>.</p>`), { html: true }); } })
       .on("noscript", { element(e) { e.remove(); } });
     return htmlResponse(rw.transform(shell), 404);
@@ -234,17 +234,17 @@ export async function visionCompany(request, env, raw) {
   const r = d.r, sym = r.sym, name = r.name || sym, canonical = `${VISION}/company/${key}`;
   const ctx = Object.assign({ today: istDate() }, d.ctx, { vsig: d.vsig });
   const mt = insight.matters(r, d.x, ctx), ch = insight.changes(r, d.x, ctx);
-  const title = `${name} (${sym}) — what matters, what changed · Vision`;
+  const title = `${name} (${sym}): what matters, what changed · Vision`;
   const desc = `${name}, NSE: ${sym}${r.sector ? " · " + r.sector : ""}. ${inr(r.price)} at the close of ${r.last_date || "the last build"}. `
     + mt.slice(0, 3).map((m) => `${m.k} ${m.v}`).join(" · ") + ". Sourced figures, not advice.";
-  const list = (h, xs) => xs.length ? `<h3>${h}</h3><ul>${xs.map((i) => `<li><b>${esc(i.t)}</b> — ${esc(i.basis)} <small>(${esc(i.src)})</small></li>`).join("")}</ul>` : "";
+  const list = (h, xs) => xs.length ? `<h3>${h}</h3><ul>${xs.map((i) => `<li><b>${esc(i.t)}</b>: ${esc(i.basis)} <small>(${esc(i.src)})</small></li>`).join("")}</ul>` : "";
   const body = vPage(`<p class="ssr-k"><a href="${SIGNAL}/">← Signal</a> · <a href="/">Vision</a> · ${esc(r.sector || "")}</p>
     <h1>${esc(name)} <span>${esc(sym)}</span></h1>
     <p class="ssr-s"><b>${inr(r.price)}</b> ${pct(r.r1d)} · close of ${esc(r.last_date || "the last build")} · 52-week ${inr(r.low52)} – ${inr(r.high52)} · 50-day ${inr(r.sma50)} · 200-day ${inr(r.sma200)}</p>
-    <h2>What matters</h2><dl>${mt.map((m) => `<dt>${esc(m.k)}</dt><dd>${esc(m.v)}${m.sub ? ` — ${esc(m.sub)}` : ""} <small>(${esc(m.src)})</small></dd>`).join("")}</dl>
+    <h2>What matters</h2><dl>${mt.map((m) => `<dt>${esc(m.k)}</dt><dd>${esc(m.v)}${m.sub ? `, ${esc(m.sub)}` : ""} <small>(${esc(m.src)})</small></dd>`).join("")}</dl>
     <h2>What changed</h2>${list("Improved", ch.improved)}${list("Weakened", ch.weakened)}${list("Worth weighing", ch.watch)}${list("Events", ch.events)}
     ${!ch.improved.length && !ch.weakened.length ? "<p>No measured change crossed its threshold since the last filing and build.</p>" : ""}
-    <p><a href="${SIGNAL}/stock/${encodeURIComponent(sym)}">${esc(sym)} on Signal — the published record →</a></p>`);
+    <p><a href="${SIGNAL}/stock/${encodeURIComponent(sym)}">${esc(sym)} on Signal, the published record →</a></p>`);
   const rw = headRewriter({ title, desc, canonical, site: "Vision", robots: "index,follow,max-image-preview:large",
     ld: { "@context": "https://schema.org", "@graph": [
       { "@type": "WebPage", "@id": canonical, url: canonical, name: title, description: desc, isPartOf: { "@id": `${VISION}/#website` },
