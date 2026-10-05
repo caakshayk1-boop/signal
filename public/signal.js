@@ -4887,6 +4887,7 @@
     waiting:    ['Entry not met', r => r.vd?.c === 'WAIT'],
     avoid:      ['Red flags',      r => r.vd?.c === 'AVOID' || (r.vd?.f || []).length > 0],
     vetted:     ['Vetted',         r => r.vet?.s === 'cleared'],
+    eight:      ['Eight tests',    r => r.vet?.q?.a === true],
     breakout:   ['Breaking out',   r => (r.setup?.tags || []).some(t => /BREAKOUT/.test(t))],
     rsleader:   ['RS leaders',     r => (r.setup?.tags || []).includes('RS LEADER')],
     volume:     ['Volume spike',   r => (r.vol_spike ?? 0) >= 2],
@@ -4915,7 +4916,7 @@
   const SCR_GROUPS = [
     ['The call', ['buy_lt', 'buy_pos', 'buy_swing', 'waiting', 'avoid']],
     ['Chart', ['breakout', 'rsleader', 'volume', 'oversold']],
-    ['Business', ['quality', 'value', 'debtfree', 'compounder', 'magic', 'vetted']],
+    ['Business', ['quality', 'value', 'debtfree', 'compounder', 'magic', 'vetted', 'eight']],
     ['Index', ['ahimsa']],
   ];
   const SORTS = { comp: 'Composite', q: 'Quality', g: 'Growth', v: 'Value',
@@ -5360,7 +5361,7 @@
           (() => {
             /* The Vetted chip waits for the data: until a screen build carries
                `vet`, it would filter to nothing and say nothing about why. */
-            const shown = k => PRESETS[k] && (k !== 'vetted' || SCREEN.some(r => r.vet));
+            const shown = k => PRESETS[k] && (k !== 'vetted' || SCREEN.some(r => r.vet)) && (k !== 'eight' || SCREEN.some(r => r.vet && r.vet.q));
             const chip = k => {
               const on = k === 'all' ? scrPresets.size === 0 : scrPresets.has(k);
               return `<button type="button" class="chip${on ? ' on' : ''}" data-p="${k}"
@@ -11937,7 +11938,7 @@
    * A missing figure is a sentence ("market cap not published"), never a zero:
    * the first build of this gate found RELIANCE and TCS carrying a market cap
    * of 0 and reading as microcaps, which is the reason the gate exists. */
-  let vtQ = '', vtSec = '', vtView = 'cleared', vtTop = 25;
+  let vtQ = '', vtSec = '', vtView = 'cleared', vtTop = 25, vtLens = '', vtEight = false;
   R['/vetted'] = async () => {
     const T = 'Vetted', S = 'Every screened company, checked before it is compared: who clears, who is held out and why, and what the screen measures for and against each name that clears.';
     paint(head(T, S, 'Research · not advice') + skel('sk-row', 6), true);
@@ -11957,6 +11958,10 @@
       paint(out); return;
     }
     const label = Object.fromEntries((V.rules || []).map(x => [x.code, x.label]));
+    const E8 = V.eight && Array.isArray(V.eight.tests) ? V.eight : null;
+    const LENS = Array.isArray(V.lenses) ? V.lenses : [];
+    const tLabel = Object.fromEntries(((E8 && E8.tests) || []).map(t => [t.code, t.label]));
+    const lLabel = Object.fromEntries(LENS.map(l => [l.code, l.label]));
     const byCheck = Object.entries(V.by_check || {}).sort((a, b) => b[1] - a[1]);
     const cleared = all.filter(r => r.vet.s === 'cleared').sort((a, b) => (b.comp == null) - (a.comp == null) || (b.comp || 0) - (a.comp || 0));
     const held = all.filter(r => r.vet.s !== 'cleared').sort((a, b) => (b.turnover_cr || 0) - (a.turnover_cr || 0));
@@ -11977,19 +11982,49 @@
         it reads the same fields, and a weak business belongs in the case against, which prints its risk flags.</p>`,
       '', 'The thresholds are the screen’s own bands.');
 
+    /* THE FOUR LENSES. Themes over the vetted set, each defined once in
+       stock_screen.py. They describe; they do not score. */
+    if (LENS.length) {
+      out += sec('Four lenses', `<div class="vt-lens" role="group" aria-label="Lens">${LENS.map(l =>
+          `<button type="button" class="vt-lensb" data-vtlens="${esc(l.code)}" aria-pressed="${vtLens === l.code}">
+            <b>${esc(l.label)}</b><span class="cnum">${l.n}</span><small>${esc(l.rule)}</small></button>`).join('')}</div>
+        <p class="hint">Counted among the ${V.cleared} vetted companies. Pick one to narrow the list below; pick it again to clear it.</p>`,
+        '', 'Four ways to read the same vetted set.');
+    }
+    /* THE EIGHT TESTS. The recipe asks for 10 years of history; the screen holds
+       four. Each test says what it measures instead, in the page's own words. */
+    if (E8) {
+      out += sec('Eight tests', `<ul class="vt-8">${E8.tests.map(t => `<li class="${t.applied ? '' : 'is-off'}">
+          <span class="vt-8h"><b>${esc(t.label)}</b> ${esc(t.rule)}</span>
+          <span class="vt-8n cnum">${t.applied ? `${t.pass} pass · ${t.fail} fail · ${t.unk} not measured` : 'Not applied: no vetted company could be measured on it'}</span>
+          ${t.note ? `<small>${esc(t.note)}</small>` : ''}</li>`).join('')}</ul>
+        <p class="hint"><b>${E8.passed_all}</b> of ${V.cleared} vetted companies pass all ${E8.applied} tests that apply.
+          A company that could not be measured on a test has not passed it. Lenders cannot pass all of them, because debt to equity and cash flow are not defined for them.
+          <button type="button" class="chip" data-vteight="1" aria-pressed="${vtEight}">Only those ${E8.passed_all}</button></p>`,
+        '', 'A screening recipe, measured over the history this screen holds.');
+    }
+
     const secs = [...new Set(all.map(r => r.sector).filter(Boolean))].sort();
     const q = vtQ.trim().toLowerCase();
-    const pool = vtView === 'cleared' ? cleared : held;
+    const pool = vtView === 'cleared'
+      ? cleared.filter(r => (!vtLens || (r.vet.l || []).includes(vtLens)) && (!vtEight || (r.vet.q && r.vet.q.a)))
+      : held;
     let view = pool.filter(r => (!vtSec || r.sector === vtSec) && (!q || `${r.sym} ${r.name || ''} ${r.ind || ''}`.toLowerCase().includes(q)));
     const total = view.length;
     if (vtView === 'cleared' && vtTop) view = view.slice(0, vtTop);
-    const caseHtml = (c) => {
+    const caseHtml = (c, q) => {
+      const names = (xs) => (xs || []).map(k => esc(tLabel[k] || k)).join(', ');
       const list = (xs, none) => xs.length
         ? `<ul>${xs.map(i => `<li>${esc(i.t)}${i.k ? `<small>${esc(i.k)}</small>` : ''}</li>`).join('')}</ul>`
         : `<p class="muted">${none}</p>`;
       return `<div class="vt-case">
         <div><h4>The case for</h4>${list(c.for || [], 'The screen lists no measured strength for this company.')}</div>
-        <div><h4>The case against</h4>${list(c.against || [], 'No measured weakness crossed the screen’s thresholds. That describes the thresholds, not the company.')}</div></div>`;
+        <div><h4>The case against</h4>${list(c.against || [], 'No measured weakness crossed the screen’s thresholds. That describes the thresholds, not the company.')}</div>
+        ${E8 && q ? (() => {
+          const ok = E8.tests.filter(t => t.applied && !(q.f || []).includes(t.code) && !(q.u || []).includes(t.code)).map(t => t.code);
+          return `<p class="vt-8l"><b>Eight tests:</b> ${q.a ? `passes all ${E8.applied}` : [
+            ok.length ? `passes ${names(ok)}` : '', (q.f || []).length ? `fails ${names(q.f)}` : '', (q.u || []).length ? `not measured: ${names(q.u)}` : ''].filter(Boolean).join('. ')}.</p>`;
+        })() : ''}</div>`;
     };
     out += sec(vtView === 'cleared' ? 'Vetted companies' : 'Held out', `<div class="tools">
         <input type="search" id="vtq" class="scr-in" value="${esc(vtQ)}" placeholder="Search by name or symbol" aria-label="Search the list">
@@ -12001,15 +12036,16 @@
       ${vtView === 'cleared' ? `<div class="chips" role="group" aria-label="How many">${[[25, 'Top 25'], [100, 'Top 100'], [0, `All ${V.cleared}`]].map(([n, l]) =>
         `<button type="button" class="chip" data-vttop="${n}" aria-pressed="${vtTop === n}">${esc(l)}</button>`).join('')}</div>` : ''}
       ${view.length ? (vtView === 'cleared'
-        ? `<div class="rank vt-t"><div class="vt-head"><span>Company</span><span>Composite</span><span>The case</span><span>1M</span></div>${view.map(r => { const c = (r.vet && r.vet.c) || { for: [], against: [] }; /* No data-sym here: that attribute makes Signal's global click handler open the
+        ? `<div class="rank vt-t"><div class="vt-head"><span>Company</span><span>Composite</span><span>The case</span><span>Eight tests</span><span>1M</span></div>${view.map(r => { const c = (r.vet && r.vet.c) || { for: [], against: [] }; /* No data-sym here: that attribute makes Signal's global click handler open the
               company sheet on top of the row. This row only expands. */
             return `<details class="vt-r">
-            <summary><span class="s">${watchBtn(r.sym)}<b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span><span class="wtags"><i class="wt">${esc(r.sector || 'No sector')}</i></span></span>
+            <summary><span class="s">${watchBtn(r.sym)}<b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span><span class="wtags"><i class="wt">${esc(r.sector || 'No sector')}</i>${(r.vet.l || []).map(k => `<i class="wt wt-l">${esc(lLabel[k] || k)}</i>`).join('')}</span></span>
               <span class="x cnum" data-l="Composite">${r.comp != null ? Number(r.comp).toFixed(1) : 'No score'}</span>
               <span class="x" data-l="The case">${(c.for || []).length} for · ${(c.against || []).length} against</span>
+              <span class="x" data-l="Eight tests">${E8 && r.vet.q ? `${r.vet.q.p} of ${E8.applied}` : 'Not published'}</span>
               <span class="m ${dir(r.r1m)}" data-l="1M">${pct(r.r1m)}</span></summary>
-            ${caseHtml(c)}<p class="vt-open"><a href="/stock/${encodeURIComponent(r.sym)}">Open the company page</a></p></details>`; }).join('')}</div>
-          <p class="hint">Showing ${view.length} of ${total}${vtSec || q ? ' that match' : ''}, in the order of the screen’s own composite, which is the order on /screen. Vetting adds nothing to it.
+            ${caseHtml(c, r.vet.q)}<p class="vt-open"><a href="/stock/${encodeURIComponent(r.sym)}">Open the company page</a></p></details>`; }).join('')}</div>
+          <p class="hint">${[vtLens ? `Lens: ${esc(lLabel[vtLens] || vtLens)}` : '', vtEight ? 'only those passing all the eight tests' : ''].filter(Boolean).join(', ')}${vtLens || vtEight ? '. ' : ''}Showing ${view.length} of ${total}${vtSec || q ? ' that match' : ''}, in the order of the screen’s own composite, which is the order on /screen. Vetting adds nothing to it.
             Open a row for what the screen measures for and against the company, each line with its figure.</p>`
         : `<div class="rank vt-t"><div class="vt-head vt-head-h"><span>Company</span><span>Held out because</span><span>Failed</span></div>${view.map(r => `<a class="vt-h" href="/stock/${encodeURIComponent(r.sym)}">
             <span class="s"><b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span></span>
@@ -12032,6 +12068,8 @@
     if (ss) ss.addEventListener('change', () => { vtSec = ss.value; R['/vetted'](); });
     main.querySelectorAll('[data-vtview]').forEach(b => b.addEventListener('click', () => { vtView = b.dataset.vtview; R['/vetted'](); }));
     main.querySelectorAll('[data-vttop]').forEach(b => b.addEventListener('click', () => { vtTop = Number(b.dataset.vttop); R['/vetted'](); }));
+    main.querySelectorAll('[data-vtlens]').forEach(b => b.addEventListener('click', () => { vtLens = vtLens === b.dataset.vtlens ? '' : b.dataset.vtlens; vtView = 'cleared'; R['/vetted'](); }));
+    main.querySelectorAll('[data-vteight]').forEach(b => b.addEventListener('click', () => { vtEight = !vtEight; vtView = 'cleared'; R['/vetted'](); }));
     /* A star inside a summary must star, not open the row. */
     main.querySelectorAll('.vt-r summary [data-watch]').forEach(b => b.addEventListener('click', e => e.preventDefault()));
   };

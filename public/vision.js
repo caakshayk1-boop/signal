@@ -1845,6 +1845,11 @@
     ['pe', 'PE', 'Valuation', (r) => num(r.pe), 'n', 'n1'], ['pb', 'PB', 'Valuation', (r) => num(r.pb), 'n', 'n2'],
     ['pe_pctile', 'PE vs its own history (pct)', 'Valuation', (r) => num(r.pe_pctile), 'n', 'n0', '0 = cheapest it has been'],
     ['vetted', 'Vetted', 'Quality', (r) => (r.vet && r.vet.s ? r.vet.s === 'cleared' : null), 'b', null, 'Passed the nine data and balance-sheet checks. A company that could not be measured is held out, never passed'],
+    ['lens_small', 'Small cap, vetted', 'Quality', (r) => (r.vet && r.vet.s === 'cleared' ? (r.vet.l || []).includes('small') : null), 'b', null, 'In the NSE Smallcap 250 and passed the vetting gate'],
+    ['lens_mom', 'Momentum, vetted', 'Quality', (r) => (r.vet && r.vet.s === 'cleared' ? (r.vet.l || []).includes('mom') : null), 'b', null, 'Above its 50 and 200-day, ahead of the Nifty over 3 months, RSI 55 to 75, and vetted'],
+    ['lens_debt', 'Debt-free, vetted', 'Quality', (r) => (r.vet && r.vet.s === 'cleared' ? (r.vet.l || []).includes('debt') : null), 'b', null, 'Debt to equity from 0 to 0.1 (never negative, never a lender) and vetted'],
+    ['lens_div', 'Dividend income, vetted', 'Quality', (r) => (r.vet && r.vet.s === 'cleared' ? (r.vet.l || []).includes('div') : null), 'b', null, 'Dividend yield of 2% or more and vetted'],
+    ['eight', 'Passes the eight tests', 'Quality', (r) => (r.vet && r.vet.q ? !!r.vet.q.a : null), 'b', null, 'Market cap, growth, ROCE, insiders, return, debt, margin and cash flow, measured over the 3 to 4 years held. The breakdown is on Signal'],
     ['mf_rank', 'Magic Formula rank', 'Valuation', (r) => (r.mf && Number.isInteger(r.mf.rank) ? r.mf.rank : null), 'n', 'n0', '1 = best; lenders, utilities and small or unreported names are unranked'],
     ['comp', 'Composite', 'Scores', (r) => num(r.comp), 'n', 'n0'], ['q', 'Quality score', 'Scores', (r) => num(r.q), 'n', 'n0'],
     ['g', 'Growth score', 'Scores', (r) => num(r.g), 'n', 'n0'], ['v', 'Valuation score', 'Scores', (r) => num(r.v), 'n', 'n0'],
@@ -1863,7 +1868,11 @@
     ['highs', 'Near highs on volume', 'Within 3% of the 52-week high with volume behind it', [['from_high', '>=', -3], ['vol_spike', '>=', 1.5]]],
     ['qdisc', 'Quality at a discount', 'High quality, cheap against its own history', [['q', '>=', 70], ['pe_pctile', '<=', 30]]],
     ['magic', 'Magic Formula top 30', 'Greenblatt: ROCE rank plus EBIT/EV rank, lowest sum first', [['mf_rank', '<=', 30]], { sort: 'mf_rank', dir: 1 }],
-    ['qvet', 'Quality at a discount, vetted', 'The same screen with the gate in front of it: stale, unmeasured and cash-poor names removed first', [['vetted', 'is', true], ['q', '>=', 70], ['pe_pctile', '<=', 30]]],
+    ['lsmall', 'Vetted small cap', 'NSE Smallcap 250 names that passed the vetting gate', [['lens_small', 'is', true]]],
+    ['lmom', 'Vetted momentum', 'Vetted, above both averages, ahead of the Nifty, RSI 55 to 75', [['lens_mom', 'is', true]]],
+    ['ldebt', 'Vetted debt-free', 'Vetted, debt to equity from 0 to 0.1', [['lens_debt', 'is', true]]],
+    ['ldiv', 'Vetted dividend income', 'Vetted, dividend yield of 2% or more', [['lens_div', 'is', true]]],
+    ['leight', 'Vetted, all eight tests', 'Vetted names that pass all eight tests; the tests are on Signal', [['eight', 'is', true]]],
     ['leaders', 'Momentum leaders', 'Strong 3 months, above every average, RSI not stretched', [['r3m', '>=', 20], ['stack', 'is', true], ['rsi', 'between', [55, 75]]]],
     ['oversold', 'Oversold quality', 'Good businesses the chart has sold down', [['rsi', '<=', 35], ['q', '>=', 60]]],
     ['compound', 'Compounders', 'High returns on capital, growing, little debt', [['roce', '>=', 20], ['rev_cagr', '>=', 15], ['de', 'between', [0, 0.5]]]],
@@ -1944,7 +1953,11 @@
     const save = () => store.set('vis:scr2', { conds: st.conds, mode: st.mode, sort: st.sort, dir: st.dir, cols: st.cols, preset: st.preset });
 
     const paintPresets = () => {
-      $('#sbPre').innerHTML = `<div class="presets">${SPRESETS.map((p) => `<button type="button" class="pre${st.preset === p[0] ? ' on' : ''}" data-pre="${p[0]}" title="${esc(p[2])}"><b>${esc(p[1])}</b><span>${esc(p[2])}</span></button>`).join('')}</div>`;
+      /* The vetted presets wait for the data: until a screen build carries `vet`, they would
+         return nothing and say nothing about why. */
+      const VET_PRE = new Set(['lsmall', 'lmom', 'ldebt', 'ldiv', 'leight']);
+      const hasVet = all0.some((r) => r.vet && (r.vet.q || r.vet.l));
+      $('#sbPre').innerHTML = `<div class="presets">${SPRESETS.filter((p) => hasVet || !VET_PRE.has(p[0])).map((p) => `<button type="button" class="pre${st.preset === p[0] ? ' on' : ''}" data-pre="${p[0]}" title="${esc(p[2])}"><b>${esc(p[1])}</b><span>${esc(p[2])}</span></button>`).join('')}</div>`;
     };
     const fieldSelect = (cur) => {
       const groups = [...new Set(SF.map((f) => f[2]))];
