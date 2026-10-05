@@ -13723,7 +13723,7 @@
       const d = document.documentElement;
       const h = d.scrollHeight - window.innerHeight;
       const pc = h > 0 ? Math.min(100, Math.max(0, window.scrollY / h * 100)) : 0;
-      bar.style.width = pc + '%';
+      bar.style.transform = 'scaleX(' + (pc / 100) + ')';
       // Announced as well as drawn: the element is a progressbar to the
       // assistive tree, and a bar with no value is furniture.
       bar.setAttribute('aria-valuenow', Math.round(pc));

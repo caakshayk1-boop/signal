@@ -191,7 +191,7 @@
   /* One motion vocabulary for the whole site. Three durations, two curves.
      Everything that moves picks from here, so nothing on the page animates at
      a speed nothing else uses — which is what makes motion read as noise. */
-  --t-fast:140ms; --t-mid:220ms; --t-slow:380ms;
+  --t-fast:140ms; --t-mid:220ms; --t-slow:280ms;
   --ease:cubic-bezier(.22,.61,.36,1);
   --ease-out:cubic-bezier(.16,1,.3,1);
   /* THE PRESS. gems.css has declared --t-press since the feel pass and this
@@ -786,7 +786,7 @@ main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh
 /* Subscription, as a shape. 1x is the line that matters. */
 .subs{display:flex;align-items:center;gap:8px}
 .subs-bar{flex:1;height:6px;border-radius:var(--r-1);background:var(--raised);overflow:hidden;position:relative}
-.subs-bar i{display:block;height:100%;background:var(--accent);transition:width .7s var(--ease-out)}
+.subs-bar i{display:block;height:100%;background:var(--accent)}
 .subs-bar::after{content:"";position:absolute;left:calc(var(--one,10%) - 1px);top:0;bottom:0;width:2px;background:var(--line2)}
 .subs-v{font:500 var(--t-4)/1 var(--mono);white-space:nowrap}
 
@@ -870,8 +870,7 @@ main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh
    framing in which "+3%" means anything. */
 .prog{display:grid;gap:5px}
 .prog-bar{position:relative;height:7px;border-radius:var(--r-1);background:var(--raised);overflow:hidden}
-.prog-bar i{display:block;height:100%;background:var(--accent);
-  transition:width .6s var(--ease-out)}
+.prog-bar i{display:block;height:100%;background:var(--accent)}
 .prog-bar em{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--text);opacity:.55}
 .prog-l{display:flex;justify-content:space-between;
   font:400 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--dim)}
@@ -927,12 +926,6 @@ body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
    whose position is the thing making it work. */
 main,.foot{position:relative;z-index:1}
 
-/* The header runs a slow scan. 9 seconds, 1px, and it stops for anyone who
-   asked for less motion. */
-.bar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;
-  background:linear-gradient(90deg,transparent,var(--live),transparent);
-  opacity:.55;animation:scan 9s linear infinite}
-@keyframes scan{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 
 /* Live clock. Tabular so the seconds do not shuffle the layout every tick —
    a clock that reflows once a second is a layout shift once a second. */
@@ -989,8 +982,10 @@ main,.foot{position:relative;z-index:1}
 .sc-v{display:block;font:500 var(--t-8)/1.1 var(--mono);margin:6px 0 7px;font-variant-numeric:tabular-nums}
 .mini-bar{display:block;height:3px;border-radius:var(--r-1);background:var(--raised);overflow:hidden}
 .mini-bar i{display:block;height:100%;background:var(--live);
-  animation:grow .5s var(--ease-out) both}
-@keyframes grow{from{width:0!important}}
+  animation:barIn var(--t-slow) var(--ease-out) both}
+/* Bars reveal from their axis with clip-path, not width: the width is the
+   datum and stays put, and the reveal never touches layout. */
+@keyframes barIn{from{clip-path:inset(0 100% 0 0)}}
 @media(prefers-reduced-motion:reduce){.mini-bar i{animation:none}}
 
 .two{display:grid;gap:8px;grid-template-columns:1fr}
@@ -1552,10 +1547,9 @@ body::before{display:none}
 .rng-f{position:absolute;left:0;top:0;bottom:0;border-radius:var(--r-1);
   background:linear-gradient(90deg,color-mix(in srgb,var(--down) 32%,transparent),
                                    color-mix(in srgb,var(--up) 40%,transparent));
-  transition:width var(--t-slow) var(--ease-out)}
+}
 .rng-m{position:absolute;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;
-  background:var(--text);border:1.5px solid var(--surface);
-  transition:left var(--t-slow) var(--ease-out)}
+  background:var(--text);border:1.5px solid var(--surface)}
 .rng-e{font:400 var(--t-1)/1 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums;
   white-space:nowrap;flex:none}
 
@@ -2900,8 +2894,6 @@ main.route-in{animation:routeIn var(--t-mid) var(--ease-out) both}
 .wc-rim{fill:none;stroke:var(--line2);stroke-width:1.1}
 .wc-par{fill:none;stroke:var(--line);stroke-width:.7;opacity:.75}
 .wc-mer{fill:none;stroke:var(--line);stroke-width:.7;opacity:.75}
-.wc-spin{transform-origin:60px 60px;animation:wcSpin 42s linear infinite}
-@keyframes wcSpin{from{transform:rotateY(0)}to{transform:rotateY(360deg)}}
 .wc-city{fill:var(--dim)}
 .wc-city.on{fill:var(--up)}
 
@@ -4014,8 +4006,8 @@ html:has(dialog[open]){overflow:hidden}
  *
  * A generic class name in a 200KB single stylesheet is a collision waiting for
  * a second author, and I was the second author. */
-.scrollprog{position:fixed;top:0;left:0;height:2px;width:0;background:var(--accent);
-  z-index:2000;transition:width .1s linear;pointer-events:none}
+.scrollprog{position:fixed;top:0;left:0;height:2px;width:100%;background:var(--accent);
+  z-index:2000;pointer-events:none;transform:scaleX(0);transform-origin:0 50%}
 @media (prefers-reduced-motion:reduce){ .scrollprog{transition:none} }
 
 /* ── ROUTE SNAPSHOT ───────────────────────────────────────────────────────
@@ -5508,14 +5500,13 @@ a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,
 .splitb{display:flex;height:34px;border-radius:var(--r-2);overflow:hidden;
   border:1px solid var(--line);background:var(--raised)}
 .splitb i{display:flex;align-items:center;justify-content:center;font-style:normal;
-  font:700 var(--t-2)/1 var(--ui);color:#fff;min-width:0;overflow:hidden;
-  animation:grow var(--t-slow) var(--ease-out) backwards}
+  font:700 var(--t-2)/1 var(--ui);color:#fff;min-width:0;overflow:hidden}
+.splitb{animation:barIn var(--t-slow) var(--ease-out) backwards}
 .splitb .sb-u{background:var(--up)} .splitb .sb-f{background:var(--dim)}
 .splitb .sb-d{background:var(--down)}
 /* Dark-mode fills are light (#3CC98C, #FF7B6F), so white labels on them fell
    to 2.1–3.2:1. The dark ink holds 6:1 or better on all three. */
 :root[data-theme="dark"] .splitb i{color:var(--on-ink)}
-@keyframes grow{from{flex-basis:0 !important;opacity:.4}}
 .splitl{display:flex;justify-content:space-between;margin-top:6px;
   font-size:var(--t-2);color:var(--dim)}
 
@@ -5524,9 +5515,8 @@ a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,
 .meter{height:8px;border-radius:999px;background:var(--line);overflow:hidden}
 .meter i{display:block;height:100%;width:var(--w);border-radius:999px;
   background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 55%,var(--up)));
-  animation:mgrow var(--t-slow) var(--ease-out) backwards}
+  animation:barIn var(--t-slow) var(--ease-out) backwards}
 .meter.up i{background:var(--up)} .meter.dn i{background:var(--down)}
-@keyframes mgrow{from{width:0}}
 
 /* ── SPARK CARD ───────────────────────────────────────────────────────────
    A small infographic tile: label, big number, trend line, delta. */
@@ -6854,7 +6844,7 @@ main{min-height:calc(100vh - var(--barh))}
    the headline. Off for reduced motion, and never on a repaint. */
 @keyframes homeIn{from{opacity:0;transform:translateY(6px)}}
 @media(prefers-reduced-motion:no-preference){
-  .home-hero.is-in>*{animation:homeIn 320ms cubic-bezier(.23,1,.32,1) both}
+  .home-hero.is-in>*{animation:homeIn 280ms cubic-bezier(.23,1,.32,1) both}
   .home-hero.is-in>*+*{animation-delay:60ms}
 }
 /* The gate keeps its counts, set as a line inside the card, not a boxed
@@ -6920,3 +6910,10 @@ input,textarea{caret-color:var(--accent)}
 .lmk{border-left-width:1px}
 .bar-v em{text-transform:none;letter-spacing:0}
 .isc-b em,.card-foot .lnks a{text-transform:none;letter-spacing:0}
+
+/* One entrance per navigation. Where the View Transitions API runs (supported
+   and motion allowed), it already fades the new page in; main.is-nav on top of
+   it played the same rise twice. */
+@supports (view-transition-name:none){
+  @media (prefers-reduced-motion:no-preference){ main.is-nav{animation:none} }
+}
