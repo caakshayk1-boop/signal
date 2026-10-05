@@ -381,6 +381,21 @@ try {
     const loc = res ? new URL(res.headers.get("location") || "/", SITE).pathname : "";
     ok(`${r} forwards to ${to}`, !!res && res.status === 301 && loc === to, res && [res.status, loc]);
   }
+  /* VETTED. The page is either the gate's list or says the gate has not been
+     published yet. It is never blank, and it never prints a missing figure as a
+     word like NaN. The same check passes before and after a screen build that
+     carries `vet`, so the deploy gate cannot fail on build timing alone. */
+  await p.goto(SITE + "/vetted", { waitUntil: "domcontentloaded" });
+  await until(p, () => /Vetted/.test(document.querySelector("main h1")?.innerText || "")
+    && (document.querySelector(".vt-r") || /has not published the vetting gate/.test(document.querySelector("main")?.innerText || "")));
+  const vt = await p.evaluate(() => ({ rows: document.querySelectorAll(".vt-r").length, txt: document.querySelector("main").innerText }));
+  ok("/vetted is the gate's list, or says the gate is not published yet", vt.rows > 0 || /has not published the vetting gate/.test(vt.txt), vt.rows);
+  ok("/vetted prints no NaN, undefined or null", !/\bNaN\b|undefined|\bnull\b/.test(vt.txt));
+  if (vt.rows) {
+    await p.locator(".vt-r summary").first().click();
+    const heads = await p.evaluate(() => [...document.querySelectorAll(".vt-r[open] .vt-case h4")].map((h) => h.innerText));
+    ok("a vetted row opens to the case for and the case against", heads.join("|") === "The case for|The case against", heads);
+  }
   await p.goto(SITE + "/plan/not-a-plan", { waitUntil: "domcontentloaded" });
   await until(p, () => /Plan not found/.test(document.querySelector("main h1")?.innerText || ""));
   ok("an unknown plan id says so, and does not borrow another plan",

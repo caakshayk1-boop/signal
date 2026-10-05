@@ -668,11 +668,12 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
    * It stays an EXACT count rather than becoming `>= 3`, because the exact
    * form is what catches the dangerous direction: a guard deleted from an
    * existing site. `>=` would pass while a route quietly started reading a
-   * lite cache. The four are the screen, the company page, the engine floor
-   * and the regime panel; adding a fifth means moving this number, on
+   * lite cache. The five are the screen, the company page, the engine floor,
+   * the regime panel and /vetted (its case for and against is the one field
+   * the lite table drops); adding a sixth means moving this number, on
    * purpose, in the same commit. */
   const fullGuards = (code.match(/!SCREEN \|\| SCREEN_LITE/g) || []).length;
-  ok("every full-payload call site rejects a lite cache", fullGuards === 4, fullGuards);
+  ok("every full-payload call site rejects a lite cache", fullGuards === 5, fullGuards);
   /* And nothing may reach for the raw path any more — through get(), and
    * equally through the two CACHE lookups.
    *
@@ -2785,6 +2786,28 @@ ok("no figure counts up", !/countUp/.test(JS));
        MFR.length > 2000 && /a\.mf\.rank - b\.mf\.rank/.test(MFR) && !/roc_rank\s*[+]|ey_rank\s*[+]|\.sort\([^)]*roc\b/.test(MFR));
     ok("/magic says why there is no backtest, and that the book is paper", /Why there is no backtest/.test(MFR) && /Paper, forward only/.test(MFR));
     ok("/magic makes no forecast", !/will (rise|beat|outperform)|expected return|probabilit|guarantee/i.test(MFR));
+    /* VETTED: a gate and a case. The page prints stock_screen.py::vet() and computes none of it. */
+    const VTR = (JS.match(/R\['\/vetted'\] = async[\s\S]*?\n  \};/) || [""])[0];
+    ok("/vetted is a real page: Worker PAGES, route meta, sitemap, Discover",
+       /"\/magic", "\/vetted"/.test(IXS) && /"\/vetted": \[/.test(readFileSync("src/route-meta.js", "utf8"))
+       && /\/vetted</.test(readFileSync("public/sitemap.xml", "utf8")) && /\['\/vetted',\s+'Vetted'/.test(JS));
+    ok("/vetted prints the screen's gate and computes no check, count or case",
+       VTR.length > 1500 && /SCREEN_META\.vet/.test(VTR) && !/\.filter\([^)]*\b(de|icover|cfo_pat|mcap_cr)\b[^)]*[<>]/.test(VTR) && !/Math\.(random|round)\(/.test(VTR));
+    ok("/vetted reads the FULL table: the case is the one field the lite table drops", /!SCREEN \|\| SCREEN_LITE/.test(VTR));
+    ok("/vetted says unmeasured is not a pass, and that cleared is not a recommendation",
+       /A check that cannot be measured is not a pass/.test(VTR) && /not a recommendation/i.test(VTR));
+    ok("/vetted says what an empty case means, about the thresholds and not the company",
+       /No measured weakness crossed the screen.s thresholds\. That describes the thresholds, not the company/.test(VTR));
+    ok("/vetted makes no forecast and gives no advice",
+       !/will (rise|beat|outperform|fall)|expected return|probabilit|guarantee|\b(buy|sell)\b|target price|upside/i.test(
+         VTR.replace("a recommendation to buy or sell anything", "")));
+    ok("/vetted orders by the screen's own composite and adds nothing to it", /in the order of the screen.s own composite/.test(VTR) && /Vetting adds nothing to it/.test(VTR));
+    ok("the screen has a Vetted preset, and the company page prints the gate's one line",
+       /vetted:\s+\['Vetted',\s+r => r\.vet\?\.s === 'cleared'\]/.test(JS) && /const vetLine = \(r\)/.test(JS) && /\$\{vetLine\(r\)\}/.test(JS));
+    const VJS3 = readFileSync("public/vision.js", "utf8");
+    ok("Vision carries the LIMITED version: status and reason only, never the case",
+       /r\.vet\.s === 'cleared'/.test(VJS3) && /\['vetted', 'Vetted', 'Quality'/.test(VJS3) && /\['qvet', 'Quality at a discount, vetted'/.test(VJS3)
+       && !/vet\.c\b|vet\?\.c\b|\.vet\.c\./.test(VJS3));
     ok("the screen offers the formula as a preset and a sort, unranked last",
        /magic:\s+\['Magic Formula top 30'/.test(JS) && /if \(k === 'mf'\)\s+return Number\.isInteger\(r\.mf\?\.rank\) \? -r\.mf\.rank : null/.test(JS));
     ok("Vision shows a company's rank, or that it is unranked and why",
