@@ -65,6 +65,10 @@ export const SIGNAL_META = {
   "Watchlist, your names, sorted by what needs attention",
   "The names you follow, ranked by what changed rather than alphabetically."
  ],
+ "/vetted": [
+  "Vetted, every screened company checked before it is compared",
+  "Nine checks on data quality and balance sheet, which companies are held out and why, and what the screen measures for and against each one that clears."
+ ],
  "/magic": [
   "Magic Formula, Greenblatt's ranking across the NSE screen",
   "Every company on the screen ranked by return on capital and earnings yield, the two ranks added, and a forward paper book that buys the top."

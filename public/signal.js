@@ -4573,7 +4573,7 @@
   const noteScreenMeta = (d) => {
     if (!d || typeof d !== 'object') return d;
     for (const k of ['weights', 'changes', 'universe', 'universe_size',
-                     'universe_core', 'universe_ext', 'built_on', 'magic_formula']) {
+                     'universe_core', 'universe_ext', 'built_on', 'magic_formula', 'vet']) {
       if (d[k] !== undefined) SCREEN_META[k] = d[k];
     }
     /* The screen is a NIGHTLY file and the ledger is live, so a route reading
@@ -4886,6 +4886,7 @@
     buy_swing:  ['Criteria met · swing', r => r.vd?.c === 'BUY' && r.vd?.h === 'swing'],
     waiting:    ['Entry not met', r => r.vd?.c === 'WAIT'],
     avoid:      ['Red flags',      r => r.vd?.c === 'AVOID' || (r.vd?.f || []).length > 0],
+    vetted:     ['Vetted',         r => r.vet?.s === 'cleared'],
     breakout:   ['Breaking out',   r => (r.setup?.tags || []).some(t => /BREAKOUT/.test(t))],
     rsleader:   ['RS leaders',     r => (r.setup?.tags || []).includes('RS LEADER')],
     volume:     ['Volume spike',   r => (r.vol_spike ?? 0) >= 2],
@@ -4914,7 +4915,7 @@
   const SCR_GROUPS = [
     ['The call', ['buy_lt', 'buy_pos', 'buy_swing', 'waiting', 'avoid']],
     ['Chart', ['breakout', 'rsleader', 'volume', 'oversold']],
-    ['Business', ['quality', 'value', 'debtfree', 'compounder', 'magic']],
+    ['Business', ['quality', 'value', 'debtfree', 'compounder', 'magic', 'vetted']],
     ['Index', ['ahimsa']],
   ];
   const SORTS = { comp: 'Composite', q: 'Quality', g: 'Growth', v: 'Value',
@@ -5357,6 +5358,9 @@
             * preset is still here, in the same order, under a label. */''}
         <div class="chips scr-fg" role="group" aria-label="Screen filters">${
           (() => {
+            /* The Vetted chip waits for the data: until a screen build carries
+               `vet`, it would filter to nothing and say nothing about why. */
+            const shown = k => PRESETS[k] && (k !== 'vetted' || SCREEN.some(r => r.vet));
             const chip = k => {
               const on = k === 'all' ? scrPresets.size === 0 : scrPresets.has(k);
               return `<button type="button" class="chip${on ? ' on' : ''}" data-p="${k}"
@@ -5365,10 +5369,10 @@
             const seen = new Set(['all']);
             const rowsOf = SCR_GROUPS.map(([label, keys]) => {
               keys.forEach(k => seen.add(k));
-              return `<div class="scr-fr"><span class="scr-fl">${esc(label)}</span>${keys.filter(k => PRESETS[k]).map(chip).join('')}</div>`;
+              return `<div class="scr-fr"><span class="scr-fl">${esc(label)}</span>${keys.filter(shown).map(chip).join('')}</div>`;
             });
             /* A preset added later and not yet given a group still renders. */
-            const rest = Object.keys(PRESETS).filter(k => !seen.has(k));
+            const rest = Object.keys(PRESETS).filter(k => !seen.has(k) && shown(k));
             if (rest.length) rowsOf.push(`<div class="scr-fr"><span class="scr-fl">More</span>${rest.map(chip).join('')}</div>`);
             /* "Everything" leads the first row: it is the reset for all of them. */
             rowsOf[0] = rowsOf[0].replace('</span>', `</span>${chip('all')}`);
@@ -6590,6 +6594,18 @@
     </div>`;
   };
 
+  /* The gate's verdict on this company, in one line. The case for and against
+     is already on this page as the strengths, weaknesses and risk flags, so it
+     is not repeated; /vetted explains the nine checks. A row the screen has not
+     vetted yet prints nothing rather than a guess. */
+  const vetLine = (r) => {
+    const v = r.vet;
+    if (!v || !v.s) return '';
+    return v.s === 'cleared'
+      ? `<p class="vt-line"><b>Vetted.</b> It passed all ${v.n} checks that apply to it. <a href="/vetted">How the gate works</a></p>`
+      : `<p class="vt-line"><b>Held out:</b> ${esc(v.w || 'a check failed')}. <a href="/vetted">How the gate works</a></p>`;
+  };
+
   const stockPage = (r, q) => {
     const { body } = stockCard(r);
     return `<div class="route-h stock-h">
@@ -6597,6 +6613,7 @@
         <p>${esc(r.name || '')} · ${esc(r.sector || 'NSE')}${r.ind ? ', ' + esc(r.ind) : ''} · <a class="to-vision" href="${visionUrl(r.sym)}">Open in Vision, what matters, what changed ↗</a></p>
       </div>
       ${liveMark(r, q)}
+      ${vetLine(r)}
       ${/* NOT { lead: true }. That flag gives a section the route's hero
             treatment, display size, the full standfirst measure, and this
             page already has a hero: the ticker and the company name directly
@@ -8355,6 +8372,7 @@
     ['/watch', 'Watchlist', 'Names you starred, and your price alerts'],
     ['/alerts', 'Alerts', 'What changed on the names you watch'],
     ['/magic', 'Magic Formula', "Greenblatt's ranking across the screen, and its paper book"],
+    ['/vetted', 'Vetted', 'Every company checked before it is compared, and the case for and against'],
     ['/news', 'News', 'The full wire, and the screened names each story touches'],
     ['/brief', 'Brief', 'The current plan, in full'],
     ['/discover', 'Discover', 'Every way into the screen'],
@@ -10556,6 +10574,8 @@
    * is the thing a reader needs to choose between them. Ordered by how often
    * they answer a question rather than alphabetically. */
   const DISCOVER = [
+    ['/vetted',  'Vetted',        'Checked before it is compared',
+                 'Nine checks on data quality and balance sheet, who is held out and why, and for each company that clears, what the screen measures for and against it.'],
     ['/magic',   'Magic Formula', 'Greenblatt’s ranking, every company',
                  'Return on capital and earnings yield, each ranked across the screen and added, plus a paper book that buys the top and holds a year.'],
     ['/heat',    'The heatmap',   'Today, in each name’s own units',
@@ -11902,6 +11922,120 @@
     main.querySelectorAll('[data-mftop]').forEach(b => b.addEventListener('click', () => { mfTop = Number(b.dataset.mftop); R['/magic'](); }));
   };
 
+  /* ══ VETTED ═══════════════════════════════════════════════════════════════
+   *
+   * A gate in front of the screen, and the case for and against what clears it.
+   * stock_screen.py::vet() decides; this page PRINTS. It computes no check, no
+   * count and no case: every row's `vet` is the screen's own, and the page says
+   * where it has not been published yet rather than filling the gap.
+   *
+   * Two things this page must never become. A ranking: it is ordered by the
+   * screen's composite, which is already on /screen, and "vetted" adds no
+   * points to it. A recommendation: cleared means "passed nine checks on the
+   * data held", and the page says so beside the list, not in a footer.
+   *
+   * A missing figure is a sentence ("market cap not published"), never a zero:
+   * the first build of this gate found RELIANCE and TCS carrying a market cap
+   * of 0 and reading as microcaps, which is the reason the gate exists. */
+  let vtQ = '', vtSec = '', vtView = 'cleared', vtTop = 25;
+  R['/vetted'] = async () => {
+    const T = 'Vetted', S = 'Every screened company, checked before it is compared: who clears, who is held out and why, and what the screen measures for and against each name that clears.';
+    paint(head(T, S, 'Research · not advice') + skel('sk-row', 6), true);
+    if (!SCREEN || SCREEN_LITE) {
+      const r = await get(FULL_URL).then(noteLadder);
+      if (routeOf() !== '/vetted') return;
+      if (!r.ok) { paint(head(T, S, 'Research · not advice') + fail('The screen', r.error)); return; }
+      noteScreenMeta(r.data); setScreen((r.data.rows || []).filter(x => x && x.sym), false);
+    }
+    if (routeOf() !== '/vetted') return;
+    const V = SCREEN_META.vet || null;
+    const all = SCREEN.filter(r => r.vet && r.vet.s);
+    let out = head(T, S, 'Research · not advice');
+    if (!V || !all.length) {
+      out += sec('Not published yet', `<p class="v2-none"><b>The screen has not published the vetting gate yet.</b>
+        It is computed on every nightly screen build; the first build with it fills this page.</p>`);
+      paint(out); return;
+    }
+    const label = Object.fromEntries((V.rules || []).map(x => [x.code, x.label]));
+    const byCheck = Object.entries(V.by_check || {}).sort((a, b) => b[1] - a[1]);
+    const cleared = all.filter(r => r.vet.s === 'cleared').sort((a, b) => (b.comp == null) - (a.comp == null) || (b.comp || 0) - (a.comp || 0));
+    const held = all.filter(r => r.vet.s !== 'cleared').sort((a, b) => (b.turnover_cr || 0) - (a.turnover_cr || 0));
+
+    out += sec('The gate', `<div class="grid v2-rec v2-rec3">
+        ${tile(String(V.total), 'Screened', 'every company on the screen')}
+        ${tile(String(V.held), 'Held out', 'failed a check, or could not be measured')}
+        ${tile(String(V.cleared), 'Vetted', 'passed every check that applies')}
+      </div>
+      <p class="hint">Held out, by check (a company can fail more than one):
+        ${byCheck.map(([k, n]) => `${esc(label[k] || k)} <b>${n}</b>`).join(' · ') || 'none'}.</p>`,
+      `${V.cleared} of ${V.total}`, 'Cleared is not a recommendation, and not a score.');
+
+    out += sec('The nine checks', `<ul class="v2-list vt-rules">${(V.rules || []).map(x =>
+        `<li><b>${esc(x.label)}.</b> ${esc(x.rule)}.${x.core ? ' <i class="wt">core</i>' : ''}</li>`).join('')}</ul>
+      <p class="hint">Cleared means a company passed nine checks on the data held. A check that cannot be measured is not a pass. On a core field it holds the company out; where the measure does not exist for that kind of company
+        (a lender has no interest cover) it is marked not applicable and counted as neither pass nor fail. The screen's risk grade is not one of the nine:
+        it reads the same fields, and a weak business belongs in the case against, which prints its risk flags.</p>`,
+      '', 'The thresholds are the screen’s own bands.');
+
+    const secs = [...new Set(all.map(r => r.sector).filter(Boolean))].sort();
+    const q = vtQ.trim().toLowerCase();
+    const pool = vtView === 'cleared' ? cleared : held;
+    let view = pool.filter(r => (!vtSec || r.sector === vtSec) && (!q || `${r.sym} ${r.name || ''} ${r.ind || ''}`.toLowerCase().includes(q)));
+    const total = view.length;
+    if (vtView === 'cleared' && vtTop) view = view.slice(0, vtTop);
+    const caseHtml = (c) => {
+      const list = (xs, none) => xs.length
+        ? `<ul>${xs.map(i => `<li>${esc(i.t)}${i.k ? `<small>${esc(i.k)}</small>` : ''}</li>`).join('')}</ul>`
+        : `<p class="muted">${none}</p>`;
+      return `<div class="vt-case">
+        <div><h4>The case for</h4>${list(c.for || [], 'The screen lists no measured strength for this company.')}</div>
+        <div><h4>The case against</h4>${list(c.against || [], 'No measured weakness crossed the screen’s thresholds. That describes the thresholds, not the company.')}</div></div>`;
+    };
+    out += sec(vtView === 'cleared' ? 'Vetted companies' : 'Held out', `<div class="tools">
+        <input type="search" id="vtq" class="scr-in" value="${esc(vtQ)}" placeholder="Search by name or symbol" aria-label="Search the list">
+        <select id="vtsec" class="scr-sel" aria-label="Sector"><option value="">Every sector</option>
+          ${secs.map(x => `<option value="${esc(x)}"${vtSec === x ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select>
+      </div>
+      <div class="chips" role="group" aria-label="Which list">${[['cleared', `Vetted ${V.cleared}`], ['held', `Held out ${V.held}`]].map(([k, l]) =>
+        `<button type="button" class="chip" data-vtview="${k}" aria-pressed="${vtView === k}">${esc(l)}</button>`).join('')}</div>
+      ${vtView === 'cleared' ? `<div class="chips" role="group" aria-label="How many">${[[25, 'Top 25'], [100, 'Top 100'], [0, `All ${V.cleared}`]].map(([n, l]) =>
+        `<button type="button" class="chip" data-vttop="${n}" aria-pressed="${vtTop === n}">${esc(l)}</button>`).join('')}</div>` : ''}
+      ${view.length ? (vtView === 'cleared'
+        ? `<div class="rank vt-t"><div class="vt-head"><span>Company</span><span>Composite</span><span>The case</span><span>1M</span></div>${view.map(r => { const c = (r.vet && r.vet.c) || { for: [], against: [] }; /* No data-sym here: that attribute makes Signal's global click handler open the
+              company sheet on top of the row. This row only expands. */
+            return `<details class="vt-r">
+            <summary><span class="s">${watchBtn(r.sym)}<b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span><span class="wtags"><i class="wt">${esc(r.sector || 'No sector')}</i></span></span>
+              <span class="x cnum" data-l="Composite">${r.comp != null ? Number(r.comp).toFixed(1) : 'No score'}</span>
+              <span class="x" data-l="The case">${(c.for || []).length} for · ${(c.against || []).length} against</span>
+              <span class="m ${dir(r.r1m)}" data-l="1M">${pct(r.r1m)}</span></summary>
+            ${caseHtml(c)}<p class="vt-open"><a href="/stock/${encodeURIComponent(r.sym)}">Open the company page</a></p></details>`; }).join('')}</div>
+          <p class="hint">Showing ${view.length} of ${total}${vtSec || q ? ' that match' : ''}, in the order of the screen’s own composite, which is the order on /screen. Vetting adds nothing to it.
+            Open a row for what the screen measures for and against the company, each line with its figure.</p>`
+        : `<div class="rank vt-t"><div class="vt-head vt-head-h"><span>Company</span><span>Held out because</span><span>Failed</span></div>${view.map(r => `<a class="vt-h" href="/stock/${encodeURIComponent(r.sym)}">
+            <span class="s"><b>${esc(r.sym)}</b><span>${esc(r.name || '')}</span></span>
+            <span class="x" data-l="Held out because">${esc((r.vet && r.vet.w) || 'a check failed')}</span>
+            <span class="x hm" data-l="Failed">${((r.vet && r.vet.f) || []).map(k => esc(label[k] || k)).join(', ') || 'Too few checks apply'}</span></a>`).join('')}</div>
+          <p class="hint">${total} held out${vtSec || q ? ' that match' : ''}, the most-traded first. A name is held for the reason printed, not because anything is wrong with the company as a business.</p>`)
+        : `<div class="empty">No company matches.</div>`}`,
+      `${total} shown`, '', { lead: true });
+    out += sec('What this is not', `<p class="muted">It is not a ranking, a rating or a recommendation to buy or sell anything. A company that clears can still be expensive, falling or badly run;
+        a company that is held out is not thereby poor. The gate exists so that a company with a stale price, thin statements, no published market cap or earnings that do not arrive as cash
+        is not sorted beside the rest as if it were a like-for-like peer.</p>`);
+    paint(out);
+
+    const qi = document.getElementById('vtq');
+    if (qi) qi.addEventListener('input', async () => {
+      vtQ = qi.value; const at = qi.selectionStart; await R['/vetted']();
+      const again = document.getElementById('vtq'); if (again) { again.focus(); try { again.setSelectionRange(at, at); } catch (e) { /* not text */ } }
+    });
+    const ss = document.getElementById('vtsec');
+    if (ss) ss.addEventListener('change', () => { vtSec = ss.value; R['/vetted'](); });
+    main.querySelectorAll('[data-vtview]').forEach(b => b.addEventListener('click', () => { vtView = b.dataset.vtview; R['/vetted'](); }));
+    main.querySelectorAll('[data-vttop]').forEach(b => b.addEventListener('click', () => { vtTop = Number(b.dataset.vttop); R['/vetted'](); }));
+    /* A star inside a summary must star, not open the row. */
+    main.querySelectorAll('.vt-r summary [data-watch]').forEach(b => b.addEventListener('click', e => e.preventDefault()));
+  };
+
   let watchQ = '', watchSort = 'sym', watchSec = '', watchQuick = '', WVIEW = null;
   /* ── WHAT EACH STARRED NAME IS DOING ELSEWHERE ON THIS SITE ─────────────
    * The table answered "where is the price"; a watchlist is also asked
@@ -13131,6 +13265,8 @@
                      'Mutual funds ranked on three- and five-year return against their own drawdown and volatility. Direct plans only, because the cost difference compounds.'],
     '/watch':       ['Watchlist, your names, sorted by what needs attention',
                      'The names you follow, ranked by what changed rather than alphabetically.'],
+    '/vetted':      ['Vetted, every screened company checked before it is compared',
+                     'Nine checks on data quality and balance sheet, which companies are held out and why, and what the screen measures for and against each one that clears.'],
     '/magic':       ['Magic Formula, Greenblatt\'s ranking across the NSE screen',
                      'Every company on the screen ranked by return on capital and earnings yield, the two ranks added, and a forward paper book that buys the top.'],
     '/alerts':      ['Alerts, what changed on the names you watch',
@@ -13231,7 +13367,7 @@
    * breadcrumb reading "Today" while you are looking at Today is noise. */
   const WHERE = { '/': '', '/markets': 'Market', '/ipo': 'IPO',
                   '/opportunities': 'Setups', '/performance': 'Record', '/plan/:id': 'Plan', '/setup/:id': 'Setup',
-                  '/screen': 'Screen', '/brief': 'Brief', '/watch': 'Watchlist', '/alerts': 'Alerts', '/magic': 'Magic Formula',
+                  '/screen': 'Screen', '/brief': 'Brief', '/watch': 'Watchlist', '/alerts': 'Alerts', '/magic': 'Magic Formula', '/vetted': 'Vetted',
                   '/radar': 'Market · Radar', '/discover': 'All tools',
                   '/map': 'Market · Map', '/reads': 'Weekly reads', '/heat': 'Market · Heatmap',
                   '/join': 'The brief', '/methodology': 'Methodology',

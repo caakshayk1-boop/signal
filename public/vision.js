@@ -1685,7 +1685,9 @@
         <div class="row wrap" style="margin-top:var(--s-2)">
           ${r && r.risk ? `<span class="chip ${r.risk.level === 'HIGH' ? 'dn' : r.risk.level === 'MEDIUM' ? 'warn' : ''}">Risk ${esc(r.risk.level)}</span>` : ''}
           ${r && r.mf && Number.isInteger(r.mf.rank) ? `<a class="chip" href="${SIGNAL_URL}/magic" title="ROCE rank ${r.mf.roc_rank} + EBIT/EV rank ${r.mf.ey_rank}; the whole ranking on Signal">Magic Formula #${r.mf.rank} of ${r.mf.of} ↗</a>`
-            : r && r.mf && r.mf.why ? `<span class="chip" title="Not ranked by the Magic Formula: ${esc(r.mf.why)}">Magic Formula: unranked</span>` : ''}</div></div>
+            : r && r.mf && r.mf.why ? `<span class="chip" title="Not ranked by the Magic Formula: ${esc(r.mf.why)}">Magic Formula: unranked</span>` : ''}
+          ${r && r.vet && r.vet.s === 'cleared' ? `<a class="chip" href="${SIGNAL_URL}/vetted" title="Passed all ${Number(r.vet.n) || 0} data and balance-sheet checks that apply to it. What the screen measures for and against it is on Signal.">Vetted ↗</a>`
+            : r && r.vet && r.vet.s ? `<a class="chip warn" href="${SIGNAL_URL}/vetted" title="Held out of the vetted list. The nine checks are on Signal.">Held out: ${esc(r.vet.w || 'a check failed')} ↗</a>` : ''}</div></div>
       <div class="ah-px"><div class="px">${px != null ? '₹' + fmt(px, 2) : '—'}</div>
         <div class="px-s">${lv ? chg(lv.change_pct) + ` <span class="mut">${quoteWord()}</span>` : r ? chg(r.r1d) + ` <span class="mut">close of ${esc(r.last_date || r.price_date || 'the last build')}</span>` : ''}</div>
         <div class="row ah-act" style="margin-top:var(--s-2);gap:6px">
@@ -1842,6 +1844,7 @@
     ['em_label', 'Earnings momentum', 'Growth', (r) => r.em_label || null, 'c', null, '', ['accelerating', 'stable', 'decelerating']],
     ['pe', 'PE', 'Valuation', (r) => num(r.pe), 'n', 'n1'], ['pb', 'PB', 'Valuation', (r) => num(r.pb), 'n', 'n2'],
     ['pe_pctile', 'PE vs its own history (pct)', 'Valuation', (r) => num(r.pe_pctile), 'n', 'n0', '0 = cheapest it has been'],
+    ['vetted', 'Vetted', 'Quality', (r) => (r.vet && r.vet.s ? r.vet.s === 'cleared' : null), 'b', null, 'Passed the nine data and balance-sheet checks. A company that could not be measured is held out, never passed'],
     ['mf_rank', 'Magic Formula rank', 'Valuation', (r) => (r.mf && Number.isInteger(r.mf.rank) ? r.mf.rank : null), 'n', 'n0', '1 = best; lenders, utilities and small or unreported names are unranked'],
     ['comp', 'Composite', 'Scores', (r) => num(r.comp), 'n', 'n0'], ['q', 'Quality score', 'Scores', (r) => num(r.q), 'n', 'n0'],
     ['g', 'Growth score', 'Scores', (r) => num(r.g), 'n', 'n0'], ['v', 'Valuation score', 'Scores', (r) => num(r.v), 'n', 'n0'],
@@ -1854,12 +1857,13 @@
   ];
   const SFK = Object.fromEntries(SF.map((f) => [f[0], f]));
   const OPS_N = [['>=', '≥'], ['<=', '≤'], ['between', 'between']];
-  /* Ten presets, each a different idea. Starting points, not recommendations. */
+  /* Presets, each a different idea. Starting points, not recommendations. */
   const SPRESETS = [
     ['bottom', 'Bottom reversal', 'Off the floor, reclaiming the 50-day, still under the 200-day', [['from_low', '>=', 15], ['above50', 'is', true], ['above200', 'is', false]]],
     ['highs', 'Near highs on volume', 'Within 3% of the 52-week high with volume behind it', [['from_high', '>=', -3], ['vol_spike', '>=', 1.5]]],
     ['qdisc', 'Quality at a discount', 'High quality, cheap against its own history', [['q', '>=', 70], ['pe_pctile', '<=', 30]]],
     ['magic', 'Magic Formula top 30', 'Greenblatt: ROCE rank plus EBIT/EV rank, lowest sum first', [['mf_rank', '<=', 30]], { sort: 'mf_rank', dir: 1 }],
+    ['qvet', 'Quality at a discount, vetted', 'The same screen with the gate in front of it: stale, unmeasured and cash-poor names removed first', [['vetted', 'is', true], ['q', '>=', 70], ['pe_pctile', '<=', 30]]],
     ['leaders', 'Momentum leaders', 'Strong 3 months, above every average, RSI not stretched', [['r3m', '>=', 20], ['stack', 'is', true], ['rsi', 'between', [55, 75]]]],
     ['oversold', 'Oversold quality', 'Good businesses the chart has sold down', [['rsi', '<=', 35], ['q', '>=', 60]]],
     ['compound', 'Compounders', 'High returns on capital, growing, little debt', [['roce', '>=', 20], ['rev_cagr', '>=', 15], ['de', 'between', [0, 0.5]]]],
