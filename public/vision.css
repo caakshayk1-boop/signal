@@ -695,7 +695,7 @@ select.inp{padding-right:var(--s-5)}
 #hL li em{font-style:normal;color:var(--ink-3);font-size:var(--t-xs);white-space:nowrap}
 #hL mark{background:var(--accent-bg);color:var(--ink);border-radius:2px}
 .hrec{margin-top:var(--s-3);gap:6px;align-items:center}
-.hrec .mut{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.06em;margin:0 2px 0 6px}
+.hrec .mut{font-size:var(--t-sm);margin:0 2px 0 6px}
 .hrec .mut:first-child{margin-left:0}
 @media (max-width:560px){ #hL li{grid-template-columns:90px minmax(0,1fr)} #hL li em{display:none} }
 .dir{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px}
@@ -989,3 +989,40 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 /* Search results: the selected row moves its highlight, it does not jump. */
 #hL li,#palL li{transition:background-color 120ms ease,color 120ms ease}
 @media (prefers-reduced-motion:reduce){.cmp tr.cmp-diff th,.cmp tr.cmp-diff td{animation:none}#hL li,#palL li{transition:none}}
+
+/* ── HOME, TASTE PASS (2026-10-05) ────────────────────────────────────────
+   Audit: six text items in the hero, four equal boxed tiles, the same
+   two-equal-panel row three times. Now the hero is four items (the way back
+   to Signal, headline, one line, search), the four figures are one ruled row
+   of facts rather than four cards, and the panel rows alternate wide/narrow
+   so no two rows share a shape. The market cards stay here, not on Signal's
+   front page: this is the research site. */
+.hero2 h1{font-size:clamp(32px,4.4vw,48px)}
+.glance{gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:var(--s-5) 0 0}
+.glance .gl{border:0;border-radius:0;background:none;padding:var(--s-3) var(--s-4) var(--s-3) 0;border-left:0}
+.glance .gl + .gl{border-left:1px solid var(--line);padding-left:var(--s-4)}
+.glance .gl span{font-size:var(--t-sm);font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink-3)}
+@media (hover:hover) and (pointer:fine){.glance .gl:hover{border-color:var(--line)}.glance .gl:hover b{color:var(--accent)}}
+@media (max-width:720px){
+  .glance{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .glance .gl:nth-child(3){border-left:0;padding-left:0}
+  .glance .gl:nth-child(n+3){border-top:1px solid var(--line)}
+}
+.g-21{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.g-12{grid-template-columns:minmax(0,1fr) minmax(0,2fr)}
+.grid.solo{grid-template-columns:minmax(0,1fr)}
+.hrow{margin-top:var(--s-5)}
+@media (max-width:900px){.g-21,.g-12{grid-template-columns:minmax(0,1fr)}}
+/* Small uppercase labels inside panels become sentence case: they were ten
+   of the page's ten "eyebrows". */
+.hrow h3.k{text-transform:none;letter-spacing:0;font-size:var(--t-sm)}
+@keyframes heroIn{from{opacity:0;transform:translateY(6px)}}
+@media (prefers-reduced-motion:no-preference){.hero2.is-in>*{animation:heroIn 320ms cubic-bezier(.23,1,.32,1) both}.hero2.is-in>*:nth-child(n+3){animation-delay:60ms}}
+/* The wide panel carries its eight setups in two columns rather than one
+   column with an empty middle. */
+@media (min-width:901px){.g-21 #hPaper ul.hl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:var(--s-5);padding:0 var(--s-4)}
+  .g-21 #hPaper ul.hl li a{padding-left:0;padding-right:0}}
+/* Unusual today: the three counts sit in the panel, not in a box inside it. */
+.hrow #hUnu .kv{border:0;background:none;border-radius:0;border-bottom:1px solid var(--line);padding-bottom:var(--s-3)}
+.hrow #hUnu .kv>div{border:0;background:none;padding-left:0}
+.hrow #hUnu .kv em{text-transform:none;letter-spacing:0;font-size:var(--t-sm)}

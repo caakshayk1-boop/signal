@@ -29,7 +29,7 @@
 .v2w .v2w-per{font:400 12px/1.4 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut);margin:0 0 12px}
 .v2w .v2w-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:0 0 14px}
 .v2w .v2w-k{display:flex;flex-direction:column;gap:2px;min-width:0}
-.v2w .v2w-k span{font:600 10px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.08em;text-transform:uppercase;color:var(--w-dim)}
+.v2w .v2w-k span{font:500 12px/1.3 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut)}
 .v2w .v2w-k b{font:600 22px/1.15 var(--ui,var(--f-sans,system-ui,sans-serif));font-variant-numeric:tabular-nums;color:var(--w-ink)}
 .v2w .v2w-k em{font:400 12px/1.35 var(--ui,var(--f-sans,system-ui,sans-serif));font-style:normal;color:var(--w-mut)}
 .v2w .v2w-note{font:400 12px/1.5 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-mut);margin:10px 0 0}
@@ -132,7 +132,7 @@
 .v2w .v2w-trk.one i.up,.v2w .v2w-trk.one i.dn{left:0;right:auto;border-radius:0 4px 4px 0}
 .v2w .v2w-mv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 @media (max-width:599px){.v2w .v2w-mv{grid-template-columns:minmax(0,1fr)}.v2w .v2w-bars{grid-template-columns:minmax(84px,1fr) minmax(0,1.4fr) 54px}}
-.v2w .v2w-mv h4{font:600 12px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim);margin:0 0 8px}
+.v2w .v2w-mv h4{font:600 13px/1.2 var(--ui,var(--f-sans,system-ui,sans-serif));color:var(--w-ink);margin:0 0 8px}
 .v2w a.sym{color:var(--w-ink);font-weight:600;text-decoration:none}
 .v2w a.sym:hover{color:var(--w-acc);text-decoration:underline}
 .v2w-ai{border-color:color-mix(in srgb,var(--w-acc) 35%,var(--w-line))}
@@ -175,6 +175,16 @@ a.v2w-src:hover{border-color:var(--w-acc);color:var(--w-acc)}
 .v2w .v2w-ch li.r4{grid-template-columns:92px minmax(0,1fr)}
 .v2w .v2w-ch .t{font:600 10.5px/1.4 var(--mono,ui-monospace,monospace);letter-spacing:.06em;text-transform:uppercase;color:var(--w-dim,var(--dim,#6b6b6b))}
 .v2w .v2w-ch li.r0 .t{color:var(--w-down,var(--down,#c0392b))} .v2w .v2w-ch li.r2 .t,.v2w .v2w-ch li.r3 .t{color:var(--w-up,var(--up,#0b7a4b))}
+/* FLAT: the caller's section is already the container (Signal's front page),
+   so the card's own border, fill and padding go, and the small-caps labels
+   become sentence case. Opt-in through opts.flat; nothing else changes. */
+.v2w.v2w-flat{border:0;background:none;box-shadow:none;padding:0}
+.v2w.v2w-flat .v2w-ch{border:0;border-radius:0;border-top:1px solid var(--w-line,var(--line,#e5e2db));border-bottom:1px solid var(--w-line,var(--line,#e5e2db))}
+.v2w.v2w-flat .v2w-ch li{padding-left:0;padding-right:0;grid-template-columns:64px 96px minmax(0,1fr)}
+.v2w.v2w-flat .v2w-ch li.r4{grid-template-columns:64px minmax(0,1fr)}
+.v2w.v2w-flat .v2w-ch .t{font:600 12px/1.4 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:0;text-transform:none}
+.v2w.v2w-flat.v2w-chs h3{font-size:13px;margin:0 0 6px}
+.v2w.v2w-flat .v2w-dh{font:500 12px/1 var(--ui,var(--f-sans,system-ui,sans-serif));letter-spacing:0;text-transform:none}
 .v2w .v2w-ch .w i{font-style:normal;color:var(--w-dim,var(--dim,#6b6b6b));font-size:12px;margin-left:4px}
 .v2w .v2w-ch a{color:inherit}
 @media(max-width:600px){.v2w .v2w-ch li{grid-template-columns:auto minmax(0,1fr)}.v2w .v2w-ch li .w{grid-column:1/-1}}
@@ -914,7 +924,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     const P = d && d.paper;
     const stock = opts.stockHref || ((s) => '#/' + encodeURIComponent(s));
     if (!P || !Array.isArray(P.engines)) {
-      return `<section class="v2w" id="paper" aria-label="${Q}"><h3>Paper test <span class="v2w-tag pp">paper</span></h3>
+      return `<section class="v2w${opts.flat ? ' v2w-flat' : ''}" id="paper" aria-label="${Q}"><h3>Paper test <span class="v2w-tag pp">paper</span></h3>
         <p class="v2w-empty"><b>The paper test has not published yet.</b>Four engines (Technical Confluence, Failed Breakdown Reclaim,
         Compression Release, Opening Demand) start recording after the next session's close. Nothing here is a plan until then.</p></section>`;
     }
@@ -998,7 +1008,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     const intraHtml = intra.length ? `<h4 class="v2w-h">Intraday, graded after the close</h4><ul class="v2w-rl">${intra.map((p) =>
       `<li><span><a class="sym" href="${esc(stock(p.symbol))}">${esc(p.symbol)}</a> · ${esc(dayShort(p.session))} · bought ${px(p.entry)}, stop ${px(p.stop)}</span>
        <span class="r ${p.total_r > 0 ? 'up' : p.total_r < 0 ? 'dn' : ''}">${rR(p.total_r)}</span></li>`).join('')}</ul>` : '';
-    return `<section class="v2w" id="paper" aria-label="${Q}">
+    return `<section class="v2w${opts.flat ? ' v2w-flat' : ''}" id="paper" aria-label="${Q}">
       <h3>${opts.title ? esc(opts.title) : 'Paper test: four engines, tracked forward'} <span class="v2w-tag pp">paper</span></h3>
       <p class="v2w-per">As of the ${esc(day(P.as_of))} close · simulated fills · no order is placed · not the published record</p>
       ${opts.compact ? '' : eng}
@@ -1246,7 +1256,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     const li = items.map((x) => `<li class="r${x.r}"><span class="t">${esc(x.tag)}</span><a href="${esc(href(x.p))}"><b>${esc(x.p.symbol)}</b></a>
       <span class="w">${x.text} <i>${esc(names[x.p.engine] || '')}</i></span></li>`);
     if (fresh.length) li.push(`<li class="r4"><span class="t">New</span><span class="w">${fresh.length} new paper setup${fresh.length > 1 ? 's' : ''} for the ${esc(dayShort(fresh[0].for_session))} session: ${fresh.map((p) => `<a href="${esc(href(p))}">${esc(p.symbol)}</a>`).join(', ')}</span></li>`);
-    return `<section class="v2w v2w-chs" aria-label="Since the last scan">
+    return `<section class="v2w v2w-chs${opts.flat ? ' v2w-flat' : ''}" aria-label="Since the last scan">
       <h3>Since the last scan <span class="v2w-per">${esc(day(s))} close · paper</span></h3>
       ${li.length ? `<ul class="v2w-ch">${li.join('')}</ul>` : `<p class="v2w-empty"><b>Nothing changed on the ${esc(day(s))} close.</b>No setup was filed, filled, sold, stopped or lapsed.</p>`}</section>`;
   }

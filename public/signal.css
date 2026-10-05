@@ -6823,3 +6823,50 @@ main{min-height:calc(100vh - var(--barh))}
 .v2-dec a{color:var(--text);text-decoration:underline;text-decoration-color:var(--line2,var(--line));text-underline-offset:3px}
 .v2-dec a b{font-weight:650}
 @media (hover:hover) and (pointer:fine){.v2-dec a:hover{text-decoration-color:var(--accent)}}
+
+/* ── THE FRONT PAGE, TASTE PASS (2026-10-05) ──────────────────────────────
+   Audit: 19 small-caps labels, 38 boxes nested up to three deep, three rows
+   of equal stat boxes, the market drawn twice across two sites. The rules
+   below are scoped to .home so no other route moves.
+   - One hero band: headline and today's sentence left, the four status
+     facts as a plain list right. No boxes, sentence-case keys.
+   - One level of container at most: the change log and the gate's counts
+     sit in their parents without a second border.
+   - One radius for containers on this page (10px), pills only for buttons. */
+.home-hero{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:clamp(20px,3vw,48px);
+  align-items:start;margin:0 0 var(--s-6, 32px);padding-bottom:var(--s-5, 24px);border-bottom:1px solid var(--line)}
+.home-hero .route-h.route-home{margin:0;padding:0;border:0}
+.home-hero .route-h.route-home h1{font-size:clamp(28px,3.4vw,40px)}
+.home-hero .v2-dec{margin:16px 0 0;font-size:var(--t-5, 14px);color:var(--text)}
+.home-hero .v2-dec span{font:600 var(--t-5, 14px)/1 var(--ui);text-transform:none;letter-spacing:0;color:var(--text);margin-right:2px}
+.home-hero .v2-dec a{color:var(--text);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
+@media(hover:hover) and (pointer:fine){.home-hero .v2-dec a:hover{text-decoration-color:var(--accent)}}
+.home-hero .v2-strip{grid-template-columns:minmax(0,1fr);gap:0;margin:0;background:none;border:0;border-radius:0;overflow:visible}
+.home-hero .v2-strip>div{background:none;padding:10px 0;border-top:1px solid var(--line);
+  display:grid;grid-template-columns:7.5rem minmax(0,1fr);column-gap:12px;row-gap:2px}
+.home-hero .v2-strip>div:first-child{border-top:0;padding-top:4px}
+.home-hero .v2-strip .k{grid-row:1 / span 2;font:500 var(--t-3, 12px)/1.45 var(--ui);letter-spacing:0;text-transform:none;color:var(--muted);padding-top:1px}
+.home-hero .v2-strip b,.home-hero .v2-strip .s{grid-column:2}
+@media(max-width:899px){.home-hero{grid-template-columns:minmax(0,1fr);gap:var(--s-4, 16px)}}
+@media(max-width:420px){.home-hero .v2-strip>div{grid-template-columns:minmax(0,1fr)}.home-hero .v2-strip .k{grid-row:auto}.home-hero .v2-strip b,.home-hero .v2-strip .s{grid-column:1}}
+/* Enters once per page load: a 6px rise and a fade, the facts 60ms behind
+   the headline. Off for reduced motion, and never on a repaint. */
+@keyframes homeIn{from{opacity:0;transform:translateY(6px)}}
+@media(prefers-reduced-motion:no-preference){
+  .home-hero.is-in>*{animation:homeIn 320ms cubic-bezier(.23,1,.32,1) both}
+  .home-hero.is-in>*+*{animation-delay:60ms}
+}
+/* The gate keeps its counts, set as a line inside the card, not a boxed
+   grid inside a boxed card. */
+.home .v2-gate-n{background:none;border:0;border-radius:0;gap:0 28px;grid-template-columns:repeat(3,max-content)}
+.home .v2-gate-n>div{background:none;padding:0}
+.home .v2-gate-n dt{font:500 var(--t-3, 12px)/1.4 var(--ui);letter-spacing:0;text-transform:none;color:var(--muted);margin:0 0 2px}
+@media(max-width:600px){.home .v2-gate-n{grid-template-columns:minmax(0,1fr);gap:10px}}
+/* The market, as a line on this page; the charts are on Market. */
+.v2-mline{margin:0 0 12px;font:400 var(--t-5, 14px)/1.6 var(--ui);color:var(--text)}
+.v2-mline a{margin-left:10px;white-space:nowrap}
+/* A record with nothing in it is a sentence. */
+.v2-rec-line{margin:0;font:400 var(--t-5, 14px)/1.6 var(--ui);color:var(--muted);max-width:70ch}
+.v2-rec-line b{color:var(--text);font-weight:600}
+.home-chg{margin:22px 0 0}
+.home-paper{margin-top:var(--s-6, 32px)}

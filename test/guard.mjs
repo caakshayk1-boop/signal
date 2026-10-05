@@ -2811,6 +2811,28 @@ ok("no figure counts up", !/countUp/.test(JS));
        /\.scr-in:focus-visible,\.scr-sel:focus-visible\{box-shadow/.test(GC) && /button\.v2w-c:focus-visible\{[^}]*outline:2px solid/.test(GW));
     ok("Signal's screen opens the Magic Formula preset in rank order", /if \(k === 'magic'\) \{ scrSort = 'mf'; scrDir = 'desc'; \}/.test(JS));
   }
+  {
+    /* Taste pass (2026-10-05): the front pages read as one product, not a template. */
+    const TC = readFileSync("public/signal.css", "utf8"), TV = readFileSync("public/vision.css", "utf8"),
+          TW = readFileSync("public/v2widgets.js", "utf8"), TVJ = readFileSync("public/vision.js", "utf8");
+    const HOME = (JS.match(/R\['\/'\] = async[\s\S]*?\n  \};/) || [""])[0];
+    ok("Signal's front page is one hero band: headline and today's sentence, the status facts beside it",
+       /class="home-hero/.test(HOME) && /\$\{v2StatusStrip\(d, reg\)\}<\/div>/.test(HOME) && !/head\(H, S, 'Today'\)/.test(HOME)
+       && /\.home-hero \.v2-strip>div\{background:none/.test(TC));
+    ok("the market on Signal's front page is a line; its four cards moved to Market, not deleted",
+       /v2MarketLine\(nx, pu, d, ctx\)/.test(HOME) && !/v2Market\(nx, pu, d, ctx\)/.test(HOME)
+       && /out \+= v2Market\(nx, p, null, '', 'The year and the week'\)/.test(JS));
+    ok("an empty record on the front page is a sentence, still naming 'Plans published'",
+       /compact && !m\.published[\s\S]{0,80}Plans published: 0\./.test(JS));
+    ok("shared widgets go flat only when the caller asks", /opts\.flat \? ' v2w-flat' : ''/.test(TW) && /\.v2w\.v2w-flat\{border:0/.test(TW)
+       && /flat: true/.test(HOME));
+    ok("no em-dash in the front pages' own copy", !/Paper setups — a test/.test(JS) && !/Search a company —/.test(TVJ));
+    ok("Vision's hero is four items and its rows alternate wide and narrow",
+       /id="hHint" class="hhint vh"/.test(TVJ) && /grid g-21 hrow/.test(TVJ) && /grid g-12 hrow/.test(TVJ) && /\.g-21\{grid-template-columns:minmax\(0,2fr\)/.test(TV));
+    ok("the heroes enter once per page load, never under reduced motion",
+       /window\.__homeIn/.test(HOME) && /window\.__visHeroIn/.test(TVJ)
+       && /prefers-reduced-motion:no-preference\)\{\s*\.home-hero\.is-in/.test(TC) && /prefers-reduced-motion:no-preference\)\{\.hero2\.is-in/.test(TV));
+  }
   ok("the watchlist exports and imports, merging rather than overwriting",
      /id="wExport"/.test(JS) && /id="wImport"/.test(JS) && /kind: 'signal-watchlist'/.test(JS) && /new Set\(\[\.\.\.watchAll\(\), \.\.\.clean\]\)/.test(JS));
 }

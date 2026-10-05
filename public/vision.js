@@ -459,7 +459,7 @@
   function paintTicker() {
     const m = tickRows();
     const el = $('#tickIn');
-    if (!S.ticker) { el.innerHTML = `<span class="tk tk-na">${FR['Live prices'] && !FR['Live prices'].ok ? 'Live prices unavailable — ' + esc(FR['Live prices'].error) : 'Loading live prices…'}</span>`; return; }
+    if (!S.ticker) { el.innerHTML = `<span class="tk tk-na">${FR['Live prices'] && !FR['Live prices'].ok ? 'Live prices unavailable: ' + esc(FR['Live prices'].error) : 'Loading live prices…'}</span>`; return; }
     el.innerHTML = `<span class="tk mkt-t" title="NSE session, IST"></span>` + STRIP.map(([n, lab]) => {
       const it = m[n];
       if (!it) return `<a class="tk" href="#/markets" title="${esc(n)}: not in this fetch"><b>${esc(lab)}</b><span class="tk-na">—</span></a>`;
@@ -1078,21 +1078,21 @@
     return out.sort((a, b) => a[0] - b[0] || a[1] - b[1]).slice(0, n).map((x) => x[2]); };
   V.home = async (el, arg, alive) => {
     setTitle('');
-    el.innerHTML = `<section class="hero2">
+    /* The hero enters once per page load; a return to Companies is instant. */
+    const heroIn = !window.__visHeroIn; window.__visHeroIn = true;
+    el.innerHTML = `<section class="hero2${heroIn ? ' is-in' : ''}">
         <p class="up"><a href="${SIGNAL_URL}/">← Signal</a> finds what deserves attention. Vision shows why.</p>
         <h1>Understand any Indian company in minutes.</h1>
-        <p class="sub">Price, financials, ownership, technical structure and market context for ~1,000 NSE names. Every figure carries its source and its age.</p>
+        <p class="sub">Price, financials, ownership and technical structure for about 1,000 NSE names. Every figure shows its source and age.</p>
         <div class="hsearch"><input id="hQ" type="search" role="combobox" aria-expanded="false" aria-controls="hL" aria-autocomplete="list" autocomplete="off" spellcheck="false"
-          placeholder="Search a company — Reliance, TCS, HDFC Bank…" aria-label="Search a company" aria-describedby="hHint"><ul id="hL" role="listbox" aria-label="Matching companies"></ul></div>
-        <p id="hHint" class="hhint">Company name or NSE symbol. Every figure on a company page names its source and its age.<span class="k"> Press <span class="kbd">/</span> on any page to search.</span></p>
+          placeholder="Search a company: Reliance, TCS, HDFC Bank…" aria-label="Search a company" aria-describedby="hHint"><ul id="hL" role="listbox" aria-label="Matching companies"></ul></div>
+        <p id="hHint" class="hhint vh">Company name or NSE symbol. Every figure on a company page names its source and its age.<span class="k"> Press <span class="kbd">/</span> on any page to search.</span></p>
         <div id="hRecent" class="row wrap hrec"></div><p id="hSince" class="since" hidden></p></section>
       <div id="hGlance" class="glance">${skel(2)}</div>
-      <div class="grid g-2">${panel('Paper setups for the next session', skel(5), { bodyId: 'hPaper', flush: true, more: '#/brief', moreText: 'Open the brief' })}${panel('Strongest technical reads', skel(5), { bodyId: 'hReads', flush: true, more: '#/screener', moreText: 'Screener' })}</div>
-      <div style="height:var(--s-4)"></div>
-      <div class="grid g-2">${panel('What changed across the screen', skel(6), { bodyId: 'hChg', fb: 'Screen' })}${panel('Unusual today', skel(5), { bodyId: 'hUnu', fb: 'Screen' })}</div>
+      <div class="grid g-21 hrow">${panel('Paper setups for the next session', skel(5), { bodyId: 'hPaper', flush: true, more: '#/brief', moreText: 'Open the brief' })}${panel('Strongest technical reads', skel(5), { bodyId: 'hReads', flush: true, more: '#/screener', moreText: 'Screener' })}</div>
+      <div class="grid g-12 hrow">${panel('Unusual today', skel(5), { bodyId: 'hUnu', fb: 'Screen' })}${panel('What changed across the screen', skel(6), { bodyId: 'hChg', fb: 'Screen' })}</div>
       <div id="hMkt"></div>
-      <div style="height:var(--s-4)"></div>
-      <div class="grid g-2">${panel('Plans for the next session', skel(4), { bodyId: 'hSig', flush: true, fb: 'Setups', more: '#/setups', moreText: 'All setups' })}${panel('Most-traded companies', skel(6), { bodyId: 'hTop', fb: 'Screen' })}</div>`;
+      <div class="grid g-2 hrow">${panel('Plans for the next session', skel(4), { bodyId: 'hSig', flush: true, fb: 'Setups', more: '#/setups', moreText: 'All setups' })}${panel('Most-traded companies', skel(6), { bodyId: 'hTop', fb: 'Screen' })}</div>`;
     const inp = $('#hQ'), L = $('#hL');
     let hits = [], sel = 0;
     const paintL = () => { const Q = inp.value.trim().toUpperCase(); hits = findCo(inp.value); sel = clamp(sel, 0, Math.max(0, hits.length - 1));
@@ -1175,11 +1175,11 @@
         <div><em>Volume 3×+ average ${defn('Volume spike')}</em><b>${C.vol_n}</b></div><div><em>Closed at a 52-week high</em><b>${C.hi52_n}</b></div><div><em>Results in 7 days</em><b>${C.results_n}</b></div></div>
         ${C.vol.length ? `<p class="note" style="margin:var(--s-3) 0 4px"><b>Heaviest volume</b></p><div class="row wrap">${C.vol.slice(0, 10).map((x) => `<a class="chip" href="#/asset/${esc(x.sym)}">${esc(x.sym)}</a>`).join('')}</div>` : ''}
         ${C.results.length ? `<p class="note" style="margin:var(--s-3) 0 4px"><b>Results due</b></p><div class="row wrap">${C.results.map((x) => `<a class="chip" href="#/asset/${esc(x.sym)}">${esc(x.sym)} · ${esc(dshort(x.on))}</a>`).join('')}</div>` : ''}
-        <p class="note src">From the screen's last close. Results dates as listed on the screen — confirm on the exchange.</p>`;
+        <p class="note src">From the screen's last close. Results dates as listed on the screen; confirm on the exchange.</p>`;
     $('#hSig').innerHTML = vePlansBrief(S.veod);
     // Nothing published: the panel would only repeat what the paper panel above
     // already says, so it goes rather than printing an empty box.
-    if (!veOpen(S.veod).length) { const pn = $('#hSig') && $('#hSig').closest('.pn'); if (pn) pn.remove(); }
+    if (!veOpen(S.veod).length) { const pn = $('#hSig') && $('#hSig').closest('.pn'); if (pn) { const row = pn.parentElement; pn.remove(); if (row) row.classList.add('solo'); } }
     $('#hTop').innerHTML = d && d.top ? `<div class="dir">${d.top.slice(0, 30).map((x) => `<a href="#/asset/${esc(x.sym)}"><b>${esc(x.sym)}</b><span>${esc(x.name || '')}</span></a>`).join('')}</div>` : failBox('The screen summary', site.error);
   };
 
