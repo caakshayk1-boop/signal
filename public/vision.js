@@ -1680,7 +1680,7 @@
     const lo52 = num(r && r.low52), newLo = px > 0 && lo52 > 0 && px < lo52;
     const fhTxt = fh == null ? '' : fh >= 0 ? 'above the 52w high — a new high' : newLo ? "under the 52w low — a new low" : signed(fh, 1) + ' from the high';
     $('#aHead').innerHTML = `<div class="pn"><div class="pb"><div class="ah">
-      <div style="min-width:0;flex:1"><span class="eb" style="display:block;font-size:var(--t-xs);font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)">${esc((r && r.sector) || 'Not on the screen')}${r && r.ind && r.ind !== r.sector ? ' · ' + esc(r.ind) : ''}</span>
+      <div style="min-width:0;flex:1"><span class="eb" style="display:block;font-size:var(--t-sm);font-weight:500;color:var(--accent)">${esc((r && r.sector) || 'Not on the screen')}${r && r.ind && r.ind !== r.sector ? ' · ' + esc(r.ind) : ''}</span>
         <div class="row" style="gap:var(--s-2)"><h1>${esc(s)}</h1>${star(s)}</div><div class="nm">${esc((r && r.name) || '')}</div>
         <div class="row wrap" style="margin-top:var(--s-2)">
           ${r && r.risk ? `<span class="chip ${r.risk.level === 'HIGH' ? 'dn' : r.risk.level === 'MEDIUM' ? 'warn' : ''}">Risk ${esc(r.risk.level)}</span>` : ''}
@@ -1734,9 +1734,9 @@
     }
 
     $('#aWhy').innerHTML = r ? `${moveFactors(mv.parts)}
-      <p class="note" style="margin:var(--s-3) 0 var(--s-4)"><b>Move score ${mv.score == null ? 'not scored' : mv.score}</b> · ${esc(strengthWord(mv.score))}. Trend, momentum and volume from the daily screen; institutional from the latest shareholding. Missing components leave the mean — they are never scored zero.</p>
+      <p class="note" style="margin:var(--s-3) 0 var(--s-4)"><b>Move score ${mv.score == null ? 'not scored' : mv.score}</b> · ${esc(strengthWord(mv.score))}. Trend, momentum and volume from the daily screen; institutional from the latest shareholding. Missing components leave the mean; they are never scored zero.</p>
       ${factors([['Quality', r.q, 'ROCE, ROE, leverage, cash conversion'], ['Growth', r.g, 'Revenue, EBITDA and EPS growth'], ['Valuation', r.v, 'PE and PB against the screen'], ['Technical', r.tech, 'Trend and momentum on the screen']])}
-      <p class="note" style="margin-top:var(--s-3)"><b>Composite ${r.comp != null ? Math.round(r.comp) : 'unranked'}</b> — the screen's weighted blend of the four above${r.comp == null ? '; no statements, so no composite' : ''}. A description of the business and the chart as filed, not a forecast.</p>` : empty('Not on the screen', 'No factor data for this name.');
+      <p class="note" style="margin-top:var(--s-3)"><b>Composite ${r.comp != null ? Math.round(r.comp) : 'unranked'}</b>: the screen's weighted blend of the four above${r.comp == null ? '; no statements, so no composite' : ''}. A description of the business and the chart as filed, not a forecast.</p>` : empty('Not on the screen', 'No factor data for this name.');
 
     const bars = [['1D', r && r.r1d], ['1W', r && r.r1w], ['1M', r && r.r1m], ['3M', r && r.r3m], ['6M', r && r.r6m]];
     const mx = Math.max(1, ...bars.map(([, v]) => Math.abs(num(v) || 0)));
@@ -1786,7 +1786,7 @@
         <div><em>DII</em><b>${fmt(x.dii, 2)}%</b><small>${signed(x.dii_pp, 2, ' pp')} q/q</small></div>
         <div><em>Promoter</em><b>${fmt(x.promoter, 2)}%</b></div></div>
       ${ownChart(x.series, ($('#aIns') || {}).clientWidth)}
-      <p class="note" style="margin-top:var(--s-2)"><b>${esc(x.signal_label || x.band_label || '')}</b> · ${esc(x.period || '')} against ${esc(x.prev_period || '')}. Quarterly filings — this moves four times a year.</p>
+      <p class="note" style="margin-top:var(--s-2)"><b>${esc(x.signal_label || x.band_label || '')}</b> · ${esc(x.period || '')} against ${esc(x.prev_period || '')}. Quarterly filings: this moves four times a year.</p>
       <p class="note src">Source: NSE shareholding pattern filings (SEBI XBRL), ${esc((x.series || []).length)} quarters.</p>`
       : empty('No complete shareholding', x ? esc(x.reason || 'partial filing') : 'Not in the institutional feed.');
 

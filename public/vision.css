@@ -934,7 +934,7 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 .one{list-style:none;margin:0;padding:0;display:grid;gap:0}
 .one li{display:grid;grid-template-columns:150px minmax(150px,220px) minmax(0,1fr);gap:4px 16px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line)}
 .one li:first-child{border-top:0}
-.one-l{font-size:var(--t-xs);color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
+.one-l{font-size:var(--t-sm);color:var(--ink-3)}
 .one-w{font-weight:600;color:var(--ink)} .one-w.up{color:var(--up)} .one-w.dn{color:var(--dn)}
 .one-f{font:400 var(--t-sm,13px)/1.45 var(--f-mono);color:var(--ink-2);font-variant-numeric:tabular-nums}
 .one-r{grid-column:3;font-size:var(--t-xs);color:var(--ink-3)}
@@ -1026,3 +1026,13 @@ details.how{margin-top:var(--s-3)} details.how summary{cursor:pointer;font-size:
 .hrow #hUnu .kv{border:0;background:none;border-radius:0;border-bottom:1px solid var(--line);padding-bottom:var(--s-3)}
 .hrow #hUnu .kv>div{border:0;background:none;padding-left:0}
 .hrow #hUnu .kv em{text-transform:none;letter-spacing:0;font-size:var(--t-sm)}
+
+/* ── COMPANY PAGE, TASTE PASS (2026-10-05) ────────────────────────────────
+   Audit: 8 small-caps labels, 48 boxes (figure grids boxed inside panels),
+   12 em-dashes. The sector line above the symbol is sentence case; the
+   figure grids (.kv) lose their outer frame and keep only their inner rules,
+   so a panel is the one container and its figures read as a ruled table. */
+.ah .eb{text-transform:none;letter-spacing:0;font-weight:500;font-size:var(--t-sm)}
+.kv{border:0;border-radius:0;background:none;gap:0;border-top:1px solid var(--line)}
+.kv > div{background:none;border-bottom:1px solid var(--line);padding:var(--s-3) var(--s-3) var(--s-3) 0}
+.kv em{text-transform:none;letter-spacing:0;font-size:var(--t-sm)}

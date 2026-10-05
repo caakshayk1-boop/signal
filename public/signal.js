@@ -1274,7 +1274,11 @@
   };
 
   const head = (title, sub, eyebrow) =>
-    `<div class="route-h"><span class="eyebrow">${esc(eyebrow || 'Signal')}</span>
+    /* No eyebrow above the title (taste pass, 2026-10-05): it said "Signal"
+       on most pages, which the logo already says, and it was one of the
+       small-caps labels the audit counted on every route. The parameter
+       stays so no caller changes. */
+    `<div class="route-h">
       <h1>${esc(title)}</h1>${sub ? `<p>${esc(sub)}</p>` : ''}</div>`;
   // `lead` is the serif line under the label: the label says what the block
   // IS, the lead says what it MEANS. Blocks with nothing to add omit it.
@@ -4009,15 +4013,15 @@
      * way the freshness badge in the header qualifies the page. */
     out += sec('The trading day', `<div id="wcHost"></div>
       <p class="hint">Local time at each exchange, with regular cash-session hours.
-        <b>Holidays are not tracked</b> — on Diwali or Thanksgiving a market will show
+        <b>Holidays are not tracked</b>: on Diwali or Thanksgiving a market will show
         as open here when it is shut.</p>`,
       '', 'Six exchanges, and which of them is awake.');
 
     out += sec('Breadth', breadthWidget(pu.breadth) || `<div class="empty">Screen not built yet.</div>`,
       '', 'How many names went up, out of every name measured.');
-    out += sec(`Sector heat — the week, all ${pu.universe || 1000}`, heatmap(pu.sectors, 'r1w') +
+    out += sec(`Sector heat this week, all ${pu.universe || 1000} names`, heatmap(pu.sectors, 'r1w') +
       `<p class="hint">Median move over the <b>past week</b> across the full <b>${pu.universe || 1000}-name</b>
-        screen — the wider, slower view. The front page shows today over the largest 250.
+        screen: the wider, slower view. The front page shows today over the largest 250.
         Width is how many names the sector holds; tap one for the names behind it.</p>`
       + heatKey(1.5, 'Sector move'),
       pu.sectors ? `${pu.sectors.length} sectors · one week` : '');
@@ -4101,7 +4105,7 @@
          <div data-mv-p="up">${levelTable(up)}</div>
          <div data-mv-p="dn" hidden>${levelTable(dn)}</div>`,
         `${up.length} up · ${dn.length} down`,
-        'The biggest moves of the week — a day is mostly noise.');
+        'The biggest moves of the week. A single day is mostly noise.');
     };
     const before = out;
     paint(out + movers());
@@ -7686,7 +7690,7 @@
     if (v != null) {
       const sc = v < 12 ? 85 : v < 16 ? 70 : v < 20 ? 50 : v < 26 ? 28 : 10;
       add('volatility', 'Volatility', sc,
-          `India VIX at ${v.toFixed(2)} — ${v < 12 ? 'very calm' : v < 16 ? 'normal'
+          `India VIX at ${v.toFixed(2)}, ${v < 12 ? 'very calm' : v < 16 ? 'normal'
             : v < 20 ? 'unsettled' : v < 26 ? 'jumpy' : 'stressed'}`);
     }
 
@@ -12726,7 +12730,7 @@
        is gone from here: the paper board above names and explains every
        engine, and Performance keeps the list. */
     const cards = (list) => `<div class="v2-cards">${list.map(p => v2Card(p, d)).join('')}</div>`;
-    const states = [['Extended — above the entry cap', extended], ['Active', active], ['Closed', done],
+    const states = [['Extended: above the entry cap', extended], ['Active', active], ['Closed', done],
                     ['Expired or cancelled before entry', lapsed]];
     const tally = `<div class="v2-tally">${states.map(([l, list]) =>
       `<div><b>${list.length}</b><span>${esc(l)}</span></div>`).join('')}</div>`;
@@ -12738,10 +12742,10 @@
       vsec('Eligible next session', eligible.length ? cards(eligible)
         : `<p class="v2-none"><b>Nothing is eligible for the next session.</b> ${esc(d.status_detail || '')}</p>`,
         String(eligible.length), null, { lead: true }) +
-      v2Paper(d, { cardHref: setupHref }) +
+      v2Paper(d, { cardHref: setupHref, flat: true }) +
       vsec('Every plan by state', tally + states.filter(([, list]) => list.length)
         .map(([l, list]) => `<h3 class="v2-st-h">${esc(l)} <span>${list.length}</span></h3>${cards(list)}`).join('')) +
-      `<p class="v2-note">Candidates that failed a rule are not published, and neither are their reasons — the rules stay private. ${esc(d.notice || '')}</p>`);
+      `<p class="v2-note">Candidates that failed a rule are not published, and neither are their reasons: the rules stay private. ${esc(d.notice || '')}</p>`);
     /* Arriving from a digest row on the front page: land on that setup's card. */
     const tgt = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
     if (tgt) requestAnimationFrame(() => tgt.scrollIntoView({ block: 'center', behavior: REDUCED ? 'auto' : 'smooth' }));
@@ -12750,8 +12754,8 @@
   function v2Strategies(d) {
     const s = d.strategies || [];
     if (!s.length) return '<p class="muted">No strategy is listed.</p>';
-    const word = { research: 'Research — not publishing', shadow: 'Paper test — tracked forward, not published',
-                   forward_paper: 'Forward paper — publishing paper plans', validated: 'Validated' };
+    const word = { research: 'Research, not publishing', shadow: 'Paper test: tracked forward, not published',
+                   forward_paper: 'Forward paper: publishing paper plans', validated: 'Validated' };
     return `<ul class="v2-strat">${s.map(x => `<li><b>${esc(x.name)}</b> <span class="v2-pill">${esc(word[x.status] || x.status)}</span>
       <p>${esc(x.public_summary || '')}</p></li>`).join('')}</ul>`;
   }

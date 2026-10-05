@@ -6870,3 +6870,16 @@ main{min-height:calc(100vh - var(--barh))}
 .v2-rec-line b{color:var(--text);font-weight:600}
 .home-chg{margin:22px 0 0}
 .home-paper{margin-top:var(--s-6, 32px)}
+
+/* ── SETUPS, RECORD, MARKET: TASTE PASS (2026-10-05) ──────────────────────
+   The record's tiles and the setups tally were boxes in a section; they are
+   ruled figures now, one container (the section) and a hairline per row. The
+   "Trades" / "Paper money" labels are sentence case, not mono small caps. */
+.v2-rec{gap:0 24px}
+.v2-rec .tile{background:none;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none;padding:12px 0 14px;min-height:0}
+.v2-rec-h{font:600 var(--t-4, 13px)/1.3 var(--ui);letter-spacing:0;text-transform:none;color:var(--text)}
+.v2-tally{border:0;border-radius:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:none}
+.v2-tally span{font-size:var(--t-3, 12px);color:var(--muted)}
+.sg-head span{text-transform:none;letter-spacing:0}
+/* Setups: the flat paper board needs the gap its card used to give it. */
+.sec + section#paper{margin-top:var(--s-6, 32px)}
