@@ -4187,13 +4187,14 @@ html:has(dialog[open]){overflow:hidden}
  * One call per name at the top of the company card. The screen had 89 correct
  * columns and no answer; this is the answer, and it is styled to be read
  * before anything else on the card rather than to compete with the scores.
- * The left rule carries the call so it is legible without reading the pill. */
-.vd{border:1px solid var(--line);border-left:3px solid var(--accent);
-    border-radius:4px;padding:8px 12px;margin:0 0 14px}
-.vd-buy{border-left-color:var(--up)}
-.vd-wait{border-left-color:var(--warn)}
-.vd-avoid{border-left-color:var(--down)}
-.vd-watch,.vd-unrated{border-left-color:var(--line)}
+ * The whole border is tinted by the call, so it is legible without reading
+ * the pill. It was a 3px left stripe; a coloured side stripe is decoration a
+ * border of one weight does not need. */
+.vd{border:1px solid var(--line);border-radius:4px;padding:8px 12px;margin:0 0 14px}
+.vd-buy{border-color:color-mix(in srgb,var(--up) 55%,var(--line))}
+.vd-wait{border-color:color-mix(in srgb,var(--warn) 55%,var(--line))}
+.vd-avoid{border-color:color-mix(in srgb,var(--down) 55%,var(--line))}
+.vd-watch,.vd-unrated{border-color:var(--line)}
 .vd-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
 .vd-head b{font-size:var(--t-5);letter-spacing:-.01em}
 .vd-conf{font:400 var(--t-2)/1 var(--mono);color:var(--dim);margin-left:auto;
@@ -6883,3 +6884,39 @@ main{min-height:calc(100vh - var(--barh))}
 .sg-head span{text-transform:none;letter-spacing:0}
 /* Setups: the flat paper board needs the gap its card used to give it. */
 .sec + section#paper{margin-top:var(--s-6, 32px)}
+
+/* ── REMAINING PAGES, TASTE PASS (2026-10-05) ────────────────────────────
+   DESIGN.md: "Labels are sentence case, not tracked capitals." These five
+   label classes on the alert form, the stock page and the screen's card
+   still set mono small caps. */
+.alform label,.alform label span{font:500 var(--t-3, 12px)/1.3 var(--ui);letter-spacing:0;text-transform:none;color:var(--muted)}
+.alloc-l,.cardmeta i,.vd-conf,.lmk-l{font-family:var(--ui);letter-spacing:0;text-transform:none}
+/* Impeccable craft floor: no coloured side-stripe above 1px on a callout.
+   The gate's pause mark and the flag's own words carry the state. */
+.v2-gate{border-left:1px solid var(--line)}
+.note-dn{border-left:1px solid color-mix(in srgb,var(--dn, var(--down)) 45%,var(--line));background:var(--down-soft)}
+.vd-flag{border-left:0;padding-left:0}
+/* The browser's own surfaces carry the palette: selection and the caret. */
+::selection{background:var(--accent-soft);color:var(--text)}
+input,textarea{caret-color:var(--accent)}
+
+/* Craft floor, remaining side stripes: a coloured border-left above 1px is
+   decoration. The tone moves to a whole 1px border tinted by the state. */
+.note{border-left:1px solid color-mix(in srgb,var(--warn) 45%,var(--line))}
+.note.err{border-left-color:color-mix(in srgb,var(--down) 45%,var(--line))}
+.trail,.ag-fix{border-left:1px solid color-mix(in srgb,var(--warn) 45%,var(--line))}
+.note.note-dn{border-left-color:color-mix(in srgb,var(--dn, var(--down)) 45%,var(--line))}
+/* Status pills on a soft tint read 4.42:1 at the base up colour; the text
+   steps one shade darker so a measured state clears 4.5:1. */
+:root:not([data-theme="dark"]) .pill-up{color:color-mix(in srgb,var(--up) 88%,#000)}
+
+/* Company page and screen, last of the craft floor: labels in sentence case,
+   and the call carried by a tinted 1px border instead of a 4px stripe. */
+.scr-fl,.vtag,.bvd-k,.lmk-l{text-transform:none;letter-spacing:0}
+.bible-vd{border:1px solid var(--line2)}
+.bible-vd.vd-buy{border-color:color-mix(in srgb,var(--up) 55%,var(--line2))}
+.bible-vd.vd-avoid{border-color:color-mix(in srgb,var(--dn) 55%,var(--line2))}
+.bible-vd.vd-watch,.bible-vd.vd-wait{border-color:color-mix(in srgb,var(--accent) 45%,var(--line2))}
+.lmk{border-left-width:1px}
+.bar-v em{text-transform:none;letter-spacing:0}
+.isc-b em,.card-foot .lnks a{text-transform:none;letter-spacing:0}
