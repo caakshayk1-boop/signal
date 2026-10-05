@@ -622,6 +622,194 @@
     toast(`${next === 'light' ? 'Light' : 'Dark'} theme`);
   }
 
+  /* ── MOTION ─────────────────────────────────────────────────────────────────
+     Entrances explain hierarchy (what is the page, what is a panel) and state
+     (a skeleton became content). They play ONCE per navigation, only while the
+     reader has not yet touched the page, and never on a live repaint: a quote
+     refresh or a sort must not replay anything. Only transform and opacity move.
+     Reduced motion: nothing is tagged and the ambient field is never drawn. */
+  const Motion = (() => {
+    const reduceMQ = matchMedia('(prefers-reduced-motion: reduce)');
+    const ENTER = '.view > .vhead, .view > .pn, .view .grid > .pn, .glance > .gl, .presets > .pre, .hm-g';
+    let navAt = 0, touched = false, batchN = 0, batchT = 0, io = null;
+    const live = () => !reduceMQ.matches && !touched && performance.now() - navAt < 5000;
+    for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { touched = true; }, { capture: true, passive: true });
+    const clear = (el, ms) => setTimeout(() => el.classList.remove('m-in', 'm-fade'), ms);
+    const play = (el, i) => {
+      el.style.setProperty('--i', i);
+      el.classList.remove('m-hold'); el.classList.add('m-in');
+      clear(el, 340 + i * 50 + 700);
+    };
+    const seen = new WeakSet();
+    const enter = (el) => {
+      if (seen.has(el)) return; seen.add(el);
+      if (!live()) return;
+      const now = performance.now();
+      if (now - batchT > 140) batchN = 0;
+      batchT = now;
+      /* Heatmap tiles: the first screenful pops in; the other hundreds do not
+         (a thousand class changes and layout reads would cost more than they say). */
+      if (el.matches('.hm-g')) { if (batchN < 70) play(el, batchN); batchN++; return; }
+      const i = Math.min(batchN++, 7);
+      const below = el.getBoundingClientRect().top > innerHeight * 0.92;
+      if (below && !el.matches('.hm-g')) {
+        el.classList.add('m-hold');
+        if (!io) io = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { io.unobserve(e.target); if (e.target.classList.contains('m-hold')) play(e.target, 0); } },
+          { rootMargin: '0px 0px -6% 0px' });
+        io.observe(el);
+        /* Safety: whatever happens, nothing stays hidden. */
+        setTimeout(() => { if (el.classList.contains('m-hold')) { el.classList.remove('m-hold'); io.unobserve(el); } }, 6000);
+      } else play(el, i);
+    };
+    const scan = (root) => {
+      if (root.nodeType !== 1 || !live()) return;
+      if (root.matches(ENTER)) enter(root);
+      root.querySelectorAll && root.querySelectorAll(ENTER).forEach(enter);
+      countUp(root); markers(root);
+    };
+    const fadeKids = (host) => {
+      if (!live()) return;
+      Array.from(host.children).slice(0, 10).forEach((k, i) => { k.style.setProperty('--i', i); k.classList.add('m-fade'); clear(k, 220 + i * 30 + 600); });
+    };
+    let mo = null;
+    function watch() {
+      if (mo || reduceMQ.matches) return;
+      mo = new MutationObserver((muts) => {
+        for (const m of muts) {
+          /* A skeleton replaced by content: the content fades in, in place. */
+          if (m.target.nodeType === 1 && m.removedNodes.length && Array.from(m.removedNodes).some((n) => n.nodeType === 1 && n.classList.contains('sk'))
+              && m.addedNodes.length && !m.target.matches('.view')) fadeKids(m.target);
+          m.addedNodes.forEach(scan);
+        }
+      });
+      mo.observe($('#main'), { childList: true, subtree: true });
+    }
+    function nav() {
+      navAt = performance.now(); touched = false; batchN = 0; watch();
+      const o = $('#nav .nav-ind');
+      if (o) { try { const m = new DOMMatrix(getComputedStyle(o).transform); if (m.a) { indX = m.m41; indW = m.a * 100; } } catch (e) { /* ok */ } }
+    }
+
+    /* Nav indicator: one bar that travels between links. */
+    let indX = null, indW = null;
+    function navInd() {
+      const n = $('#nav'); if (!n) return;
+      const a = $('a[aria-current="page"], .nav-more[aria-current="page"]', n);
+      let ind = $('.nav-ind', n);
+      if (!a) { if (ind) ind.style.opacity = '0'; return; }
+      if (!ind) { ind = document.createElement('i'); ind.className = 'nav-ind'; ind.setAttribute('aria-hidden', 'true'); n.appendChild(ind); }
+      ind.style.opacity = '';
+      const nr = n.getBoundingClientRect(), r = a.getBoundingClientRect();
+      const x = r.left - nr.left, w = r.width;
+      const to = `translateX(${x}px) scaleX(${w / 100})`;
+      ind.style.transform = to;
+      n.classList.add('has-ind');
+      /* The bar is rebuilt with the links on every navigation, so it is started
+         from where the last one was (or is, if that was still moving). */
+      if (indX != null && !reduceMQ.matches && ind.animate && (Math.abs(indX - x) > 0.5 || Math.abs(indW - w) > 0.5)) {
+        try { ind.animate([{ transform: `translateX(${indX}px) scaleX(${indW / 100})` }, { transform: to }], { duration: 260, easing: 'cubic-bezier(.77,0,.175,1)' }); } catch (e) { /* ok */ }
+      }
+      indX = x; indW = w;
+    }
+    addEventListener('resize', () => { indX = null; if ($('#nav .nav-ind')) navInd(); });
+
+    /* Count-up: a headline integer, once per session, from zero. The text is
+       restored exactly at the end. Counts only, never a price or a percentage. */
+    let cuT = 0;
+    function countUp(root) {
+      if (!live()) return;
+      const bs = (root.matches('.gl') ? [root] : $$('.gl', root)).map((g) => $('b', g)).filter((b) => b && /^\d[\d,]*$/.test(b.textContent.trim()));
+      if (!bs.length) return;
+      /* Once per session; the cards of one batch arrive together. */
+      let done = false; try { done = sessionStorage.getItem('vis:cu') === '1'; } catch (e) { /* ok */ }
+      if (done && performance.now() - cuT > 60) return;
+      cuT = cuT || performance.now();
+      try { sessionStorage.setItem('vis:cu', '1'); } catch (e) { /* ok */ }
+      const t0 = performance.now(), D = 700;
+      const items = bs.map((b) => ({ b, txt: b.textContent, n: +b.textContent.replace(/,/g, '') }));
+      const tick = (t) => {
+        const p = Math.min(1, (t - t0) / D), e = 1 - Math.pow(1 - p, 4);
+        for (const it of items) it.b.textContent = p < 1 ? Math.round(it.n * e).toLocaleString('en-IN') : it.txt;
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+
+    /* A marker (52-week range, barometer) glides from the left edge to its place. */
+    function markers(root) {
+      if (!live() || !root.animate) return;
+      for (const i of (root.matches('.rng i, .gauge i') ? [root] : $$('.rng i, .gauge i', root))) {
+        const par = i.parentElement, w = par.getBoundingClientRect().width, left = parseFloat(i.style.left);
+        if (!w || !Number.isFinite(left)) continue;
+        try { i.animate([{ transform: `translateX(${-(left / 100) * w}px)` }, { transform: 'translateX(0)' }],
+          { duration: 520, delay: 200, easing: 'cubic-bezier(.77,0,.175,1)', composite: 'add', fill: 'backwards' }); } catch (e) { /* ok */ }
+      }
+    }
+
+    /* Header becomes a material once content is under it. */
+    function header() {
+      const top = $('.top'); if (!top || $('.top-sent')) return;
+      const s = document.createElement('i'); s.className = 'top-sent'; s.setAttribute('aria-hidden', 'true');
+      document.body.insertBefore(s, document.body.firstChild);
+      new IntersectionObserver((es) => top.classList.toggle('is-scrolled', !es[0].isIntersecting)).observe(s);
+    }
+
+    /* Spotlight: set two custom properties on the card under a mouse. */
+    function spotlight() {
+      let raf = 0, last = null;
+      document.addEventListener('pointermove', (e) => {
+        if (e.pointerType !== 'mouse' || reduceMQ.matches) return;
+        const c = e.target.closest && e.target.closest('.pre, .gl'); if (!c) return;
+        last = { c, x: e.clientX, y: e.clientY };
+        if (raf) return;
+        raf = requestAnimationFrame(() => { raf = 0; const r = last.c.getBoundingClientRect();
+          last.c.style.setProperty('--sx', (last.x - r.left) + 'px'); last.c.style.setProperty('--sy', (last.y - r.top) + 'px'); });
+      }, { passive: true });
+    }
+
+    /* A star you have just switched on settles with a spring. */
+    function stars() {
+      document.addEventListener('click', (e) => {
+        const b = e.target.closest && e.target.closest('[data-star]'); if (!b || reduceMQ.matches) return;
+        requestAnimationFrame(() => { if (b.getAttribute('aria-pressed') !== 'true') return; b.classList.add('pop'); setTimeout(() => b.classList.remove('pop'), 500); });
+      });
+    }
+
+    /* The ambient field on the home hero: decorative, no data, pausable. */
+    const NODES = [[60, 90], [150, 40], [250, 110], [350, 60], [440, 130], [90, 210], [200, 200], [320, 230], [430, 300], [140, 330], [260, 360], [370, 380]];
+    const EDGES = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [1, 6], [2, 6], [5, 6], [6, 7], [3, 7], [4, 8], [7, 8], [5, 9], [6, 10], [9, 10], [10, 11], [8, 11], [7, 10]];
+    const fieldHTML = () => `<div class="hwrap-f"><div class="hf" aria-hidden="true"><div class="hf-glow"></div><div class="hf-par">
+      <div class="hf-ring r1"><b></b></div><div class="hf-ring r2"><b></b><b></b></div><div class="hf-ring r3"><b></b></div>
+      <svg class="hf-net" viewBox="0 0 520 440">${EDGES.map(([a, b]) => `<line x1="${NODES[a][0]}" y1="${NODES[a][1]}" x2="${NODES[b][0]}" y2="${NODES[b][1]}"/>`).join('')}</svg>
+      ${NODES.map(([x, y], i) => `<i class="hf-node${i === 2 || i === 8 ? ' a' : ''}" style="left:${(x / 520 * 100).toFixed(2)}%;top:${(y / 440 * 100).toFixed(2)}%;--d:${((i * 0.37) % 3.2).toFixed(2)}s"></i>`).join('')}
+      </div></div><button type="button" class="hf-pause" aria-pressed="false" aria-label="Pause the background motion">Pause motion</button></div>`;
+    function field(root) {
+      const f = $('.hf', root); if (!f) return;
+      if (reduceMQ.matches) { f.remove(); const p = $('.hf-pause', root); if (p) p.remove(); return; }
+      const btn = $('.hf-pause', root), par = $('.hf-par', f);
+      let paused = false; try { paused = localStorage.getItem('vis:hf') === '1'; } catch (e) { /* ok */ }
+      const setPaused = (p) => { paused = p; f.classList.toggle('is-paused', p); btn.setAttribute('aria-pressed', String(p)); btn.textContent = p ? 'Play motion' : 'Pause motion';
+        btn.setAttribute('aria-label', p ? 'Resume the background motion' : 'Pause the background motion'); try { localStorage.setItem('vis:hf', p ? '1' : '0'); } catch (e) { /* ok */ } };
+      setPaused(paused);
+      btn.addEventListener('click', () => setPaused(!paused));
+      /* Off-screen or in a hidden tab, nothing runs. */
+      const vis = { on: true, tab: !document.hidden };
+      const sync = () => f.classList.toggle('is-off', !(vis.on && vis.tab));
+      new IntersectionObserver((es) => { vis.on = es[0].isIntersecting; sync(); }).observe(f);
+      document.addEventListener('visibilitychange', () => { vis.tab = !document.hidden; sync(); });
+      /* A pointer pushes the field a few pixels, with inertia. Fine pointers only. */
+      if (FINE()) {
+        let tx = 0, ty = 0, cx = 0, cy = 0, raf = 0;
+        const step = () => { cx += (tx - cx) * 0.09; cy += (ty - cy) * 0.09; par.style.transform = `translate3d(${cx.toFixed(2)}px,${cy.toFixed(2)}px,0)`;
+          raf = (Math.abs(tx - cx) > 0.05 || Math.abs(ty - cy) > 0.05) ? requestAnimationFrame(step) : 0; };
+        addEventListener('pointermove', (e) => { if (paused || e.pointerType !== 'mouse' || f.classList.contains('is-off')) return;
+          tx = (e.clientX / innerWidth - 0.5) * -20; ty = (e.clientY / innerHeight - 0.5) * -12; if (!raf) raf = requestAnimationFrame(step); }, { passive: true });
+      }
+    }
+    header(); spotlight(); stars();
+    return { nav, navInd, countUp, markers, field, fieldHTML };
+  })();
+
   /* ── ROUTER ─────────────────────────────────────────────────────────────── */
   const V = {};
   let navTok = 0, cur = null;
@@ -644,7 +832,9 @@
     const tok = ++navTok;
     closeLayer();
     cur = { name, arg, tok, live: null };
+    Motion.nav();
     paintNav(NAV.some((n) => n[0] === name) ? name : '');
+    Motion.navInd();
     const main = $('#main');
     main.innerHTML = '';
     const view = document.createElement('div'); view.className = 'view'; main.appendChild(view);
@@ -1080,19 +1270,20 @@
     setTitle('');
     /* The hero enters once per page load; a return to Companies is instant. */
     const heroIn = !window.__visHeroIn; window.__visHeroIn = true;
-    el.innerHTML = `<section class="hero2${heroIn ? ' is-in' : ''}">
+    el.innerHTML = `<div class="hwrap">${Motion.fieldHTML()}<section class="hero2${heroIn ? ' is-in' : ''}">
         <p class="up"><a href="${SIGNAL_URL}/">← Signal</a> finds what deserves attention. Vision shows why.</p>
         <h1>Understand any Indian company in minutes.</h1>
         <p class="sub">Price, financials, ownership and technical structure for about 1,000 NSE names. Every figure shows its source and age.</p>
         <div class="hsearch"><input id="hQ" type="search" role="combobox" aria-expanded="false" aria-controls="hL" aria-autocomplete="list" autocomplete="off" spellcheck="false"
           placeholder="Search a company: Reliance, TCS, HDFC Bank…" aria-label="Search a company" aria-describedby="hHint"><ul id="hL" role="listbox" aria-label="Matching companies"></ul></div>
         <p id="hHint" class="hhint vh">Company name or NSE symbol. Every figure on a company page names its source and its age.<span class="k"> Press <span class="kbd">/</span> on any page to search.</span></p>
-        <div id="hRecent" class="row wrap hrec"></div><p id="hSince" class="since" hidden></p></section>
+        <div id="hRecent" class="row wrap hrec"></div><p id="hSince" class="since" hidden></p></section></div>
       <div id="hGlance" class="glance">${skel(2)}</div>
       <div class="grid g-21 hrow">${panel('Paper setups for the next session', skel(5), { bodyId: 'hPaper', flush: true, more: '#/brief', moreText: 'Open the brief' })}${panel('Strongest technical reads', skel(5), { bodyId: 'hReads', flush: true, more: '#/screener', moreText: 'Screener' })}</div>
       <div class="grid g-12 hrow">${panel('Unusual today', skel(5), { bodyId: 'hUnu', fb: 'Screen' })}${panel('What changed across the screen', skel(6), { bodyId: 'hChg', fb: 'Screen' })}</div>
       <div id="hMkt"></div>
       <div class="grid g-2 hrow">${panel('Plans for the next session', skel(4), { bodyId: 'hSig', flush: true, fb: 'Setups', more: '#/setups', moreText: 'All setups' })}${panel('Most-traded companies', skel(6), { bodyId: 'hTop', fb: 'Screen' })}</div>`;
+    Motion.field(el);
     const inp = $('#hQ'), L = $('#hL');
     let hits = [], sel = 0;
     const paintL = () => { const Q = inp.value.trim().toUpperCase(); hits = findCo(inp.value); sel = clamp(sel, 0, Math.max(0, hits.length - 1));

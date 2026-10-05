@@ -2863,6 +2863,32 @@ ok("no figure counts up", !/countUp/.test(JS));
        /window\.__homeIn/.test(HOME) && /window\.__visHeroIn/.test(TVJ)
        && /prefers-reduced-motion:no-preference\)\{\s*\.home-hero\.is-in/.test(TC) && /prefers-reduced-motion:no-preference\)\{\.hero2\.is-in/.test(TV));
   }
+  {
+    /* Vision motion system (2026-10-05). */
+    const MC = readFileSync("public/vision.css", "utf8"), MJ = readFileSync("public/vision.js", "utf8");
+    const BLK = MC.slice(MC.indexOf("MOTION SYSTEM (2026-10)"));
+    ok("Vision's motion block uses the shared easing tokens and a spring that falls back to ease-out",
+       /--ease-out:cubic-bezier\(\.23,1,\.32,1\)/.test(BLK) && /--ease-io:cubic-bezier\(\.77,0,\.175,1\)/.test(BLK)
+       && /--spring:var\(--ease-out\)/.test(BLK) && /@supports \(transition-timing-function:linear\(0,1\)\)/.test(BLK));
+    ok("nothing in Vision's CSS transitions 'all' or eases in",
+       !/transition:\s*all/.test(MC) && !/ease-in[^-o]/.test(BLK.replace(/ease-io/g, "")));
+    ok("Vision's entrances are transform and opacity only, backwards-filled",
+       /@keyframes mIn\{from\{opacity:0;transform:translateY\(8px\)\}\}/.test(BLK) && /animation:mIn 340ms var\(--ease-out\) backwards/.test(BLK)
+       && !/@keyframes (mIn|mFade|mTick|mPop|hfPulse|hfPing|hfSpin)\{[^}]*(width|height|top|left|margin)/.test(BLK));
+    ok("the ambient field is decorative, paused off-screen and on request, and not drawn on a phone or under reduced motion",
+       /class="hf" aria-hidden="true"/.test(MJ) && /aria-pressed="false" aria-label="Pause the background motion"/.test(MJ)
+       && /is-off/.test(MJ) && /visibilitychange/.test(MJ) && /localStorage\.setItem\('vis:hf'/.test(MJ)
+       && /@media \(max-width:899px\)\{\.hf,\.hf-pause\{display:none\}\}/.test(BLK) && /prefers-reduced-motion:reduce\)\{\.hf,\.hf-pause\{display:none\}/.test(BLK)
+       && /animation-play-state:paused!important/.test(BLK));
+    ok("entrances play once, only before the reader touches the page, and nothing stays hidden",
+       /const live = \(\) => !reduceMQ\.matches && !touched && performance\.now\(\) - navAt < 5000/.test(MJ)
+       && /'pointerdown', 'keydown'/.test(MJ) && /setTimeout\(\(\) => \{ if \(el\.classList\.contains\('m-hold'\)\)/.test(MJ) && /\}, 6000\)/.test(MJ));
+    ok("the count-up runs once per session, on counts only, and restores the exact text",
+       /sessionStorage\.setItem\('vis:cu'/.test(MJ) && /\^\\d\[\\d,\]\*\$/.test(MJ) && /: it\.txt/.test(MJ));
+    ok("the ⌘K palette and the keyboard are not animated by the motion module",
+       !/openPalette[\s\S]{0,200}Motion\./.test(MJ) && /\.drw\{transition-timing-function:var\(--ease-drawer\)\}/.test(BLK));
+    ok("hover motion is for fine pointers", /@media \(hover:hover\) and \(pointer:fine\)\{\s*\.pre:hover\{transform:translateY\(-2px\)/.test(BLK));
+  }
   ok("the watchlist exports and imports, merging rather than overwriting",
      /id="wExport"/.test(JS) && /id="wImport"/.test(JS) && /kind: 'signal-watchlist'/.test(JS) && /new Set\(\[\.\.\.watchAll\(\), \.\.\.clean\]\)/.test(JS));
 }
