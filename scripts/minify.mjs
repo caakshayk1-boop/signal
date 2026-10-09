@@ -59,6 +59,8 @@ const TARGETS = [
   ["public/engines.js", "js"],
   ["public/heatcore.js", "js"],
   ["public/v2widgets.js", "js"],
+  ["public/record-analytics.js", "js"],
+  ["public/signal-ui.js", "js"],
   ["public/gems.js", "js"],
   ["public/brief_fundamentals.js", "js"],
   ["public/vision.js", "js"],

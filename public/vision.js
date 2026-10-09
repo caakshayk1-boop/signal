@@ -605,7 +605,7 @@
     const paint = () => {
       palItems = palIndex(inp.value); palSel = clamp(palSel, 0, Math.max(0, palItems.length - 1));
       $('#palL').innerHTML = palItems.length ? palItems.map((it, i) => `<li id="po${i}" role="option" aria-selected="${i === palSel}" data-i="${i}">
-        <span class="k">${esc(it.k)}</span><b>${esc(it.t)}</b><span>${esc(it.sub)}</span>${it.go && it.go.startsWith('#/asset/') ? `<span class="r">${star(it.t)}</span>` : ''}</li>`).join('')
+        <span class="k">${esc(it.k)}</span><b>${esc(it.t)}</b><span>${esc(it.sub)}</span></li>`).join('')
         : `<li aria-disabled="true"><span>No match${SCR ? '' : ' yet; the full screen is still loading'}</span></li>`;
       inp.setAttribute('aria-activedescendant', palItems.length ? 'po' + palSel : '');
       $('#palN').textContent = SCR ? `${Object.keys(SCR).length.toLocaleString('en-IN')} names searchable · screen build: ${badgeState('Screen').txt}` : 'loading the screen…';
@@ -2050,9 +2050,9 @@
       <p class="note" style="margin-top:var(--s-2)">${esc(r.fy || '')} statements, ${r.fy_count || '—'} fiscal years. Scores read the multi-year median, not the latest year.</p>` : empty('No statements', 'Not on the screen.');
 
     $('#aIns').innerHTML = x && x.quality === 'complete' ? `<div class="kv" style="margin-top:0">
-        <div><em>FII</em><b>${fmt(x.fii, 2)}%</b><small>${signed(x.fii_pp, 2, ' pp')} q/q</small></div>
-        <div><em>DII</em><b>${fmt(x.dii, 2)}%</b><small>${signed(x.dii_pp, 2, ' pp')} q/q</small></div>
-        <div><em>Promoter</em><b>${fmt(x.promoter, 2)}%</b></div></div>
+        <div><em>FII</em><b>${x.fii == null ? NA : fmt(x.fii, 2) + '%'}</b><small>${x.fii_pp == null ? '' : signed(x.fii_pp, 2, ' pp') + ' q/q'}</small></div>
+        <div><em>DII</em><b>${x.dii == null ? NA : fmt(x.dii, 2) + '%'}</b><small>${x.dii_pp == null ? '' : signed(x.dii_pp, 2, ' pp') + ' q/q'}</small></div>
+        <div><em>Promoter</em><b>${x.promoter == null ? NA : fmt(x.promoter, 2) + '%'}</b></div></div>
       ${ownChart(x.series, ($('#aIns') || {}).clientWidth)}
       <p class="note" style="margin-top:var(--s-2)"><b>${esc(x.signal_label || x.band_label || '')}</b> · ${esc(x.period || '')} against ${esc(x.prev_period || '')}. Quarterly filings: this moves four times a year.</p>
       <p class="note src">Source: NSE shareholding pattern filings (SEBI XBRL), ${esc((x.series || []).length)} quarters.</p>`

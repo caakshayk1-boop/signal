@@ -17,7 +17,13 @@ const JS = readFileSync("public/signal.js", "utf8");
 const CSS = readFileSync("public/signal.css", "utf8");
 const HTML = readFileSync("public/index.html", "utf8");
 const GEMS = readFileSync("public/gems.js", "utf8");
+const VISION = readFileSync("public/vision.js", "utf8");
+const WIDGETS = readFileSync("public/v2widgets.js", "utf8");
 const IDX = readFileSync("src/index.js", "utf8");
+const PUBLICATION_MODULES = ["public/record-analytics.js", "public/signal-ui.js", "public/v2widgets.js"]
+  .map(file => [file, readFileSync(file, "utf8")]);
+const RENDERERS = [["public/signal.js", JS], ...PUBLICATION_MODULES];
+const RENDERER_SOURCE = RENDERERS.map(([, source]) => source).join("\n");
 
 let fails = 0, checks = 0, retired = 0;
 /* SIGNAL V2 (2026-10-01). These checks pinned V1 surfaces that no longer exist
@@ -75,10 +81,11 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
  * Any ternary whose two arms are textually identical is either a typo or dead
  * code; there is no third case. */
 {
-  const re = /\?\s*([^?:;()]{1,40}?)\s*:\s*([^?:;()]{1,40}?)\s*([)\];,])/g;
+  // A nullish coalescing token (??) is not a ternary opener.
+  const re = /(?<!\?)\?(?!\?)\s*([^?:;()]{1,40}?)\s*:\s*([^?:;()]{1,40}?)\s*([)\];,])/g;
   const hits = [];
   let m;
-  for (const [label, src] of [["signal.js", JS]]) {
+  for (const [label, src] of RENDERERS) {
     while ((m = re.exec(src))) {
       const a = m[1].trim(), b = m[2].trim();
       if (a && a === b) hits.push(`${label}:${lineOf(src, m.index)}  ? ${a} : ${b}`);
@@ -95,7 +102,7 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   const routes = new Set([...JS.matchAll(/R\['(\/[a-z0-9/:-]*)'\]\s*=/g)].map(x => x[1]));
   ok("the router declares routes", routes.size > 5, routes.size);
   const hrefs = new Set();
-  for (const src of [JS, HTML]) {
+  for (const src of [RENDERER_SOURCE, HTML]) {
     for (const x of src.matchAll(/href="(#?\/[a-z0-9/-]*)"/g)) hrefs.add(x[1]);
   }
   const bad = [...hrefs]
@@ -109,7 +116,7 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
 {
   const routes = [...JS.matchAll(/R\['(\/[a-z0-9/:-]*)'\]\s*=/g)].map(x => x[1]);
   const linked = new Set();
-  for (const src of [JS, HTML]) {
+  for (const src of [RENDERER_SOURCE, HTML]) {
     for (const x of src.matchAll(/href="#?(\/[a-z0-9/-]*)"/g)) linked.add(x[1]);
     for (const x of src.matchAll(/data-route="(\/[a-z0-9/-]*)"/g)) linked.add(x[1]);
     for (const x of src.matchAll(/go\('(\/[a-z0-9/-]*)'\)/g)) linked.add(x[1]);
@@ -138,9 +145,9 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
  * built by string concatenation are excluded because they cannot be read
  * statically. */
 {
-  const PREFIXES = ["ef-", "scr-ins", "insti-", "isc", "ispark", "isp-", "xr", "xd", "ia-"];
+  const PREFIXES = ["ef-", "scr-ins", "insti-", "isc", "ispark", "isp-", "xr", "xd", "ia-", "sig2-"];
   const emitted = new Set();
-  for (const x of JS.matchAll(/class="([a-z0-9 _-]+)"/g)) {
+  for (const x of RENDERER_SOURCE.matchAll(/class="([a-z0-9 _-]+)"/g)) {
     for (const c of x[1].split(/\s+/)) {
       if (c && PREFIXES.some(p => c.startsWith(p))) emitted.add(c);
     }
@@ -272,7 +279,7 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
  * everyone learns to skip. */
 {
   const bad = [];
-  for (const [file, code] of [["public/signal.js", JS], ["public/gems.js", GEMS]]) {
+  for (const [file, code] of [...RENDERERS, ["public/gems.js", GEMS]]) {
     // Arrow-function bodies that both coerce with Number() and can return null:
     // the "number or nothing" helper shape.
     for (const m of code.matchAll(/=>\s*\{([\s\S]{0,320}?)\}/g)) {
@@ -335,6 +342,64 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      extra.length === 0, extra);
 }
 
+/* ── 14. UNKNOWN OWNERSHIP IS NOT A PERCENTAGE ──────────────────────────────
+ * A complete filing can still omit an individual holding. fmt(null) returns
+ * null, so a percent suffix outside its guard printed "null%" to readers. */
+{
+  const bad = [];
+  for (const [file, source] of [...RENDERERS, ['public/vision.js', VISION]]) {
+    for (const m of source.matchAll(/\$\{\s*fmt\([^{}]+\)\s*\}%/g)) bad.push(`${file}:${lineOf(source, m.index)}`);
+  }
+  ok('no bare nullable fmt interpolation carries a percent suffix', !bad.length, bad);
+  const ownership = VISION.slice(VISION.indexOf("$('#aIns').innerHTML ="), VISION.indexOf('const W = await F.wire();', VISION.indexOf("$('#aIns').innerHTML =")));
+  for (const key of ['fii', 'dii', 'promoter']) {
+    ok(`unknown ${key} ownership uses the existing NA`, ownership.includes(`x.${key} == null ? NA : fmt(x.${key}, 2) + '%'`));
+  }
+  for (const key of ['fii_pp', 'dii_pp']) {
+    ok(`unknown ${key} omits the q/q label too`, ownership.includes(`x.${key} == null ? '' : signed(x.${key}, 2, ' pp') + ' q/q'`));
+  }
+  const palette = VISION.slice(VISION.indexOf('palItems.map('), VISION.indexOf("inp.setAttribute('aria-activedescendant'"));
+  ok('command palette rows contain no nested watchlist control', palette.length > 0 && !/star\(|data-star/.test(palette));
+}
+
+/* ── 15. BOLD LABELS MUST NOT SWALLOW THE NEXT WORD ────────────────────────
+ * Block styling disguised these missing spaces until text was copied or
+ * read aloud. Scan the two affected template renderers, without an allowlist. */
+{
+  const glued = [];
+  for (const [file, source] of [['signal.js', JS], ['v2widgets.js', WIDGETS]]) {
+    for (const m of source.matchAll(/<\/b>[A-Za-z]/g)) glued.push(`${file}:${lineOf(source, m.index)}`);
+  }
+  ok('no word is glued to a closing bold label', !glued.length, glued);
+}
+
+/* ── 16. A STAR POP MUST REPLAY, NOT JUST SET A PERMANENT CLASS ───────────── */
+{
+  ok('spring has an ease-out fallback and a supported linear curve',
+    /--spring:\s*var\(--ease-out\)/.test(CSS) && /@supports \(transition-timing-function:linear\(0,1\)\)/.test(CSS) && /--spring:linear\(/.test(CSS));
+  ok('the watch star has a pop keyframe and replays after toggling',
+    /@keyframes starpop/.test(CSS) && /\.wstar\.pop\{animation:starpop 380ms var\(--spring\)/.test(CSS)
+    && /toggleWatch\(b.dataset.watch\);\s*b.classList.remove\('pop'\);\s*void b.offsetWidth;\s*b.classList.add\('pop'\)/.test(JS));
+}
+
+/* ── 17. DECORATION FAILS QUIETLY AND HONOURS THE READER'S PREFERENCES ────── */
+{
+  for (const [regime, color] of Object.entries({ calm_trend: '#2fa08c', calm_range: '#9a8f7a', highvol_trend: '#c99a2e', highvol_mr: '#c97a2e', crisis: '#c0392b' })) {
+    ok(`ambient ${regime} uses its declared color`, CSS.includes(`html[data-regime="${regime}"]{--amb-c:${color}}`));
+  }
+  ok('ambient layer is inert and behind main', /\.amb\{position:fixed;inset:0;z-index:0;pointer-events:none/.test(CSS)
+    && /amb.setAttribute\('aria-hidden', 'true'\)/.test(JS) && /document.body.prepend\(amb\)/.test(JS));
+  ok('ambient layer disables transitions and hides for reduced transparency',
+    /@media\(prefers-reduced-motion:reduce\)\{\.amb\{transition:none\}\}/.test(CSS)
+    && /@media\(prefers-reduced-transparency:reduce\)\{\.amb\{display:none\}\}/.test(CSS));
+  ok('spark and price strokes are normalized for draw-in', /<path class="ln" pathLength="100"/.test(JS)
+    && /<path class="px" pathLength="100"/.test(WIDGETS));
+  ok('line draw and star pop are opt-in motion only', /@keyframes linedraw\{to\{stroke-dashoffset:0\}\}/.test(CSS)
+    && /@media\(prefers-reduced-motion:no-preference\)\{\s*\.spark \.ln,path.px\{[^}]*animation:linedraw[\s\S]*?\.wstar\.pop\{animation:starpop/.test(CSS));
+  const news = JS.slice(JS.indexOf("R['/news'] ="), JS.indexOf("R['/news'] =") + 450);
+  ok('news paints six skeleton rows before awaiting feeds', /paint\(head\('The wire',[\s\S]*?skel\('sk-row', 6\), true\);[\s\S]*?await Promise.all/.test(news));
+}
+
 /* ── EVERY FEED THE APP FETCHES MUST BE MIRRORED ─────────────────────────────
  * The incident: signal.js fetches /research.json and /alerts_log.json, and
  * sync-data.yml's feed list contained neither. Both files existed in public/,
@@ -372,8 +437,13 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
     .join("\n");
   const builtHere = (f) => WF.includes(`public/${f}.json`);
   const fetched = new Set(
-    [...JS.matchAll(/get\(\s*['"]\/([a-z0-9_-]+)\.json['"]/g)].map((m) => m[1])
+    [...RENDERER_SOURCE.matchAll(/get\(\s*['"]\/([a-z0-9_-]+)\.json['"]/g)].map((m) => m[1])
   );
+  // A named URL is still a fetched feed. TRIAL_URL must not evade mirroring
+  // checks merely because the browser and edge share a constant contract.
+  for (const m of RENDERER_SOURCE.matchAll(/const\s+(\w+)\s*=\s*['"]\/([a-z0-9_-]+)\.json['"]/g)) {
+    if (new RegExp(`get\\(\\s*${m[1]}\\s*\\)`).test(RENDERER_SOURCE)) fetched.add(m[2]);
+  }
   // Feeds the private engine writes to trading-dashboard/feeds/ (not docs/)
   // are mirrored by their own named step, each with its schema check.
   const fromFeedsDir = (f) => SYNC.includes(`f=${f}.json`);
@@ -387,10 +457,21 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
   const OTHER = new Set(["edition", "screen"]);   // read by index.html / gems.js
   const orphan = [...feeds].filter(
     (f) => !fetched.has(f) && !OTHER.has(f) &&
-           !JS.includes(`${f}.json`) && !GEMS.includes(`${f}.json`) &&
+           !RENDERER_SOURCE.includes(`${f}.json`) && !GEMS.includes(`${f}.json`) &&
            !HTML.includes(`${f}.json`)
   );
   ok("no feed is mirrored that nothing reads", orphan.length === 0, orphan);
+}
+
+// Shared publication renderers must be loaded in dependency order; a missing
+// script otherwise makes the main, edge and prerender versions disagree.
+{
+  const order = ['record-analytics.js', 'signal-ui.js', 'signal.js'].map(file => HTML.indexOf(`<script src="/${file}"`));
+  ok('publication scripts load analytics, renderer and router in that order',
+    order.every(i => i >= 0) && order[0] < order[1] && order[1] < order[2], order);
+  ok('browser and edge read the same canonical trial publication',
+    /const TRIAL_URL = '\/signal_trials\.json'/.test(JS)
+    && /asset\(env, request, '\/signal_trials\.json'/.test(readFileSync('src/seo.js', 'utf8')));
 }
 
 /* ── A LANE IS NOT A DATABASE KEY ────────────────────────────────────────────
@@ -1259,7 +1340,7 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      browser is the fault this site avoids everywhere else; a score that goes
      on reading as current is the fault directly above. */
   ok("the score keeps its value and says when it was taken",
-     /\$\{voided \? ' <i>at build<\/i>' : ''\}/.test(code));
+     /Math\.round\(Number\(p\.score\)\)/.test(code) && /\$\{voided \? ' <i>at last scan<\/i>' : ''\}/.test(code));
   /* The stop path and scale-out restate the levels as instructions one block
      below the strike-through, and read live until this wrapped them. */
   ok("the stop path goes with the plan",
@@ -1897,8 +1978,10 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
      sheet as well as an emitter, and scanning it as only the latter reported
      eighteen bf- classes as unstyled when every one of them is styled inside
      the file that emits it. */
-  const SHEETS = CSS + readFileSync("public/heat.css", "utf8") + BF;
-  const EMITTERS = JS + HTML + BF + readFileSync("public/heatcore.js", "utf8");
+  // v2widgets owns its inline style block; the shared publication modules now
+  // emit the same HTML at the edge, at build time, and in the browser.
+  const SHEETS = CSS + readFileSync("public/heat.css", "utf8") + BF + readFileSync("public/v2widgets.js", "utf8");
+  const EMITTERS = RENDERER_SOURCE + HTML + BF + readFileSync("public/heatcore.js", "utf8");
 
   /* ── forward: emitted, styled nowhere ── */
   const emitted = new Set();
@@ -2609,8 +2692,9 @@ ok("no figure counts up", !/countUp/.test(JS));
   ok("the disclosure states when the record began",
      /The forward record begins \$\{since \? v2Date\(since\)/.test(V2C) && /The forward record begins 1 October 2026/.test(JS));
   ok("the headline and subheading are the V2 ones",
-     /Indian equities, screened after the close\./.test(V2C) && /Review qualified setups, plan the next session, and track every paper trade\./.test(V2C)
-     && /Indian equities, screened after the close\./.test(readFileSync("scripts/prerender.mjs", "utf8")));
+     /Indian equities, screened after the close\./.test(V2C) && /Conditional paper plans for the next session, and a forward record that counts every one\./.test(V2C)
+     && /Indian equities, screened after the close\./.test(readFileSync("scripts/prerender.mjs", "utf8"))
+     && /Conditional paper plans for the next session, and a forward record that counts every one\./.test(readFileSync("scripts/prerender.mjs", "utf8")));
   ok("no V2 view invents a best-stock pick when nothing qualified",
      /never substitutes a "best stock of the day"/.test(V2B) && /No plan qualified for the/.test(V2C) && /paused: `No plans for the .*new plans are paused\./.test(V2C));
   ok("state is a word plus a glyph, never colour alone", /const V2_STATE = \{[\s\S]*?awaiting_entry:\s*\['Awaiting entry'/.test(V2C) && /<i aria-hidden="true">\$\{i\}<\/i>\$\{esc\(w\)\}/.test(V2C));

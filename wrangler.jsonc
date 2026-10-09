@@ -124,6 +124,7 @@
   // `wrangler secret put`, which stores them encrypted and keeps them out of
   // git. See README.md.
   "vars": {
-    "SITE": "signal"
+    "SITE": "signal",
+    "SIGNAL_PUBLIC_URL": "https://signal.askakshay.com"
   }
 }

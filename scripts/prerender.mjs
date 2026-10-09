@@ -10,6 +10,8 @@
  * engines.js are not consulted; the old record is excluded from every surface.
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import "../public/record-analytics.js";
+import "../public/signal-ui.js";
 
 const OPEN = "<!--PRERENDER-->";
 const CLOSE = "<!--/PRERENDER-->";
@@ -26,23 +28,15 @@ const v2 = read("signal_v2");
 const news = read("news") || [];
 const wire = Array.isArray(news) ? news : [];
 const ok = v2 && v2.schema === "signal-v2-public/1";
-const m = (ok && v2.metrics) || {};
-const next = ok ? (v2.plans || []).filter((p) => p.state === "awaiting_entry") : [];
 
 const block = `${OPEN}
 <section class="pre">
   <p class="pre-k">Signal${ok ? ` · latest session ${esc(day(v2.session_date))}` : ""}</p>
   <h1 class="pre-h">Indian equities, screened after the close.</h1>
-  <p class="pre-s">Review qualified setups, plan the next session, and track every paper trade.</p>
-  ${ok ? `<p class="pre-m">${next.length
-      ? `<b>${next.length}</b> plan${next.length === 1 ? "" : "s"} for the ${esc(day(v2.next_session))} session.`
-      : `No plan for the ${esc(day(v2.next_session))} session. ${esc(v2.status_detail || "")}`}</p>
-  <p class="pre-m">Forward record${v2.forward_record_start ? ` since ${esc(day(v2.forward_record_start))}` : ""}:
-    <b>${m.published ?? 0}</b> published, <b>${m.closed ?? 0}</b> closed${m.closed ? "" : " — no completed sample yet"}.</p>` :
-  `<p class="pre-m">The plan feed was not available at build time; the live page loads it.</p>`}
+  <p class="pre-s">Conditional paper plans for the next session, and a forward record that counts every one.</p>
+  ${globalThis.SignalUI.snapshot(v2)}
   ${wire.length ? `<ul class="pre-l">${wire.slice(0, 4).map((x) =>
     `<li><b>${esc(x.source || "wire")}</b> — ${esc(x.title || "")}</li>`).join("")}</ul>` : ""}
-  <p class="pre-n">Snapshot published with the build. The live page replaces it as soon as it loads.</p>
 </section>
 ${CLOSE}`;
 

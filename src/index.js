@@ -31,7 +31,9 @@ import calendar from "./api/calendar.js";
 import ipolive from "./api/ipolive.js";
 import wire from "./api/wire.js";
 import { runWatchdog } from "./watchdog.js";
-import subscribe from "./api/subscribe.js";
+import { checkScanFreshness, checkWatchdogHealth } from "./scan_watch.js";
+import subscribe, { confirmationHandler, unsubscribeHandler, preferencesHandler } from "./api/subscribe.js";
+import { createDeliveryHandler } from "./delivery/handler.js";
 import telegramWebhook from "./bot/webhook.js";
 import clientError from "./api/clienterror.js";
 import heat from "./api/heat.js";
@@ -48,6 +50,9 @@ const ROUTES = {
   "/api/ipo-live": ipolive,
   "/api/wire": wire,
   "/api/subscribe": subscribe,
+  "/api/subscribe/confirm": confirmationHandler,
+  "/api/unsubscribe": unsubscribeHandler,
+  "/api/subscription/preferences": preferencesHandler,
   "/api/client-error": clientError,
 };
 
@@ -86,6 +91,8 @@ function health(env, request) {
     serves: (((request && request.headers.get("host")) || (u && u.hostname) || "")
              .toLowerCase().startsWith("gems.")) ? "gems" : "signal",
     turso_configured: Boolean(env.TURSO_URL && env.TURSO_TOKEN),
+    email_delivery_configured: Boolean(env.RESEND_API_KEY && env.SIGNAL_EMAIL_FROM && env.SIGNAL_PUBLIC_URL && env.DELIVERY_TOKEN_SECRET && env.EDIT_KEY),
+    telegram_alerts_configured: Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID),
     // Whether /api/snapshot can sign. Says which key exists, never its value.
     snapshots: env.SNAPSHOT_KEY ? "SNAPSHOT_KEY" : env.EDIT_KEY ? "derived from EDIT_KEY" : "not configured",
     // The Data Sources page reads this rather than hardcoding a provider name,
@@ -97,7 +104,8 @@ function health(env, request) {
 }
 
 /* Routes that write. Never proxied — see the note at the call site. */
-const NO_PROXY = new Set(["/api/subscribe", "/api/client-error"]);
+const NO_PROXY = new Set(["/api/subscribe", "/api/subscribe/confirm", "/api/unsubscribe",
+  "/api/subscription/preferences", "/api/delivery", "/api/client-error"]);
 
 const UPSTREAM = "https://signal.askakshay.com";
 
@@ -272,12 +280,14 @@ export default {
    */
   async scheduled(event, env, ctx) {
     mirrorEnv(env);
-    ctx.waitUntil(runWatchdog(env).then((r) => {
+    ctx.waitUntil(checkScanFreshness(env).catch(() => console.log("scan_watch failed")));
+    ctx.waitUntil(runWatchdog(env).then(async (r) => {
       // One line per tick in the observability log, and only when it acted —
       // a watchdog that logs "nothing to do" every twenty minutes buries the
       // one line that matters.
       const acted = (r.checked || []).filter((c) => c.dispatched || c.error);
       if (acted.length) console.log("watchdog", JSON.stringify(acted));
+      await checkWatchdogHealth(env, r);
     }).catch((e) => console.log("watchdog failed", String(e))));
   },
 
@@ -344,6 +354,10 @@ export default {
     // Native too: it reads env.ASSETS and signs with a Worker secret, and a
     // signing request must never be forwarded by the dev proxy below.
     if (url.pathname === "/api/snapshot") return snapshot(request, env);
+    if (url.pathname === "/api/delivery") {
+      const delivery = createDeliveryHandler({ env, assets: env.ASSETS });
+      return runVercelHandler(delivery, request, ctx);
+    }
 
     const handler = ROUTES[url.pathname];
     if (handler) {
@@ -464,7 +478,7 @@ export default {
     const mp = url.pathname.replace(/\/+$/, "") || "/";
     if (MOVED[mp]) return Response.redirect(new URL(MOVED[mp], request.url).toString(), 301);
     const PAGES = new Set(["/", "/about", "/brief", "/disclaimer", "/disclosures",
-      "/opportunities", "/performance",
+      "/opportunities", "/performance", "/pulse", "/compass", "/digests",
       "/discover", "/funds",
       "/gems", "/heat", "/ipo", "/join", "/map", "/markets",
       "/methodology", "/news", "/privacy", "/radar", "/reads", "/screen",
@@ -474,6 +488,16 @@ export default {
          which runs against SIGNAL_URL. */
       "/vision"]);
     const p = url.pathname.replace(/\/+$/, "") || "/";
+    // Dated editions are immutable static documents, not SPA routes. Confirm
+    // the manifest exists before serving HTML so missing dates remain 404s.
+    const digestDate = p.match(/^\/digests\/(\d{4}-\d{2}-\d{2})$/);
+    if (digestDate) {
+      const marker = await env.ASSETS.fetch(new Request(new URL(`${p}/delivery.json`, request.url)));
+      if (!marker.ok || !(marker.headers.get("content-type") || "").includes("json")) {
+        return new Response("Digest not published", { status: 404 });
+      }
+      return env.ASSETS.fetch(new Request(new URL(`${p}/`, request.url), request));
+    }
     const isPage = PAGES.has(p) || p.startsWith("/stock/") || /^\/plan\/[^/]+$/.test(p) || /^\/setup\/[^/]+$/.test(p);
     // A request for a real file (/signal.js, /screen.json, /fonts/...) has an
     // extension and is left entirely alone — the assets binding answers it,

@@ -194,6 +194,7 @@
   --t-fast:140ms; --t-mid:220ms; --t-slow:280ms;
   --ease:cubic-bezier(.22,.61,.36,1);
   --ease-out:cubic-bezier(.16,1,.3,1);
+  --spring:var(--ease-out);
   /* THE PRESS. gems.css has declared --t-press since the feel pass and this
      sheet did not, so the two bundles that were deliberately brought onto one
      motion vocabulary disagreed about the one duration a finger can feel.
@@ -541,6 +542,32 @@ a{color:inherit;text-decoration:none}
    makes the reader scroll while a third of the screen sits empty is wasting
    the one thing a desktop has over a phone. */
 main{max-width:1280px;margin:0 auto;padding:16px var(--gut) 36px;min-height:60vh}
+/* Regime is atmosphere only; the content stays above this inert layer. */
+html[data-regime="calm_trend"]{--amb-c:#2fa08c}
+html[data-regime="calm_range"]{--amb-c:#9a8f7a}
+html[data-regime="highvol_trend"]{--amb-c:#c99a2e}
+html[data-regime="highvol_mr"]{--amb-c:#c97a2e}
+html[data-regime="crisis"]{--amb-c:#c0392b}
+.amb{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0;
+  --amb-hi:color-mix(in srgb,var(--amb-c,transparent) 10%,transparent);
+  --amb-lo:color-mix(in srgb,var(--amb-c,transparent) 7%,transparent);
+  background:radial-gradient(ellipse at 12% 0%,var(--amb-hi),transparent 65%),
+    radial-gradient(ellipse at 90% 90%,var(--amb-lo),transparent 65%);
+  transition:opacity 1.4s var(--ease-out)}
+html[data-regime] .amb{opacity:1}
+@media(prefers-reduced-motion:reduce){.amb{transition:none}}
+@media(prefers-reduced-transparency:reduce){.amb{display:none}}
+/* One physical spring, with the existing ease-out in older browsers. */
+@supports (transition-timing-function:linear(0,1)){
+  :root{--spring:linear(0,.03,.107,.214,.336,.463,.585,.698,.797,.88,.947,.999,1.037,1.062,1.077,1.083,1.083,1.078,1.07,1.06,1.05,1.039,1.029,1.021,1.013,1.007,1)}
+}
+@keyframes linedraw{to{stroke-dashoffset:0}}
+@keyframes starpop{0%{transform:scale(.55) rotate(-16deg)}100%{transform:scale(1) rotate(0)}}
+@media(prefers-reduced-motion:no-preference){
+  .spark .ln,path.px{stroke-dasharray:100;stroke-dashoffset:100;animation:linedraw .9s var(--ease-out) forwards}
+  path.px{animation-duration:1.1s}
+  .wstar.pop{animation:starpop 380ms var(--spring)}
+}
 /* THE PAGE HEAD, rebuilt to the brief's rhythm: a mono eyebrow, a serif
    headline set light and large, one line of standfirst, then a rule. The old
    head was an 800-weight sans headline with a 14.5px grey line under it and
@@ -1132,35 +1159,6 @@ h4.sh{font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wider);text-tran
 
 
 
-/* ── JOIN ─────────────────────────────────────────────────────────────────── */
-.join{display:grid;gap:28px;padding:24px 0 8px}
-@media(min-width:900px){.join{grid-template-columns:1.15fr .85fr;gap:56px;padding:48px 0 24px;align-items:start}}
-.join h1{font:400 clamp(var(--t-10),5vw,46px)/1.05 var(--serif);letter-spacing:var(--ls-tight);text-wrap:balance}
-.join-sub{font-size:clamp(var(--t-6),2vw,var(--t-7));line-height:1.6;color:var(--muted);margin-top:14px;max-width:52ch}
-.join-ul{list-style:none;margin:24px 0 0;display:grid;gap:12px}
-.join-ul li{font-size:var(--t-5);line-height:1.55;color:var(--muted);padding-left:20px;position:relative}
-.join-ul li::before{content:"";position:absolute;left:0;top:7px;width:7px;height:7px;
-  border-radius:50%;background:var(--live)}
-.join-ul b{color:var(--text);font-weight:600}
-.join-r form{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-4);padding:22px}
-.join-r label{display:block;font:600 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-widest);
-  text-transform:uppercase;color:var(--dim);margin-bottom:8px}
-.join-r input[type=email]{width:100%;background:var(--bg);color:var(--text);
-  border:1px solid var(--line2);border-radius:var(--r-3);padding:14px;font:400 var(--t-6)/1.2 var(--ui);min-height:50px}
-.join-r input[type=email]:focus{outline:none;border-color:var(--live)}
-.btn-primary{width:100%;margin-top:12px;background:var(--live);color:#06231F;border:0;
-  border-radius:var(--r-3);padding:14px;font:600 var(--t-6)/1 var(--ui);cursor:pointer;min-height:50px;
-  transition:opacity var(--t-fast)}
-@media (hover:hover) and (pointer:fine){.btn-primary:hover{opacity:.9}}
-
-.btn-primary:disabled{opacity:.55;cursor:default}
-.join-note{margin-top:12px;font-size:var(--t-3);line-height:1.5;color:var(--dim)}
-.join-note.bad{color:var(--down)}
-.join-ok{font-size:var(--t-5);line-height:1.6;color:var(--muted)}
-.join-ok b{display:block;color:var(--live);font-size:var(--t-6);margin-bottom:7px}
-/* The honeypot. Off-screen rather than display:none — some bots skip hidden
-   fields, and one that is merely positioned away still gets filled. */
-.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 
 /* ══════════════ PRESENTATION PASS ════════════════════════════════════════
    Matching the reference site's type and surface treatment, applied to this
@@ -1193,7 +1191,6 @@ body{font-family:var(--ui);font-size:var(--t-6);line-height:1.5;letter-spacing:v
    sentence: 18-21px, --muted rather than --dim, 58ch. */
 .route-h p{font-size:clamp(var(--t-7),1.8vw,var(--t-8));line-height:1.5;color:var(--muted);
   margin-top:var(--s-4);max-width:58ch;text-wrap:pretty}
-.join h1{font-family:var(--serif);font-weight:400;letter-spacing:var(--ls-tight)}
 .sheet-h h2{font-weight:500;letter-spacing:var(--ls-snug);font-size:var(--t-8)}
 .brand-name{font:700 var(--t-7)/1 var(--disp);letter-spacing:var(--ls-tight)}
 
@@ -1212,7 +1209,7 @@ body{font-family:var(--ui);font-size:var(--t-6);line-height:1.5;letter-spacing:v
 
 /* Surfaces: hairline borders at 9% and NO shadows, which is what makes their
    page feel flat and calm rather than layered. */
-.tile,.card,.ipo,.breadth,.sc-t,.pane,.join-r form,.rank,.board,.wire,.yoy,.meth{
+.tile,.card,.ipo,.breadth,.sc-t,.pane,.rank,.board,.wire,.yoy,.meth{
   box-shadow:none;border-radius:var(--r-3)}
 .tile{min-height:104px;padding:16px 16px}
 .tile .v{font:500 clamp(var(--t-9),2.6vw,var(--t-10))/1.1 var(--mono);letter-spacing:var(--ls-tight)}
@@ -1221,8 +1218,6 @@ body{font-family:var(--ui);font-size:var(--t-6);line-height:1.5;letter-spacing:v
 
 /* Buttons: black fill, 6px, weight 500 — theirs exactly. */
 
-.btn-primary{background:var(--ink-btn);color:var(--on-ink);border-radius:var(--r-2);
-  font:500 var(--t-6)/1 var(--ui);letter-spacing:var(--ls-0)}
 .chip{border-radius:var(--r-pill);font:500 var(--t-4)/1 var(--ui);padding:8px 16px;min-height:38px;
   letter-spacing:var(--ls-0)}
 .chip[aria-pressed="true"]{background:var(--ink-btn);border-color:var(--ink-btn);color:var(--on-ink)}
@@ -6277,7 +6272,6 @@ h2,.sec-h h2,h3,h4{font-family:var(--ui)}
 @media (hover:hover) and (pointer:fine){.chip:hover{border-color:var(--line2);color:var(--text)}
   .chip[aria-pressed="true"]:hover,.chip.on:hover,.chip.is-on:hover{color:var(--bg)}}
 .pill{border-radius:var(--r-1)}
-.btn-primary{background:var(--accent);color:var(--on-accent);border-radius:var(--r-3);box-shadow:none}
 input[type="search"],input[type="text"],input[type="email"],select{border-radius:var(--r-3)}
 
 /* ── THE MASTHEAD ─────────────────────────────────────────────────────── */
@@ -6424,7 +6418,6 @@ main{max-width:calc(var(--maxw) + var(--gut) * 2)}
    takes the first column whole and the rest stack beside it. */
 @media(min-width:641px){.more-g:first-child{grid-row:1 / span 3}}
 @media(max-width:640px){.more-dlg{width:100vw;max-width:100vw;left:0;right:0}}
-.join h1{font:400 clamp(var(--t-11),4.2vw,var(--t-13))/1.06 var(--disp);letter-spacing:-.018em}
 /* The pre-rendered snapshot is shorter than the live page, so the footer and
    the freshness line sat inside the first screen and jumped when the app
    painted — most of the measured CLS on the front page. <main> reserves a full
@@ -6535,7 +6528,6 @@ main{min-height:calc(100vh - var(--barh))}
 .v2-rec .tile .v{font-variant-numeric:tabular-nums}
 .v2-recon{font:400 var(--t-3, 12px)/1.5 var(--mono);color:var(--muted);margin:12px 0 0}
 .v2-disc{font:600 var(--t-4, 13px)/1.5 var(--ui);color:var(--text);margin:8px 0 0}
-.v2-note{font:400 var(--t-3, 12px)/1.5 var(--ui);color:var(--dim);max-width:72ch;margin-top:var(--s-5, 24px)}
 .v2-ctx{margin:0;font:400 var(--t-5, 14px)/1.55 var(--ui)}
 .v2-wl{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .v2-wl li{display:flex;justify-content:space-between;gap:12px;align-items:center;min-height:44px;
@@ -6698,8 +6690,6 @@ main{min-height:calc(100vh - var(--barh))}
 @media(max-width:700px){.v2-tally{grid-template-columns:1fr 1fr}
   .v2-tally > div:nth-child(3){border-left:0}
   .v2-tally > div:nth-child(n+3){border-top:1px solid var(--line)}}
-.v2-st-h{margin:18px 0 10px;font-size:var(--t-4);font-weight:600}
-.v2-st-h span{font:500 var(--t-2)/1 var(--mono);color:var(--dim);margin-left:6px}
 /* The record on Performance: two labelled rows of four. */
 .v2-rec-h{margin:4px 0 8px;font:500 var(--t-1)/1 var(--mono);letter-spacing:var(--ls-wide);
   text-transform:uppercase;color:var(--dim)}
@@ -6994,3 +6984,56 @@ input,textarea{caret-color:var(--accent)}
 .vt-8l{grid-column:1/-1;margin:0;font:400 var(--t-3,13px)/1.5 var(--ui);color:var(--muted)}
 .vt-8l b{color:var(--text);font-weight:600}
 .wt-l{border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+
+/* Publication components: 8px rhythm, existing faces, numeric columns.
+   Green is reserved for active states, positive results and the primary CTA. */
+:root{--signal-accent:var(--up);--accent:var(--text);--accent-soft:color-mix(in srgb,var(--text) 7%,transparent)}
+html[data-theme="dark"]{--accent:var(--text);--accent-soft:color-mix(in srgb,var(--text) 12%,transparent)}
+body{line-height:1.6}
+.sig2-example,.sig2-subscribe,.sig2-analytics{margin:var(--s-5) 0;padding:var(--s-5);border:1px solid var(--line);border-radius:var(--r-3);background:var(--surface);min-width:0}
+.sig2-example h2,.sig2-subscribe h2,.sig2-analytics h2{font:600 var(--t-8)/1.3 var(--ui);margin:0 0 var(--s-4)}
+.sig2-example h3,.sig2-analytics h3{font:600 var(--t-7)/1.4 var(--ui);margin:var(--s-4) 0 var(--s-2)}
+.sig2-example p,.sig2-subscribe p,.sig2-analytics>p{max-width:68ch;margin:var(--s-2) 0 var(--s-4)}
+.sig2-label{font-size:var(--t-4);color:var(--muted)}
+.sig2-levels,.sig2-stats,.sig2-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--s-4);margin:var(--s-4) 0;font-variant-numeric:tabular-nums}
+.sig2-levels dt,.sig2-stats dt,.sig2-metrics dt{color:var(--muted);font-size:var(--t-4)}
+.sig2-levels dd,.sig2-stats dd,.sig2-metrics dd{margin:0;font-size:var(--t-6)}
+.sig2-stats{grid-template-columns:repeat(5,minmax(0,1fr));border-block:1px solid var(--line);padding:var(--s-4) 0;margin:var(--s-5) 0}
+.sig2-stats dd{font-weight:600}
+.sig2-scroll{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
+.sig2-scroll:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+.sig2-setups{min-width:0;margin:var(--s-4) 0}
+.sig2-filterempty{padding:var(--s-4);border:1px dashed var(--line);color:var(--muted)}
+.sig2-table{width:100%;border-collapse:collapse;font-size:var(--t-4);font-variant-numeric:tabular-nums}
+.sig2-table caption{text-align:left;color:var(--muted);padding:var(--s-2) 0;font-size:var(--t-4)}
+.sig2-table th,.sig2-table td{text-align:right;padding:var(--s-2) var(--s-4);border-bottom:1px solid var(--line);white-space:nowrap}
+.sig2-table th:first-child,.sig2-table td:first-child,.sig2-table td:nth-child(2){text-align:left}
+.sig2-table thead th{font-weight:500;color:var(--muted)}
+.sig2-state{display:inline-block;border:1px solid var(--line2);border-radius:var(--r-1);padding:0 var(--s-2);font-size:var(--t-3)}
+.sig2-state.is-eligible,.sig2-state.is-active{color:var(--signal-accent);border-color:var(--signal-accent)}
+.sig2-state.is-extended{color:var(--warn);border-style:dashed}
+.sig2-state.is-closed{border-width:2px}
+.sig2-state.is-expired{color:var(--muted);border-style:dotted}
+.sig2-formrow{display:flex;gap:var(--s-2);margin:var(--s-2) 0}
+.sig2-formrow input{flex:1;min-width:0;border:1px solid var(--line2);border-radius:var(--r-2);padding:var(--s-2) var(--s-4);font:inherit;color:var(--text);background:var(--bg)}
+.sig2-formrow button{min-height:48px;border:0;border-radius:var(--r-2);padding:var(--s-2) var(--s-5);background:var(--signal-accent);color:var(--bg);font:600 var(--t-6)/1.3 var(--ui);cursor:pointer}
+.sig2-formrow button:disabled{opacity:.65;cursor:wait}
+.sig2-formrow :focus-visible{outline:2px solid var(--text);outline-offset:2px}
+.sig2-honey{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+.sig2-formstatus{min-height:1.6em}
+.sig2-metrics{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));border-block:1px solid var(--line);padding:var(--s-4) 0}
+.sig2-metrics dd:first-of-type{font-weight:600;font-size:var(--t-8)}
+.sig2-warning{padding:var(--s-4);border-left:2px solid var(--warn);background:var(--raised);max-width:68ch}
+.sig2-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s-4)}
+.sig2-chart{margin:0;min-width:0}
+.sig2-chart svg{width:100%;height:auto;display:block;fill:var(--text)}
+.sig2-chart svg text{font:12px var(--mono);fill:var(--muted)}
+.sig2-baseline{stroke:var(--line2);stroke-dasharray:4 4}
+.sig2-line{stroke:var(--text);stroke-width:2;fill:none;stroke-linejoin:round}
+.sig2-chart figcaption{font-size:var(--t-3);color:var(--muted)}
+.sig2-detail{white-space:pre-wrap;overflow-wrap:anywhere;font:var(--t-4)/1.6 var(--mono);max-width:68ch}
+.sig2-journal{padding-left:var(--s-5);max-width:68ch}
+.sig2-journal li{padding:var(--s-2) 0;border-bottom:1px solid var(--line)}
+.sig2-journal time{display:block;font-size:var(--t-4);color:var(--muted);font-variant-numeric:tabular-nums}
+[data-density="compact"] .sig2-table th,[data-density="compact"] .sig2-table td{padding-block:var(--s-1)}
+@media(max-width:700px){.sig2-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.sig2-charts{grid-template-columns:minmax(0,1fr)}.sig2-example,.sig2-subscribe,.sig2-analytics{padding:var(--s-4)}.sig2-formrow{flex-direction:column}}

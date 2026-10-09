@@ -161,6 +161,7 @@
    * this exists. A feed added next year gets one line here and is covered
    * everywhere at once. */
   const FEED_NAMES = {
+    '/signal_trials.json': 'Trial publication',
     '/pulse.json': 'Market pulse', '/signal_v2.json': 'Plans',
     '/screen.json': 'Screen', '/screen-lite.json': 'Screen',
 
@@ -927,7 +928,44 @@
        throws, or never runs because the tab is hidden, the page is unchanged —
        which is the whole reason the widgets render their finished state. */
     try { runWidgets(main); } catch (e) { /* never break a page over an animation */ }
+    bindPublicationUI(main);
   };
+
+  function bindPublicationUI(scope) {
+    scope.querySelectorAll('[data-sig2-state]').forEach(b => b.addEventListener('click', () => {
+      const host = b.closest('[data-sig2-setups]');
+      host.querySelectorAll('[data-sig2-state]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      let shown = 0;
+      host.querySelectorAll('tbody tr').forEach(row => {
+        row.hidden = b.dataset.sig2State !== 'all' && row.dataset.state !== b.dataset.sig2State;
+        if (!row.hidden) shown++;
+      });
+      host.querySelector('.sig2-filterempty').hidden = shown > 0;
+    }));
+    scope.querySelectorAll('[data-sig2-subscribe]').forEach(form => {
+      const mounted = Date.now();
+      form.addEventListener('submit', async ev => {
+        ev.preventDefault();
+        if (!form.reportValidity()) return;
+        const button = form.querySelector('button'), status = form.querySelector('[role="status"]');
+        if (button.disabled) return;
+        const elapsed = (Date.now() - mounted) / 1000;
+        if (elapsed < 2) { status.textContent = 'Please review your address, then subscribe.'; return; }
+        button.disabled = true; status.textContent = 'Sending your confirmation request…';
+        try {
+          const response = await fetch('/api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ email: form.elements.email.value.trim(), company: form.elements.company.value,
+              source: form.dataset.source, elapsed }) });
+          const data = await response.json();
+          if (!response.ok || data.ok !== true) throw new Error(data.error || 'The subscription service did not accept the request.');
+          status.textContent = window.SignalUI.subscriptionMessage(data);
+        } catch (e) {
+          status.textContent = 'Could not verify your request. ' + (e.message || 'Check your connection.') + ' No automatic retry was made.';
+        } finally { button.disabled = false; }
+      });
+    });
+  }
+  bindPublicationUI(main);
 
   // A mono eyebrow, a serif headline, one line of standfirst — the brief's
   // masthead rhythm, now the rhythm of every route. `eyebrow` defaults to the
@@ -1184,7 +1222,7 @@
       ? at.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) + ' IST'
       : null;
     return `<div class="integ" role="group" aria-label="Signal integrity">
-      <div class="integ-h"><b>Signal integrity</b><span>${LR.live === false ? 'build-time snapshot' : 'live ledger'}</span></div>
+      <div class="integ-h"><b>Signal integrity</b><span>${LR.live === false ? 'last published record' : 'current ledger'}</span></div>
       <div class="integ-r">
         <div class="integ-c tot"><b>${LR.published}</b><em>in the book</em></div>
         <i class="integ-eq" aria-hidden="true">=</i>
@@ -1551,7 +1589,7 @@
     const cls = series[n - 1] > series[0] ? 'up' : series[n - 1] < series[0] ? 'dn' : '';
     return `<svg class="spark ${cls}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
       aria-hidden="true" focusable="false"><path class="fill" d="${d} L${W} ${H} L0 ${H} Z"/>
-      <path class="ln" d="${d}"/></svg>`;
+      <path class="ln" pathLength="100" d="${d}"/></svg>`;
   };
 
   /* ── 52-WEEK RANGE BAR ───────────────────────────────────────────────────
@@ -1612,7 +1650,7 @@
      * is real and is applied two lines below, the composite's weights are
      * published in the payload, and a verdict carries its own reason string. */
     score: ['Composite score', 'A weighted blend of four separately-computed scores, quality, growth, valuation and technical. The weights are published with the payload rather than hidden here. Missing data scores nothing and leaves the denominator: a company that reports less gets a lower confidence, never a higher score. It is a MODEL, not a measurement.'],
-    call: ['The call', 'A rule applied to the screen\u2019s own numbers at build time, not a forecast and not advice. Each carries the reason it was reached. It is stamped when the screen is built, if the stop has since been breached the setup is void and the card says so, because the facts moved and the verdict did not.'],
+    call: ['The call', 'A rule applied to the screen\u2019s own numbers at the last scan. Each carries the reason it was reached. If the stop has since been breached the setup is void and the card says so, because the facts moved and the verdict did not.'],
     risk: ['Risk flags', 'Conditions the screen found in the filings that argue against the name, cash not matching profit, leverage, dilution. They are reasons for caution that the score already carries; the flags are the working, not a second opinion. Open the company to read them in full.'],
     range52: ['52-week range', 'Where the current price sits between the lowest and highest price of the past year. 0% is the year’s low, 100% its high.'],
     session: ['Session', 'Whether the exchange is inside its regular trading hours right now, taken from the exchange’s own published session window, not from this page’s refresh.'],
@@ -1663,7 +1701,7 @@
     tipOwner = b;
     tipOpenedAt = Date.now();
     b.setAttribute('aria-expanded', 'true');
-    tipCard.innerHTML = `<b>${esc(t[0])}</b>${esc(t[1])}`;
+    tipCard.innerHTML = `<b>${esc(t[0])}</b> ${esc(t[1])}`;
     // Inside the brief the ground is near-black, so the card inverts there.
     tipCard.classList.add('on');
 
@@ -2072,7 +2110,7 @@
   };
   const engineTallyNote = () => {
     const t = engineTally();
-    return `<b>${t.names} engine${t.names === 1 ? '' : 's'} publish here</b>${t.bands}.`
+    return `<b>${t.names} engine${t.names === 1 ? '' : 's'} publish here</b> ${t.bands}.`
       + (t.research
          ? ` A further <b>${t.research}</b> are measured but <b>not cleared to publish</b> —
             they sit on <a href="/research">the research floor</a> with the null results that
@@ -2280,6 +2318,9 @@
     ev.stopPropagation();                 // never open the card behind the star
     ev.preventDefault();
     const on = toggleWatch(b.dataset.watch);
+    b.classList.remove('pop');
+    void b.offsetWidth;
+    b.classList.add('pop');
     /* Said once, briefly: the star changes in place, but a reader on a long
        list cannot see the Watchlist it went to. */
     toast(on ? `${b.dataset.watch} added to your watchlist` : `${b.dataset.watch} removed from your watchlist`,
@@ -2938,8 +2979,8 @@
           * invented in the browser is the made-up figure this site refuses
           * elsewhere; a score that quietly keeps reading as current is the
           * fault directly above. So it keeps its number and says when. */''}
-      <span class="pill pill-ac" title="Composite score${voided ? ', measured at the build price' : ''}">${
-        Math.round(Number(p.score))}/100${voided ? ' <i>at build</i>' : ''}</span>
+      <span class="pill pill-ac" title="Composite score${voided ? ', measured at the last scan price' : ''}">${
+        Math.round(Number(p.score))}/100${voided ? ' <i>at last scan</i>' : ''}</span>
       ${p.rr ? `<span class="pill ${voided ? '' : 'pill-up'}" title="Reward to risk, entry to the second target${
         voided ? ', measured before the stop was broken'
                : ''}">${esc(p.rr)}:1</span>` : ''}
@@ -3143,7 +3184,7 @@
          * What is per-card is WHICH SOURCE the card used, and that is all
          * this now says. The timestamp it refers to is stated once, below. */
         : (IPO_AGE_H != null ? `<span class="subs-age${IPO_AGE_H > 6 ? ' is-old' : ''}"
-            title="From the morning build, as at ${esc(IPO_STAMP)}">Morning build</span>` : '')}
+            title="From the morning publication, as at ${esc(IPO_STAMP)}">Morning publication</span>` : '')}
       ${cats.length ? `<span class="subs-cat">${cats.slice(0, 4).map(c =>
           `<i><u>${esc(c.cat)}</u><b>${Number(c.x).toFixed(2)}×</b></i>`).join('')}</span>` : ''}`;
   };
@@ -3166,7 +3207,7 @@
        whatever the age, because a card saying "Morning build" has to be able
        to tell you WHICH morning; the staleness warning is the part that is
        conditional on the figure actually being old. */
-    return `<p class="hint">Figures marked <b>Morning build</b> are as at
+    return `<p class="hint">Figures marked <b>Morning publication</b> are as at
        <b>${esc(IPO_STAMP)}</b>${IPO_AGE_H > 6 ? `, <b>${esc(ageWord(IPO_AGE_H))}</b>` : ''},
        not read from NSE just now.${IPO_AGE_H > 6
          ? ' A book moves fastest on its last day, so treat a subscription figure that old as a'
@@ -3224,8 +3265,8 @@
         <div class="sec-h"><h2>${hosts.length ? 'Also open on NSE' : 'Open on NSE'}</h2>
           <span class="sec-n">${missing.length} not in the screen</span></div>
         <p class="sec-lead">${hosts.length
-          ? "Books NSE lists as active that this morning's build did not carry."
-          : "Read live from NSE. The build that carries bands, lots and verdicts has not run since these opened."}</p>
+          ? "Books NSE lists as active that this morning's publication did not carry."
+          : "Read from NSE. The publication carrying bands, lots and research notes has not updated since these opened."}</p>
         <div class="rank">${missing.map(x => `<div class="rank-r xtra">
           <span class="s"><b>${esc(x.symbol)}</b><span>${esc(x.company || '')}</span></span>
           ${/* Number(null) is 0, not NaN, so an unpublished book rendered as
@@ -5813,7 +5854,7 @@
   };
   const STOP_VOID_WHY = (live, stop) =>
     `The published stop ${price(stop)} was broken at ${price(live)}. The call, `
-    + `the score and the reward-to-risk beside it were measured at the build `
+    + `the score and the reward-to-risk beside it were measured at the last scan `
     + `price, before this. A new setup needs a new level, not this one again.`;
 
   const verdictBlock = r => {
@@ -7134,14 +7175,14 @@
           <i style="width:${(strain * 100).toFixed(0)}%"></i>
         </div>
         <div class="ag-m">
-          <span><b>${floor}R</b>a setup must earn</span>
-          <span><b>${win == null ? '—' : win + '%'}</b>win rate that set it</span>
+          <span><b>${floor}R</b> a setup must earn</span>
+          <span><b>${win == null ? '—' : win + '%'}</b> win rate that set it</span>
           ${/* NOT "closed". This is engines.json's sample — 107 trades for
               * BREACH — which is the history the floor was computed from, and
               * it stretches back long before this site's record began. Calling
               * it "closed" put a four-figure-old number under a card on a page
               * whose every other count starts at LAUNCH. */''}
-          <span><b>${trades}</b>trades behind it</span>
+          <span><b>${trades}</b> trades behind it</span>
         </div>
         <footer class="ag-f">
           <span>${esc(meta.tf)}</span>
@@ -8071,83 +8112,7 @@
    * this project is at Vercel's twelve-function cap — see the note in
    * api/signals.js. That is a decision to take deliberately, not a box to draw.
    */
-  const MOUNTED_AT = Date.now();
-  R['/join'] = async () => {
-    paint(`<div class="join">
-      <div class="join-l">
-        <h1>Join the morning list.</h1>
-        <p class="join-sub">The daily email is <b>not being sent yet</b>. Leave your address and
-          you will get the first one when it starts: what moved, the sector heat, the books open
-          that day and the names the engine put up, with the levels it put them up at.
-          Until then, <a href="/brief">today’s brief</a> is here every morning.</p>
-        <ul class="join-ul">
-          <li><b>Free.</b> No card, no trial that expires into a charge.</li>
-            <li><b>The record is public.</b> Every signal is scored when it closes, losers
-            included, which is the point of publishing it.</li>
-          <li><b>One email a day, once it starts.</b> Unsubscribe in one click, and the list
-            is a table we own rather than a mailing vendor's.</li>
-        </ul>
-      </div>
-      <div class="join-r">
-        <form id="joinF" novalidate>
-          <label for="joinE">Email address</label>
-          <input id="joinE" name="email" type="email" inputmode="email" autocomplete="email"
-                 placeholder="you@example.com" required>
-          <!-- Bots fill this. Humans never see it. -->
-          <div class="hp" aria-hidden="true">
-            <label for="joinW">Website</label>
-            <input id="joinW" name="website" type="text" tabindex="-1" autocomplete="off">
-          </div>
-          <button type="submit" class="btn-primary" id="joinB">Join the list</button>
-          <p class="join-note" id="joinM">Nothing is sent until the daily email starts. Then one a day, nothing else.</p>
-        </form>
-      </div>
-    </div>`);
-
-    const f = document.getElementById('joinF');
-    f.addEventListener('submit', async ev => {
-      ev.preventDefault();
-      const btn = document.getElementById('joinB');
-      const msg = document.getElementById('joinM');
-      const email = document.getElementById('joinE').value.trim();
-      // Validate here as well as on the server: a round trip to be told the
-      // address has no @ in it is a round trip wasted.
-      if (!/^[^@\s]+@[^@\s.]+\.[^@\s]{2,}$/.test(email)) {
-        msg.className = 'join-note bad';
-        msg.textContent = 'That address does not look right, check for a typo.';
-        return;
-      }
-      btn.disabled = true; btn.textContent = 'Sending…';
-      msg.className = 'join-note'; msg.textContent = 'One moment.';
-      try {
-        const r = await fetch('/api/subscribe', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email, website: document.getElementById('joinW').value,
-            elapsed: Date.now() - MOUNTED_AT,
-          }),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (r.ok && j.ok !== false) {
-          /* THE RECEIPT SAYS WHAT HAPPENS NEXT, AND NOTHING THAT WILL NOT.
-             It promised "the next brief goes out before tomorrow's open"; no
-             job sends it yet (the list is exported, not mailed), so a reader
-             was told to watch for an email that was never coming. */
-          f.innerHTML = `<div class="join-ok" role="status"><b>You are on the list.</b>
-            Nothing will be sent until the daily email starts; the first one will say so.
-            Until then, <a href="/brief">today's brief</a> is on this site every morning.</div>`;
-        } else {
-          msg.className = 'join-note bad';
-          msg.textContent = j.error || 'That did not go through. Try again in a moment.';
-          btn.disabled = false; btn.textContent = 'Join the list';
-        }
-      } catch (e) {
-        msg.className = 'join-note bad';
-        msg.textContent = 'No connection. Your address was not sent, try again.';
-        btn.disabled = false; btn.textContent = 'Join the list';
-      }
-    });
-  };
+  // /join uses the same evening subscription form as Today and plan pages.
 
   /* ══════════════════════════════════════════════════════════════════════
    * THE TRADING SIGNAL BRIEF
@@ -8861,7 +8826,7 @@
               <em style="font-style:normal;color:var(--dim);font-size:var(--t-3)">${esc(x.url || 'not fetched by this bar')}</em></span>
             <span class="p">${x.ts
               ? esc(isDateOnly(x.ts) ? String(x.ts) + ' (date only)' : String(x.ts).slice(0, 16).replace('T', ' '))
-              : '—'}${x.inherited ? '<br><em style="font-style:normal;color:var(--dim);font-size:var(--t-2)">from the edition build</em>' : ''}</span>
+              : '—'}${x.inherited ? '<br><em style="font-style:normal;color:var(--dim);font-size:var(--t-2)">from the edition publication</em>' : ''}</span>
             <span class="c ${x.h == null ? '' : x.h <= (x.maxH || 26) ? 'up' : 'dn'}">${
               /* "did not load" is a FAILURE and a passive row is not one — it
                  is a feed this page had no reason to download. Printing the
@@ -9393,6 +9358,7 @@
   };
 
   R['/news'] = async () => {
+    paint(head('The wire', '', 'Every story') + skel('sk-row', 6), true);
     const [n, sc, pu, ed, lw] = await Promise.all(
       [get('/news.json'), getScreen(false).then(g => g.r), get('/pulse.json'), get('/edition.json'),
        get('/api/wire')]);
@@ -10011,7 +9977,7 @@
       sec('Top signals', `<div class="rd-feed">${nodes.map((n, i) => radarRow(n, i)).join('')}</div>`,
           `${nodes.length} shown`) +
       `<p class="hint rd-foot"><b>Prices are live; the score is not.</b> The four components
-        are computed from the screen's daily build${SCREEN_DATE ? `, priced ${esc(SCREEN_DATE)}` : ''},
+        are measured in the daily screen${SCREEN_DATE ? `, priced ${esc(SCREEN_DATE)}` : ''},
         so a name that moved sharply today is still scored on where it stood then,
         <span id="rdLive">prices updating…</span>.
         <br><b>The score is a model, not a measurement.</b> It weights
@@ -10532,7 +10498,7 @@
                 }
               }
               const sw = el.querySelector('.rd-sc em');
-              if (sw && hit) sw.textContent = 'at build';
+              if (sw && hit) sw.textContent = 'at last scan';
             }
           }
         });
@@ -11026,8 +10992,8 @@
 
     const band = ([name, items]) => {
       const ix = byName(HEAT_IDX[name] || '');
-      items.sort((a, b) => (b.h ? b.h.k : 0) - (a.h ? a.h.k : 0)
-                        || Math.abs(b.change_pct) - Math.abs(a.change_pct));
+      items.sort((a, b) => Math.abs(b.change_pct) - Math.abs(a.change_pct)
+                        || (b.h ? b.h.k : 0) - (a.h ? a.h.k : 0));
       const secUp = items.filter(x => x.change_pct > 0).length;
       return `<section class="hband">
         <div class="hb-h">
@@ -12503,6 +12469,18 @@
   };
   const v2PlanUrl = (p) => '/plan/' + encodeURIComponent(p.id);
   const v2Vision = (sym) => VISION_URL + '/company/' + encodeURIComponent(sym);
+  function publicationArticle(p, d) {
+    const tag = document.createElement('script');
+    tag.id = 'ld-publication'; tag.type = 'application/ld+json';
+    const canonical = 'https://signal.askakshay.com' + location.pathname;
+    tag.textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'Article',
+      '@id': canonical + '#article', headline: p ? p.symbol + ': conditional paper plan' : 'Signal paper plans for ' + (d.next_session || d.session_date),
+      datePublished: p ? p.published_at : d.published_at, dateModified: d.published_at,
+      author: { '@id': 'https://signal.askakshay.com/#akshay' }, publisher: { '@id': 'https://signal.askakshay.com/#akshay' },
+      mainEntityOfPage: canonical, inLanguage: 'en-IN' });
+    const previous = document.getElementById(tag.id); if (previous) previous.remove();
+    document.head.appendChild(tag);
+  }
 
   let V2 = null;
   async function v2Load() {
@@ -12515,8 +12493,8 @@
       V2 = null;
       return { ok: false, why: r.ok ? 'the plan feed is in an unknown format' : (r.error || 'no answer') };
     }
-    V2 = r.data;
-    return { ok: true, d: r.data, stale: r.stale, age: r.age };
+    V2 = { ...r.data, status_detail: window.SignalUI ? window.SignalUI.publicCopy(r.data.status_detail) : r.data.status_detail };
+    return { ok: true, d: V2, stale: r.stale, age: r.age };
   }
   /* The Technical Confluence reads (technical_read.json): one stock's
      five-part chart read as the engine computed it after the close. Loaded
@@ -12568,7 +12546,8 @@
   };
   const v2Paper = (d, opts) => {
     if (!window.V2W || !window.V2W.paper) return '';
-    const html = window.V2W.paper(d, { stockHref: (s) => '/stock/' + encodeURIComponent(s), isNew: isNewSetup, ...opts });
+    const html = window.V2W.paper(d, { stockHref: (s) => '/stock/' + encodeURIComponent(s), isNew: isNewSetup,
+      table: routeOf() === '/opportunities', ...opts });
     noteSetups(d);
     return html;
   };
@@ -12644,7 +12623,7 @@
     const cand = (P.plans || []).filter(p => p.state === 'awaiting_entry' || (p.fill_price != null && !p.ended_session)).length;
     const title = d.status === 'paused' ? `No plan published for the ${v2Date(d.next_session)} session` : v2NoneWhy(d);
     const why = d.status === 'paused'
-      ? 'The publication gate is closed: no engine has yet passed its promotion criteria on forward data, so nothing enters the record.'
+      ? 'Trial engines must earn their place with real forward results before their plans count. See Methodology.'
       : (d.status_detail || '');
     return `<section class="v2-gate" aria-labelledby="v2GateH" role="status">
       <div class="v2-gate-h"><span class="v2-gate-i" aria-hidden="true"></span>
@@ -12699,7 +12678,7 @@
     const sr = nx && nx.ok ? nx.data : null, pd = pu && pu.ok ? pu.data : null;
     const br = pd && pd.breadth;
     const week = br && br.counted
-      ? `<p class="v2-mline"><b class="cnum">${br.up}</b> of <b class="cnum">${br.counted}</b> screened names rose this week${pd.built_on ? ` (built ${esc(v2Date(pd.built_on))})` : ''}.`
+      ? `<p class="v2-mline"><b class="cnum">${br.up}</b> of <b class="cnum">${br.counted}</b> screened names rose this week${pd.built_on ? ` (updated ${esc(v2Date(pd.built_on))})` : ''}.`
         + ` <a href="/markets">Charts on Market →</a> <a href="/map">Every sector on the map →</a></p>`
       : `<p class="v2-mline">This week's breadth did not load. <a href="/markets">Charts on Market →</a></p>`;
     const why = (x) => (x && (x.error || x.why)) || 'no answer';
@@ -12779,7 +12758,7 @@
   // ── TODAY ─────────────────────────────────────────────────────────────
   R['/'] = async () => {
     const H = 'Indian equities, screened after the close.';
-    const S = 'Review qualified setups, plan the next session, and track every paper trade.';
+    const S = 'Conditional paper plans for the next session, and a forward record that counts every one.';
     /* One line, not two at 48px: the headline is the brand line, not the content. */
     /* NO EYEBROW. "Today" sat above a headline that already says what the
        page is; nineteen small-caps labels on one page was the loudest
@@ -12842,6 +12821,7 @@
          hero's own column: it is the "what is new" half of the same answer. */
       `<div class="home-hero${heroIn ? ' is-in' : ''}">${hh(decision + (window.V2W && window.V2W.changes ? `<div class="home-chg">${window.V2W.changes(d, { href: setupHref, flat: true })}</div>` : ''))}${v2StatusStrip(d, reg)}</div>` +
       (r.stale ? staleNote(r.age) : '') +
+      (window.SignalUI ? window.SignalUI.example(d) + window.SignalUI.statsStrip(d) : '') +
       vsec(`Plans for ${v2Date(d.next_session)}`, next.length ? `<div class="v2-cards">${next.map(p => v2Card(p, d)).join('')}</div>`
         : noPlans, String(next.length), null, { lead: true }) +
       /* A DIGEST, NOT A COPY. The front page listed the same twelve full cards
@@ -12857,7 +12837,7 @@
       `</div>` +
       v2MarketLine(nx, pu, d, ctx) +
       vsec('Record', v2Record(d, true) + `<p><a href="/performance">Full record →</a></p>`) +
-      `<p class="v2-note">${esc(d.notice || '')}</p></div>`);
+      (window.SignalUI ? window.SignalUI.subscribe('world') : '') + `</div>`);
     /* The digest's State column becomes the entry check once quotes arrive:
        "Inside the buy range", "Above the most to pay", and so on. */
     const live = ((d.paper || {}).plans || []).filter(p => p.state === 'awaiting_entry' || p.fill_price != null);
@@ -12910,13 +12890,13 @@
     const nse = exchangeState('Asia/Kolkata', 9.25, 15.5, 'NSE');
     const statusLine = `<p class="v2-sline">Scan of the <b>${v2Date(d.session_date)}</b> close · next scan ${v2Date(d.next_session)}, after the close · NSE ${nse.open ? 'open' : 'closed'} · prices delayed</p>`;
     paint(head(T, S, 'Signal') + statusLine +
-      vsec('Eligible next session', eligible.length ? cards(eligible)
+      vsec('Eligible next session', eligible.length ? `<p>${eligible.length} main plan${eligible.length === 1 ? '' : 's'} eligible. Every level is in the main table below.</p>`
         : `<p class="v2-none"><b>Nothing is eligible for the next session.</b> ${esc(d.status_detail || '')}</p>`,
         String(eligible.length), null, { lead: true }) +
       v2Paper(d, { cardHref: setupHref, flat: true }) +
-      vsec('Every plan by state', tally + states.filter(([, list]) => list.length)
-        .map(([l, list]) => `<h3 class="v2-st-h">${esc(l)} <span>${list.length}</span></h3>${cards(list)}`).join('')) +
-      `<p class="v2-note">Candidates that failed a rule are not published, and neither are their reasons: the rules stay private. ${esc(d.notice || '')}</p>`);
+      vsec('Every main plan by state', window.SignalUI ? window.SignalUI.setups(plans, 'main') : tally) +
+      `<p><a href="/pulse">Pulse trial →</a> · <a href="/compass">Compass trial →</a></p>` +
+      (window.SignalUI ? window.SignalUI.subscribe('world') : ''));
     /* Arriving from a digest row on the front page: land on that setup's card. */
     const tgt = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
     if (tgt) requestAnimationFrame(() => tgt.scrollIntoView({ block: 'center', behavior: REDUCED ? 'auto' : 'smooth' }));
@@ -12998,7 +12978,8 @@
       vsec('Company research', `<p><a href="${v2Vision(p.symbol)}">Why this company? ${esc(p.symbol)} in Vision ↗</a> · <a href="/stock/${encodeURIComponent(p.symbol)}">Screen card</a></p>
         <p class="muted">The research below describes the company. It is not part of the plan's rules and does not change its levels.</p>
         ${fund}`) +
-      `<p class="v2-note">${esc(d.notice || '')}</p>`);
+      (window.SignalUI ? window.SignalUI.subscribe('world') : ''));
+    publicationArticle(p, d);
   };
 
   /* ── THE ENTRY CHECK ───────────────────────────────────────────────────
@@ -13040,7 +13021,8 @@
         v2Shell(t.symbol, `Paper setup · ${nm0[t.engine] || t.engine} · finished ${v2Date(t.ended_session || t.filed_session)}`,
           window.V2W.replay(t, rec, { noSymbol: true }) +
           `<p class="v2-pp-links"><a href="${VISION_URL}/#/brief/${encodeURIComponent(t.symbol)}">Read the company context in Vision ↗</a>
-            · <a href="/stock/${encodeURIComponent(t.symbol)}">Screen card</a> · <a href="/performance#finished">Every finished setup</a></p>`);
+            · <a href="/stock/${encodeURIComponent(t.symbol)}">Screen card</a> · <a href="/performance#finished">Every finished setup</a></p>` +
+            (window.SignalUI ? window.SignalUI.subscribe('world') : ''));
         return;
       }
     }
@@ -13054,7 +13036,8 @@
     v2Shell(p.symbol, `Paper setup · ${nm[p.engine] || p.engine} · for the ${v2Date(p.for_session)} session`,
       window.V2W.passport(p, d, { noSymbol: true }) +
       `<p class="v2-pp-links"><a href="${VISION_URL}/#/brief/${encodeURIComponent(p.symbol)}">Why this company? ${esc(p.symbol)} in Vision: chart, technical read and the business ↗</a>
-        · <a href="/stock/${encodeURIComponent(p.symbol)}">Screen card</a> · <a href="/opportunities">Every setup</a></p>`);
+        · <a href="/stock/${encodeURIComponent(p.symbol)}">Screen card</a> · <a href="/opportunities">Every setup</a></p>` +
+        (window.SignalUI ? window.SignalUI.subscribe('world') : ''));
     const e = (await paperEntry([p]))[p.id];
     const slot = document.querySelector('[data-v2w-entry]');
     if (slot && e && routeOf() === '/setup/:id') slot.innerHTML = window.V2W.entryHtml(e);
@@ -13073,6 +13056,7 @@
     const c = d.costs || {};
     paint(head(T, S, 'Signal') +
       vsec('The record', v2Record(d, false), null, null, { lead: true }) +
+      (window.SignalUI ? window.SignalUI.analytics(window.SignalAnalytics.main(d)) : '') +
       v2Widgets(d, 'perf', 'calendar') +
       vsec('Closed trades', closed.length ? `<table class="v2-tbl"><thead><tr><th scope="col">Symbol</th><th scope="col" class="hm">Signal</th><th scope="col" class="hm">Fill</th><th scope="col" class="hm">Exit</th><th scope="col">Outcome</th><th scope="col">Net R</th><th scope="col">Net ₹</th></tr></thead><tbody>${rows}</tbody></table>`
         : `<p class="muted">No trade has closed. A win rate needs closed trades, so none is shown.</p>`, String(closed.length)) +
@@ -13096,6 +13080,30 @@
   };
 
   // ── OLD ADDRESSES ─────────────────────────────────────────────────────
+  // Separate trial publication; unrelated to the market-data pulse.json.
+  const TRIAL_URL = '/signal_trials.json';
+  async function trialPage(engine) {
+      const title = engine === 'pulse' ? 'Pulse' : 'Compass';
+      paint(head(title, 'Forward paper trial · excluded from the main record.', 'Signal') + skel('sk-card', 2), true);
+      const result = await get(TRIAL_URL);
+      if (routeOf() !== '/' + engine) return;
+      paint(head(title, 'Forward paper trial · excluded from the main record.', 'Signal') +
+        (result.ok && window.SignalUI ? (result.stale ? staleNote(result.age) : '') + window.SignalUI.trials(result.data, engine)
+          : fail('The trial publication', result.error || 'the renderer did not load')));
+  }
+  R['/pulse'] = async () => trialPage('pulse');
+  R['/compass'] = async () => trialPage('compass');
+  R['/digests'] = async () => {
+    const title = head('Past editions', 'Completed-session paper research, preserved as published.', 'Signal');
+    paint(title + skel('sk-card', 2), true);
+    const result = await get('/digests/index.json');
+    if (routeOf() !== '/digests') return;
+    paint(title + (result.ok && window.SignalUI
+      ? (result.stale ? staleNote(result.age) : '') + window.SignalUI.digests(result.data)
+      : fail('The digest archive index', result.error || 'the renderer did not load')));
+  };
+  R['/join'] = async () => paint(head('The evening desk', 'Subscribe to the daily publication.', 'Signal') + window.SignalUI.subscribe('world'));
+
   /* Pages from before the 1 Oct 2026 start. The Worker answers them with a
      301 to the page that replaced them; these cover an in-app navigation. */
   const moved = (to) => async () => go(to, { replace: true });
@@ -13139,7 +13147,9 @@
         <div class="v2-brief-b"><div id="bRead">${skel('sk-card', 1)}</div></div>
       </div>
       <div id="bBiz" class="v2-brief-biz">${skel('sk-card', 1)}</div>
-      <p class="v2-pp-links"><a href="${setupHref(p)}">This setup on its own page</a> · <a href="${VISION_URL}/#/brief/${encodeURIComponent(p.symbol)}">Why this company? ${esc(p.symbol)} in Vision ↗</a> · <a href="/opportunities">Every setup</a></p>`);
+      <p class="v2-pp-links"><a href="${setupHref(p)}">This setup on its own page</a> · <a href="${VISION_URL}/#/brief/${encodeURIComponent(p.symbol)}">Why this company? ${esc(p.symbol)} in Vision ↗</a> · <a href="/opportunities">Every setup</a></p>` +
+      (window.SignalUI ? window.SignalUI.subscribe('world') : ''));
+    publicationArticle(null, d);
     const here = () => routeOf() === '/brief';
     /* Each part arrives on its own; a slow one never holds the others. */
     paperEntry(live).then(chk => {
@@ -13258,8 +13268,11 @@
    * the shell shipped with. scripts/prerender.mjs writes the shell's copy, and
    * the per-route prerender is the remaining half of that job. */
   const META = {
-    '/':            ['Signal, Indian equities, screened after the close',
-                     'Review qualified setups, plan the next session, and track every paper trade. NSE equities, long only, with a forward record that starts empty.'],
+    '/':            ['Signal by Akshay Kothari: NSE paper plans and a forward record',
+                      'Indian equities, screened after the close. Conditional paper plans for the next session, and a forward record that counts every one.'],
+    '/pulse':       ['Pulse swing trial · Signal by Akshay Kothari', 'Conditional swing paper plans, publication gate, net trial results and an append-only journal. Excluded from the main forward record.'],
+    '/compass':     ['Compass position trial · Signal by Akshay Kothari', 'Thesis-driven position paper plans, tranche rules and a forward journal. Excluded from the main forward record.'],
+    '/digests':     ['Past editions · Signal by Akshay Kothari', 'Completed-session paper digests preserved as published. Main forward plans and unpromoted trials remain separate.'],
     '/opportunities': ['Setups, every paper setup and plan by state',
                      'Next-session plans for NSE equities, grouped as eligible, extended, active, closed and expired, each with its entry range, stop and three targets.'],
     '/performance': ['Record, the Signal forward record',
@@ -13317,7 +13330,7 @@
                      'The feed behind every figure on this site, and how fresh each one is.'],
     '/terms':       ['Terms', 'Terms of use for signal.askakshay.com.'],
     '/privacy':     ['Privacy', 'What this site stores, and what it does not.'],
-    '/join':        ['The morning list', 'Join the list for the daily email. It is not being sent yet; the brief is on the site every morning.'],
+    '/join':        ['The evening desk · Signal by Akshay Kothari', 'One email each evening: tomorrow’s paper plans, the desk’s reasoning and the record’s numbers. Confirm your address before delivery.'],
     /* THESE THREE HAD NO ROW, so each fell through to META['/'] and told a
        crawler, a link preview and the tab bar that it was the front page —
        same title, same description, same canonical. An external audit read it
@@ -13333,6 +13346,9 @@
   };
   const ORIGIN = 'https://signal.askakshay.com';
   const setHead = (route) => {
+    // Server Article data belongs to the URL that was requested. A client
+    // navigation must not carry that plan's schema onto another page.
+    for (const id of ['ld-edge', 'ld-publication']) { const old = document.getElementById(id); if (old) old.remove(); }
     const [title, desc] = META[route] || META['/'];
     const url = ORIGIN + (location.pathname === '/' ? '/' : location.pathname);
     document.title = title;
@@ -13404,7 +13420,7 @@
   /* The route's own name, shown beside the brand. Empty on Today, because a
    * breadcrumb reading "Today" while you are looking at Today is noise. */
   const WHERE = { '/': '', '/markets': 'Market', '/ipo': 'IPO',
-                  '/opportunities': 'Setups', '/performance': 'Record', '/plan/:id': 'Plan', '/setup/:id': 'Setup',
+                   '/opportunities': 'Setups', '/performance': 'Record', '/plan/:id': 'Plan', '/setup/:id': 'Setup', '/pulse': 'Pulse trial', '/compass': 'Compass trial',
                   '/screen': 'Screen', '/brief': 'Brief', '/watch': 'Watchlist', '/alerts': 'Alerts', '/magic': 'Magic Formula', '/vetted': 'Vetted',
                   '/radar': 'Market · Radar', '/discover': 'All tools',
                   '/map': 'Market · Map', '/reads': 'Weekly reads', '/heat': 'Market · Heatmap',
@@ -14301,6 +14317,22 @@
 
   /* ── edition stamp and data health ─────────────────────────────────────── */
   paintFreshness();
+  // Decoration is independent of the route: an absent/unknown regime leaves
+  // the page alone, and a failed tint must never hold up the first render.
+  (async () => {
+    try {
+      const amb = document.createElement('div');
+      amb.className = 'amb';
+      amb.setAttribute('aria-hidden', 'true');
+      document.body.prepend(amb);
+      const r = await get('/regime.json');
+      const regime = r.ok && r.data && r.data.today && r.data.today.regime;
+      if (typeof regime === 'string' && /^[a-z_]{3,20}$/.test(regime)
+          && ['calm_trend', 'calm_range', 'highvol_trend', 'highvol_mr', 'crisis'].includes(regime)) {
+        document.documentElement.dataset.regime = regime;
+      }
+    } catch (e) { /* atmosphere is optional */ }
+  })();
   get('/edition.json').then(r => {
     if (r.ok && r.data && r.data.build_date) {
       EDITION_DAY = String(r.data.build_date).slice(0, 10);

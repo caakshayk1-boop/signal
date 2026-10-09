@@ -426,7 +426,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
         <div class="v2w-k"><span>From the high</span><b>${pct(dd.current_pct)}</b><em>${dd.sessions_since_peak ? esc(dd.sessions_since_peak) + ' session' + (dd.sessions_since_peak === 1 ? '' : 's') + ' since the peak' : 'at the high'}</em></div>
       </div>
       ${chart(h, bname)}
-      <p class="v2w-note">${esc(h.basis || '')} Paper results from simulated fills; no order is placed. Not a forecast.</p>
+      <p class="v2w-note">${esc(h.basis || '')}</p>
       <p class="v2w-more"><a href="${esc(more)}">Every trade behind these figures →</a></p></section>`;
   }
 
@@ -483,7 +483,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     cross.style.display = 'block'; cross.style.left = px + 'px';
     dn.style.display = p[1] == null ? 'none' : 'block'; if (p[1] != null) { dn.style.left = px + 'px'; dn.style.top = py(p[1]) + 'px'; }
     db.style.display = p[2] == null ? 'none' : 'block'; if (p[2] != null) { db.style.left = px + 'px'; db.style.top = py(p[2]) + 'px'; }
-    tip.innerHTML = `<b>${esc(day(p[0]))}</b>Paper NAV ${p[1] == null ? 'not recorded' : esc(p[1].toFixed(2)) + (p[3] != null ? ` · ${esc(inr(p[3]))}` : '')}<br>${esc(D.bname)} ${p[2] == null ? 'not recorded' : esc(p[2].toFixed(2)) + (p[4] != null ? ` · ${esc(Number(p[4]).toLocaleString('en-IN'))}` : '')}`;
+    tip.innerHTML = `<b>${esc(day(p[0]))}</b> Paper NAV ${p[1] == null ? 'not recorded' : esc(p[1].toFixed(2)) + (p[3] != null ? ` · ${esc(inr(p[3]))}` : '')}<br>${esc(D.bname)} ${p[2] == null ? 'not recorded' : esc(p[2].toFixed(2)) + (p[4] != null ? ` · ${esc(Number(p[4]).toLocaleString('en-IN'))}` : '')}`;
     tip.style.display = 'block';
     const tw = tip.offsetWidth;
     tip.style.left = Math.min(Math.max(0, px + 12), r.width - tw) + 'px';
@@ -708,7 +708,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     const cross = el.querySelector('.v2w-cross'), tip = el.querySelector('.v2w-tip');
     cross.style.display = 'block'; cross.style.left = x + 'px';
     const dchg = prev ? 100 * (p[1] / prev[1] - 1) : null;
-    tip.innerHTML = `<b>${esc(day(p[0]))}</b>Close ${esc(num2(p[1]))}${dchg != null ? ` · ${esc(sgn(dchg, 2))} on the day` : ''}<br>${p[2] < 0 ? esc(sgn(p[2])) + ' below its high so far' : 'At a new high'}`;
+    tip.innerHTML = `<b>${esc(day(p[0]))}</b> Close ${esc(num2(p[1]))}${dchg != null ? ` · ${esc(sgn(dchg, 2))} on the day` : ''}<br>${p[2] < 0 ? esc(sgn(p[2])) + ' below its high so far' : 'At a new high'}`;
     tip.style.display = 'block';
     tip.style.left = Math.min(Math.max(0, x + 12), wr.width - tip.offsetWidth) + 'px';
   }
@@ -929,7 +929,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     const stock = opts.stockHref || ((s) => '#/' + encodeURIComponent(s));
     if (!P || !Array.isArray(P.engines)) {
       return `<section class="v2w${opts.flat ? ' v2w-flat' : ''}" id="paper" aria-label="${Q}"><h3>Paper test <span class="v2w-tag pp">paper</span></h3>
-        <p class="v2w-empty"><b>The paper test has not published yet.</b>Four engines (Technical Confluence, Failed Breakdown Reclaim,
+        <p class="v2w-empty"><b>The paper test has not published yet.</b> Four engines (Technical Confluence, Failed Breakdown Reclaim,
         Compression Release, Opening Demand) start recording after the next session's close. Nothing here is a plan until then.</p></section>`;
     }
     const names = Object.fromEntries(P.engines.map((e) => [e.id, e.name]));
@@ -1003,8 +1003,9 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     const digestHtml = `${nNew ? `<p class="v2w-newsum"><i class="v2w-new">New</i> ${nNew} of ${live.length} not here at your last visit.</p>` : ''}<div class="v2w-dg" role="list"><div class="v2w-dr v2w-dh" aria-hidden="true"><b>Name</b><span class="e">Engine</span>
         <span class="n">Buy between</span><span class="n">Stop · risk</span><span class="w">Window</span><span class="s">State</span></div>
         ${live.map(item).join('')}</div>`;
-    const liveHtml = live.length ? (opts.digest ? digestHtml : `<div class="v2w-pcs">${live.map(card).join('')}</div>`)
-      : `<p class="v2w-empty"><b>No paper setup is open or waiting.</b>The engines found nothing that met their rules on the ${esc(day(P.as_of))} close. They are not loosened to fill this space.</p>`;
+    const table = opts.table && window.SignalUI ? window.SignalUI.setups(P.plans, 'trial') : '';
+    const liveHtml = table || (live.length ? (opts.digest ? digestHtml : `<div class="v2w-pcs">${live.map(card).join('')}</div>`)
+      : `<p class="v2w-empty"><b>No paper setup is open or waiting.</b> The engines found nothing that met their rules on the ${esc(day(P.as_of))} close. They are not loosened to fill this space.</p>`);
     const doneHtml = done.length ? `<h4 class="v2w-h">Closed recently</h4><ul class="v2w-rl">${done.map((p) =>
       `<li><span><a class="sym" href="${esc(stock(p.symbol))}">${esc(p.symbol)}</a> · ${esc(names[p.engine] || '')} · ${esc(PSTATE[p.state] || p.state)}</span>
        <span class="r ${p.total_r > 0 ? 'up' : p.total_r < 0 ? 'dn' : ''}">${p.fill_price == null ? 'no fill' : rR(p.total_r)}</span></li>`).join('')}</ul>` : '';
@@ -1014,9 +1015,9 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
        <span class="r ${p.total_r > 0 ? 'up' : p.total_r < 0 ? 'dn' : ''}">${rR(p.total_r)}</span></li>`).join('')}</ul>` : '';
     return `<section class="v2w${opts.flat ? ' v2w-flat' : ''}" id="paper" aria-label="${Q}">
       <h3>${opts.title ? esc(opts.title) : 'Paper test: four engines, tracked forward'} <span class="v2w-tag pp">paper</span></h3>
-      <p class="v2w-per">As of the ${esc(day(P.as_of))} close · simulated fills · no order is placed · not the published record</p>
+      <p class="v2w-per">As of the ${esc(day(P.as_of))} close · trial cohort, not the published record</p>
       ${opts.compact ? '' : eng}
-      ${opts.compact ? '' : '<h4 class="v2w-h">Paper setups</h4>'}${liveHtml}${opts.compact ? '' : doneHtml + intraHtml}
+      ${opts.compact ? '' : '<h4 class="v2w-h">Paper setups</h4>'}${liveHtml}${opts.compact ? '' : (table ? '' : doneHtml) + intraHtml}
       ${opts.digest ? '' : `<p class="v2w-note">${esc(P.basis || '')}</p>`}
       ${opts.moreHref ? `<p class="v2w-more"><a href="${esc(opts.moreHref)}">${opts.digest ? 'Every setup with its sells and reason, and every engine →' : 'Every paper engine and result →'}</a></p>` : ''}</section>`;
   }
@@ -1042,7 +1043,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     const r = feed.reads && feed.reads[sym];
     if (!r) {
       return `<section class="v2w" aria-label="${Q}"><h3>${Q}</h3>
-        <p class="v2w-empty"><b>No read for ${esc(sym)}.</b>It needs about a year of completed daily bars and a bar on the ${esc(day(feed.session_date))} close; this name has not got both.</p></section>`;
+        <p class="v2w-empty"><b>No read for ${esc(sym)}.</b> It needs about a year of completed daily bars and a bar on the ${esc(day(feed.session_date))} close; this name has not got both.</p></section>`;
     }
     const pts = r.pts || [];
     const MAX = [3, 2, 2, 2, 1];
@@ -1112,7 +1113,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
         <svg${once('levels') ? ' class="v2w-reveal"' : ''} viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
           ${band ? `<rect class="band" x="0" width="${W}" y="${y(band[1]).toFixed(1)}" height="${Math.max(2, y(band[0]) - y(band[1])).toFixed(1)}"/>` : ''}
           ${L.map((l) => `<line class="lv ${l.cls}" x1="0" x2="${W}" y1="${y(l.v).toFixed(1)}" y2="${y(l.v).toFixed(1)}" vector-effect="non-scaling-stroke"/>`).join('')}
-          <path class="px" d="${d}" vector-effect="non-scaling-stroke"/>
+          <path class="px" pathLength="100" d="${d}" vector-effect="non-scaling-stroke"/>
         </svg>
         <span class="v2w-y" style="top:0%">${money(hi - pad)}</span><span class="v2w-y" style="top:100%">${money(lo + pad)}</span>
         ${labs.map((l) => `<span class="lab ${l.cls}" style="top:${Math.min(100, l.top).toFixed(2)}%"><b>${esc(l.label)}</b> ${l.range ? `${money(l.range[0])}–${money(l.range[1])}` : money(l.v)}</span>`).join('')}
@@ -1130,7 +1131,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     const cross = el.querySelector('.v2w-cross'), dot = el.querySelector('.v2w-dot'), tip = el.querySelector('.v2w-tip');
     cross.style.display = 'block'; cross.style.left = px + 'px';
     dot.style.display = 'block'; dot.style.left = px + 'px'; dot.style.top = py + 'px';
-    tip.innerHTML = `<b>${esc(day(p[0]))}</b>Close ₹${esc(Number(p[1]).toLocaleString('en-IN', { maximumFractionDigits: 2 }))}`;
+    tip.innerHTML = `<b>${esc(day(p[0]))}</b> Close ₹${esc(Number(p[1]).toLocaleString('en-IN', { maximumFractionDigits: 2 }))}`;
     tip.style.display = 'block';
     tip.style.left = Math.min(Math.max(0, px + 12), r.width - tip.offsetWidth) + 'px';
   }
@@ -1217,7 +1218,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     const tr = Array.isArray(p.tranches) && p.tranches.length === 3 && p.qty ? p.tranches : null;
     const sp = p.sell_pct || [40, 35, 25];
     if (!tr) {
-      return `<p class="v2w-empty"><b>Sells ${sp[0]}%, ${sp[1]}% and ${sp[2]}% at ${px(p.t1)}, ${px(p.t2)} and ${px(p.t3)}.</b>Share counts appear with the next scan.</p>`;
+      return `<p class="v2w-empty"><b>Sells ${sp[0]}%, ${sp[1]}% and ${sp[2]}% at ${px(p.t1)}, ${px(p.t2)} and ${px(p.t3)}.</b> Share counts appear with the next scan.</p>`;
     }
     const ref = p.fill_price != null ? p.fill_price : p.entry_high;
     const refWord = p.fill_price != null ? `the ${px(p.fill_price)} fill` : `${px(p.entry_high)}, the most it pays`;
@@ -1262,7 +1263,7 @@ dialog.v2w-ed::backdrop{background:rgba(0,0,0,.35)}
     if (fresh.length) li.push(`<li class="r4"><span class="t">New</span><span class="w">${fresh.length} new paper setup${fresh.length > 1 ? 's' : ''} for the ${esc(dayShort(fresh[0].for_session))} session: ${fresh.map((p) => `<a href="${esc(href(p))}">${esc(p.symbol)}</a>`).join(', ')}</span></li>`);
     return `<section class="v2w v2w-chs${opts.flat ? ' v2w-flat' : ''}" aria-label="Since the last scan">
       <h3>Since the last scan <span class="v2w-per">${esc(day(s))} close · paper</span></h3>
-      ${li.length ? `<ul class="v2w-ch">${li.join('')}</ul>` : `<p class="v2w-empty"><b>Nothing changed on the ${esc(day(s))} close.</b>No setup was filed, filled, sold, stopped or lapsed.</p>`}</section>`;
+      ${li.length ? `<ul class="v2w-ch">${li.join('')}</ul>` : `<p class="v2w-empty"><b>Nothing changed on the ${esc(day(s))} close.</b> No setup was filed, filled, sold, stopped or lapsed.</p>`}</section>`;
   }
 
   /* The whole Passport for one setup. `slot` is where the caller writes the

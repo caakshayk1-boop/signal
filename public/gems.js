@@ -1497,6 +1497,10 @@
           );
         }).join('')}</div>`,
         `${openIpo.length} open · ${upcoming.length} upcoming`));
+    } else {
+      add('ipo', 'IPO', sec('ipo', 'Primary market',
+        ipo ? 'No open or upcoming issues in the available IPO feed.' : 'The IPO feed is unavailable.',
+        '<p class="said">No issue is suggested to fill an empty publication. <a href="https://signal.askakshay.com/ipo">Review IPO data on Signal</a>.</p>'));
     }
 
     /* ── 7. AT A LEVEL ─────────────────────────────────────────────────────

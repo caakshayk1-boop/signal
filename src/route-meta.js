@@ -2,8 +2,20 @@
    guard.mjs fails the build if this falls out of step. */
 export const SIGNAL_META = {
  "/": [
-  "Signal, Indian equities, screened after the close",
-  "Review qualified setups, plan the next session, and track every paper trade. NSE equities, long only, with a forward record that starts empty."
+  "Signal by Akshay Kothari: NSE paper plans and a forward record",
+  "Indian equities, screened after the close. Conditional paper plans for the next session, and a forward record that counts every one."
+ ],
+ "/pulse": [
+  "Pulse swing trial · Signal by Akshay Kothari",
+  "Conditional swing paper plans, publication gate, net trial results and an append-only journal. Excluded from the main forward record."
+ ],
+ "/compass": [
+  "Compass position trial · Signal by Akshay Kothari",
+  "Thesis-driven position paper plans, tranche rules and a forward journal. Excluded from the main forward record."
+ ],
+ "/digests": [
+  "Past editions · Signal by Akshay Kothari",
+  "Completed-session paper digests preserved as published. Main forward plans and unpromoted trials remain separate."
  ],
  "/opportunities": [
   "Setups, every paper setup and plan by state",
@@ -98,8 +110,8 @@ export const SIGNAL_META = {
   "What this site stores, and what it does not."
  ],
  "/join": [
-  "The morning list",
-  "Join the list for the daily email. It is not being sent yet; the brief is on the site every morning."
+  "The evening desk · Signal by Akshay Kothari",
+  "One email each evening: tomorrow’s paper plans, the desk’s reasoning and the record’s numbers. Confirm your address before delivery."
  ],
  "/about": [
   "About, who builds Signal",

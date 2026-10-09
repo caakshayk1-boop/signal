@@ -56,6 +56,8 @@ jobs:
           fi
 
       - run: npm ci
+      - name: Publication and delivery regression tests
+        run: npm run test:unit
 
       # REFRESH THE FEEDS FIRST, which this step did not do and had to.
       #
@@ -80,6 +82,13 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deliver confirmed subscriptions
+        if: ${{ vars.DELIVERY_ENABLED == 'true' }}
+        env:
+          SIGNAL_URL: ${{ vars.SIGNAL_URL }}
+          EDIT_KEY: ${{ secrets.EDIT_KEY }}
+        run: node scripts/deliver-digest.mjs
 
       # SIGNAL_URL is a repo variable, not a secret — it is a public URL, and
       # putting it in vars means the log can print which site was checked.

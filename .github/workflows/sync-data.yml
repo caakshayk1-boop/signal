@@ -243,6 +243,20 @@ jobs:
             rm -f ".incoming/$f"
           fi
 
+      - name: Fetch the separate Pulse and Compass trial feed
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          f=signal_trials.json
+          if gh api "repos/$UPSTREAM/contents/feeds/$f" -H "Accept: application/vnd.github.raw" > ".incoming/$f" \
+            && python3 -c "import json; d=json.load(open('.incoming/$f')); assert d.get('schema')=='signal-trials/1' and d.get('status') and all(k in d.get('engines',{}) for k in ('pulse','compass'))"; then
+            printf 'Validated separate trial feed\n'
+          else
+            rm -f ".incoming/$f"
+            printf '::warning::Trial feed unavailable; preserving last known publication\n'
+          fi
+
       # The record of finished paper setups, for the replay on each setup's
       # page and the list on the Record page. Kept permanently upstream; the
       # paper block in signal_v2.json forgets a finished setup after ten
@@ -397,8 +411,25 @@ jobs:
           # deploy`: route meta, then the company files, then the snapshot.
           node scripts/route-meta.mjs
           node scripts/company-pages.mjs
+          node scripts/build-digests.mjs
           node scripts/prerender.mjs
+          node scripts/csp-hashes.mjs
           # Stamp AFTER the feeds and the snapshot are in place, so the build
           # hash describes what is actually being uploaded.
           node scripts/stamp-build.mjs
           npx wrangler deploy
+
+      - name: Persist immutable digest editions
+        run: |
+          git add public/digests public/feed.xml public/sitemap.xml
+          if ! git diff --cached --quiet; then
+            git commit -m "data: publish immutable digest archive [skip ci]"
+            git push origin HEAD:main
+          fi
+
+      - name: Deliver confirmed subscriptions
+        if: ${{ vars.DELIVERY_ENABLED == 'true' }}
+        env:
+          SIGNAL_URL: ${{ vars.SIGNAL_URL }}
+          EDIT_KEY: ${{ secrets.EDIT_KEY }}
+        run: node scripts/deliver-digest.mjs

@@ -189,7 +189,15 @@ try {
   const p = await ctx.newPage();
   const errs = [];
   p.on("pageerror", e => errs.push("pageerror: " + e.message));
-  p.on("console", m => { if (m.type() === "error") errs.push("console: " + m.text()); });
+  p.on("console", m => {
+    if (m.type() !== "error") return;
+    // This deliberate missing-plan navigation now returns a real HTTP 404.
+    // Exempt only that document's browser resource message, never JS errors
+    // or missing assets; its response status is asserted below.
+    const expected404 = m.location().url === SITE + "/plan/not-a-plan"
+      && m.text() === "Failed to load resource: the server responded with a status of 404 (Not Found)";
+    if (!expected404) errs.push("console: " + m.text());
+  });
   // "Failed to load resource" on its own names nothing. Record the URL and the
   // status alongside it, so a red run points at the endpoint instead of at the
   // browser. Asset 404s from a cold cache are not interesting; API ones are.
@@ -319,9 +327,11 @@ try {
   await p.goto(SITE + "/opportunities", { waitUntil: "domcontentloaded" });
   await until(p, () => /Eligible next session/.test(document.querySelector("main")?.innerText || ""));
   const oppT = await p.locator("main").innerText().catch(() => "");
-  ok("Opportunities groups plans by state, eligible first",
-     oppT.indexOf("Eligible next session") > -1 && oppT.indexOf("Eligible next session") < oppT.indexOf("Active")
-     && /Expired or cancelled before entry/.test(oppT));
+  // The state sections are now a filterable table, with main/trial captions.
+  const stateFilters = await p.locator('[data-sig2-setups] button[data-sig2-state]').evaluateAll(es => [...new Set(es.map(e => e.dataset.sig2State))]);
+  ok("Opportunities offers every state filter, eligible summary first",
+     oppT.indexOf("Eligible next session") > -1 && oppT.indexOf("Eligible next session") < oppT.indexOf("Every main plan by state")
+     && JSON.stringify(stateFilters) === JSON.stringify(["all", "eligible", "extended", "active", "closed", "expired"]), stateFilters);
   ok("Opportunities never fills an empty day with a pick", !/best stock|top pick/i.test(oppT));
   /* THE PASSPORT. Every paper setup has one page; the front page's digest
      links to it, and it carries the plan, an entry check that names its quote
@@ -396,7 +406,8 @@ try {
     const heads = await p.evaluate(() => [...document.querySelectorAll(".vt-r[open] .vt-case h4")].map((h) => h.innerText));
     ok("a vetted row opens to the case for and the case against", heads.join("|") === "The case for|The case against", heads);
   }
-  await p.goto(SITE + "/plan/not-a-plan", { waitUntil: "domcontentloaded" });
+  const missingPlan = await p.goto(SITE + "/plan/not-a-plan", { waitUntil: "domcontentloaded" });
+  ok("an unknown plan is a real HTTP 404", missingPlan.status() === 404, missingPlan.status());
   await until(p, () => /Plan not found/.test(document.querySelector("main h1")?.innerText || ""));
   ok("an unknown plan id says so, and does not borrow another plan",
      /There is no plan with the id/.test(await p.locator("main").innerText().catch(() => "")));

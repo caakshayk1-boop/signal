@@ -21,10 +21,12 @@
  *     here would cost more CPU than the plan allows a request;
  *   - "what changed" is insight.js, the SAME file the browser runs.
  *
- * Every page body says it is a snapshot and when it was built.
+ * Publication pages carry the actual feed's levels and its own timestamps.
  */
 import { SIGNAL_META } from "./route-meta.js";
 import "../public/insight.js";           // attaches globalThis.VisionInsight
+import "../public/record-analytics.js";
+import "../public/signal-ui.js";
 
 const insight = globalThis.VisionInsight;
 
@@ -113,9 +115,7 @@ function signalFacts(route, site) {
         + (w ? line(`Over the past week <b>${esc(w.up)}</b> of <b>${esc(w.counted)}</b> screened names rose and <b>${esc(w.down)}</b> fell.`) : "")
         + (site.above200 != null ? line(`<b>${esc(site.above200)}%</b> of names trade above their 200-day average.`) : "");
     case "/screen": case "/discover":
-      return line(`<b>${esc(site.universe)}</b> NSE names screened on price, trend, quality, value and institutional flow${built ? `, build of ${esc(built)}` : ""}.`);
-    case "/opportunities": case "/performance": case "/brief":
-      return line("Signal: conditional next-session paper plans for NSE equities and a forward record of every one, from 1 October 2026. The live page loads them from the plan feed.");
+      return line(`<b>${esc(site.universe)}</b> NSE names screened on price, trend, quality, value and institutional flow${built ? `, updated ${esc(built)}` : ""}.`);
     case "/watch":
       return line("Your watchlist is stored in this browser only. Star any name on the site to follow it here.");
     default: return "";
@@ -125,7 +125,6 @@ function signalFacts(route, site) {
 export async function signalPage(request, env, path) {
   const shellReq = new Request(new URL("/", request.url), request);
   const shell = await env.ASSETS.fetch(shellReq);
-  if (path === "/") return shell;                 // the deploy-time pre-render is already this route's
   const site = await asset(env, request, "/c/_site.json");
 
   if (path.startsWith("/stock/")) return signalStock(request, env, shell, decodeURIComponent(path.slice(7)), site);
@@ -136,17 +135,51 @@ export async function signalPage(request, env, path) {
   const [title, desc] = SIGNAL_META[key] || SIGNAL_META["/404"];
   const h1 = title.split(" — ")[0];
   const canonical = SIGNAL + path;
+  const publicationRoutes = new Set(['/', '/opportunities', '/performance', '/brief', '/plan/:id', '/setup/:id']);
+  const feed = publicationRoutes.has(key) ? await asset(env, request, '/signal_v2.json', 60_000) : null;
+  const valid = feed && feed.schema === 'signal-v2-public/1';
+  let content = '', article = null, status = 200;
+  if (publicationRoutes.has(key)) {
+    if (!valid) content = '<p class="pre-m">The plan publication is unavailable. No current scan or plan count can be confirmed.</p>';
+    else if (key === '/') content = globalThis.SignalUI.snapshot(feed);
+    else if (key === '/performance') content = globalThis.SignalUI.analytics(globalThis.SignalAnalytics.main(feed));
+    else {
+      let plans = feed.plans || [], cohort = 'main';
+      if (key === '/setup/:id' || (key === '/brief' && !plans.some(p => ['awaiting_entry', 'activated', 'partially_exited'].includes(p.state)))) {
+        cohort = 'trial';
+        const record = key === '/setup/:id' ? await asset(env, request, '/paper_record.json', 60_000) : null;
+        plans = [...((feed.paper || {}).plans || []), ...((record && record.schema === 'paper-record/1' && record.trades) || [])];
+      }
+      if (key === '/plan/:id' || key === '/setup/:id') {
+        const id = decodeURIComponent(path.split('/').at(-1));
+        plans = plans.filter(p => p.id === id).slice(0, 1);
+        if (!plans.length) { status = 404; content = '<p class="pre-m">No published plan with this ID was found.</p>'; }
+      }
+      if (!content) content = `<p class="pre-m">Latest session ${esc(globalThis.SignalUI.day(feed.session_date))} · published ${esc(globalThis.SignalUI.timestamp(feed.published_at))}.</p><p>${esc(globalThis.SignalUI.publicCopy(feed.status_detail))}</p>${globalThis.SignalUI.setups(plans, cohort)}${key === '/opportunities' && feed.paper && Array.isArray(feed.paper.plans) ? '<h2>Existing trials · excluded from the main record</h2>' + globalThis.SignalUI.setups(feed.paper.plans, 'trial') : ''}${plans.map(p => `<p><b>${esc(p.symbol)}</b>: ${esc(p.thesis_note || p.why || p.setup || '')}${p.stop_rule ? ' · ' + esc(p.stop_rule) : ''}${p.management ? ' · ' + esc(p.management) : ''}</p>`).join('')}${globalThis.SignalUI.subscribe()}`;
+      if (status === 200 && (key === '/brief' || key === '/plan/:id')) {
+        const published = key === '/plan/:id' ? plans[0].published_at : feed.published_at;
+        article = { '@type': 'Article', '@id': canonical + '#article', headline: key === '/plan/:id' ? plans[0].symbol + ': conditional paper plan' : 'Signal paper plans for ' + (feed.next_session || feed.session_date),
+          datePublished: published, dateModified: feed.published_at, author: { '@id': SIGNAL + '/#akshay' },
+          publisher: { '@id': SIGNAL + '/#akshay' }, mainEntityOfPage: canonical, inLanguage: 'en-IN', description: desc };
+      }
+    }
+  } else if (key === '/pulse' || key === '/compass') {
+    const trial = await asset(env, request, '/signal_trials.json', 60_000);
+    content = globalThis.SignalUI.trials(trial, key.slice(1));
+  } else if (key === '/digests') {
+    content = globalThis.SignalUI.digests(await asset(env, request, '/digests/index.json', 60_000));
+  }
   const body = `<p class="pre-k">Signal · ${esc(h1)}</p>
     <h1 class="pre-h">${esc(title)}</h1>
-    <p class="pre-s">${esc(desc)}</p>${signalFacts(key, site)}
+    <p class="pre-s">${esc(desc)}</p>${content || signalFacts(key, site)}
     <ul class="pre-l">${SIGNAL_LINKS.filter(([h]) => h !== path).map(([h, t]) => `<li><a href="${h}">${t}</a></li>`).join("")}<li><a href="${VISION}/">Vision, company research ↗</a></li></ul>
-    <p class="pre-n">A summary written by the server${site && site.built_at ? ` from the build of ${esc(day(site.built_at))}` : ""}. The live page replaces it as soon as it loads.</p>`;
-  const rw = headRewriter({ title, desc, canonical, site: "Signal", robots: "index,follow,max-image-preview:large",
+    <p class="pre-n">Updated daily after market close${site && site.built_at ? `. Last update: ${esc(globalThis.SignalUI.timestamp(site.built_at))}` : ""}.</p>`;
+  const rw = headRewriter({ title, desc, canonical, site: "Signal", robots: status === 404 ? "noindex,follow" : "index,follow,max-image-preview:large",
     ld: { "@context": "https://schema.org", "@graph": [
       { "@type": "WebPage", "@id": canonical, url: canonical, name: title, description: desc, isPartOf: { "@id": `${SIGNAL}/#website` }, inLanguage: "en-IN" },
-      crumbs([["Signal", SIGNAL + "/"], [h1, canonical]])] } })
+       crumbs([["Signal", SIGNAL + "/"], [h1, canonical]]), ...(article ? [article] : [])] } })
     .on("section.pre", { element(e) { e.setInnerContent(body, { html: true }); } });
-  return htmlResponse(rw.transform(shell));
+  return htmlResponse(rw.transform(shell), status);
 }
 
 async function signalStock(request, env, shell, raw, site) {
@@ -176,7 +209,7 @@ async function signalStock(request, env, shell, raw, site) {
     ${ch.improved.length ? `<p class="pre-m"><b>Improved</b></p><ul class="pre-l">${li(ch.improved)}</ul>` : ""}
     ${ch.weakened.length ? `<p class="pre-m"><b>Weakened</b></p><ul class="pre-l">${li(ch.weakened)}</ul>` : ""}
     <p class="pre-m"><a href="${VISION}/company/${keyOf(sym)}">Open ${esc(sym)} in Vision, the full company research →</a></p>
-    <p class="pre-n">Written by the server from the screen build${d.ctx && d.ctx.built_at ? ` of ${esc(day(d.ctx.built_at))}` : ""}. Descriptive, not a recommendation. The live page replaces it on load.</p>`;
+    <p class="pre-n">Updated daily after market close${d.ctx && d.ctx.built_at ? `. Last update: ${esc(globalThis.SignalUI.timestamp(d.ctx.built_at))}` : ""}.</p>`;
   const rw = headRewriter({ title, desc, canonical, site: "Signal", robots: "index,follow,max-image-preview:large",
     ld: { "@context": "https://schema.org", "@graph": [
       { "@type": "WebPage", "@id": canonical, url: canonical, name: title, description: desc, isPartOf: { "@id": `${SIGNAL}/#website` },
@@ -197,7 +230,7 @@ async function visionShell(env, request) {
 }
 
 const vPage = (inner) => `<div class="ssr">${inner}
-  <p class="ssr-n">This page was written by the server so it reads without JavaScript. The live workspace replaces it as soon as it loads. Educational research, not SEBI-registered advice.</p></div>`;
+  <p class="ssr-n">Updated daily after market close.</p></div>`;
 
 export async function visionHome(request, env) {
   const shell = await visionShell(env, request);
