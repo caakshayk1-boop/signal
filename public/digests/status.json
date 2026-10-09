@@ -1,1 +1,1 @@
-{"schema":"signal-digest-status/1","status":"blocked","reason":"trials_session_mismatch","created":false,"session_date":"2026-10-01","input_hash":null,"archive_issues":[]}
+{"schema":"signal-digest-status/1","status":"ready","reason":null,"created":true,"session_date":"2026-10-09","input_hash":"37a1be867b5e5c994888bf7c4759c27fd15d944fb3ebd03cf53a675ef890545f","archive_issues":[]}
