@@ -195,7 +195,7 @@ try {
     // Exempt only that document's browser resource message, never JS errors
     // or missing assets; its response status is asserted below.
     const expected404 = m.location().url === SITE + "/plan/not-a-plan"
-      && m.text() === "Failed to load resource: the server responded with a status of 404 (Not Found)";
+      && /^Failed to load resource: the server responded with a status of 404 \((?:Not Found)?\)$/.test(m.text());
     if (!expected404) errs.push("console: " + m.text());
   });
   // "Failed to load resource" on its own names nothing. Record the URL and the
