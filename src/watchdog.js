@@ -33,6 +33,12 @@
 import { db } from "./api/_db.js";
 
 const API = "https://api.github.com";
+const hdrs = token => ({
+  Authorization: `Bearer ${token}`,
+  Accept: "application/vnd.github+json",
+  "X-GitHub-Api-Version": "2022-11-28",
+  "User-Agent": "Signal-pipeline-watchdog",
+});
 
 /* The schedule, the grace and the due-slot arithmetic live in their own file
  * so a test can import them without dragging in the database this one opens
