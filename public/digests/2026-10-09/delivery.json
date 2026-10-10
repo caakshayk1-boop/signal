@@ -1,0 +1,54 @@
+{
+  "schema": "signal-delivery/1",
+  "session_date": "2026-10-09",
+  "published_at": "2026-10-10T00:28:13+05:30",
+  "input_hash": "37a1be867b5e5c994888bf7c4759c27fd15d944fb3ebd03cf53a675ef890545f",
+  "archive_url": "https://signal.askakshay.com/digests/2026-10-09/",
+  "sources": [
+    {
+      "schema": "signal-v2-public/1",
+      "status": "paused",
+      "session_date": "2026-10-09",
+      "published_at": "2026-10-10T00:28:13+05:30",
+      "next_scan_due": "2026-10-13T00:30+05:30"
+    },
+    {
+      "schema": "signal-trials/1",
+      "status": "deferred",
+      "session_date": "2026-10-09",
+      "published_at": "2026-10-10T00:31:31.709452+05:30",
+      "next_scan_due": null
+    }
+  ],
+  "metrics": {
+    "published": 0,
+    "awaiting_entry": 0,
+    "active": 0,
+    "closed": 0,
+    "wins": 0,
+    "losses": 0,
+    "breakevens": 0,
+    "expired_unfilled": 0,
+    "cancelled_before_entry": 0,
+    "net_pnl_inr": null,
+    "charges_inr": null,
+    "mean_r_closed": null,
+    "win_rate": null
+  },
+  "trial_statuses": [
+    {
+      "name": "pulse",
+      "status": "deferred",
+      "reason": null
+    },
+    {
+      "name": "compass",
+      "status": "deferred",
+      "reason": null
+    }
+  ],
+  "text": "Signal completed-session digest — 2026-10-09\n\nDelayed completed-session data. All events and outcomes are simulated paper research, not real-time instructions, recommendations or live fills. Pulse and Compass are separate unpromoted trial cohorts; they never enter the canonical main record.\n\nOperational summary: canonical publication status paused; 0 published main plans awaiting entry/eligible. 0 main lifecycle rows and 0 separate trial rows supplied. Missing statistics are not estimated; no market interpretation is inferred.\n\nMain record statistics (as reported)\n\npublished: 0 · awaiting_entry: 0 · active: 0 · closed: 0 · wins: 0 · losses: 0 · breakevens: 0 · expired_unfilled: 0 · cancelled_before_entry: 0 · net_pnl_inr: not reported · charges_inr: not reported · mean_r_closed: not reported · win_rate: not reported\n\nEligible main plans (conditional paper levels)\n\nCanonical main record\n\nSeparate trial cohorts (unpromoted)\n\npulse: deferred · compass: deferred\n\nArchive: https://signal.askakshay.com/digests/2026-10-09/\n\nImmutable input SHA-256: 37a1be867b5e5c994888bf7c4759c27fd15d944fb3ebd03cf53a675ef890545f\n\nDelayed completed-session data. All events and outcomes are simulated paper research, not real-time instructions, recommendations or live fills. Pulse and Compass are separate unpromoted trial cohorts; they never enter the canonical main record.",
+  "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Signal digest — 2026-10-09</title><link rel=\"canonical\" href=\"https://signal.askakshay.com/digests/2026-10-09/\"><link rel=\"alternate\" type=\"application/rss+xml\" href=\"https://signal.askakshay.com/digests/feed.xml\" title=\"Signal digests\"></head><body><main><h1>Signal digest — 2026-10-09</h1><p>Delayed completed-session data. All events and outcomes are simulated paper research, not real-time instructions, recommendations or live fills. Pulse and Compass are separate unpromoted trial cohorts; they never enter the canonical main record.</p><p>Data as of: 2026-10-09. Published: 2026-10-10T00:28:13+05:30.</p><h2>Operational commentary</h2><p>Operational summary: canonical publication status paused; 0 published main plans awaiting entry/eligible. 0 main lifecycle rows and 0 separate trial rows supplied. Missing statistics are not estimated; no market interpretation is inferred.</p><h2>Main record statistics (as reported)</h2><p>published: 0 · awaiting_entry: 0 · active: 0 · closed: 0 · wins: 0 · losses: 0 · breakevens: 0 · expired_unfilled: 0 · cancelled_before_entry: 0 · net_pnl_inr: not reported · charges_inr: not reported · mean_r_closed: not reported · win_rate: not reported</p><section><h2>Eligible main plans (conditional paper levels)</h2><p>No published setups in this cohort for this completed session. No outcomes are invented.</p></section><section><h2>Canonical main record</h2><p>No published setups in this cohort for this completed session. No outcomes are invented.</p></section><h2>Trial engine publication status</h2><p>pulse: deferred · compass: deferred</p><section><h2>Separate unpromoted trials</h2><p>No published setups in this cohort for this completed session. No outcomes are invented.</p></section><p>Immutable input SHA-256: <code>37a1be867b5e5c994888bf7c4759c27fd15d944fb3ebd03cf53a675ef890545f</code></p><p><a href=\"https://signal.askakshay.com/digests/2026-10-09/\">Permanent archive</a> · <a href=\"https://signal.askakshay.com/digests/feed.xml\">RSS</a></p><footer><p>Delayed completed-session data. All events and outcomes are simulated paper research, not real-time instructions, recommendations or live fills. Pulse and Compass are separate unpromoted trial cohorts; they never enter the canonical main record.</p></footer></main></body></html>\n",
+  "rows": [],
+  "manifest_hash": "80e524427d13b5872c4c631f9c24f3238e5571f57f5f6e3a00f634da5ea66e12"
+}
