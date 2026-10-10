@@ -73,8 +73,8 @@ export function retired(res) {
   res.setHeader("Cache-Control", "public, max-age=3600");
   return res.status(410).json({
     ok: false, retired: true,
-    error: "This endpoint was removed on 2026-10-01. Plans are published in /signal_v2.json.",
-    successor: "/signal_v2.json",
+    error: "This publication is no longer available. Market research remains available.",
+    successor: "/screen",
   });
 }
 

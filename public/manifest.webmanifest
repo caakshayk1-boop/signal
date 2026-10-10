@@ -1,7 +1,7 @@
 {
   "name": "Signal — Indian markets, every morning",
   "short_name": "Signal",
-  "description": "Sector heat, IPO books open now, ranked trade ideas and a public signal ledger — wins and losses both.",
+  "description": "Indian market research: sector heat, IPOs, company screening, financials and institutional ownership.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

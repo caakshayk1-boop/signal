@@ -39,6 +39,7 @@ import clientError from "./api/clienterror.js";
 import heat from "./api/heat.js";
 import snapshot from "./api/snapshot.js";
 import { signalPage, visionHome, visionCompany } from "./seo.js";
+import { retirementResponse } from "./retirement.js";
 
 const ROUTES = {
   "/api/ticker": ticker,
@@ -98,7 +99,7 @@ function health(env, request) {
     // The Data Sources page reads this rather than hardcoding a provider name,
     // so the page cannot claim a feed the Worker is not actually using.
     provider: providerInfo(),
-    routes: Object.keys(ROUTES),
+    routes: Object.keys(ROUTES).filter(path => !['/api/stats', '/api/subscribe', '/api/subscribe/confirm'].includes(path)),
     at: new Date().toISOString(),
   }, { headers: { "Cache-Control": "no-store" } });
 }
@@ -315,6 +316,22 @@ export default {
   async handleRequest(request, env, ctx) {
     mirrorEnv(env);
     const url = new URL(request.url);
+
+    const retired = retirementResponse(request);
+    if (retired) return retired;
+
+    // The market regime is still useful research. Its historical strategy
+    // performance is private; retain the stored file for internal consumers.
+    if (decodeURIComponent(url.pathname).replace(/\/+$/, '') === '/regime.json') {
+      const res = await env.ASSETS.fetch(request);
+      if (!res.ok) return res;
+      const data = await res.json();
+      const { measured, ...market } = data;
+      market.caveats = (data.caveats || []).slice(0, 2);
+      const { min_cell, trust_n, trust_t, ...thresholds } = data.thresholds || {};
+      market.thresholds = thresholds;
+      return Response.json(market, { headers: { 'cache-control': 'public, max-age=0, must-revalidate' } });
+    }
 
     if (url.pathname === "/api/health") return health(env, request);
     // Read-only on purpose: a status endpoint that starts builds because

@@ -60,13 +60,13 @@ export function publishDigest({ publicDir, origin, expectedSession, now = new Da
   writeChanged(join(root, 'feed.xml'), `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>Signal completed-session paper digests</title><link>${escape(origin)}/digests/</link><description>Delayed simulated paper research. Separate unpromoted trials. Not real-time instructions.</description>${items}</channel></rss>\n`);
   writeChanged(join(publicDir, 'feed.xml'), readFileSync(join(root, 'feed.xml'), 'utf8'));
   writeChanged(join(root, 'index.html'), `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Signal digest archive</title><link rel="canonical" href="${escape(origin)}/digests/"></head><body><h1>Completed-session paper digests</h1><p>Delayed simulated paper research; unpromoted trials are separate. Not real-time instructions.</p><a href="feed.xml">RSS</a><ul>${editions.map(d => `<li><a href="${escape(d.archive_url)}">${d.session_date}</a></li>`).join('')}</ul></body></html>\n`);
-  // Preserve unrelated URLs. Add only missing digest entries to a valid map.
+  // Public digests were retired 2026-10-10. Keep durable archives and internal
+  // delivery manifests, but remove their discovery URLs from the public map.
   const sitemap = join(publicDir, 'sitemap.xml');
   if (existsSync(sitemap)) {
     const xml = readFileSync(sitemap, 'utf8');
     if (xml.includes('</urlset>')) {
-      const additions = [`${origin}/digests/`, ...editions.map(d => d.archive_url)].filter(url => !xml.includes(`<loc>${escape(url)}</loc>`)).map(url => `<url><loc>${escape(url)}</loc></url>`).join('\n');
-      if (additions) writeChanged(sitemap, xml.replace('</urlset>', `${additions}\n</urlset>`));
+      writeChanged(sitemap, xml.replace(/<url>\s*<loc>[^<]*\/digests(?:\/[^<]*)?<\/loc>[\s\S]*?<\/url>\s*/g, ''));
     }
   }
   return result;

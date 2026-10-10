@@ -12,6 +12,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { WATCH, dueSlot, GRACE_MIN } from "../src/watchdog_schedule.js";
+import '../public/retirement.js';
 
 const JS = readFileSync("public/signal.js", "utf8");
 const CSS = readFileSync("public/signal.css", "utf8");
@@ -61,6 +62,7 @@ const RETIRED_WITH_V1 = new Set([
   "Brief is in the bar — on a phone it had no entry of its own at all",
 ]);
 const ok = (name, cond, detail) => {
+  if (RETIRED_PUBLICATION.has(name)) { retired++; return; }
   if (RETIRED_WITH_V1.has(name)) { retired++; return; }
   checks++;
   if (cond) return;
@@ -69,6 +71,34 @@ const ok = (name, cond, detail) => {
   if (detail !== undefined) console.log(`        ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
 };
 const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
+
+// 2026-10-10: these assertions specifically required public publication UI.
+// Replaced by public-retirement.mjs and retirement-ui.mjs; generic link,
+// numerical, escaping, cache, market-data and layout checks remain enforced.
+const RETIRED_PUBLICATION = new Set([
+  'the five are the V2 destinations, in order',
+  'on a phone they read Setups and Record, once each, and Market gives its slot to More',
+  'the desktop names the same two pages the same way',
+  "vision's setups read the canonical V2 plan feed",
+  'vision renders exactly one plan feed: the canonical V2 feed',
+  'both sites show the paper board and the read',
+  'the headline and subheading are the V2 ones',
+  'both front pages carry the analyst',
+  'Vision separates research levels from the one actionable stop',
+  'the sitemap lists the V2 pages and no retired one',
+  'the service worker cache was bumped for V2',
+  'every cross-site link says why to follow it',
+  '/magic is a real page: Worker PAGES, route meta, sitemap, Discover',
+  'the screen offers the formula as a preset and a sort, unranked last',
+  "Vision shows a company's rank, or that it is unranked and why",
+  "Vision's Magic Formula preset opens in rank order, so its #1 is /magic's #1",
+  "Vision's hero is four items and its rows alternate wide and narrow",
+  'the watchlist rows carry setup, results, alert and since-last-visit, with five quick filters',
+  'the V1 ledger API answers 410 Gone, quotes and series stay',
+  'browser and edge read the same canonical trial publication',
+  ...['/', '/opportunities', '/performance', '/plan/:id', '/brief'].map(r => `V2 route ${r} is rendered by the V2 block`),
+  ...[['/signals', '/performance'], ['/engines', '/opportunities'], ['/research', '/opportunities'], ['/buoy', '/opportunities'], ['/ideas', '/opportunities']].map(([r, to]) => `old address ${r} forwards to ${to}`),
+]);
 
 /* ── 1. A COMPARISON WHOSE BRANCHES ARE IDENTICAL ────────────────────────────
  * The incident: a stop-rule simulation scored one branch as
@@ -134,7 +164,7 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
    * they exist so an old bookmark lands on a retired notice, and nothing in
    * the site should send a reader there. */
   const ALIAS = new Set(["/404", "/buoy", "/signals", "/engines", "/research", "/ideas"]);
-  const orphans = routes.filter(r => !linked.has(r) && !r.includes(":") && !ALIAS.has(r));
+   const orphans = routes.filter(r => !linked.has(r) && !r.includes(":") && !ALIAS.has(r) && r !== '/retired' && !PublicRetirement.page(r));
   ok("no route is unreachable from any link", orphans.length === 0, orphans);
 }
 
@@ -334,7 +364,7 @@ const lineOf = (src, idx) => src.slice(0, idx).split("\n").length;
    * soft-404 this whole fix exists to remove. */
   /* Old addresses answered by the Worker's 301 (MOVED) are not pages. */
   const moved = new Set([...(IDX.match(/const MOVED = \{([\s\S]*?)\};/) || ["", ""])[1].matchAll(/"(\/[a-z]+)":/g)].map((m) => m[1]));
-  const missing = [...routes].filter((r) => !dynamic(r) && r !== "/404" && !pages.has(r) && !moved.has(r));
+  const missing = [...routes].filter((r) => !dynamic(r) && r !== "/404" && r !== '/retired' && !PublicRetirement.page(r) && !pages.has(r) && !moved.has(r));
   const extra = [...pages].filter((p) => p !== "/gems" && p !== "/vision" && !routes.has(p));
   ok("every app route is in the Worker's PAGES list (else it 404s live)",
      missing.length === 0, missing);
@@ -2614,7 +2644,9 @@ ok("no figure counts up", !/countUp/.test(JS));
     const strip = (f) => readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
     const SEEN = ["public/signal.js", "public/vision.js", "public/v2widgets.js", "src/seo.js", "src/route-meta.js",
       "scripts/prerender.mjs", "scripts/company-pages.mjs"].map((f) => [f, strip(f)]);
-    const bad = SEEN.flatMap(([f, t]) => (t.match(/Signal V[12]\b|\bV[12] (?:plan|record|forward|paper|trade)|retired V1|Signal V1|[Pp]revious model results|has been retired|belonged to Signal/g) || []).map((m) => f + ": " + m));
+    // The new 410 notice is required; retain the no-version-jargon guard for
+    // all other copy rather than dropping this generic presentation check.
+    const bad = SEEN.flatMap(([f, t]) => (t.replace(/This publication has been retired/g, '').match(/Signal V[12]\b|\bV[12] (?:plan|record|forward|paper|trade)|retired V1|Signal V1|[Pp]revious model results|has been retired|belonged to Signal/g) || []).map((m) => f + ": " + m));
     ok("no page names a version or narrates the retired engines", bad.length === 0, bad.slice(0, 6));
   }
   ok("every R:R printed is the feed's own field", /p\['rr_' \+ k\]/.test(V2C) && !/\(p\.t[123] - p\.entry_high\) \/ \(p\.entry_high - p\.(?:initial_)?stop\)/.test(V2C));
@@ -2992,5 +3024,5 @@ ok("no figure counts up", !/countUp/.test(JS));
 
 console.log(fails
   ? `\n${fails} of ${checks} guard checks FAILED`
-  : `\n${checks}/${checks} guard checks pass (${retired} V1 checks retired by name)`);
+  : `\n${checks}/${checks} guard checks pass (${retired} publication checks retired by name: V1 and 2026-10-10)`);
 process.exit(fails ? 1 : 0);

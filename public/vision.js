@@ -395,9 +395,9 @@
      compare it, the two setups, the screen, the map, the day. The rest are
      one tap away under More; nothing was removed. */
   const NAV = [
-    ['home', 'Companies', '#/'], ['compare', 'Compare', '#/compare'], ['setups', 'Setups', '#/setups'],
+    ['home', 'Companies', '#/'], ['compare', 'Compare', '#/compare'],
     ['screener', 'Screener', '#/screener'], ['heatmap', 'Heatmap', '#/heatmap'], ['today', 'Today', '#/today'],
-    ['brief', 'Brief', '#/brief'], ['cockpit', 'Cockpit', '#/cockpit'], ['markets', 'Markets', '#/markets'], ['news', 'News', '#/news'],
+    ['cockpit', 'Cockpit', '#/cockpit'], ['markets', 'Markets', '#/markets'], ['news', 'News', '#/news'],
     ['watchlist', 'Watchlist', '#/watchlist'], ['alerts', 'Alerts', '#/alerts'],
   ];
   /* FIVE DESTINATIONS, as on Signal: the company search, compare, the two
@@ -405,7 +405,7 @@
      news, the watchlist and alerts are one tap away under More. "Setups", not
      "Signals": the parent product is called Signal, and a tab with nearly its
      name that means something else is how a reader gets lost between them. */
-  const PRIMARY = ['home', 'compare', 'setups', 'screener', 'heatmap'];
+  const PRIMARY = ['home', 'compare', 'watchlist', 'screener', 'heatmap'];
   const ICON = {
     home: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
     setups: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
@@ -418,7 +418,7 @@
     watchlist: '<path d="m12 2.8 2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.3l-5.6 2.9 1.1-6.3L2.9 9.5l6.3-.9z"/>',
     more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   };
-  const TABS = ['home', 'setups', 'screener', 'heatmap'];
+  const TABS = ['home', 'watchlist', 'screener', 'heatmap'];
   const svgI = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
 
   function paintNav(cur) {
@@ -434,14 +434,14 @@
     const small = innerWidth < 1100;
     drawer('More', `<div class="more">${NAV.filter(([k]) => !(small ? TABS : PRIMARY).includes(k)).map(([k, t, h]) =>
       `<a href="${h}"><b>${t}</b><span>${esc(BLURB[k] || '')}</span></a>`).join('')}
-      <a href="${SIGNAL_URL}/"><b>← Signal</b><span>The parent product: what deserves attention today, and the public ledger</span></a>
+      <a href="${SIGNAL_URL}/"><b>← Signal</b><span>Market context and company research</span></a>
       <a href="#" data-act="theme"><b>Theme</b><span>Switch dark / light</span></a>
       <a href="#" data-act="search"><b>Search</b><span>Any company or page</span></a></div>`);
   }
   const BLURB = {
     home: 'Search any company, what matters, what changed', compare: 'Up to five companies, side by side',
     markets: 'Indices, FX, commodities, crypto, flows', screener: 'Every name on the NSE screen',
-    setups: 'Next-session plans: entry range, stop, three exits', news: 'The wire, matched to names', alerts: 'Price alerts in this browser',
+    news: 'The wire, matched to names', alerts: 'Price alerts in this browser',
     today: 'The day in two minutes, it ends', cockpit: 'The market on one screen', heatmap: 'Every liquid name, by sector', watchlist: 'Names you follow',
   };
 
@@ -892,6 +892,7 @@
     const raw = location.hash.replace(/^#\/?/, ''), qi = raw.indexOf('?');
     const h = decodeURIComponent(qi < 0 ? raw : raw.slice(0, qi));
     const [name, ...rest] = h.split('/');
+    if (window.PublicRetirement.page('/' + name)) return { name: 'retired', arg: '', params: new URLSearchParams() };
     /* /company/<KEY> is a real path — the Worker writes its HTML for readers
        without JavaScript and for search — and the app opens it as that
        company's page. Any hash route wins over the path. */
@@ -925,6 +926,7 @@
     paintStars(); paintBadges();
   }
   const setTitle = (t) => { document.title = t ? `${t} · Vision` : 'Vision: understand any Indian company in minutes'; };
+  V.retired = async el => { setTitle('Publication retired'); el.innerHTML = '<h1>This publication has been retired</h1><p>Company research and market data remain available.</p><p><a href="#/">Explore companies</a> · <a href="#/markets">Markets</a></p>'; };
   const vhead = (eb, title, sub, right) => { setTitle(title);
     return `<div class="vhead"><div><h1>${esc(title)}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${right ? `<div class="vhead-r">${right}</div>` : ''}</div>`; };
 
@@ -1318,7 +1320,7 @@
   };
 
   /* The one plan feed, fetched from one place (the guard counts the call). */
-  const v2Feed = () => get('/signal_v2.json', 600000);
+  const v2Feed = async () => ({ ok: false, error: 'Publication retired' });
   const mattersHtml = (mt) => mt.length ? `${MT_KEY()}<div class="kv intel-kv" style="margin-top:0">${mt.map((m) => `<div title="${esc(m.src)}"><em>${esc(m.k)} ${defn(MT_DEF[m.k])}</em><b class="${m.tone}">${esc(m.v)}</b><small>${esc(m.sub || '')}</small>${
       INS() && INS().WHY && INS().WHY[m.k] ? `<details class="mt-why"><summary>Why it matters</summary><p>${esc(INS().WHY[m.k])}</p></details>` : ''}</div>`).join('')}</div>${srcNote(mt)}`
     : empty('Nothing measured', 'The screen carries no statements for this company.');
@@ -1354,10 +1356,9 @@
         <p id="hHint" class="hhint vh">Company name or NSE symbol. Every figure on a company page names its source and its age.<span class="k"> Press <span class="kbd">/</span> on any page to search.</span></p>
         <div id="hRecent" class="row wrap hrec"></div><p id="hSince" class="since" hidden></p></section></div>
       <div id="hGlance" class="glance">${skel(2)}</div>
-      <div class="grid g-21 hrow">${panel('Paper setups for the next session', skel(5), { bodyId: 'hPaper', flush: true, more: '#/brief', moreText: 'Open the brief' })}${panel('Strongest technical reads', skel(5), { bodyId: 'hReads', flush: true, more: '#/screener', moreText: 'Screener' })}</div>
       <div class="grid g-12 hrow">${panel('Unusual today', skel(5), { bodyId: 'hUnu', fb: 'Screen' })}${panel('What changed across the screen', skel(6), { bodyId: 'hChg', fb: 'Screen' })}</div>
       <div id="hMkt"></div>
-      <div class="grid g-2 hrow">${panel('Plans for the next session', skel(4), { bodyId: 'hSig', flush: true, fb: 'Setups', more: '#/setups', moreText: 'All setups' })}${panel('Most-traded companies', skel(6), { bodyId: 'hTop', fb: 'Screen' })}</div>`;
+      <div class="hrow">${panel('Most-traded companies', skel(6), { bodyId: 'hTop', fb: 'Screen' })}</div>`;
     Motion.field(el);
     const inp = $('#hQ'), L = $('#hL');
     let hits = [], sel = 0;
@@ -1381,19 +1382,18 @@
     });
     L.addEventListener('click', (e) => { const li = e.target.closest('[data-go]'); if (li) go(li.dataset.go); });
     if (FINE()) inp.focus();
-    const [sr, site, , nx, pu, rd] = await Promise.all([F.screen(), F.site(), F.veod(),
+    const [sr, site, nx, pu] = await Promise.all([F.screen(), F.site(),
       get('/api/signals?series=' + encodeURIComponent('^NSEI') + '&range=1y').catch(() => ({ ok: false })),
-      get('/pulse.json').catch(() => ({ ok: false })), F.reads().catch(() => ({ ok: false }))]);
+      get('/pulse.json').catch(() => ({ ok: false }))]);
     if (!alive()) return;
-    homeLead(S.veod, rd && rd.ok ? S.reads : null, pu && pu.ok ? pu.data : null, site && site.ok ? site.data : null);
+    $('#hGlance').innerHTML = `<p><a href="#/screener">Explore the company screen</a> · <a href="#/heatmap">Market breadth</a> · <a href="#/news">News</a></p>`;
     {
       /* The market cards, shared with Signal (v2widgets.js). A stock opens here
          in Vision, not on Signal. */
       const W = window.V2W && window.V2W.market, m = $('#hMkt');
       if (m) m.innerHTML = !W ? `<p class="note">The market charts could not load.</p>` : (() => {
         const s2 = nx && nx.ok ? nx.data : null, p2 = pu && pu.ok ? pu.data : null, o = { stockHref: (x) => '#/asset/' + encodeURIComponent(x) };
-        const ex = window.V2W.explain ? window.V2W.explain({ series: s2, pulse: p2, feed: S.veod, plansRef: '#/setups',
-          recordRef: SIGNAL_URL + '/performance', enginesRef: SIGNAL_URL + '/performance', paperRef: '#/setups', error: nx && nx.error }) : '';
+        const ex = '';
         return `<div style="margin-top:var(--s-5)">${ex}</div><div class="v2w-grid2">${W.nifty(s2, { more: '#/markets', error: nx && nx.error })}${W.days(s2, { error: nx && nx.error })}</div>
           <div class="v2w-grid2">${W.sectors(p2, { more: '#/heatmap', error: pu && pu.error })}${W.movers(p2, { ...o, error: pu && pu.error })}</div>`;
       })();
@@ -1423,8 +1423,6 @@
         if (mv.length) parts.push(mv.map(([x, c]) => `<a href="#/asset/${esc(x)}">${esc(x)}</a> <b class="${c < 0 ? 'dn' : 'up'}">${c > 0 ? '+' : ''}${c.toFixed(1)}%</b>`).join(', '));
         const fired = S.alerts.filter((a) => a.fired && Date.parse(a.fired) > b.at).length;
         if (fired) parts.push(`<b>${fired}</b> alert${fired === 1 ? '' : 's'} fired`);
-        const filed = ((S.veod && S.veod.plans) || []).filter((p) => Date.parse(p.published_at) > b.at).length;
-        if (filed) parts.push(`<b>${filed}</b> new plan${filed === 1 ? '' : 's'} <a href="#/setups">published</a>`);
       }
       const h = (Date.now() - ((b && b.at) || Date.now())) / 3600000;
       const ago = h < 1 ? 'under an hour ago' : h < 24 ? `${Math.round(h)} h ago` : `${Math.round(h / 24)} d ago`;
@@ -1442,10 +1440,6 @@
         ${C.vol.length ? `<p class="note" style="margin:var(--s-3) 0 4px"><b>Heaviest volume</b></p><div class="row wrap">${C.vol.slice(0, 10).map((x) => `<a class="chip" href="#/asset/${esc(x.sym)}">${esc(x.sym)}</a>`).join('')}</div>` : ''}
         ${C.results.length ? `<p class="note" style="margin:var(--s-3) 0 4px"><b>Results due</b></p><div class="row wrap">${C.results.map((x) => `<a class="chip" href="#/asset/${esc(x.sym)}">${esc(x.sym)} · ${esc(dshort(x.on))}</a>`).join('')}</div>` : ''}
         <p class="note src">From the screen's last close. Results dates as listed on the screen; confirm on the exchange.</p>`;
-    $('#hSig').innerHTML = vePlansBrief(S.veod);
-    // Nothing published: the panel would only repeat what the paper panel above
-    // already says, so it goes rather than printing an empty box.
-    if (!veOpen(S.veod).length) { const pn = $('#hSig') && $('#hSig').closest('.pn'); if (pn) { const row = pn.parentElement; pn.remove(); if (row) row.classList.add('solo'); } }
     $('#hTop').innerHTML = d && d.top ? `<div class="dir">${d.top.slice(0, 30).map((x) => `<a href="#/asset/${esc(x.sym)}"><b>${esc(x.sym)}</b><span>${esc(x.name || '')}</span></a>`).join('')}</div>` : failBox('The screen summary', site.error);
   };
 
@@ -1625,9 +1619,9 @@
 
   V.today = async (el, arg, alive) => {
     const day = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
-    el.innerHTML = vhead('Today', day, 'The market, what moved and why, the plans for the next session and your names, written from the live feeds. Two minutes, and it ends.', fb('Quotes'))
+    el.innerHTML = vhead('Today', day, 'The market, what moved and why, and your names, written from the live feeds. Two minutes, and it ends.', fb('Quotes'))
       + `<article class="brief" id="tBody">${skel(12)}</article>`;
-    const [sr, b, , W] = await Promise.all([F.screen(), F.baro(), tickerP, F.wire(), F.veod()]);
+    const [sr, b, , W] = await Promise.all([F.screen(), F.baro(), tickerP, F.wire()]);
     if (!alive()) return;
     await F.heat(); if (!alive()) return;
     const paint = () => {
@@ -1659,11 +1653,6 @@
           ${src('Median live 1D move of each sector\'s quoted names; sectors with fewer than five are left out.')}</section>
         <section><h2>What moved, and why</h2>${liquid.length ? `<p class="k">Up most</p><ul>${top.map(li).join('')}</ul><p class="k">Down most</p><ul>${bot.map(li).join('')}</ul>` : '<p class="mut">No live quotes yet.</p>'}
           ${src('Names trading at least ₹25 cr a day. "Why" is the latest headline that names the stock, a text match, not a judgement that it caused the move.')}</section>
-        <section><h2>Plans for the next session</h2>${!V0 ? '<p class="mut">No end-of-day scan has been published yet.</p>' : veBanner(V0) + (vnext.length
-          ? `<p><b>${vnext.length}</b> plan${vnext.length === 1 ? '' : 's'} from the close of ${esc(dshort(V0.session_date))}, for ${esc(dshort(V0.next_session))}.</p>
-            <ul>${vnext.slice(0, 5).map((p) => `<li><a class="sym" href="#/asset/${esc(p.symbol)}">${esc(p.symbol)}</a> · buy only ${veMoney(p.entry_low)}–${veMoney(p.entry_high)} · stop ${veMoney(p.stop)} · exits ${veMoney(p.t1)} / ${veMoney(p.t2)} / ${veMoney(p.t3)}</li>`).join('')}</ul>
-            <p><a href="#/setups">Every plan, position and outcome →</a></p>` : `<p>${esc(V0.status_detail || 'No plan on the last scan.')}</p>`)}
-          ${src(`Conditional plans for the next session, never a trade until filled; fills simulated; ${V0 && V0.mode === 'paper' ? 'paper mode' : 'research mode, not validated'}.${V0 && V0.published_at ? ` Published ${esc(istWhen(V0.published_at))}.` : ''}`)}</section>
         <section><h2>Your names</h2>${!S.watch.length ? '<p class="mut">Your watchlist is empty, star a name anywhere and it is reported here.</p>'
           : mine.length ? `<ul>${mine.slice(0, 5).map((w) => `<li><a class="sym" href="#/asset/${esc(w.s)}">${esc(w.s)}</a> ${chg(w.l.change_pct)}${why(w.s)}</li>`).join('')}</ul>` : '<p class="mut">No live quote for your names yet.</p>'}</section>
         <section><h2>Worth reading</h2>${named.length ? `<ul>${named.map((st) => `<li><a href="${esc(st.link)}" target="_blank" rel="noopener">${esc(st.title)}</a> <span class="mut">${esc(st.source)}</span></li>`).join('')}</ul>`
@@ -1695,9 +1684,6 @@
         ${panel('Top movers', skel(8), { bodyId: 'oMov', flush: true, fb: 'Live prices', more: '#/markets', moreText: 'Markets' })}
         ${panel('Market intelligence', skel(8), { bodyId: 'oNews', flush: true, fb: 'Wire', more: '#/news', moreText: 'All news' })}
       </div>
-      <div style="height:var(--s-4)"></div>
-      ${panel('Plans for the next session', skel(4), { bodyId: 'oSig', flush: true, fb: 'Setups', more: '#/setups', moreText: 'All setups',
-        foot: 'Made after the last close for the next session: a range never to buy above, a stop and three exits. Research mode until validated; fills are simulated.' })}
       <div style="height:var(--s-4)"></div>
       ${panel('Watchlist', skel(4), { bodyId: 'oWatch', flush: true, more: '#/watchlist', moreText: 'Manage', fb: 'Quotes' })}`;
     const h = $('[data-hero]', el); if (h) h.onclick = () => { store.set('vis:hero', false); h.closest('.hero').remove(); };
@@ -1822,7 +1808,7 @@
       if (!alive()) return;
     };
 
-    await Promise.all([paintPulse(), paintLeaders(), paintNews(), paintHeat(), paintSig(), (async () => { await tickerP; paintMovers(); })()]);
+    await Promise.all([paintPulse(), paintLeaders(), paintNews(), paintHeat(), (async () => { await tickerP; paintMovers(); })()]);
     await Promise.all([refreshQuotes(), liveHeat()]); if (!alive()) return;
     await paintWatch();
     return async () => { paintMovers(); await liveHeat(); await paintWatch(); };
@@ -1903,7 +1889,6 @@
       <div class="grid g-7-5"><div class="stack">
         ${panel('Why it reads the way it does', skel(5), { bodyId: 'aWhy', fb: 'Screen' })}
         ${panel('Move profile', skel(4), { bodyId: 'aChart', fb: 'Screen' })}
-        <div id="aTr">${skel(4)}</div>
       </div><div class="stack">
         ${panel('Levels', skel(6), { bodyId: 'aLvl', fb: 'Screen' })}
         ${panel('Business', skel(6), { bodyId: 'aFun', fb: 'Screen' })}
@@ -1925,14 +1910,6 @@
        (v2widgets.js). Printed as the engine computed it after the close: a
        read is not a plan and sets no level. Loaded beside, never before, the
        page, so a slow file cannot hold the rest back. */
-    get('/technical_read.json', 600000).then((tr) => {
-      const box = $('#aTr');
-      if (!box || !alive()) return;
-      const ok = tr && tr.ok && tr.data && tr.data.schema === 'technical-read/1';
-      box.innerHTML = window.V2W && window.V2W.read
-        ? window.V2W.read(ok ? tr.data : null, s, { error: ok ? '' : ((tr && tr.error) || 'technical_read.json did not load') })
-        : `<p class="note">The technical read could not load.</p>`;
-    });
     const px = lv ? lv.price : (r ? r.price : null);
     const mv = moveOf(r);
     /* The range label reads the SAME price as the marker beside it. It printed
@@ -1950,16 +1927,13 @@
         <div class="row" style="gap:var(--s-2)"><h1>${esc(s)}</h1>${star(s)}</div><div class="nm">${esc((r && r.name) || '')}</div>
         <div class="row wrap" style="margin-top:var(--s-2)">
           ${r && r.risk ? `<span class="chip ${r.risk.level === 'HIGH' ? 'dn' : r.risk.level === 'MEDIUM' ? 'warn' : ''}">Risk ${esc(r.risk.level)}</span>` : ''}
-          ${r && r.mf && Number.isInteger(r.mf.rank) ? `<a class="chip" href="${SIGNAL_URL}/magic" title="ROCE rank ${r.mf.roc_rank} + EBIT/EV rank ${r.mf.ey_rank}; the whole ranking on Signal">Magic Formula #${r.mf.rank} of ${r.mf.of} ↗</a>`
-            : r && r.mf && r.mf.why ? `<span class="chip" title="Not ranked by the Magic Formula: ${esc(r.mf.why)}">Magic Formula: unranked</span>` : ''}
           ${r && r.vet && r.vet.s === 'cleared' ? `<a class="chip" href="${SIGNAL_URL}/vetted" title="Passed all ${Number(r.vet.n) || 0} data and balance-sheet checks that apply to it. What the screen measures for and against it is on Signal.">Vetted ↗</a>`
             : r && r.vet && r.vet.s ? `<a class="chip warn" href="${SIGNAL_URL}/vetted" title="Held out of the vetted list. The nine checks are on Signal.">Held out: ${esc(r.vet.w || 'a check failed')} ↗</a>` : ''}</div></div>
       <div class="ah-px"><div class="px">${px != null ? '₹' + fmt(px, 2) : '—'}</div>
         <div class="px-s">${lv ? chg(lv.change_pct) + ` <span class="mut">${quoteWord()}</span>` : r ? chg(r.r1d) + ` <span class="mut">close of ${esc(r.last_date || r.price_date || 'the last build')}</span>` : ''}</div>
         <div class="row ah-act" style="margin-top:var(--s-2);gap:6px">
-          <a class="btn sm" href="#/brief/${encodeURIComponent(s)}">Brief</a>
           <a class="btn sm" href="#/compare?s=${[s].concat(peersOf(s)).map(encodeURIComponent).join(',')}">Compare</a>
-          <a class="btn sm" href="${SIGNAL_URL}/stock/${encodeURIComponent(s)}" title="Its screen card, and any setup, on Signal">On Signal ↗</a>
+          <a class="btn sm" href="${SIGNAL_URL}/stock/${encodeURIComponent(s)}" title="Its company research on Signal">On Signal ↗</a>
           <button class="btn sm" type="button" data-copy="${VISION_URL}/company/${keyOf(s)}">Copy link</button>
           <button class="btn sm" type="button" data-snap="${esc(s)}" title="A dated, signed copy of this read that does not change">Snapshot</button>
           <a class="btn sm" href="#/alerts?sym=${esc(s)}">Alert</a>
@@ -1981,15 +1955,6 @@
          feed Signal reads: a live paper setup links to its own page; no setup
          says so and offers the screen card. A feed that does not answer says
          nothing rather than implying there is no setup. */
-      v2Feed().then((v2) => {
-        const box = $('#aOne'); if (!box || !alive()) return;
-        const P = v2 && v2.ok && v2.data && v2.data.paper ? v2.data.paper.plans || [] : null;
-        if (!P) return;
-        const sp = P.filter((x) => x.symbol === s && (x.state === 'awaiting_entry' || (x.fill_price != null && !x.ended_session)))[0];
-        box.insertAdjacentHTML('beforeend', `<p class="one-sig">${sp
-          ? `<b>How did this become a setup?</b> <a href="${SIGNAL_URL}/setup/${encodeURIComponent(sp.id)}">View it on Signal: levels, entry check and history ↗</a>`
-          : `<b>Not a paper setup tonight.</b> <a href="${SIGNAL_URL}/stock/${encodeURIComponent(s)}">Its screen card on Signal ↗</a>`}</p>`);
-      });
       $('#aMat').innerHTML = mattersHtml(I.matters(d.r, d.x, ctx));
       $('#aChg').innerHTML = changesHtml(I.changes(d.r, d.x, ctx), I.T);
       { const qb = $('#aQs'); if (qb) { const qs = I.questions ? I.questions(d.r, d.x, ctx) : [];
@@ -2035,7 +2000,7 @@
         <div class="now"><span>Now</span><em>${lv ? 'live, delayed' : 'at the last close'}</em><span class="num">₹${fmt(px, 1)}</span></div>
         ${lv2.filter((l) => l[1] <= px).map(lrow).join('')}</div>
       ${atrp != null ? `<p class="note" style="margin-top:var(--s-2)">A typical day moves it <b>${atrp.toFixed(1)}%</b>; a level closer than that is inside ordinary noise, so it is a reference, not a test.</p>` : ''}
-      <p class="note" style="margin-top:var(--s-2)">These are research levels. ${v2p ? `The only actionable stop is the Signal plan's: <b>₹${fmt(v2p.stop, 2)}</b>: <a href="#/setups">see the plan</a>.` : 'There is no Signal plan for this company, so there is no actionable stop here.'}</p>` : empty('No levels', 'Not on the screen.');
+      <p class="note" style="margin-top:var(--s-2)">These are descriptive research levels, not instructions to trade.</p>` : empty('No levels', 'Not on the screen.');
 
     const de = num(r && r.de), lender = !!(r && isLender(r));
     $('#aFun').innerHTML = r ? `<div class="kv" style="margin-top:0">
@@ -2116,7 +2081,6 @@
     ['lens_debt', 'Debt-free, vetted', 'Quality', (r) => (r.vet && r.vet.s === 'cleared' ? (r.vet.l || []).includes('debt') : null), 'b', null, 'Debt to equity from 0 to 0.1 (never negative, never a lender) and vetted'],
     ['lens_div', 'Dividend income, vetted', 'Quality', (r) => (r.vet && r.vet.s === 'cleared' ? (r.vet.l || []).includes('div') : null), 'b', null, 'Dividend yield of 2% or more and vetted'],
     ['eight', 'Passes the eight tests', 'Quality', (r) => (r.vet && r.vet.q ? !!r.vet.q.a : null), 'b', null, 'Market cap, growth, ROCE, insiders, return, debt, margin and cash flow, measured over the 3 to 4 years held. The breakdown is on Signal'],
-    ['mf_rank', 'Magic Formula rank', 'Valuation', (r) => (r.mf && Number.isInteger(r.mf.rank) ? r.mf.rank : null), 'n', 'n0', '1 = best; lenders, utilities and small or unreported names are unranked'],
     ['comp', 'Composite', 'Scores', (r) => num(r.comp), 'n', 'n0'], ['q', 'Quality score', 'Scores', (r) => num(r.q), 'n', 'n0'],
     ['g', 'Growth score', 'Scores', (r) => num(r.g), 'n', 'n0'], ['v', 'Valuation score', 'Scores', (r) => num(r.v), 'n', 'n0'],
     ['tech', 'Technical score', 'Scores', (r) => num(r.tech), 'n', 'n0'],
@@ -2133,7 +2097,6 @@
     ['bottom', 'Bottom reversal', 'Off the floor, reclaiming the 50-day, still under the 200-day', [['from_low', '>=', 15], ['above50', 'is', true], ['above200', 'is', false]]],
     ['highs', 'Near highs on volume', 'Within 3% of the 52-week high with volume behind it', [['from_high', '>=', -3], ['vol_spike', '>=', 1.5]]],
     ['qdisc', 'Quality at a discount', 'High quality, cheap against its own history', [['q', '>=', 70], ['pe_pctile', '<=', 30]]],
-    ['magic', 'Magic Formula top 30', 'Greenblatt: ROCE rank plus EBIT/EV rank, lowest sum first', [['mf_rank', '<=', 30]], { sort: 'mf_rank', dir: 1 }],
     ['lsmall', 'Vetted small cap', 'NSE Smallcap 250 names that passed the vetting gate', [['lens_small', 'is', true]]],
     ['lmom', 'Vetted momentum', 'Vetted, above both averages, ahead of the Nifty, RSI 55 to 75', [['lens_mom', 'is', true]]],
     ['ldebt', 'Vetted debt-free', 'Vetted, debt to equity from 0 to 0.1', [['lens_debt', 'is', true]]],
@@ -2184,6 +2147,9 @@
     const fromUrl = params && params.get('s') ? decodeScreen(params.get('s')) : null;
     let st = Object.assign({ conds: presetConds(SPRESETS[0]).slice(0, 0), mode: 'all', q: '', sort: 'turnover_cr', dir: -1, cols: SCOL_DEF.slice(), preset: '' },
       store.get('vis:scr2', {}), fromUrl || {});
+    st.conds = st.conds.filter(c => SFK[c.f]);
+    st.cols = st.cols.filter(k => k === 'sym' || SFK[k]);
+    if (!SFK[st.sort] && st.sort !== 'sym') st.sort = 'turnover_cr';
     /* A preset that is a RANKING (Magic Formula) opens in rank order with the
        rank column shown; filtering a ranked list and ordering it by turnover put
        a different name first than /magic does on the Signal site. A screen saved

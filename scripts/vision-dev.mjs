@@ -37,6 +37,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
+import { retirementResponse } from '../src/retirement.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "public");
 const PORT = Number(process.argv[2] || 8799);
@@ -154,6 +155,8 @@ const API = {
 http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   let p = u.pathname;
+  const retired = retirementResponse(new Request(u, { method: req.method }));
+  if (retired) { res.writeHead(retired.status, Object.fromEntries(retired.headers)); return res.end(await retired.text()); }
   if (p.startsWith("/api/")) {
     const key = p.replace(/\/+$/, "");
     if (SLOW) await new Promise((r) => setTimeout(r, SLOW));
@@ -178,7 +181,7 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     return res.end(readFileSync(TREAD));
   }
-  if (SITE === "vision" && (p === "/" || p === "/vision")) p = "/vision.html";
+  if (SITE === "vision" && (p === "/" || p === "/vision" || p.startsWith('/company/'))) p = "/vision.html";
   /* The signal site routes by PATH: anything that is not a file is its shell. */
   if (SITE === "signal" && (!/\.[a-z0-9]+$/i.test(p) || p.startsWith("/plan/") || p.startsWith("/setup/") || p.startsWith("/stock/"))) p = p === "/vision" ? "/vision.html" : p === "/gems" ? "/gems.html" : "/index.html";
   const f = join(ROOT, p);

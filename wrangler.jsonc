@@ -52,7 +52,7 @@
       // file exists when it does not. A handful of feed requests per page load
       // is worth one Worker invocation each to answer that honestly.
       "!/*.js", "!/*.css", "!/*.svg", "!/*.png", "!/*.jpg",
-      "!/*.ico", "!/*.txt", "!/*.xml", "!/*.webmanifest",
+      "!/*.ico", "!/*.txt", "!/*.webmanifest",
       "!/fonts/*"
     ],
     // EVERY ROUTE IS A REAL PATH NOW, so the server has to answer for paths it

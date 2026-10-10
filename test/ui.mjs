@@ -28,6 +28,9 @@ import { readFileSync } from "node:fs";
 
 const BASE = (process.argv[2] || "http://127.0.0.1:8787").replace(/\/$/, "");
 const SITE = BASE;   // the site is served at the root here, not /next.html
+// Explicit product retirement. The old publication-only groups below remain
+// identifiable; retirement-ui.mjs replaces them. Generic research checks stay.
+const PUBLICATION_UI_RETIRED = true;
 const fails = [];
 /* SIGNAL V2 (2026-10-01): checks that pinned the V1 front page's heatmap
    strip and regime section. The V2 front page is plans first, with one line
@@ -191,12 +194,12 @@ try {
   p.on("pageerror", e => errs.push("pageerror: " + e.message));
   p.on("console", m => {
     if (m.type() !== "error") return;
-    // This deliberate missing-plan navigation now returns a real HTTP 404.
+    // This deliberate retired-plan navigation returns a real HTTP 410.
     // Exempt only that document's browser resource message, never JS errors
     // or missing assets; its response status is asserted below.
-    const expected404 = m.location().url === SITE + "/plan/not-a-plan"
-      && /^Failed to load resource: the server responded with a status of 404 \((?:Not Found)?\)$/.test(m.text());
-    if (!expected404) errs.push("console: " + m.text());
+    const expected410 = m.location().url === SITE + "/plan/not-a-plan"
+      && /^Failed to load resource: the server responded with a status of 410 \((?:Gone)?\)$/.test(m.text());
+    if (!expected410) errs.push("console: " + m.text());
   });
   // "Failed to load resource" on its own names nothing. Record the URL and the
   // status alongside it, so a red run points at the endpoint instead of at the
@@ -288,7 +291,9 @@ try {
    * able to rely on now: the front page answers the four status questions,
    * plans come from the one feed, the record says when it began and never
    * prints a 0% on an empty sample, and an old link lands on a plain notice. */
-  console.log("\n  Signal V2");
+  console.log("\n  Publication UI retired 2026-10-10; replacement: test/retirement-ui.mjs");
+  let v2Feed = null;
+  if (!PUBLICATION_UI_RETIRED) {
   await p.goto(SITE + "/", { waitUntil: "domcontentloaded" });
   await until(p, () => !!document.querySelector(".v2-strip"));
   const v2Home = await p.locator("main").innerText().catch(() => "");
@@ -301,7 +306,7 @@ try {
      && v2Home.search(/Active paper positions/i) < v2Home.search(/^Record$/im));
   ok("the front page states when the record began", /The forward record begins/.test(v2Home));
   ok("no page names a version or a retired engine", !/Signal V[12]\b|\bV[12] (?:plan|record)|retired V1|[Pp]revious model results/.test(v2Home));
-  const v2Feed = await p.evaluate(async () => (await fetch("/signal_v2.json")).json()).catch(() => null);
+   v2Feed = await p.evaluate(async () => (await fetch("/signal_v2.json")).json()).catch(() => null);
   ok("the canonical plan feed is served", !!v2Feed && v2Feed.schema === "signal-v2-public/1");
   if (v2Feed) {
     const m = v2Feed.metrics || {};
@@ -315,6 +320,7 @@ try {
   ok("zero plans is said in words, not left blank",
        nNext > 0 || /No plan published for the .+ session|No plan qualified for the|new plans are paused\.|session was not scanned\.|The last run failed\.|No new plans for the/.test(v2Home), nNext);
   }
+  }
   await p.goto(SITE + "/markets", { waitUntil: "domcontentloaded" });
   await until(p, () => document.querySelectorAll(".v2w h3").length >= 4);
   const mkCards = await p.locator(".v2w h3").allInnerTexts().catch(() => []);
@@ -324,6 +330,7 @@ try {
   ok("a market card either draws its chart or says what did not load",
      (await p.locator(".v2w [data-v2w-mk], .v2w .v2w-hm-g").count()) === 2
      || /did not load/.test((await p.locator(".v2w").allInnerTexts().catch(() => [])).join(" ")));
+  if (!PUBLICATION_UI_RETIRED) {
   await p.goto(SITE + "/opportunities", { waitUntil: "domcontentloaded" });
   await until(p, () => /Eligible next session/.test(document.querySelector("main")?.innerText || ""));
   const oppT = await p.locator("main").innerText().catch(() => "");
@@ -391,6 +398,7 @@ try {
     const loc = res ? new URL(res.headers.get("location") || "/", SITE).pathname : "";
     ok(`${r} forwards to ${to}`, !!res && res.status === 301 && loc === to, res && [res.status, loc]);
   }
+  }
   /* VETTED. The page is either the gate's list or says the gate has not been
      published yet. It is never blank, and it never prints a missing figure as a
      word like NaN. The same check passes before and after a screen build that
@@ -407,10 +415,9 @@ try {
     ok("a vetted row opens to the case for and the case against", heads.join("|") === "The case for|The case against", heads);
   }
   const missingPlan = await p.goto(SITE + "/plan/not-a-plan", { waitUntil: "domcontentloaded" });
-  ok("an unknown plan is a real HTTP 404", missingPlan.status() === 404, missingPlan.status());
-  await until(p, () => /Plan not found/.test(document.querySelector("main h1")?.innerText || ""));
-  ok("an unknown plan id says so, and does not borrow another plan",
-     /There is no plan with the id/.test(await p.locator("main").innerText().catch(() => "")));
+  ok("a former plan URL is a real HTTP 410", missingPlan.status() === 410, missingPlan.status());
+  ok("a former plan URL explains retirement and links to research",
+     /publication has been retired/.test(await p.locator("main").innerText().catch(() => "")) && await p.locator('main a[href="/"]').count() === 1);
   /* From Node, not the page: an in-page 410 is logged to the console as a
      failed resource and would fail the no-errors check below on purpose. */
   const apiOld = await fetch(SITE + "/api/signals?limit=5").then((r) => r.status).catch(() => 0);
@@ -430,8 +437,8 @@ try {
      `h1.pre-h`, which the client render replaces. Waiting on the real one is
      the difference between "the page has rendered" and "the page arrived as
      HTML". */
-  await until(p, () => !!document.querySelector(".v2-strip"));
-  ok("the front page renders its V2 heading", /Indian equities/.test(await p.locator("main .route-h h1").innerText().catch(() => "")));
+  await until(p, () => !!document.querySelector("main .route-h h1"));
+  ok("the front page renders its research heading", /Research the company/.test(await p.locator("main .route-h h1").innerText().catch(() => "")));
   /* BOUND TO THE BRIEF LINK, NOT TO WHICHEVER BUTTON IS PRIMARY.
    *
    * This read `.btn-hero`, which encoded an assumption the check never meant
@@ -549,7 +556,7 @@ try {
 
   // Four pages that publish what the product can and cannot do. A disclosure
   // page that renders empty is worse than no page.
-  for (const [route, must] of [["/methodology", "next session"],
+  for (const [route, must] of [["/methodology", "descriptive"],
                                ["/sources", "Yahoo"],
                                ["/terms", "not investment advice"],
                                ["/privacy", "sig:watch"]]) {
@@ -772,7 +779,7 @@ try {
    * looks like a slow load. */
   console.log("\n  routing");
   for (const [route, wantIn] of [["/markets", "Markets"], ["/screen", "Screen"],
-                                 ["/opportunities", "Setups"], ["/performance", "Record"]]) {
+                                 ["/screen", "Screen"], ["/news", "News"]]) {
     await p.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await settled(p, SETTLE + 2500);
     const title = await p.title();
@@ -1021,8 +1028,8 @@ try {
   ok("the bar has five destinations", shell.count === 5, shell);
   ok("none of them is a dropdown", shell.dropdowns === 0, shell);
   ok("every destination has an icon", shell.icons === shell.count, shell);
-  ok("the five are Today, Setups, Watchlist, Record and Market — one name each on desktop and phone",
-     JSON.stringify(shell.labels) === JSON.stringify(["Today", "Setups", "Watchlist", "Record", "Market"]), shell.labels);
+  ok("the five are Today, Screen, Watchlist, News and Market — one name each on desktop and phone",
+     JSON.stringify(shell.labels) === JSON.stringify(["Today", "Screen", "Watchlist", "News", "Market"]), shell.labels);
   ok("tap targets clear 44px", shell.minTap >= 44, shell.minTap);
 
   /* Every route must still be reachable from the bar, Discover or the Ledger.
@@ -1044,7 +1051,7 @@ try {
     }, href);
     await p.waitForTimeout(waitMs);
   };
-  const seen = new Set(["/", "/markets", "/discover", "/watch", "/opportunities", "/performance"]);
+  const seen = new Set(["/", "/markets", "/discover", "/watch", "/screen", "/news"]);
   await hop("/discover", 2500);
   for (const h of await p.$$eval(".disc-c", (n) => n.map((x) => x.getAttribute("href"))))
     seen.add(h);
@@ -1058,7 +1065,7 @@ try {
     seen.add(h);
   const reachable = [...seen];
   const mustReach = ["/markets", "/screen", "/ipo", "/news", "/funds",
-                     "/opportunities", "/performance", "/methodology", "/sources"];
+                     "/screen", "/news", "/methodology", "/sources"];
   const stranded = mustReach.filter(r => !reachable.includes(r));
   ok("no page is stranded by the flattened nav", stranded.length === 0, stranded);
   ok("Discover lists the discovery pages", discCards >= 6, discCards);
@@ -1097,7 +1104,7 @@ try {
   const rmCtx = await newCtx({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
   const rp = await rmCtx.newPage();
   await rp.goto(SITE + "/", { waitUntil: "domcontentloaded" });
-  await until(rp, () => !!document.querySelector(".v2-strip"));
+  await until(rp, () => !!document.querySelector("main .route-h h1"));
   /* Under reduced motion every figure is written in its final state: nothing
      waits on an animation that will not run. */
   ok("the V2 record is written, not animated in", /Plans published/.test(await rp.locator("main").innerText().catch(() => "")));
@@ -1227,8 +1234,8 @@ try {
    * So this sweeps every route and asserts both: no thrown error, and no
    * rendered failure panel. The second is the one that would have caught it. */
   console.log("\n  every route — thrown errors and rendered failures");
-  const ROUTES = ["/", "/markets", "/opportunities", "/performance", "/screen",
-                  "/news", "/ipo", "/funds", "/watch", "/alerts", "/radar", "/reads", "/join",
+  const ROUTES = ["/", "/markets", "/screen",
+                  "/news", "/ipo", "/funds", "/watch", "/alerts", "/radar", "/reads",
                   "/methodology", "/sources", "/terms", "/privacy"];
   const swCtx = await newCtx({ viewport: { width: 1440, height: 900 } });
   const sw = await swCtx.newPage();
@@ -1317,8 +1324,8 @@ try {
   const colMobCtx = await newCtx({ viewport: { width: 390, height: 844 } });
   const colMobP = await colMobCtx.newPage();
   for (const [label, pg] of [["desktop", colP], ["phone", colMobP]])
-  for (const route of ["/", "/opportunities", "/screen", "/markets", "/ipo",
-                       "/performance", "/watch", "/radar", "/news", "/funds", "/reads",
+  for (const route of ["/", "/screen", "/markets", "/ipo",
+                       "/watch", "/radar", "/news", "/funds", "/reads",
                        "/research"]) {
     await pg.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await settled(pg, SETTLE + 3000);
@@ -1411,8 +1418,8 @@ try {
   console.log("\n  the same fact is not printed twice");
   const dupCtx = await newCtx({ viewport: { width: 1440, height: 900 } });
   const dupP = await dupCtx.newPage();
-  for (const route of ["/", "/opportunities", "/screen", "/markets", "/ipo",
-                       "/performance", "/radar", "/news", "/funds", "/reads", "/watch",
+  for (const route of ["/", "/screen", "/markets", "/ipo",
+                       "/radar", "/news", "/funds", "/reads", "/watch",
                        "/research"]) {
     await dupP.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await settled(dupP, SETTLE + 3000);
@@ -1537,7 +1544,7 @@ try {
   // the defect this whole block exists to catch, and it was unmeasured exactly
   // where it was most likely.
   for (const route of ["/", "/markets", "/screen", "/news", "/ipo",
-                       "/funds", "/watch", "/radar", "/reads", "/opportunities", "/performance", "/methodology"]) {
+                       "/funds", "/watch", "/radar", "/reads", "/methodology"]) {
     await mp.goto(SITE + route, { waitUntil: "domcontentloaded" });
     // The screen fetches 1.4 MB before it lays out; the shorter settle used by
     // the other routes measured it mid-skeleton and would have passed anything.
@@ -1796,7 +1803,7 @@ try {
    * refreshed, bookmarked or shared them — they were missing from the Worker's
    * page allow-list, and in-app navigation never asks it. Only a direct fetch
    * catches this, which is why it is asserted here rather than by clicking. */
-  for (const route of ["/heat", "/map", "/reads", "/screen", "/opportunities", "/discover"]) {
+  for (const route of ["/heat", "/map", "/reads", "/screen", "/discover"]) {
     const res = await fetch(SITE + route, { redirect: "follow" });
     ok(`${route} answers a cold request`, res.status === 200, res.status);
   }
@@ -1848,7 +1855,7 @@ try {
     ok("it is outside <main>", !!before && before.inMain === false, before);
     ok("it takes no space on the page", !!before && before.box <= 1, before);
 
-    await lp.click('a[data-route="/performance"]').catch(() => {});
+    await lp.click('a[data-route="/news"]').catch(() => {});
     await settled(lp, SETTLE);
     const after = await lp.evaluate(() => {
       const el = document.getElementById("liveNews");
@@ -1966,7 +1973,7 @@ try {
     };
   });
   for (const id of ["reading", "market", "sectors", "wire", "verdicts",
-                    "setups", "flow", "ipo", "levels", "calendar", "reads"]) {
+                    "flow", "ipo", "levels", "calendar", "reads"]) {
     ok(`gems carries the ${id} section`, gCover.ids.includes(id), gCover.ids);
   }
   /* REMOVED AT AKSHAY'S INSTRUCTION, and asserted so nobody restores them by
@@ -2279,6 +2286,7 @@ try {
   /* The Brief: a setup's plan, its levels on a chart, the technical read and
      the business. Any company can be briefed, setup or not. It must finish,
      draw its chart, and never print a NaN. */
+  if (!PUBLICATION_UI_RETIRED) {
   await v.evaluate(() => { location.hash = "#/brief/RELIANCE"; });
   await settled(v, SETTLE + 3500);
   const vBr = await v.evaluate(() => { const b = document.getElementById("bBody"); if (!b) return null;
@@ -2301,14 +2309,15 @@ try {
   ok("...shows the latest scan or says none is published yet", vSig && (vSig.pending || (vSig.scanned && !vSig.failed)), vSig);
   ok("...every plan carries its entry range, stop and three exits", vSig && vSig.levels && !vSig.bad, vSig);
   ok("...and shows nothing of the retired engines", vSig && !vSig.archive, vSig);
-  /* Today: the morning read. Against production it must finish, carry its six
+  }
+  /* Today: the market read. The publication section was retired; five remain.
      sections, end, and count breadth from live quotes. */
   await v.evaluate(() => { location.hash = "#/today"; });
   await settled(v, SETTLE + 3000);
   const vDay = await v.evaluate(() => { const b = document.getElementById("tBody"); if (!b) return null;
     return { sk: !!b.querySelector(".sk"), secs: b.querySelectorAll("section h2").length, end: !!b.querySelector(".end"),
       breadth: /Of the \d+ names quoted/.test(b.innerText), bad: /\bNaN\b|\bundefined\b|\bnull\b/.test(b.innerText) }; });
-  ok("vision's Today brief finishes, with its six sections, and ends", !!vDay && !vDay.sk && vDay.secs === 6 && vDay.end && !vDay.bad, vDay);
+  ok("vision's Today research finishes, with its five sections, and ends", !!vDay && !vDay.sk && vDay.secs === 5 && vDay.end && !vDay.bad, vDay);
   ok("...and counts breadth from live quotes", !!vDay && vDay.breadth, vDay);
   /* The heatmap card. A tile used to show a hover tooltip only, which on a
      phone could not be closed. Click opens a dialog; Escape closes it. */

@@ -12,9 +12,10 @@
  * .json (including /c/<SYMBOL>.json) go to the network every time. Offline,
  * the shell opens and the panels say their data did not load — which is true.
  */
-const CACHE = "vision-shell-v1";
+importScripts('/retirement.js');
+const CACHE = "vision-shell-v2";
 const SHELL = [
-  "/", "/vision.css", "/vision.js", "/insight.js", "/vision-icon.svg",
+  "/", "/vision.css", "/vision.js", "/retirement.js", "/v2widgets.js", "/insight.js", "/vision-icon.svg",
   "/fonts/PlusJakarta-var-latin.woff2", "/fonts/JetBrainsMono-400-latin.woff2",
   "/fonts/JetBrainsMono-500-latin.woff2", "/fonts/Newsreader-400-latin.woff2",
 ];
@@ -29,19 +30,25 @@ self.addEventListener("install", (e) => {
 
 self.addEventListener("activate", (e) => {
   e.waitUntil((async () => {
-    for (const k of await caches.keys()) if (k.startsWith("vision-shell-") && k !== CACHE) await caches.delete(k);
+    const old = (await caches.keys()).filter(k => k.startsWith('vision-shell-') && k !== CACHE);
+    for (const k of old) await caches.delete(k);
     await self.clients.claim();
+    if (old.length) for (const client of await self.clients.matchAll({ type: 'window' })) await client.navigate(client.url);
   })());
 });
 
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (PublicRetirement.page(url.pathname) || PublicRetirement.asset(url.pathname)) {
+    e.respondWith(Promise.resolve(new Response('This publication has been retired. Open / for company research.', { status: 410, headers: { 'cache-control': 'no-store' } })));
+    return;
+  }
   if (url.pathname.startsWith("/api/") || url.pathname.endsWith(".json")) return;
   e.respondWith((async () => {
     try {
       const res = await fetch(e.request);
-      if (res && res.ok) (await caches.open(CACHE)).put(e.request, res.clone());
+      if (res && res.ok && SHELL.includes(url.pathname)) (await caches.open(CACHE)).put(e.request, res.clone());
       return res;
     } catch {
       const hit = await caches.match(e.request);

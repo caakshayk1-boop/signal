@@ -162,7 +162,7 @@
    * everywhere at once. */
   const FEED_NAMES = {
     '/signal_trials.json': 'Trial publication',
-    '/pulse.json': 'Market pulse', '/signal_v2.json': 'Plans',
+    '/pulse.json': 'Market pulse',
     '/screen.json': 'Screen', '/screen-lite.json': 'Screen',
 
     '/ipo.json': 'IPO book', '/funds.json': 'Fund screen',
@@ -2420,19 +2420,15 @@
    * a list of facts dressed as a list of changes. */
   const EKEY = 'sig:events', ESNAP = 'sig:evsnap', ECHK = 'sig:evAt';
   const EV_KIND = {
-    entered: ['Entered its buy range', 'Setups', 'up'],
-    above:   ['Moved above the most to pay', 'Setups', 'warn'],
-    setup:   ['New paper setup', 'Setups', 'acc'],
-    ended:   ['Setup no longer live', 'Setups', ''],
     results: ['Results date', 'Results', 'warn'],
     insti:   ['New shareholding filing', 'Filings', ''],
     annual:  ['New annual figures', 'Filings', ''],
     price:   ['Price alert reached', 'Price', 'dn'],
   };
-  function evAll() { const l = lsGet(EKEY, []); return Array.isArray(l) ? l : []; }
+  function evAll() { const l = lsGet(EKEY, []); return Array.isArray(l) ? l.filter(e => EV_KIND[e.k]) : []; }
   function logEvents(list) {
     if (!list.length) return 0;
-    const have = evAll(), ids = new Set(have.map(e => e.id));
+    const saved = lsGet(EKEY, []), have = Array.isArray(saved) ? saved : [], ids = new Set(have.map(e => e.id));
     const fresh = list.filter(e => e && e.id && !ids.has(e.id));
     if (fresh.length) lsSet(EKEY, fresh.concat(have).slice(0, 300));
     return fresh.length;
@@ -2487,11 +2483,6 @@
             c && c.line ? c.line : `The price is between ${price(pl.entry_low)} and ${price(pl.entry_high)}.`, setupHref(pl), id + '|in|' + new Date(at).toISOString().slice(0, 10));
           else if (st === 'above' && was !== 'above' && was !== 'na') add('above', sym, c ? c.word : 'Above the most to pay',
             c && c.line ? c.line : `The price is above ${price(pl.entry_high)}.`, setupHref(pl), id + '|above|' + new Date(at).toISOString().slice(0, 10));
-        }
-        for (const id of Object.keys(a.st || {})) if (!(id in b.st)) {
-          const pl = plans.find(x => x.id === id);
-          add('ended', sym, pl ? (V2_STATE[pl.state] || [pl.state])[0] : 'No longer in the plan feed',
-            'The setup left the live states in the plan feed.', pl ? setupHref(pl) : '/opportunities', id);
         }
         if (b.ne && a.ne && b.ne !== a.ne) add('results', sym, `Moved from ${v2Date(a.ne)} to ${v2Date(b.ne)}`, 'Results calendar on the screen.', '/stock/' + encodeURIComponent(sym), b.ne);
         else if (b.ne && !a.ne) add('results', sym, `Announced for ${v2Date(b.ne)}`, 'Results calendar on the screen.', '/stock/' + encodeURIComponent(sym), b.ne);
@@ -4939,7 +4930,6 @@
     compounder: ['Compounders',    r => (r.roce ?? 0) >= 20 && (r.rev_cagr ?? 0) >= 12],
     /* Greenblatt's ranking, computed by the screen itself (stock_screen.
      * magic_formula). The top 30 of it, by its own published rank. */
-    magic:      ['Magic Formula top 30', r => Number.isInteger(r.mf?.rank) && r.mf.rank <= 30],
     /* ── NIFTY500 AHIMSA ─────────────────────────────────────────────────
      * NSE Indices launched it on 10 July 2026: the Nifty 500 filtered to
      * companies not engaged in activities harmful to animals, 326 of the 500
@@ -4962,7 +4952,6 @@
   ];
   const SORTS = { comp: 'Composite', q: 'Quality', g: 'Growth', v: 'Value',
                   tech: 'Technical', r1m: '1M return', roce: 'ROCE', mcap_cr: 'Size',
-                  mf: 'Magic Formula rank',
                   // The columns the headings sort by, listed here too so the
                   // dropdown and the headings speak one vocabulary. Without
                   // this the select still read "Rank by Composite" while the
@@ -6664,11 +6653,6 @@
       ${sec('The call, and the company behind it', bibleHtml(r), null,
             'What it does, what it earns, what it costs, and where the price sits, '
           + 'assembled from this company’s own row.')}
-      ${sec('Signal plan', v2StockBlock(r.sym), null,
-            'The one canonical plan for this stock, if there is one, the same plan every page and Vision show.')}
-      ${sec('Technical read', treadBlock(r.sym), null,
-            'Trend, levels, momentum and volume as rules computed after the close, scored out of ten. '
-          + 'Not a plan, not a forecast.')}
       ${sec('What this month has historically done', seasBlock(r.sym), null,
             'Eleven years of calendar months. A record of what repeatedly happened, which is '
           + 'a weaker claim than a forecast and the only one the data supports.')}
@@ -6676,8 +6660,8 @@
             'The card the screen opens, unchanged, so the summary above can be checked '
           + 'against the figures it was built from.')}
       <p class="hint stock-back"><a href="/screen">← All names</a> ·
-        <a href="/map">The map</a> · <a href="/opportunities">Setups</a> ·
-        <a href="/methodology">How a plan is made</a></p>`;
+        <a href="/map">The map</a> ·
+        <a href="/methodology">How the research is made</a></p>`;
   };
   /* The sheet wires its own chart on open; the page has to do the same. */
   const wireStockPage = (r) => { wireCardChart(r.sym); };
@@ -7390,11 +7374,11 @@
         <p style="margin:14px 0 0">Where you probably meant to go:</p>
         <div class="chips" style="margin-top:10px">
           <a class="chip" href="/">Today</a>
-          <a class="chip" href="/opportunities">Setups</a>
+          <a class="chip" href="/screen">Screen</a>
           <a class="chip" href="/screen">The NSE screen</a>
           <a class="chip" href="/radar">Radar</a>
           <a class="chip" href="/ipo">IPO</a>
-          <a class="chip" href="/performance">Record</a>
+          <a class="chip" href="/news">News</a>
         </div>
       </div>`);
   };
@@ -8329,18 +8313,14 @@
    * ends up unreachable by keyboard.
    */
   const CMD_ROUTES = [
-    ['/', 'Today', 'The latest session, the next one, and the plans'],
-    ['/opportunities', 'Setups', 'Every setup and plan by state, eligible first'],
-    ['/performance', 'Record', 'The forward record, from 1 Oct 2026'],
+    ['/', 'Today', 'Market context and company research'],
     ['/markets', 'Markets', 'The board: 71 instruments with a year of context'],
     ['/ipo', 'IPO', 'Books open now, and how last year’s listings did'],
     ['/screen', 'Screen', 'All names, searchable'],
     ['/watch', 'Watchlist', 'Names you starred, and your price alerts'],
     ['/alerts', 'Alerts', 'What changed on the names you watch'],
-    ['/magic', 'Magic Formula', "Greenblatt's ranking across the screen, and its paper book"],
     ['/vetted', 'Vetted', 'Every company checked before it is compared, and the case for and against'],
     ['/news', 'News', 'The full wire, and the screened names each story touches'],
-    ['/brief', 'Brief', 'The current plan, in full'],
     ['/discover', 'Discover', 'Every way into the screen'],
     ['/radar', 'Signal radar', 'What the market is doing, and which names carry it'],
     ['/methodology', 'Methodology', 'How every number on this site is made'],
@@ -8552,7 +8532,6 @@
   const FEED_AGE = [
     ['Stock screen',   screenAgeUrl,       30],
     ['Market pulse',   '/pulse.json',      30],
-    ['Plans',          '/signal_v2.json',  30],
     /* WAS 8, BECAUSE THE SUBSCRIPTION FIGURE IN THIS FILE WENT STALE INSIDE A
      * SESSION — it showed green at 19 hours while the book it described had
      * moved from 27x to 104x.
@@ -9588,7 +9567,7 @@
       const r0 = noteLadder(await get(FULL_URL));
       if (r0.ok) setScreen((r0.data.rows || []).filter(x => x && x.sym), false);
     }
-    await Promise.all([loadInsti(), v2Load().catch(() => null), treadLoad().catch(() => null)]);
+    await loadInsti();
     const r = (SCREEN || []).find(x => x.sym === sym);
     if (!r) {
       paint(head(esc(sym), '', 'Company') + `<div class="empty">
@@ -10543,8 +10522,6 @@
   const DISCOVER = [
     ['/vetted',  'Vetted',        'Checked before it is compared',
                  'Nine checks on data quality and balance sheet, who is held out and why, and for each company that clears, what the screen measures for and against it.'],
-    ['/magic',   'Magic Formula', 'Greenblatt’s ranking, every company',
-                 'Return on capital and earnings yield, each ranked across the screen and added, plus a paper book that buys the top and holds a year.'],
     ['/heat',    'The heatmap',   'Today, in each name’s own units',
                  'Colour is the move measured against that stock’s own average range, not in percent, so a quiet megacap having a violent day outshines a smallcap having a normal one.'],
     ['/map',     'The map',       'Every NSE name on one screen',
@@ -10571,8 +10548,7 @@
    * floor and the brief are also linked from the pages that cite them. */
   const MORE = [
     ['Track', [
-      ['/brief',       'The brief',   'The current plan, in full'],
-      ['/performance', 'Record', 'The forward record'],
+      ['/watch', 'Watchlist', 'Companies you follow'],
     ]],
     ['How this works', [
       ['/methodology', 'Methodology', 'How every number here is made'],
@@ -11327,10 +11303,6 @@
         aggregated by the screen build. Each company card names the financial year the figures
         belong to. Filings are restated; figures can move.</p>
 
-      <h3>The plans and their record</h3>
-      <p>Plans, levels, simulated fills, exits and results are this site's own records, written by one
-        private end-of-day process from completed daily bars and published as one file. They are the
-        only data here that is not somebody else's. Intraday OHLC, VWAP and tick data are not used.</p>
 
       <h3>Delay</h3>
       <p>Nothing on this site is real-time. Quotes are fetched when a page loads and refreshed
@@ -11376,15 +11348,12 @@
         <b>published research output, not a service you are buying</b>.</p>
 
       <h3>What the numbers are</h3>
-      <p>Each paper plan here states an entry range, a stop and three targets. Every plan is tracked
-        to its end and kept, losses included. The record is on <a href="/performance">Record</a>
-        and the method on <a href="/methodology">the methodology page</a>. None of it is a forecast.
-        Fills are simulated; a published record describes what happened, not what will.</p>
+      <p>Prices, financials and descriptive screening measures have different sources and update times.
+        Read <a href="/methodology">the methodology</a>. None is a forecast.</p>
 
       <h3>No execution, no custody, no account</h3>
       <p>This site cannot place a trade. It holds no money, connects to no broker for
-        execution, and has no view of any account you hold. Anything it describes as a
-        position is <b>paper</b> unless it says otherwise.</p>
+        execution, and has no view of any account you hold.</p>
 
       <h3>Prices can be wrong</h3>
       <p>Market data comes from third parties over endpoints that carry no service guarantee.
@@ -11393,9 +11362,7 @@
 
       <h3>Risk</h3>
       <p>Trading and investing carry risk, including the total loss of capital. Past results
-        , every figure in the record here included, do not predict future results. This
-        site's own measured expectancy is currently <b>negative</b>, and it says so on the
-        front page rather than in this paragraph.</p>
+        do not predict future results.</p>
 
       <p class="hint">This page describes how the site operates. It is not legal advice, and
         it is not a substitute for reading SEBI's own regulations at
@@ -11429,15 +11396,12 @@
         to any security this site screens. This site is a personal project, built and run
         outside that employment, and represents no employer's view.</p>
 
-      <h3>The rules are not neutral about themselves</h3>
-      <p>Every rule here was written by the author, tested by the author's code, and graded against
-        conditions the author set. That is a conflict no disclosure removes. The mitigations are that the
-        grading conditions are published, every plan is counted including the losses, failed tests are
-        recorded, and the record started empty on 1 October 2026 rather than borrowing results from anywhere. See
-        <a href="/methodology">how a plan is built and counted</a>.</p>
+      <h3>Research limitations</h3>
+      <p>The author chooses the screening measures and data sources. These choices can introduce bias.
+        <a href="/methodology">Read the methodology</a> and verify data independently.</p>
 
       <h3>What changes if this ever charges</h3>
-      <p>Registration first, this page rewritten second, and the record re-audited third.
+      <p>Registration and an updated disclosure would be required before changing the service.
         See <a href="/disclaimer">the disclaimer</a>.</p>
       `));
   };
@@ -11486,14 +11450,14 @@
         and nothing here is personalised to your circumstances.</div>
 
       <h3>No advice, no recommendation</h3>
-      <p>This site publishes conditional paper plans and what became of them. It does not
+      <p>This site publishes educational company and market research. It does not
         know your income, your goals, your existing positions or your risk tolerance, and it
-        does not attempt to. A plan is a published thesis with a defined invalidation level.
+        does not attempt to.
         Whether it is appropriate for you is a question this site cannot answer.</p>
 
       <h3>No guarantees</h3>
-      <p>Markets carry risk, including total loss of capital. Past results, including every
-        figure in the record on this site, do not predict future results. No output here is a
+      <p>Markets carry risk, including total loss of capital. Past results
+        do not predict future results. No output here is a
         prediction, a tip, or an assured return, and any figure can be wrong.</p>
 
       <h3>Verify independently</h3>
@@ -11501,15 +11465,14 @@
         wrong. Check any number against your broker or the exchange before you act on it.</p>
 
       <h3>No execution, no custody</h3>
-      <p>This site cannot place a trade, cannot connect to a broker and never holds money. The
-        position-size calculator is arithmetic on numbers you enter.</p>
+      <p>This site cannot place a trade, cannot connect to a broker and never holds money.</p>
 
       <h3>Availability</h3>
       <p>It is operated by one person on free infrastructure and may be unavailable, delayed or
         wrong at any time, without notice.</p>
 
       <p class="prose-note">Built by <b>Akshay Kothari</b>. Questions:
-        <a href="/join" style="color:var(--accent)">get the brief</a> and reply to it.</p>`));
+        <a href="mailto:ca.akshayk1@gmail.com">ca.akshayk1@gmail.com</a>.</p>`));
   };
 
   R['/privacy'] = async () => {
@@ -11539,7 +11502,7 @@
 
       <h3>What the server stores</h3>
       <ul>
-        <li><b>Email, only if you subscribe</b> to the morning list. It is stored with a salted hash of your IP
+        <li><b>Previously supplied email addresses.</b> New subscriptions are currently unavailable. Existing addresses are stored with a salted hash of your IP
           address, used for rate-limiting; the raw IP is not kept. The address is used only to send
           the list. Ask for removal by replying to any email, and the record is deleted.</li>
         <li><b>Error reports.</b> If a page throws an error, the browser sends the error message, the page path,
@@ -12075,7 +12038,7 @@
     };
     return { setup, since, hit, base };
   };
-  const WQUICK = [['', 'All'], ['setup', 'Has a setup'], ['results', 'Results soon'],
+  const WQUICK = [['', 'All'], ['results', 'Results soon'],
                   ['alert', 'Price alert'], ['changed', 'Changed since last visit']];
   R['/watch'] = async () => {
     const syms = watchAll();
@@ -12131,11 +12094,10 @@
         ${WQUICK.map(([k, l]) => `<button type="button" class="chip${k && !qCount[k] ? ' is-zero' : ''}" data-wquick="${k}"
            aria-pressed="${watchQuick === k}">${esc(l)} <b>${qCount[k]}</b></button>`).join('')}
       </div>
-      ${ckey([{ c: 'var(--accent)', shape: 'box', label: 'a setup or plan' }, { c: 'var(--warn)', shape: 'box', label: 'results within ' + RESULTS_SOON + ' days' },
+      ${ckey([{ c: 'var(--warn)', shape: 'box', label: 'results within ' + RESULTS_SOON + ' days' },
         { c: 'var(--line2)', shape: 'box', label: 'your nearest price alert (dashed)' }, { c: 'var(--up)', shape: 'text', sample: '+3%', label: 'up since your last visit' },
         { c: 'var(--down)', shape: 'text', sample: '−3%', label: 'down since' }], { title: 'Tags under each name:' })}
-      <p class="hint wq-def"><b>Has a setup</b>: a live paper setup or plan in tonight's feed.
-        <b>Results soon</b>: a results date in the next ${RESULTS_SOON} days.
+      <p class="hint wq-def"><b>Results soon</b>: a results date in the next ${RESULTS_SOON} days.
         <b>Changed</b>: price ${SINCE_MOVE}% or more away from what this browser recorded at your last visit${
           WF.base ? ` (${esc(agoWord(WF.base.at))})` : ', none recorded yet, so this stays empty until your next one'}.</p>` : ''}`,
       syms.length ? `${syms.length} starred` : '');
@@ -12218,7 +12180,7 @@
           <span class="pl-w">${priceLine(r)}</span>
         </div>`; }).join('')}</div>`
       : `<div class="empty wempty"><b>Your watchlist is empty.</b>
-         <span>Press the star on any company card or Screen row to follow it here: its setup, results date, alerts and what moved since your last visit.
+         <span>Press the star on any company card or Screen row to follow its results date, alerts and what moved since your last visit.
          Vision keeps a separate list, each site stores its own in this browser.</span>
          <a class="v2-gate-b" href="/screen">Browse companies →</a></div>`,
       syms.length ? `${syms.length} name${syms.length > 1 ? 's' : ''}` : '');
@@ -12425,13 +12387,13 @@
       : `<a href="${esc(e.href || '/watch')}">Open ${esc(e.sym)} →</a>`;
     let state = '';
     if (!syms.length) state = `<div class="empty wempty"><b>Nothing to watch yet.</b>
-        <span>Alerts follow the names on your Watchlist. Star a company and changes to it, a setup entering its range, a results date moving, a new filing, a price level you set, are logged here.</span>
+        <span>Alerts follow the names on your Watchlist. Star a company: results dates, new filings and price levels you set are logged here.</span>
         <a class="v2-gate-b" href="/screen">Browse companies →</a></div>`;
     else if (res && res.failed) state = `<p class="v2-none"><b>This check did not run:</b> ${esc(res.failed)}. The log below is from earlier checks.</p>`;
     else if (res && res.baseline && !all.length) state = `<div class="empty wempty"><b>Tracking started ${esc(timeOf(res.baseline))}.</b>
         <span>This browser has recorded where your ${syms.length} name${syms.length === 1 ? '' : 's'} stand. A change is something that differs from this record, so the first entries appear on a later visit.</span></div>`;
     else if (!all.length) state = `<div class="empty wempty"><b>No change on your ${syms.length} name${syms.length === 1 ? '' : 's'}.</b>
-        <span>Checked ${esc(timeOf(snap && snap.at || Date.now()))} against the state recorded ${snap ? 'at the previous check' : 'earlier'}. Nothing crossed into a setup, moved a results date or filed.</span></div>`;
+        <span>Checked ${esc(timeOf(snap && snap.at || Date.now()))} against the state recorded ${snap ? 'at the previous check' : 'earlier'}. No new results date, filing or price alert.</span></div>`;
     let list = '';
     if (shown.length) {
       let d0 = '';
@@ -12457,7 +12419,6 @@
           <p class="hint">Kept in this browser: the last 300 entries. <button type="button" class="lnk" id="evClear">Clear the log</button></p>`,
           `${all.length} logged`) : '')
       + sec('What is tracked', `<ul class="v2-list">
-          <li><b>Setups.</b> A new paper setup on a name you watch; its price entering the buy range or moving above the most to pay (a delayed quote in the session, the last close outside it); the setup leaving the live states.</li>
           <li><b>Results.</b> A results date announced or moved, from the screen's calendar.</li>
           <li><b>Filings.</b> A new quarter's shareholding filed; a new fiscal year's statements reaching the screen.</li>
           <li><b>Price.</b> A level you set on the <a href="/watch">Watchlist</a>.</li></ul>
@@ -12484,17 +12445,8 @@
 
   let V2 = null;
   async function v2Load() {
-    /* The strip says when NSE next opens, and that is wrong on a holiday eve
-       unless the holiday table is filled. Every V2 view draws the strip, so the
-       calendar loads here, beside the feed, not only on the routes that remembered. */
-    const [r, cal] = await Promise.all([get(V2_URL), CALENDAR || get('/api/calendar').catch(() => ({ ok: false }))]);
-    if (cal && cal.ok && cal.data && cal.data.ok && cal.data.holidays) setHolidays(cal.data.holidays.rows);
-    if (!r.ok || !r.data || r.data.schema !== 'signal-v2-public/1') {
-      V2 = null;
-      return { ok: false, why: r.ok ? 'the plan feed is in an unknown format' : (r.error || 'no answer') };
-    }
-    V2 = { ...r.data, status_detail: window.SignalUI ? window.SignalUI.publicCopy(r.data.status_detail) : r.data.status_detail };
-    return { ok: true, d: V2, stale: r.stale, age: r.age };
+    // Retired public feed. Background watchlist checks must not request it.
+    return { ok: false, why: 'Publication retired' };
   }
   /* The Technical Confluence reads (technical_read.json): one stock's
      five-part chart read as the engine computed it after the close. Loaded
@@ -13208,8 +13160,26 @@
    * OLD LINKS STILL WORK. Anything already shared as /#/markets is rewritten
    * to /markets on boot, before the first render — see the shim at the bottom
    * of this file. Nothing that was ever shared 404s. */
+  // Public research cutover. Historical publication renderers above are
+  // unreachable; the router and Worker independently enforce retirement.
+  R['/retired'] = async () => paint(head('This publication has been retired', 'Market data and company research remain available.', 'Signal') + '<p><a href="/screen">Explore companies</a> · <a href="/markets">Markets</a></p>');
+  R['/'] = async () => {
+    const title = head('Understand the market. Research the company.', 'Prices, financials, institutional ownership and market news with dated sources.', 'Signal');
+    paint(title + skel('sk-card', 3), true);
+    const [nx, pu, sc] = await Promise.all([
+      get('/api/signals?series=' + encodeURIComponent('^NSEI') + '&range=1y').catch(() => ({ ok: false })),
+      get('/pulse.json').catch(() => ({ ok: false })), screenIndex()]);
+    if (routeOf() !== '/') return;
+    const W = window.V2W && window.V2W.market;
+    const s = nx.ok ? nx.data : null, p = pu.ok ? pu.data : null;
+    const charts = W ? `<div class="v2w-grid2">${W.nifty(s, { more: '/markets', error: nx.error })}${W.days(s, { error: nx.error })}</div><div class="v2w-grid2">${W.sectors(p, { more: '/heat', error: pu.error })}${W.movers(p, { stockHref: x => '/stock/' + encodeURIComponent(x), error: pu.error })}</div>` : '<p>Market charts could not load.</p>';
+    paint(title + `<p><a href="/screen">Screen ${Object.keys(sc || {}).length || 'NSE'} companies →</a> · <a href="/news">Market news</a> · <a href="/watch">Your watchlist</a></p>` + charts);
+  };
+  R['/methodology'] = async () => paint(prose('How Signal works', 'Dated facts and descriptive screening.', 'Research the market and the company.', '<h3>Company screen</h3><p>Quality, growth, valuation and trend measures describe the available company filings and completed price bars. Missing figures remain unmeasured. The screen states its universe and data age.</p><h3>Market context</h3><p>Price history, breadth, sector moves and institutional ownership provide context. Different sources update at different times; each panel labels its source and age.</p><h3>Limits</h3><p>Scores are descriptive, not forecasts or recommendations. Check figures against the exchange and company filings. <a href="/sources">Data sources</a>.</p>'));
+  R['/about'] = async () => paint(prose('About', 'Who builds Signal, and what it is.', 'An educational market and company research workspace.', '<h3>Who</h3><p><b>Akshay Kothari</b>: Chartered Accountant, working in FP&amp;A. This is a personal project.</p><h3>Research</h3><p>Explore Indian market prices, company financials, institutional ownership and news. <a href="/methodology">How the research is made</a>.</p><p>Not registered with SEBI as a Research Analyst or Investment Adviser. Not investment advice. <a href="/disclaimer">Disclaimer</a> · <a href="/disclosures">Disclosures</a>.</p><h3>Contact</h3><p><a href="mailto:ca.akshayk1@gmail.com">ca.akshayk1@gmail.com</a></p>'));
   const routeOf = () => {
     const p = (location.pathname || '/').replace(/\/+$/, '') || '/';
+    if (window.PublicRetirement.page(p)) return '/retired';
     if (R[p]) return p;
     // /stock/RELIANCE and friends resolve to their pattern.
     const seg = p.split('/').filter(Boolean);
@@ -13268,8 +13238,8 @@
    * the shell shipped with. scripts/prerender.mjs writes the shell's copy, and
    * the per-route prerender is the remaining half of that job. */
   const META = {
-    '/':            ['Signal by Akshay Kothari: NSE paper plans and a forward record',
-                      'Indian equities, screened after the close. Conditional paper plans for the next session, and a forward record that counts every one.'],
+    '/':            ['Signal by Akshay Kothari: Indian market research',
+                      'Indian equities, market context and company research. Screen prices, financials and institutional ownership with dated sources.'],
     '/pulse':       ['Pulse swing trial · Signal by Akshay Kothari', 'Conditional swing paper plans, publication gate, net trial results and an append-only journal. Excluded from the main forward record.'],
     '/compass':     ['Compass position trial · Signal by Akshay Kothari', 'Thesis-driven position paper plans, tranche rules and a forward journal. Excluded from the main forward record.'],
     '/digests':     ['Past editions · Signal by Akshay Kothari', 'Completed-session paper digests preserved as published. Main forward plans and unpromoted trials remain separate.'],
@@ -13324,8 +13294,8 @@
                      'Setups entering their buy range, results dates moving, new filings and your price levels, logged in this browser.'],
     '/brief':       ['The brief, the current plan, in full',
                      'The current plan with every level and condition, or a plain statement that nothing qualified.'],
-    '/methodology': ['Methodology, how a plan is built and graded',
-                     'Risk-first plans, next-session entry, three targets with fixed exit sizes, simulated fills and how the forward record is counted.'],
+    '/methodology': ['Methodology, how the research is made',
+                      'Dated prices, company financials, institutional ownership and descriptive screening measures.'],
     '/sources':     ['Data sources, where each number comes from',
                      'The feed behind every figure on this site, and how fresh each one is.'],
     '/terms':       ['Terms', 'Terms of use for signal.askakshay.com.'],
@@ -13336,11 +13306,11 @@
        same title, same description, same canonical. An external audit read it
        as "/about returns the home page". It did, in the head. */
     '/about':       ['About, who builds Signal',
-                     'Signal is built by Akshay Kothari, a Chartered Accountant working in FP&A: what the site is, what it is not, and when its record began.'],
+                      'Signal is built by Akshay Kothari, a Chartered Accountant working in FP&A, for educational company and market research.'],
     '/disclaimer':  ['Disclaimer, educational research, not investment advice',
                      'Signal is not registered with SEBI as a Research Analyst or Investment Adviser. Nothing on it is a recommendation or personalised advice.'],
     '/disclosures': ['Disclosures, conflicts, incentives and who pays for this',
-                     'Who pays for Signal (nobody), personal positions, employment, and the conflict of an author grading his own engines, stated plainly.'],
+                      'Who pays for Signal, personal positions, employment and research limitations, stated plainly.'],
     '/404':         ['Not found, signal.askakshay.com',
                      'There is no page at this address.'],
   };
@@ -13368,7 +13338,7 @@
      * touched again, so a mistyped URL served a noindex-worthy page with an
      * explicit invitation to index it — and a canonical pointing at the bad
      * path, which asks the crawler to treat that URL as the preferred one. */
-    const missing = route === '/404';
+    const missing = route === '/404' || route === '/retired';
     set('meta[name="robots"]', 'content',
         missing ? 'noindex,follow' : 'index,follow,max-image-preview:large');
     const can = document.querySelector('link[rel="canonical"]');
@@ -14216,14 +14186,14 @@
     if (!btn || !dlg || !body || typeof dlg.showModal !== 'function') return;
     /* PRIMARY is the phone tab bar. Market is a desktop nav item only, so
        on a phone the sheet is its way in and it must stay listed here. */
-    const PRIMARY = new Set(['/', '/opportunities', '/watch', '/performance']);
+    const PRIMARY = new Set(['/', '/screen', '/watch', '/news']);
     const groups = [
       ['Research tools', DISCOVER.filter(([h]) => !PRIMARY.has(h)).map(([h, n, sub]) => [h, n, sub])],
-      ['Your desk', [['/brief', 'The brief', 'The current plan, in full'],
+      ['Your desk', [['/watch', 'Watchlist', 'Companies you follow'],
                      ['/discover', 'All tools', 'Every way into the screen, with what each is for']]],
-      ['How the record is made', [['/methodology', 'Methodology', 'How every number here is made'],
+      ['How the research is made', [['/methodology', 'Methodology', 'How every number here is made'],
                      ['/sources', 'Data sources', 'Where each figure comes from, and how fresh'],
-                     ['/about', 'About', 'Who builds this, and why the losses are published']]],
+                     ['/about', 'About', 'Who builds this research workspace']]],
       ['Also from this desk', [[VISION_URL + '/', 'Vision ↗', 'Research one company in depth'],
                      ['https://news.askakshay.com/', 'The newspaper ↗', 'The long-form daily read']]],
     ];

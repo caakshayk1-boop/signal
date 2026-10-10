@@ -2,8 +2,8 @@
    guard.mjs fails the build if this falls out of step. */
 export const SIGNAL_META = {
  "/": [
-  "Signal by Akshay Kothari: NSE paper plans and a forward record",
-  "Indian equities, screened after the close. Conditional paper plans for the next session, and a forward record that counts every one."
+  "Signal by Akshay Kothari: Indian market research",
+  "Indian equities, market context and company research. Screen prices, financials and institutional ownership with dated sources."
  ],
  "/pulse": [
   "Pulse swing trial · Signal by Akshay Kothari",
@@ -94,8 +94,8 @@ export const SIGNAL_META = {
   "The current plan with every level and condition, or a plain statement that nothing qualified."
  ],
  "/methodology": [
-  "Methodology, how a plan is built and graded",
-  "Risk-first plans, next-session entry, three targets with fixed exit sizes, simulated fills and how the forward record is counted."
+  "Methodology, how the research is made",
+  "Dated prices, company financials, institutional ownership and descriptive screening measures."
  ],
  "/sources": [
   "Data sources, where each number comes from",
@@ -115,7 +115,7 @@ export const SIGNAL_META = {
  ],
  "/about": [
   "About, who builds Signal",
-  "Signal is built by Akshay Kothari, a Chartered Accountant working in FP&A: what the site is, what it is not, and when its record began."
+  "Signal is built by Akshay Kothari, a Chartered Accountant working in FP&A, for educational company and market research."
  ],
  "/disclaimer": [
   "Disclaimer, educational research, not investment advice",
@@ -123,7 +123,7 @@ export const SIGNAL_META = {
  ],
  "/disclosures": [
   "Disclosures, conflicts, incentives and who pays for this",
-  "Who pays for Signal (nobody), personal positions, employment, and the conflict of an author grading his own engines, stated plainly."
+  "Who pays for Signal, personal positions, employment and research limitations, stated plainly."
  ],
  "/404": [
   "Not found, signal.askakshay.com",

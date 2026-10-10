@@ -24,6 +24,7 @@
  * Publication pages carry the actual feed's levels and its own timestamps.
  */
 import { SIGNAL_META } from "./route-meta.js";
+import { retirementResponse } from './retirement.js';
 import "../public/insight.js";           // attaches globalThis.VisionInsight
 import "../public/record-analytics.js";
 import "../public/signal-ui.js";
@@ -101,8 +102,8 @@ const crumbs = (items) => ({ "@type": "BreadcrumbList", itemListElement: items.m
 
 /* ─────────────────────────────── SIGNAL ─────────────────────────────── */
 
-const SIGNAL_LINKS = [["/", "Today"], ["/opportunities", "Setups"], ["/watch", "Watchlist"],
-  ["/performance", "Record"], ["/markets", "Market"], ["/screen", "Screen"], ["/methodology", "Methodology"], ["/about", "About"]];
+const SIGNAL_LINKS = [["/", "Today"], ["/news", "News"], ["/watch", "Watchlist"],
+  ["/markets", "Market"], ["/screen", "Screen"], ["/methodology", "Methodology"], ["/about", "About"]];
 
 function signalFacts(route, site) {
   if (!site) return "";
@@ -110,7 +111,7 @@ function signalFacts(route, site) {
   const b = site.barometer, w = site.week;
   const line = (h) => `<p class="pre-m">${h}</p>`;
   switch (route) {
-    case "/markets": case "/radar": case "/heat": case "/map":
+    case "/": case "/markets": case "/radar": case "/heat": case "/map":
       return (b ? line(`Market barometer <b>${esc(b.score)}/100</b>, ${esc(b.band || "")}${b.date ? `, as of ${esc(day(b.date))}` : ""}.`) : "")
         + (w ? line(`Over the past week <b>${esc(w.up)}</b> of <b>${esc(w.counted)}</b> screened names rose and <b>${esc(w.down)}</b> fell.`) : "")
         + (site.above200 != null ? line(`<b>${esc(site.above200)}%</b> of names trade above their 200-day average.`) : "");
@@ -123,63 +124,29 @@ function signalFacts(route, site) {
 }
 
 export async function signalPage(request, env, path) {
+  const retired = retirementResponse(request);
+  if (retired) return retired;
   const shellReq = new Request(new URL("/", request.url), request);
   const shell = await env.ASSETS.fetch(shellReq);
   const site = await asset(env, request, "/c/_site.json");
 
   if (path.startsWith("/stock/")) return signalStock(request, env, shell, decodeURIComponent(path.slice(7)), site);
-  // A plan page is one row of the live feed; the generic plan head is
-  // accurate for every id, and the app fills in the plan itself.
-  const key = path.startsWith("/plan/") ? "/plan/:id" : path.startsWith("/setup/") ? "/setup/:id" : path;
+  const key = path;
 
   const [title, desc] = SIGNAL_META[key] || SIGNAL_META["/404"];
   const h1 = title.split(" — ")[0];
   const canonical = SIGNAL + path;
-  const publicationRoutes = new Set(['/', '/opportunities', '/performance', '/brief', '/plan/:id', '/setup/:id']);
-  const feed = publicationRoutes.has(key) ? await asset(env, request, '/signal_v2.json', 60_000) : null;
-  const valid = feed && feed.schema === 'signal-v2-public/1';
-  let content = '', article = null, status = 200;
-  if (publicationRoutes.has(key)) {
-    if (!valid) content = '<p class="pre-m">The plan publication is unavailable. No current scan or plan count can be confirmed.</p>';
-    else if (key === '/') content = globalThis.SignalUI.snapshot(feed);
-    else if (key === '/performance') content = globalThis.SignalUI.analytics(globalThis.SignalAnalytics.main(feed));
-    else {
-      let plans = feed.plans || [], cohort = 'main';
-      if (key === '/setup/:id' || (key === '/brief' && !plans.some(p => ['awaiting_entry', 'activated', 'partially_exited'].includes(p.state)))) {
-        cohort = 'trial';
-        const record = key === '/setup/:id' ? await asset(env, request, '/paper_record.json', 60_000) : null;
-        plans = [...((feed.paper || {}).plans || []), ...((record && record.schema === 'paper-record/1' && record.trades) || [])];
-      }
-      if (key === '/plan/:id' || key === '/setup/:id') {
-        const id = decodeURIComponent(path.split('/').at(-1));
-        plans = plans.filter(p => p.id === id).slice(0, 1);
-        if (!plans.length) { status = 404; content = '<p class="pre-m">No published plan with this ID was found.</p>'; }
-      }
-      if (!content) content = `<p class="pre-m">Latest session ${esc(globalThis.SignalUI.day(feed.session_date))} · published ${esc(globalThis.SignalUI.timestamp(feed.published_at))}.</p><p>${esc(globalThis.SignalUI.publicCopy(feed.status_detail))}</p>${globalThis.SignalUI.setups(plans, cohort)}${key === '/opportunities' && feed.paper && Array.isArray(feed.paper.plans) ? '<h2>Existing trials · excluded from the main record</h2>' + globalThis.SignalUI.setups(feed.paper.plans, 'trial') : ''}${plans.map(p => `<p><b>${esc(p.symbol)}</b>: ${esc(p.thesis_note || p.why || p.setup || '')}${p.stop_rule ? ' · ' + esc(p.stop_rule) : ''}${p.management ? ' · ' + esc(p.management) : ''}</p>`).join('')}${globalThis.SignalUI.subscribe()}`;
-      if (status === 200 && (key === '/brief' || key === '/plan/:id')) {
-        const published = key === '/plan/:id' ? plans[0].published_at : feed.published_at;
-        article = { '@type': 'Article', '@id': canonical + '#article', headline: key === '/plan/:id' ? plans[0].symbol + ': conditional paper plan' : 'Signal paper plans for ' + (feed.next_session || feed.session_date),
-          datePublished: published, dateModified: feed.published_at, author: { '@id': SIGNAL + '/#akshay' },
-          publisher: { '@id': SIGNAL + '/#akshay' }, mainEntityOfPage: canonical, inLanguage: 'en-IN', description: desc };
-      }
-    }
-  } else if (key === '/pulse' || key === '/compass') {
-    const trial = await asset(env, request, '/signal_trials.json', 60_000);
-    content = globalThis.SignalUI.trials(trial, key.slice(1));
-  } else if (key === '/digests') {
-    content = globalThis.SignalUI.digests(await asset(env, request, '/digests/index.json', 60_000));
-  }
   const body = `<p class="pre-k">Signal · ${esc(h1)}</p>
     <h1 class="pre-h">${esc(title)}</h1>
-    <p class="pre-s">${esc(desc)}</p>${content || signalFacts(key, site)}
+    <p class="pre-s">${esc(desc)}</p>${signalFacts(key, site)}
     <ul class="pre-l">${SIGNAL_LINKS.filter(([h]) => h !== path).map(([h, t]) => `<li><a href="${h}">${t}</a></li>`).join("")}<li><a href="${VISION}/">Vision, company research ↗</a></li></ul>
     <p class="pre-n">Updated daily after market close${site && site.built_at ? `. Last update: ${esc(globalThis.SignalUI.timestamp(site.built_at))}` : ""}.</p>`;
-  const rw = headRewriter({ title, desc, canonical, site: "Signal", robots: status === 404 ? "noindex,follow" : "index,follow,max-image-preview:large",
+  const rw = headRewriter({ title, desc, canonical, site: "Signal", robots: "index,follow,max-image-preview:large",
     ld: { "@context": "https://schema.org", "@graph": [
       { "@type": "WebPage", "@id": canonical, url: canonical, name: title, description: desc, isPartOf: { "@id": `${SIGNAL}/#website` }, inLanguage: "en-IN" },
-       crumbs([["Signal", SIGNAL + "/"], [h1, canonical]]), ...(article ? [article] : [])] } })
+       crumbs([["Signal", SIGNAL + "/"], [h1, canonical]])] } })
     .on("section.pre", { element(e) { e.setInnerContent(body, { html: true }); } });
-  return htmlResponse(rw.transform(shell), status);
+  return htmlResponse(rw.transform(shell));
 }
 
 async function signalStock(request, env, shell, raw, site) {
@@ -235,15 +202,11 @@ const vPage = (inner) => `<div class="ssr">${inner}
 export async function visionHome(request, env) {
   const shell = await visionShell(env, request);
   const site = await asset(env, request, "/c/_site.json");
-  const ve = (site && site.veod) || null, sig = (ve && ve.plans) || [];
   const top = (site && site.top) || [];
   const body = vPage(`<p class="ssr-k"><a href="${SIGNAL}/">← Signal</a> · Vision</p>
     <h1>Understand any Indian company in minutes.</h1>
     <p class="ssr-s">Price, financials, ownership, events, technical structure and market context: one research workspace for ${esc(site ? site.universe : "~1,000")} NSE companies. Signal finds what deserves attention; Vision shows why.</p>
     ${site && site.barometer ? `<p>Market barometer <b>${esc(site.barometer.score)}/100</b> (${esc(site.barometer.band || "")}). Past week: ${esc(site.week ? site.week.up : "—")} names rose, ${esc(site.week ? site.week.down : "—")} fell.</p>` : ""}
-    ${sig.length ? `<h2>Plans for ${esc(ve.next_session || "the next session")}</h2><table><thead><tr><th>Company</th><th>Buy only</th><th>Stop</th><th>T1</th><th>T2</th><th>T3</th></tr></thead><tbody>
-      ${sig.slice(0, 12).map((s) => `<tr><td><a href="/company/${keyOf(s.sym)}">${esc(s.sym)}</a></td><td>₹${Number(s.entry_low).toFixed(2)}–₹${Number(s.entry_high).toFixed(2)}</td><td>₹${Number(s.stop).toFixed(2)}</td><td>₹${Number(s.t1).toFixed(2)}</td><td>₹${Number(s.t2).toFixed(2)}</td><td>₹${Number(s.t3).toFixed(2)}</td></tr>`).join("")}</tbody></table>
-      <p class="ssr-m">Conditional plans made after the close of ${esc(ve.session_date || "")}: never buy above the top of the range; fills are simulated. ${ve.mode === "paper" ? "Paper mode." : "Research mode, not validated."}</p>` : ""}
     ${top.length ? `<h2>Most-traded companies</h2><ul class="ssr-dir">${top.map((c) => `<li><a href="/company/${keyOf(c.sym)}">${esc(c.sym)}</a> <span>${esc(c.name || "")}</span></li>`).join("")}</ul>` : ""}`);
   const rw = headRewriter({ title: V_TITLE, desc: V_DESC, canonical: VISION + "/", site: "Vision", robots: "index,follow,max-image-preview:large",
     ld: { "@context": "https://schema.org", "@graph": [
@@ -277,7 +240,7 @@ export async function visionCompany(request, env, raw) {
     <h2>What matters</h2><dl>${mt.map((m) => `<dt>${esc(m.k)}</dt><dd>${esc(m.v)}${m.sub ? `, ${esc(m.sub)}` : ""} <small>(${esc(m.src)})</small></dd>`).join("")}</dl>
     <h2>What changed</h2>${list("Improved", ch.improved)}${list("Weakened", ch.weakened)}${list("Worth weighing", ch.watch)}${list("Events", ch.events)}
     ${!ch.improved.length && !ch.weakened.length ? "<p>No measured change crossed its threshold since the last filing and build.</p>" : ""}
-    <p><a href="${SIGNAL}/stock/${encodeURIComponent(sym)}">${esc(sym)} on Signal, the published record →</a></p>`);
+    <p><a href="${SIGNAL}/stock/${encodeURIComponent(sym)}">${esc(sym)} on Signal, company research →</a></p>`);
   const rw = headRewriter({ title, desc, canonical, site: "Vision", robots: "index,follow,max-image-preview:large",
     ld: { "@context": "https://schema.org", "@graph": [
       { "@type": "WebPage", "@id": canonical, url: canonical, name: title, description: desc, isPartOf: { "@id": `${VISION}/#website` },

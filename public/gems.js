@@ -835,7 +835,7 @@
          depends on it. */
       /* Signal V2 (2026-10-01): plans come from the ONE canonical feed both
          sites read. The V1 ledger at /api/signals is retired (410). */
-      get('/screen.json'), get('/signal_v2.json'),
+      get('/screen.json'), null, // Public publication retired; market feeds continue.
       get('/institutional.json'), get('/ipo.json'),
       /* THE SUBSCRIPTION BOOK HAS TO BE LIVE OR IT IS WORTHLESS.
        * ipo.json is built once, around midnight, so its subscription_x was
@@ -1350,28 +1350,6 @@
     for (const p of v2Plans) OPEN_BY_SYM.set(bare(p.symbol), { symbol: p.symbol, entry: p.entry_high, sl: p.stop,
       target1: p.t1, target2: p.t2, target3: p.t3, date: p.session_date, signal_type: 'v2', currency: '₹' });
     const v2Word = { awaiting_entry: 'awaiting entry', activated: 'open, paper', partially_exited: 'open, part sold, paper' };
-    add('setups', 'Setups', sec('setups', 'Signal V2 plans',
-      !V2 ? 'The plan feed did not load. The plans are on Signal.'
-        : v2Plans.length ? `<b>${v2Plans.length}</b> plan${v2Plans.length === 1 ? '' : 's'} awaiting entry or open as paper positions.`
-        : `No plan for the ${esc(String(V2.next_session || ''))} session. ${esc(V2.status_detail || '')}`,
-      v2Plans.length
-        ? `<div class="rows">${v2Plans.map((p, i) => xr(
-            rowHead(i + 1, p.symbol, `${esc(p.setup || 'Setup')} · ${esc(v2Word[p.state] || p.state)}`,
-              `${money(p.entry_low)}–${money(p.entry_high)}`, [`stop ${money(p.stop)}`, 'dn'],
-              p.rr_t1 != null ? [`T1 ${Number(p.rr_t1).toFixed(2)}R`, 'flat'] : null),
-            chartSlot(bare(p.symbol)) +
-            rangeBlock(screenOf(p.symbol), p.symbol, 'NSE') +
-            figs([
-              [`${money(p.entry_low)}–${money(p.entry_high)}`, 'entry range'],
-              [money(p.stop), 'stop', 'dn'],
-              [money(p.t1), 'T1', 'up'], [money(p.t2), 'T2', 'up'], [money(p.t3), 'T3', 'up'],
-            ]) +
-            `<p class="said">Plan ${esc(p.id)}, published ${esc(String(p.session_date || ''))} for the next session.
-              <a href="https://signal.askakshay.com/plan/${encodeURIComponent(p.id)}">The full plan on Signal</a>.
-              Paper only; fills are simulated.</p>`
-          )).join('')}</div>`
-        : `<div class="empty">No V2 plan is awaiting entry or open. An empty list is a result, not a gap.</div>`,
-      V2 && V2.forward_record_start ? `V2 record since ${esc(V2.forward_record_start)}` : ''));
 
     /* ── 5. INSTITUTIONAL FLOW — the distinctive one ───────────────────────
      * The only section here that no free Indian markets page carries: FII and

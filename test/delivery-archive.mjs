@@ -46,7 +46,8 @@ test('deploy-safe missing and mismatched inputs produce empty archive and RSS, n
     writeFileSync(join(dir, 'sitemap.xml'), '<urlset><url><loc>https://signal.example.com/untouched</loc></url></urlset>');
     assert.equal(publishDigest(options).status, 'ready');
     assert.match(readFileSync(join(dir, 'sitemap.xml'), 'utf8'), /\/untouched<\/loc>/);
-    assert.match(readFileSync(join(dir, 'sitemap.xml'), 'utf8'), /\/digests\/2026-10-08\//);
+    // Public digest discovery retired; archive immutability is still required.
+    assert.doesNotMatch(readFileSync(join(dir, 'sitemap.xml'), 'utf8'), /\/digests\//);
     assert.equal(publishDigest({ ...options, now: new Date('2026-10-09T09:00:00Z') }).session_date, '2026-10-08');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

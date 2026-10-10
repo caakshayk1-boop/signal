@@ -1,4 +1,8 @@
-import test from 'node:test';
+import { test as nodeTest } from 'node:test';
+// These six cases require public plans, trials or digest pages. Those products
+// were retired on 2026-10-10. Keep the cases as historical specifications;
+// public-retirement.mjs replaces their route/feed coverage, including escaping.
+const test = (name, fn) => nodeTest(name, { skip: 'Public publication retired 2026-10-10; replaced by public-retirement.mjs' }, fn);
 import assert from 'node:assert/strict';
 import { signalPage } from '../src/seo.js';
 

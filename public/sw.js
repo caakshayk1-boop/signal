@@ -29,9 +29,10 @@
 // v4 (2026-10): the redesign set every route title in Newsreader, so the
 // offline shell now carries it — the reasoning below for leaving it out held
 // while one route used it, and no longer does.
-const CACHE = "signal-shell-v5";   // v5: Signal V2 — no client keeps the V1 shell
+importScripts('/retirement.js');
+const CACHE = "signal-shell-v6";
 const SHELL = [
-  "/", "/index.html", "/signal.css", "/signal.js", "/icon.svg",
+  "/", "/index.html", "/signal.css", "/signal.js", "/retirement.js", "/engines.js", "/heatcore.js", "/v2widgets.js", "/icon.svg",
   // One variable face, weights 200-800, replacing the five static Manrope and
   // Newsreader files the redesign retired.
   "/fonts/PlusJakarta-var-latin.woff2",
@@ -54,14 +55,22 @@ self.addEventListener("install", (e) => {
 
 self.addEventListener("activate", (e) => {
   e.waitUntil((async () => {
-    for (const k of await caches.keys()) if (k !== CACHE) await caches.delete(k);
+    const old = (await caches.keys()).filter(k => k !== CACHE);
+    for (const k of old) await caches.delete(k);
     await self.clients.claim();
+    // One-time cutover: an already open tab must replace its old renderer too.
+    // No browser data is cleared; reload only when an older shell existed.
+    if (old.length) for (const client of await self.clients.matchAll({ type: 'window' })) await client.navigate(client.url);
   })());
 });
 
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (PublicRetirement.page(url.pathname) || PublicRetirement.asset(url.pathname)) {
+    e.respondWith(Promise.resolve(new Response('This publication has been retired. Open / for market research.', { status: 410, headers: { 'cache-control': 'no-store' } })));
+    return;
+  }
   // Prices are never cached. Not on a hit, not on a miss, not while offline.
   if (url.pathname.startsWith("/api/") || url.pathname.endsWith(".json")) return;
 
@@ -70,7 +79,7 @@ self.addEventListener("fetch", (e) => {
   e.respondWith((async () => {
     try {
       const res = await fetch(e.request);
-      if (res && res.ok) (await caches.open(CACHE)).put(e.request, res.clone());
+      if (res && res.ok && SHELL.includes(url.pathname)) (await caches.open(CACHE)).put(e.request, res.clone());
       return res;
     } catch {
       const hit = await caches.match(e.request);

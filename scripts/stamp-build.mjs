@@ -19,7 +19,8 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 
-const FILES = ["public/index.html", "public/signal.js", "public/signal.css", "public/sw.js"];
+const FILES = ["public/index.html", "public/signal.js", "public/signal.css", "public/sw.js",
+  "public/retirement.js", "public/vision.html", "public/vision.js", "public/vision-sw.js", "public/gems.js"];
 const h = createHash("sha256");
 for (const f of FILES) h.update(readFileSync(f));
 const build = h.digest("hex").slice(0, 12);
