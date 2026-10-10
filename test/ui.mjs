@@ -1107,7 +1107,7 @@ try {
   await until(rp, () => !!document.querySelector("main .route-h h1"));
   /* Under reduced motion every figure is written in its final state: nothing
      waits on an animation that will not run. */
-  ok("the V2 record is written, not animated in", /Plans published/.test(await rp.locator("main").innerText().catch(() => "")));
+   ok("market research is readable without motion", /Understand the market|Research the company/.test(await rp.locator("main").innerText().catch(() => "")));
   ok("no element is left mid-transition", await rp.evaluate(() =>
      [...document.querySelectorAll("main *")].filter((e) => parseFloat(getComputedStyle(e).opacity) === 0 && e.offsetHeight > 20).length) === 0);
   await rmCtx.close();
@@ -1326,7 +1326,7 @@ try {
   for (const [label, pg] of [["desktop", colP], ["phone", colMobP]])
   for (const route of ["/", "/screen", "/markets", "/ipo",
                        "/watch", "/radar", "/news", "/funds", "/reads",
-                       "/research"]) {
+                       "/discover"]) {
     await pg.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await settled(pg, SETTLE + 3000);
     const faults = await pg.evaluate(() => {
@@ -1420,7 +1420,7 @@ try {
   const dupP = await dupCtx.newPage();
   for (const route of ["/", "/screen", "/markets", "/ipo",
                        "/radar", "/news", "/funds", "/reads", "/watch",
-                       "/research"]) {
+                       "/discover"]) {
     await dupP.goto(SITE + route, { waitUntil: "domcontentloaded" });
     await settled(dupP, SETTLE + 3000);
     const found = await dupP.evaluate(() => {

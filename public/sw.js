@@ -68,7 +68,7 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== self.location.origin) return;
   if (PublicRetirement.page(url.pathname) || PublicRetirement.asset(url.pathname)) {
-    e.respondWith(Promise.resolve(new Response('This publication has been retired. Open / for market research.', { status: 410, headers: { 'cache-control': 'no-store' } })));
+    e.respondWith(Promise.resolve(new Response('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Publication retired</title><main><h1>This publication has been retired</h1><a href="/">Open market research</a></main></html>', { status: 410, headers: { 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8' } })));
     return;
   }
   // Prices are never cached. Not on a hit, not on a miss, not while offline.
