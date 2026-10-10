@@ -57,7 +57,7 @@ jobs:
 
       - run: npm ci
       - name: Publication and delivery regression tests
-        run: npm run test:unit
+        run: npm run build:publication && npm run test:unit
 
       # REFRESH THE FEEDS FIRST, which this step did not do and had to.
       #
